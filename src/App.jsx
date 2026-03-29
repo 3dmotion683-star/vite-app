@@ -77,7 +77,7 @@ function recalcInstallment(row, monthsRaw) {
 
 /* ═══════════════ CONFIG ═══════════════ */
 const SHEET_CONFIG = {
-  url: '',
+  url: 'https://docs.google.com/spreadsheets/d/1RND6D5JIWh6vnk8i_FO1mx1if4hx182VNaPzGQtKuQM/edit?gid=1272423090#gid=1272423090',
   gids: { merchants: '', balans: '', orders: '', cashbox: '', integration: '', mijozlar: '' },
 };
 const OBZVON_ALL_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=0#gid=0';
@@ -966,7 +966,7 @@ const S = {
   set: (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} },
 };
 const DEFAULT_USERS = ['Dildora', 'Dilfuza', 'Admin'];
-const DEFAULT_USER_CREDS = { Dildora:'Dildora', Dilfuza:'Dilfuza', Admin:'Admin' };
+const DEFAULT_USER_CREDS = { Dildora:'Dildora', Dilfuza:'Dilfuza', Admin:'12345' };
 const DEFAULT_ACCESS = {
   Dildora: { scope: 'own', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, settings:false } },
   Dilfuza: { scope: 'own', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, settings:false } },
@@ -991,8 +991,9 @@ function UploadModal({
   const [gids, setGids] = useState(() => S.get('aq-gs-gids', {
     merchants:'', balans:'', orders:'', cashbox:'', integration:'', mijozlar:'',
   }));
-  const sheetId = extractSheetId(mainSheetUrl);
-  const obzvonSheetId = extractSheetId(obzvonSheetUrl);
+  const fixedMainUrl = SHEET_CONFIG.url || '';
+  const fixedObzvonUrl = OBZVON_ALL_SHEET_URL || '';
+  const sheetId = extractSheetId(fixedMainUrl);
 
   const pickFile = (key) => {
     const i = document.createElement('input');
@@ -1031,18 +1032,24 @@ function UploadModal({
   };
 
   const doLoadSheets = async () => {
-    if (!sheetId) { alert("To'g'ri Google Sheets URL kiriting!"); return; }
+    const usedMainUrl = fixedMainUrl || mainSheetUrl || '';
+    const usedObzvonUrl = fixedObzvonUrl || obzvonSheetUrl || '';
+    const usedSheetId = extractSheetId(usedMainUrl);
+    const usedObzvonSheetId = extractSheetId(usedObzvonUrl);
+    if (!usedSheetId) { alert("Google Sheets URL kodda sozlanmagan!"); return; }
     setLoad(true);
     try {
-      S.set('aq-main-url', mainSheetUrl || '');
-      S.set('aq-obzvon-url', obzvonSheetUrl || '');
-      const raw = await loadFromGoogleSheets(sheetId, gids, setProg, 'named');
+      if (setMainSheetUrl) setMainSheetUrl(usedMainUrl);
+      if (setObzvonSheetUrl) setObzvonSheetUrl(usedObzvonUrl);
+      S.set('aq-main-url', usedMainUrl);
+      S.set('aq-obzvon-url', usedObzvonUrl);
+      const raw = await loadFromGoogleSheets(usedSheetId, gids, setProg, 'named');
       setProg('Hisoblanmoqda...');
       setTimeout(() => {
         try {
           const data = processAll(raw);
           onLoad(data);
-          if (obzvonSheetId && onLoadObzvonAll) onLoadObzvonAll(obzvonSheetUrl);
+          if (usedObzvonSheetId && onLoadObzvonAll) onLoadObzvonAll(usedObzvonUrl);
           setProg('');
         } catch (e2) { alert('Hisoblash xatosi: '+e2.message); setLoad(false); setProg(''); }
       }, 50);
@@ -1122,11 +1129,11 @@ function UploadModal({
                 <div style={{fontSize:11.5,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:6}}>
                   Asosiy ma'lumot fayli URL
                 </div>
-                <input className="input" style={{fontFamily:'var(--mono)',fontSize:12.5}}
-                  placeholder="https://docs.google.com/spreadsheets/d/..."
-                  value={mainSheetUrl} onChange={(e)=>setMainSheetUrl(e.target.value)}/>
+                <div className="input" style={{fontFamily:'var(--mono)',fontSize:12,padding:'10px 11px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+                  {fixedMainUrl || "URL topilmadi"}
+                </div>
                 <div style={{fontSize:11,color:'var(--t3)',marginTop:5}}>
-                  Barcha listlar bir faylda bo'lishi kerak
+                  Bu URL avtomatik ishlatiladi. Barcha listlar bir faylda bo'lishi kerak.
                 </div>
                 {sheetId && <div style={{fontSize:11,color:'var(--gr)',marginTop:5,fontFamily:'var(--mono)'}}>✓ ID: {sheetId}</div>}
               </div>
@@ -1140,9 +1147,9 @@ function UploadModal({
                 <div style={{fontSize:11.5,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:6}}>
                   Obzvon fayli URL
                 </div>
-                <input className="input" style={{fontFamily:'var(--mono)',fontSize:12.5}}
+                <input className="input" style={{fontFamily:'var(--mono)',fontSize:12}}
                   placeholder="https://docs.google.com/spreadsheets/d/..."
-                  value={obzvonSheetUrl} onChange={(e)=>setObzvonSheetUrl(e.target.value)}/>
+                  value={fixedObzvonUrl} readOnly/>
                 <div style={{fontSize:11,color:'var(--t3)',marginTop:5}}>
                   "Обзвон ВСЕ" listi shu faylda bo'lishi kerak
                 </div>
@@ -3115,8 +3122,13 @@ function SettingsPanel({
 }) {
   const [tab, setTab] = useState('staff');
   const [sel, setSel] = useState(currentUser || users[0] || 'Admin');
+  const [editUser, setEditUser] = useState('');
+  const [editLogin, setEditLogin] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const conf = access[sel] || { scope: 'all', visible: {} };
   const pages = ['dash','cust','orders','kassa','obzvon','doljniki','reports','settings'];
+  const defaultVisible = { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, settings:false };
 
   const addUser = () => {
     const name = prompt("Yangi login nomi:");
@@ -3127,11 +3139,73 @@ function SettingsPanel({
     setUsers(nextUsers);
     S.set('aq-users', nextUsers);
     setAccess((prev) => {
-      const next = { ...prev, [u]: { scope: 'own', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, settings:false } } };
+      const next = { ...prev, [u]: { scope: 'own', visible: defaultVisible } };
       S.set('aq-access', next);
       return next;
     });
+    setUserCreds((prev) => {
+      const next = { ...(prev || {}), [u]: u };
+      S.set('aq-user-creds', next);
+      return next;
+    });
     setSel(u);
+  };
+
+  const openCredEditor = (u) => {
+    setSel(u);
+    setEditUser(u);
+    setEditLogin(u);
+    setEditPassword(String(userCreds?.[u] ?? u));
+    setShowPassword(false);
+  };
+
+  const closeCredEditor = () => {
+    setEditUser('');
+    setEditLogin('');
+    setEditPassword('');
+    setShowPassword(false);
+  };
+
+  const saveCredEditor = () => {
+    if (!isAdminSession || !editUser) return;
+    const oldLogin = editUser;
+    const newLogin = String(editLogin || '').trim();
+    const newPassword = String(editPassword || '').trim();
+    if (!newLogin) { alert("Login bo'sh bo'lishi mumkin emas"); return; }
+    if (newLogin !== oldLogin && users.includes(newLogin)) {
+      alert("Bunday login allaqachon mavjud");
+      return;
+    }
+
+    const nextUsers = users.map((u) => (u === oldLogin ? newLogin : u));
+    setUsers(nextUsers);
+    S.set('aq-users', nextUsers);
+
+    setAccess((prev) => {
+      const prevConf = prev[oldLogin] || { scope:'own', visible: defaultVisible };
+      const next = { ...prev };
+      if (newLogin !== oldLogin) delete next[oldLogin];
+      next[newLogin] = prevConf;
+      S.set('aq-access', next);
+      return next;
+    });
+
+    setUserCreds((prev) => {
+      const source = prev || {};
+      const next = { ...source };
+      const oldPass = String(source[oldLogin] ?? oldLogin).trim();
+      if (newLogin !== oldLogin) delete next[oldLogin];
+      next[newLogin] = newPassword || oldPass || newLogin;
+      S.set('aq-user-creds', next);
+      return next;
+    });
+
+    if (currentUser === oldLogin) {
+      if (onSwitchUser) onSwitchUser(newLogin);
+      else setCurrentUser(newLogin);
+    }
+    setSel(newLogin);
+    closeCredEditor();
   };
 
   return (
@@ -3165,14 +3239,57 @@ function SettingsPanel({
               return (
                 <div key={u} className="card" style={{padding:12,border:u===sel?'1px solid var(--bl)':'1px solid var(--b2)'}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                    <button
+                      type="button"
+                      onClick={() => isAdminSession && openCredEditor(u)}
+                      style={{
+                        display:'flex',alignItems:'center',gap:8,border:'none',background:'transparent',
+                        color:'inherit',cursor:isAdminSession?'pointer':'default',padding:0
+                      }}
+                    >
                       <div style={{width:28,height:28,borderRadius:14,background:'var(--s3)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800}}>
                         {u.slice(0,1).toUpperCase()}
                       </div>
-                      <div style={{fontWeight:700}}>{u}</div>
-                    </div>
+                      <div style={{textAlign:'left'}}>
+                        <div style={{fontWeight:700}}>{u}</div>
+                        <div style={{fontSize:10.5,color:'var(--t3)'}}>Ismga bosing: login/parol</div>
+                      </div>
+                    </button>
                     <button className="btn btn-gh btn-sm" onClick={()=>setSel(u)}>Sozlash</button>
                   </div>
+                  {editUser === u && (
+                    <div style={{background:'var(--s3)',border:'1px solid var(--b1)',borderRadius:8,padding:8,marginBottom:8}}>
+                      <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Login</div>
+                      <input
+                        className="input"
+                        value={editLogin}
+                        onChange={(e)=>setEditLogin(e.target.value)}
+                        disabled={!isAdminSession}
+                        style={{padding:'6px 8px',fontSize:12,marginBottom:8}}
+                      />
+                      <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Parol</div>
+                      <div style={{display:'flex',gap:6}}>
+                        <input
+                          className="input"
+                          type={showPassword ? 'text' : 'password'}
+                          value={editPassword}
+                          onChange={(e)=>setEditPassword(e.target.value)}
+                          disabled={!isAdminSession}
+                          style={{padding:'6px 8px',fontSize:12,flex:1}}
+                        />
+                        <button className="btn btn-gh btn-sm" onClick={()=>setShowPassword((v)=>!v)} type="button">
+                          {showPassword ? "🙈 Yop" : "👁 Ko'r"}
+                        </button>
+                        <button className="btn btn-gh btn-sm" onClick={()=>setEditPassword('')} type="button" disabled={!isAdminSession}>
+                          Tozalash
+                        </button>
+                      </div>
+                      <div style={{display:'flex',justifyContent:'flex-end',gap:6,marginTop:8}}>
+                        <button className="btn btn-gh btn-sm" onClick={closeCredEditor} type="button">Bekor</button>
+                        <button className="btn btn-bl btn-sm" onClick={saveCredEditor} type="button" disabled={!isAdminSession}>Saqlash</button>
+                      </div>
+                    </div>
+                  )}
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
                     <span style={{fontSize:12,color:'var(--t3)'}}>Faqat o'z mijozlari</span>
                     <button className={`toggle${uc.scope==='own'?' on':''}`} onClick={() => {
@@ -3182,23 +3299,6 @@ function SettingsPanel({
                         return next;
                       });
                     }}><span className="knob" /></button>
-                  </div>
-                  <div style={{marginBottom:8}}>
-                    <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Login paroli</div>
-                    <input
-                      className="input"
-                      type={isAdminSession ? 'text' : 'password'}
-                      placeholder="Parol (ixtiyoriy)"
-                      value={userCreds?.[u] || ''}
-                      onChange={(e)=>{
-                        setUserCreds((prev) => {
-                          const next = { ...(prev || {}), [u]: e.target.value };
-                          S.set('aq-user-creds', next);
-                          return next;
-                        });
-                      }}
-                      style={{padding:'6px 8px',fontSize:12}}
-                    />
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
                     {pages.map((p) => (
@@ -3280,7 +3380,7 @@ function LoginScreen({ users=[], onLogin, onResetCreds }) {
               placeholder="Parolni kiriting"
             />
             <div style={{fontSize:11,color:'var(--t3)',marginTop:5}}>
-              Standart: parol = login nomi
+              Standart: Dildora/Dilfuza = login nomi, Admin = 12345
             </div>
           </div>
           {err && <div style={{fontSize:12,color:'var(--rd)'}}>{err}</div>}
@@ -3317,8 +3417,8 @@ export default function App() {
   const [currentUser,setCurrentUser] = useState(() => S.get('aq-current-user', 'Admin'));
   const [sessionUser,setSessionUser] = useState('');
   const [isLoggedIn,setIsLoggedIn] = useState(false);
-  const [mainSheetUrl, setMainSheetUrl] = useState(() => S.get('aq-main-url', SHEET_CONFIG.url || ''));
-  const [obzvonSheetUrl, setObzvonSheetUrl] = useState(() => S.get('aq-obzvon-url', OBZVON_ALL_SHEET_URL || ''));
+  const [mainSheetUrl, setMainSheetUrl] = useState(() => SHEET_CONFIG.url || '');
+  const [obzvonSheetUrl, setObzvonSheetUrl] = useState(() => OBZVON_ALL_SHEET_URL || '');
   const [obzvonWebhook,setObzvonWebhook] = useState(() => S.get('aq-obzvon-webhook', OBZVON_WEBHOOK_DEFAULT));
   const [showUp,setUp]     = useState(false);
   const [notif,setNotif]   = useState(null);
@@ -3329,6 +3429,19 @@ export default function App() {
     (baseUsers || []).forEach((u) => { m[u] = u; });
     return m;
   }, []);
+  const getEffectiveCreds = useCallback(() => {
+    const stored = S.get('aq-user-creds', {});
+    const merged = {
+      ...buildDefaultCreds(users),
+      ...(stored && typeof stored === 'object' ? stored : {}),
+      ...(userCreds || {}),
+    };
+    users.forEach((u) => {
+      const v = String(merged[u] ?? '').trim();
+      if (!v) merged[u] = (DEFAULT_USER_CREDS[u] || u);
+    });
+    return merged;
+  }, [users, userCreds, buildDefaultCreds]);
 
   const notify = (msg, type='ok') => {
     setNotif({ msg, type });
@@ -3338,6 +3451,14 @@ export default function App() {
   useEffect(() => { S.set('aq-obzvon-webhook', obzvonWebhook); }, [obzvonWebhook]);
   useEffect(() => { S.set('aq-main-url', mainSheetUrl || ''); }, [mainSheetUrl]);
   useEffect(() => { S.set('aq-obzvon-url', obzvonSheetUrl || ''); }, [obzvonSheetUrl]);
+  useEffect(() => {
+    const fixed = SHEET_CONFIG.url || '';
+    if (mainSheetUrl !== fixed) setMainSheetUrl(fixed);
+  }, [mainSheetUrl]);
+  useEffect(() => {
+    const fixed = OBZVON_ALL_SHEET_URL || '';
+    if (obzvonSheetUrl !== fixed) setObzvonSheetUrl(fixed);
+  }, [obzvonSheetUrl]);
   useEffect(() => { S.set('aq-obzvon-records', obzvonRecords || []); }, [obzvonRecords]);
   useEffect(() => { S.set('aq-user-creds', userCreds || {}); }, [userCreds]);
 
@@ -3362,23 +3483,34 @@ export default function App() {
   const authenticate = useCallback((loginName, password) => {
     const user = String(loginName || '').trim();
     if (!user || !users.includes(user)) return false;
-    const raw = (userCreds || {})[user];
-    const expected = String(raw ?? '').trim() || user;
     const typed = String(password || '').trim();
     if (!typed) return false;
     const t = typed.toLowerCase();
-    if (t !== expected.toLowerCase() && t !== user.toLowerCase()) return false;
+    const effective = getEffectiveCreds();
+    const stored = S.get('aq-user-creds', {});
+    const passCandidates = [
+      String((effective || {})[user] ?? '').trim(),
+      String((stored || {})[user] ?? '').trim(),
+      String(DEFAULT_USER_CREDS[user] ?? '').trim(),
+      user,
+    ]
+      .map((x) => x.toLowerCase())
+      .filter(Boolean);
+    if (!passCandidates.includes(t)) return false;
     setSessionUser(user);
     setCurrentUser(user);
     setIsLoggedIn(true);
     return true;
-  }, [users, userCreds]);
+  }, [users, getEffectiveCreds]);
 
   const resetLoginCreds = useCallback(() => {
     const next = buildDefaultCreds(users);
+    users.forEach((u) => {
+      if (DEFAULT_USER_CREDS[u]) next[u] = DEFAULT_USER_CREDS[u];
+    });
     setUserCreds(next);
     S.set('aq-user-creds', next);
-    notify("Parollar tiklandi: parol = login", 'ok');
+    notify("Parollar tiklandi (Admin=12345, qolgani=login)", 'ok');
   }, [users, buildDefaultCreds]);
 
   const logout = useCallback(() => {
@@ -3399,8 +3531,12 @@ export default function App() {
   };
 
   const loadFromConfig = useCallback(async () => {
-    const sheetId = extractSheetId(mainSheetUrl || '');
-    if (!sheetId) { setUp(true); return; }
+    const configuredMainUrl = mainSheetUrl || SHEET_CONFIG.url || '';
+    const sheetId = extractSheetId(configuredMainUrl);
+    if (!sheetId) {
+      setAutoLoad({ loading:false, progress:'', error:"Google Sheets URL topilmadi" });
+      return;
+    }
     setAutoLoad({ loading:true, progress:'Ulanilmoqda...', error:'' });
     try {
       const raw = await loadFromGoogleSheets(sheetId, SHEET_CONFIG.gids, (msg)=>setAutoLoad((p)=>({...p,progress:msg})), 'named');
@@ -3416,8 +3552,9 @@ export default function App() {
 
   const loadObzvonAll = useCallback(async (sheetUrl) => {
     try {
-      const sid = extractSheetId(sheetUrl || obzvonSheetUrl || '');
-      const gid = extractGid(sheetUrl || obzvonSheetUrl || '');
+      const configuredObzvonUrl = sheetUrl || obzvonSheetUrl || OBZVON_ALL_SHEET_URL || '';
+      const sid = extractSheetId(configuredObzvonUrl);
+      const gid = extractGid(configuredObzvonUrl);
       if (!sid) return;
 
       let rows = null;
@@ -3499,7 +3636,7 @@ export default function App() {
 
   useEffect(() => {
     loadFromConfig();
-    loadObzvonAll(obzvonSheetUrl);
+    loadObzvonAll(obzvonSheetUrl || OBZVON_ALL_SHEET_URL);
   }, [loadFromConfig, loadObzvonAll]);
   useEffect(() => {
     const checkAndSync = () => {
