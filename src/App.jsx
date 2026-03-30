@@ -483,7 +483,6 @@ function processAll(mainData) {
       const source = String(r[25] || '').trim(); // Z ustun
       const merchNote = String(r[19] || '').trim(); // T ustun = primechaniya
       allMerchants.push({ id, name, source, merchNote });
-      if (isExcludedMerchant(name)) return;
       const aaValue = String(r[26] || '').trim(); // AA ustun
       if (isExcludedZCategory(source)) return;
       if (!isAllowedAA(aaValue)) return;
@@ -515,10 +514,10 @@ function processAll(mainData) {
     mainData.sheets['Balans'];
   if (balSheet) {
     balSheet.forEach((r) => {
-      const mid = normId(r[6]); // G ustun
+      const mid = normId(r[6]) || normId(r[1]); // G ustun (fallback: B ustun)
       if (!mid) return;
-      balMapUZS[mid] = toNum(r[3]); // D ustun = UZS balans
-      balMapUSD[mid] = toNum(r[2]); // C ustun = USD balans
+      balMapUZS[mid] = (balMapUZS[mid] || 0) + toNum(r[3]); // D ustun = UZS balans (SUMIFS kabi yig'iladi)
+      balMapUSD[mid] = (balMapUSD[mid] || 0) + toNum(r[2]); // C ustun = USD balans
     });
   }
 
