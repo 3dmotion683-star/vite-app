@@ -82,6 +82,7 @@ const SHEET_CONFIG = {
 };
 const OBZVON_ALL_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=0#gid=0';
 const OBZVON_ALL_LIMIT = 100;
+const OBZVON_ALL_INSTALLED_KEY = 'aq-obzvon-all-installed';
 // Apps Script Web App URL ni shu yerga qo'ying (Deploy qilingandan keyin):
 // Misol: https://script.google.com/macros/s/AKfycb.../exec
 const OBZVON_WEBHOOK_DEFAULT = 'https://script.google.com/macros/s/AKfycbyi1OP_a_5C7-TBujLuo9dDast0RLVelhQsTiO6dlN_mefi55vnTHm_ZRXpDFFTTXb7qA/exec';
@@ -3405,7 +3406,8 @@ const NAV = [
 export default function App() {
   const [page,setPage]     = useState('dash');
   const [data,setData]     = useState(null);
-  const [obzvonAllRows,setObzvonAllRows] = useState(() => (S.get('aq-obzvon-all-cache', []) || []).slice(0, OBZVON_ALL_LIMIT));
+  const [obzvonAllRows,setObzvonAllRows] = useState(() => S.get('aq-obzvon-all-cache', []) || []);
+  const [obzvonAllInstalled,setObzvonAllInstalled] = useState(() => !!S.get(OBZVON_ALL_INSTALLED_KEY, false));
   const [obzvonRecords,setObzvonRecords] = useState(() => S.get('aq-obzvon-records', []));
   const [users,setUsers] = useState(() => S.get('aq-users', DEFAULT_USERS));
   const [access,setAccess] = useState(() => S.get('aq-access', DEFAULT_ACCESS));
@@ -3550,7 +3552,15 @@ export default function App() {
     }
   }, [mainSheetUrl]);
 
-  const loadObzvonAll = useCallback(async (sheetUrl) => {
+  const loadObzvonAll = useCallback(async (sheetUrl, opts = {}) => {
+    const full = !!opts.full;
+    const force = !!opts.force;
+    const cached = S.get('aq-obzvon-all-cache', []) || [];
+    if (full && !force && cached.length > 0) {
+      setObzvonAllRows(cached);
+      setObzvonAllInstalled(true);
+      return;
+    }
     try {
       const configuredObzvonUrl = sheetUrl || obzvonSheetUrl || OBZVON_ALL_SHEET_URL || '';
       const sid = extractSheetId(configuredObzvonUrl);
@@ -3579,20 +3589,31 @@ export default function App() {
         }
       }
 
-      const parsed = parseObzvonAllRows(rows || []).slice(0, OBZVON_ALL_LIMIT);
-      if (parsed.length > 0) {
-        setObzvonAllRows(parsed);
-        S.set('aq-obzvon-all-cache', parsed);
-      } else {
-        const cached = S.get('aq-obzvon-all-cache', []);
-        if (cached.length) setObzvonAllRows(cached.slice(0, OBZVON_ALL_LIMIT));
+      const parsedAll = parseObzvonAllRows(rows || []);
+      const parsed = full ? parsedAll : parsedAll.slice(0, OBZVON_ALL_LIMIT);
+      if (parsedAll.length > 0) {
+        if (full) {
+          setObzvonAllRows(parsedAll);
+          S.set('aq-obzvon-all-cache', parsedAll);
+          S.set(OBZVON_ALL_INSTALLED_KEY, true);
+          setObzvonAllInstalled(true);
+        } else {
+          setObzvonAllRows(parsed);
+          if (!obzvonAllInstalled) S.set('aq-obzvon-all-cache', parsed);
+        }
+      } else if (cached.length) {
+        setObzvonAllRows(cached);
+        setObzvonAllInstalled(true);
       }
     } catch (e) {
       const cached = S.get('aq-obzvon-all-cache', []);
-      if (cached.length) setObzvonAllRows(cached.slice(0, OBZVON_ALL_LIMIT));
+      if (cached.length) {
+        setObzvonAllRows(cached);
+        setObzvonAllInstalled(true);
+      }
       notify(`Obzvon ВСЕ yuklanmadi: ${e?.message || 'xato'}`, 'err');
     }
-  }, [obzvonSheetUrl]);
+  }, [obzvonSheetUrl, obzvonAllInstalled]);
   const appendObzvonAllRow = useCallback((row) => {
     setObzvonAllRows((prev) => [{
       no: '',
@@ -3636,8 +3657,9 @@ export default function App() {
 
   useEffect(() => {
     loadFromConfig();
-    loadObzvonAll(obzvonSheetUrl || OBZVON_ALL_SHEET_URL);
-  }, [loadFromConfig, loadObzvonAll]);
+    if (obzvonAllInstalled && obzvonAllRows.length > 0) return;
+    loadObzvonAll(obzvonSheetUrl || OBZVON_ALL_SHEET_URL, { full: true, force: true });
+  }, [loadFromConfig, loadObzvonAll, obzvonAllInstalled, obzvonAllRows.length, obzvonSheetUrl]);
   useEffect(() => {
     const checkAndSync = () => {
       const now = new Date();
@@ -3825,7 +3847,7 @@ export default function App() {
                 {page==='cust'    && <Customers D={rawD} currentUser={currentUser}/>}
                 {page==='orders'  && <Orders    D={D}/>}
                 {page==='kassa'   && <Kassa     D={D}/>}
-                {page==='obzvon'  && <Obzvon    D={D} allRows={obzvonAllRows} onAppendAllRow={appendObzvonAllRow} onReloadAll={()=>loadObzvonAll(obzvonSheetUrl)} webhookUrl={obzvonWebhook} currentUser={currentUser} records={obzvonRecords} setRecords={setObzvonRecords} />}
+                {page==='obzvon'  && <Obzvon    D={D} allRows={obzvonAllRows} onAppendAllRow={appendObzvonAllRow} onReloadAll={()=>loadObzvonAll(obzvonSheetUrl, { full:true, force:true })} webhookUrl={obzvonWebhook} currentUser={currentUser} records={obzvonRecords} setRecords={setObzvonRecords} />}
                 {page==='doljniki'&& <Doljniki rows={doljniki} D={D} kulerRows={D.kulerInstallments || []} onAddToObzvon={addObzvonRows} currentUser={currentUser} />}
                 {page==='reports' && <Reports   D={D}/>}
                 {page==='settings'&& <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} />}
@@ -3838,7 +3860,7 @@ export default function App() {
       {showUp && (
         <UploadModal
           onLoad={handleLoad}
-          onLoadObzvonAll={(url)=>loadObzvonAll(url)}
+          onLoadObzvonAll={(url)=>loadObzvonAll(url, { full:true, force:true })}
           hasData={!!data}
           onClose={data?()=>setUp(false):null}
           mainSheetUrl={mainSheetUrl}
