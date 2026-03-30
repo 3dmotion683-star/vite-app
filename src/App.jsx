@@ -35,7 +35,7 @@ const isAllowedAA = (v) => {
 };
 const isExcludedZCategory = (v) => {
   const s = String(v || '').trim().toLowerCase();
-  return EXCLUDED_Z_CATEGORIES.some((k) => s === k || s.includes(k));
+  return EXCLUDED_Z_CATEGORIES.some((k) => s === k);
 };
 const normCurrency = (v) => {
   const s = String(v || '').trim().toUpperCase();
@@ -482,10 +482,8 @@ function processAll(mainData) {
       const name = String(r[2] || '').trim();
       const source = String(r[25] || '').trim(); // Z ustun
       const merchNote = String(r[19] || '').trim(); // T ustun = primechaniya
-      allMerchants.push({ id, name, source, merchNote });
       const aaValue = String(r[26] || '').trim(); // AA ustun
-      if (isExcludedZCategory(source)) return;
-      if (!isAllowedAA(aaValue)) return;
+      allMerchants.push({ id, name, source, merchNote, aaTag: aaValue });
       contacts.push({
         id,
         name,
@@ -496,6 +494,7 @@ function processAll(mainData) {
                     .find((s) => !s.includes('РћР±С‰Р°СЏ')) ||
                   String(r[21] || '').split(';')[0].trim(),
         source,
+        aaTag: aaValue,
         merchantNote: merchNote,
         eskiId:   String(r[24] || '').trim(), // Y ustun — eski ID (integratsiya uchun)
       });
@@ -509,15 +508,25 @@ function processAll(mainData) {
      G(r[6])=MijozID  D(r[3])=BalansUZS  C(r[2])=BalansUSD */
   const balMapUZS = {};
   const balMapUSD = {};
+  const balMapUZSByName = {};
+  const balMapUSDByName = {};
   const balSheet =
     mainData.sheets['public.view_current_merchant_event_balance'] ||
     mainData.sheets['Balans'];
   if (balSheet) {
     balSheet.forEach((r) => {
       const mid = normId(r[6]) || normId(r[1]); // G ustun (fallback: B ustun)
-      if (!mid) return;
-      balMapUZS[mid] = (balMapUZS[mid] || 0) + toNum(r[3]); // D ustun = UZS balans (SUMIFS kabi yig'iladi)
-      balMapUSD[mid] = (balMapUSD[mid] || 0) + toNum(r[2]); // C ustun = USD balans
+      const nameKey = normText(r[1] || r[10] || '');
+      const uzs = toNum(r[3]);
+      const usd = toNum(r[2]);
+      if (mid) {
+        balMapUZS[mid] = (balMapUZS[mid] || 0) + uzs; // D ustun = UZS balans (SUMIFS kabi yig'iladi)
+        balMapUSD[mid] = (balMapUSD[mid] || 0) + usd; // C ustun = USD balans
+      }
+      if (nameKey && !/^\d+$/.test(nameKey)) {
+        balMapUZSByName[nameKey] = (balMapUZSByName[nameKey] || 0) + uzs;
+        balMapUSDByName[nameKey] = (balMapUSDByName[nameKey] || 0) + usd;
+      }
     });
   }
 
@@ -669,8 +678,9 @@ function processAll(mainData) {
     const last = sortedWater[0];
     const days = last ? daysAgo(last.orderDate) : null;
 
-    const balanceUZS = balMapUZS[c.id] ?? 0;
-    const balanceUSD = balMapUSD[c.id] ?? 0;
+    const nameKey = normText(c.name);
+    const balanceUZS = (balMapUZS[c.id] ?? balMapUZSByName[nameKey] ?? 0);
+    const balanceUSD = (balMapUSD[c.id] ?? balMapUSDByName[nameKey] ?? 0);
 
     const totalPaidUZS = myCash
       .filter((p) => isPaymentFromCounterparty(p.opType) && p.currency !== 'USD')
@@ -685,6 +695,7 @@ function processAll(mainData) {
       phone: c.phone || '—',
       district: c.district,
       source: c.source,
+      aaTag: c.aaTag || '',
       merchantNote: c.merchantNote || '',
       address: c.address,
       balanceUZS,
@@ -817,11 +828,7 @@ function processAll(mainData) {
       overdueAmount,
     };
   }).filter((x) => x.principal > 0);
-  const customerById = {};
-  customers.forEach((c) => { customerById[c.id] = c; });
-  const debtorsByBalance = Object.keys(balMapUZS)
-    .filter((id) => (balMapUZS[id] ?? 0) < 0 && customerById[id])
-    .map((id) => customerById[id]);
+  const debtorsByBalance = customers.filter((c) => !isExcludedZCategory(c.source) && (c.balanceUZS ?? 0) < 0);
 
   return {
     customers, orders: rawOrders, cashbox: rawCash, contacts,
@@ -1772,7 +1779,7 @@ function Dashboard({ D }) {
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ MIJOZLAR в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 function Customers({ D, currentUser='Admin' }) {
   const { customers } = D;
-  const [tab, setTab] = useState(currentUser === 'Admin' ? 'all' : 'own');
+  const [segment, setSegment] = useState('all');
   const [search,setS]   = useState('');
   const [sort,setSort]  = useState({ col:'name', dir:'asc' });
   const [det,setDet]    = useState(null);
@@ -1787,17 +1794,21 @@ function Customers({ D, currentUser='Admin' }) {
   const dists = [...new Set(customers.map((c)=>c.district).filter(Boolean))].sort();
   const sources = [...new Set(customers.map((c)=>c.source).filter(Boolean))].sort();
   const agents = [...new Set(customers.map((c)=>c.lastAgent).filter(Boolean))].sort();
-  const ownIds = useMemo(
-    () => new Set(Object.entries(D.assignmentById || {}).filter(([,op]) => op === currentUser).map(([id]) => id)),
-    [D.assignmentById, currentUser]
-  );
-  useEffect(() => {
-    if (currentUser === 'Admin') setTab('all');
-  }, [currentUser]);
-  const baseCustomers = useMemo(
-    () => (tab === 'own' ? customers.filter((c) => ownIds.has(c.id)) : customers),
-    [tab, customers, ownIds]
-  );
+  const segmentCustomers = useMemo(() => {
+    if (segment === 'aa_ahmadtea') {
+      return customers.filter((c) => normText(c.aaTag).includes('ahmadtea'));
+    }
+    if (segment === 'aa_other') {
+      return customers.filter((c) => !normText(c.aaTag).includes('ahmadtea'));
+    }
+    if (segment === 'active') {
+      return customers.filter((c) => !isExcludedZCategory(c.source));
+    }
+    if (segment === 'z_filtered') {
+      return customers.filter((c) => isExcludedZCategory(c.source));
+    }
+    return customers;
+  }, [customers, segment]);
 
   const toRange = (v, from, to) => {
     if (from !== '' && Number(v) < Number(from)) return false;
@@ -1806,7 +1817,7 @@ function Customers({ D, currentUser='Admin' }) {
   };
 
   const list = useMemo(() => {
-    let r = baseCustomers;
+    let r = segmentCustomers;
     if (search) {
       const q = search.toLowerCase();
       r = r.filter((c) => c.name.toLowerCase().includes(q)||c.phone.includes(q)||c.id.includes(q)||(c.district||'').toLowerCase().includes(q));
@@ -1834,7 +1845,7 @@ function Customers({ D, currentUser='Admin' }) {
       if (typeof bv==='string') bv=bv.toLowerCase();
       return sort.dir==='asc'?(av>bv?1:-1):av<bv?1:-1;
     });
-  }, [baseCustomers,search,sort,adv]);
+  }, [segmentCustomers,search,sort,adv]);
 
   const activeFilters = useMemo(() => {
     let count = 0;
@@ -1854,18 +1865,21 @@ function Customers({ D, currentUser='Admin' }) {
     ? <span style={{marginLeft:3}}>{sort.dir==='asc'?'↑':'↓'}</span>
     : <span style={{marginLeft:3,opacity:.2}}>↕</span>;
   const balColor = (v) => v<0?'var(--rd)':v>0?'var(--gr)':'var(--t3)';
-  const debt = getDebtStats(baseCustomers);
+  const debt = getDebtStats(segmentCustomers);
 
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
       <div className="tabs" style={{display:'inline-flex'}}>
-        <button className={`tab${tab==='own'?' on':''}`} onClick={()=>setTab('own')}>{E.my} O'z mijozlarim</button>
-        <button className={`tab${tab==='all'?' on':''}`} onClick={()=>setTab('all')}>{E.all} Barcha mijozlar</button>
+        <button className={`tab${segment==='all'?' on':''}`} onClick={()=>setSegment('all')}>{E.all} Hamma mijozlar</button>
+        <button className={`tab${segment==='aa_ahmadtea'?' on':''}`} onClick={()=>setSegment('aa_ahmadtea')}>AA: Ahmadtea</button>
+        <button className={`tab${segment==='aa_other'?' on':''}`} onClick={()=>setSegment('aa_other')}>Murodbaxsh</button>
+        <button className={`tab${segment==='active'?' on':''}`} onClick={()=>setSegment('active')}>Aktiv mijozlar</button>
+        <button className={`tab${segment==='z_filtered'?' on':''}`} onClick={()=>setSegment('z_filtered')}>Z filtrlangan</button>
       </div>
       <div className="g4">
-        <StatCard l="JAMI MIJOZLAR" v={baseCustomers.length} s={baseCustomers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
+        <StatCard l="JAMI MIJOZLAR" v={segmentCustomers.length} s={segmentCustomers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
         <StatCard l="QARZDORLAR" v={debt.uzsCount+' ta'} s={fmt(debt.uzsSum)+" so'm"} c="var(--rd)"/>
-        <StatCard l="JAMI IDISH" v={baseCustomers.reduce((s,c)=>s+c.tara,0)+' ta'} s="barcha mijozlarda" c="var(--pu)"/>
+        <StatCard l="JAMI IDISH" v={segmentCustomers.reduce((s,c)=>s+c.tara,0)+' ta'} s="barcha mijozlarda" c="var(--pu)"/>
         <StatCard l="FILTRLANGAN" v={list.length+' ta'} c="var(--gr)"/>
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',position:'relative'}}>
@@ -1879,7 +1893,7 @@ function Customers({ D, currentUser='Admin' }) {
           </svg>
           Filtr ({activeFilters})
         </button>
-        <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(baseCustomers)}>Excel hisobot</button>
+        <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
 
         {showAdv && (
             <div className="card" style={{position:'absolute',top:40,right:0,zIndex:30,width:520,padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)',overflow:'hidden'}}>
