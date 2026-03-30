@@ -149,6 +149,11 @@ const isNameInactiveByPrefix = (name) => {
   if (!n) return false;
   return n.startsWith('Я') || n.startsWith('РЇ');
 };
+const isAhmadteaTag = (v) => normText(v).includes('ahmadtea');
+const isAhmadteaCustomer = (c) => {
+  if (!c) return false;
+  return isAhmadteaTag(c.aaTag) || isAhmadteaTag(c.source) || isAhmadteaTag(c.name);
+};
 const isActiveCustomerName = (name) => {
   const n = String(name || '').trim();
   if (!n) return false;
@@ -1103,11 +1108,51 @@ const S = {
 };
 const DEFAULT_USERS = ['Dildora', 'Dilfuza', 'Admin'];
 const DEFAULT_USER_CREDS = { Dildora:'Dildora', Dilfuza:'Dilfuza', Admin:'12345' };
-const DEFAULT_ACCESS = {
-  Dildora: { scope: 'own', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false } },
-  Dilfuza: { scope: 'own', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false } },
-  Admin:   { scope: 'all', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:true } },
+const DEFAULT_CUSTOMER_TABS = {
+  all: true,
+  ahmadtea: true,
+  murodbaxsh: true,
+  activeAll: true,
+  activeOwn: true,
+  inactive: true,
+  other: true,
 };
+const DEFAULT_ACCESS = {
+  Dildora: {
+    scope: 'own',
+    activeScope: 'own',
+    customerTabs: { ...DEFAULT_CUSTOMER_TABS },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false },
+  },
+  Dilfuza: {
+    scope: 'own',
+    activeScope: 'own',
+    customerTabs: { ...DEFAULT_CUSTOMER_TABS },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false },
+  },
+  Admin:   {
+    scope: 'all',
+    activeScope: 'all',
+    customerTabs: { ...DEFAULT_CUSTOMER_TABS },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:true },
+  },
+};
+const DEFAULT_VISIBLE_PAGES = { ...DEFAULT_ACCESS.Admin.visible };
+const DEFAULT_OWN_CUSTOMER_TABS = { ...DEFAULT_CUSTOMER_TABS };
+function normalizeAccessConfig(user, cfg) {
+  const isAdmin = user === 'Admin';
+  const src = cfg || {};
+  const base = isAdmin
+    ? { scope:'all', activeScope:'all', customerTabs:{ ...DEFAULT_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true } }
+    : { scope:'own', activeScope:'own', customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false } };
+  const scope = src.scope || base.scope;
+  return {
+    scope,
+    activeScope: src.activeScope || (scope === 'own' ? 'own' : base.activeScope),
+    visible: { ...base.visible, ...(src.visible || {}) },
+    customerTabs: { ...base.customerTabs, ...(src.customerTabs || {}) },
+  };
+}
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ UPLOAD MODAL в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 function UploadModal({
@@ -1782,7 +1827,7 @@ function Dashboard({ D }) {
 }
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ MIJOZLAR в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
-function Customers({ D, currentUser='Admin' }) {
+function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById={} }) {
   const { customers } = D;
   const [segment, setSegment] = useState('all');
   const [search,setS]   = useState('');
@@ -1799,15 +1844,47 @@ function Customers({ D, currentUser='Admin' }) {
   const dists = [...new Set(customers.map((c)=>c.district).filter(Boolean))].sort();
   const sources = [...new Set(customers.map((c)=>c.source).filter(Boolean))].sort();
   const agents = [...new Set(customers.map((c)=>c.lastAgent).filter(Boolean))].sort();
+  const ownIds = useMemo(
+    () => new Set(Object.entries(assignmentById || {}).filter(([, op]) => op === currentUser).map(([id]) => id)),
+    [assignmentById, currentUser]
+  );
+  const tabVisible = {
+    ...DEFAULT_CUSTOMER_TABS,
+    ...((currentAccess && currentAccess.customerTabs) || {}),
+  };
+  const activeScope = (currentAccess && currentAccess.activeScope) || ((currentAccess && currentAccess.scope) === 'own' ? 'own' : 'all');
+  const availableTabs = useMemo(() => {
+    const items = [];
+    if (tabVisible.all) items.push({ id:'all', label:`${E.all} Hamma mijozlar` });
+    if (tabVisible.ahmadtea) items.push({ id:'aa_ahmadtea', label:'Ahmadtea' });
+    if (tabVisible.murodbaxsh) items.push({ id:'aa_other', label:'Murodbaxsh' });
+    if (tabVisible.activeAll) items.push({ id:'active_all', label:'Aktiv (hammasi)' });
+    if (tabVisible.activeOwn) items.push({ id:'active_own', label:"Aktiv (o'zimniki)" });
+    if (tabVisible.inactive) items.push({ id:'inactive', label:'Nofaol mijozlar' });
+    if (tabVisible.other) items.push({ id:'other_customers', label:'Boshqa mijozlar' });
+    return items.length ? items : [{ id:'all', label:`${E.all} Hamma mijozlar` }];
+  }, [tabVisible]);
+  useEffect(() => {
+    if (!availableTabs.some((t) => t.id === segment)) setSegment(availableTabs[0].id);
+  }, [availableTabs, segment]);
+
+  const activeBase = useMemo(
+    () => customers.filter((c) => !isExcludedZCategory(c.source) && !isNameInactiveByPrefix(c.name)),
+    [customers]
+  );
   const segmentCustomers = useMemo(() => {
     if (segment === 'aa_ahmadtea') {
-      return customers.filter((c) => normText(c.aaTag).includes('ahmadtea'));
+      return customers.filter((c) => isAhmadteaCustomer(c));
     }
     if (segment === 'aa_other') {
-      return customers.filter((c) => !normText(c.aaTag).includes('ahmadtea'));
+      return customers.filter((c) => !isAhmadteaCustomer(c));
     }
-    if (segment === 'active') {
-      return customers.filter((c) => !isExcludedZCategory(c.source) && !isNameInactiveByPrefix(c.name));
+    if (segment === 'active_all') {
+      if (activeScope === 'own') return activeBase.filter((c) => ownIds.has(c.id));
+      return activeBase;
+    }
+    if (segment === 'active_own') {
+      return activeBase.filter((c) => ownIds.has(c.id));
     }
     if (segment === 'inactive') {
       return customers.filter((c) => isNameInactiveByPrefix(c.name));
@@ -1816,7 +1893,7 @@ function Customers({ D, currentUser='Admin' }) {
       return customers.filter((c) => isExcludedZCategory(c.source));
     }
     return customers;
-  }, [customers, segment]);
+  }, [customers, segment, activeBase, ownIds, activeScope]);
 
   const toRange = (v, from, to) => {
     if (from !== '' && Number(v) < Number(from)) return false;
@@ -1878,12 +1955,9 @@ function Customers({ D, currentUser='Admin' }) {
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
       <div className="tabs" style={{display:'inline-flex'}}>
-        <button className={`tab${segment==='all'?' on':''}`} onClick={()=>setSegment('all')}>{E.all} Hamma mijozlar</button>
-        <button className={`tab${segment==='aa_ahmadtea'?' on':''}`} onClick={()=>setSegment('aa_ahmadtea')}>Ahmadtea</button>
-        <button className={`tab${segment==='aa_other'?' on':''}`} onClick={()=>setSegment('aa_other')}>Murodbaxsh</button>
-        <button className={`tab${segment==='active'?' on':''}`} onClick={()=>setSegment('active')}>Aktiv mijozlar</button>
-        <button className={`tab${segment==='inactive'?' on':''}`} onClick={()=>setSegment('inactive')}>Nofaol mijozlar</button>
-        <button className={`tab${segment==='other_customers'?' on':''}`} onClick={()=>setSegment('other_customers')}>Boshqa mijozlar</button>
+        {availableTabs.map((t) => (
+          <button key={t.id} className={`tab${segment===t.id?' on':''}`} onClick={()=>setSegment(t.id)}>{t.label}</button>
+        ))}
       </div>
       <div className="g4">
         <StatCard l="JAMI MIJOZLAR" v={segmentCustomers.length} s={segmentCustomers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
@@ -3909,9 +3983,18 @@ function SettingsPanel({
   const [editLogin, setEditLogin] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const conf = access[sel] || { scope: 'all', visible: {} };
+  const conf = normalizeAccessConfig(sel, access[sel]);
   const pages = ['dash','cust','orders','kassa','obzvon','doljniki','reports','refresh','settings'];
-  const defaultVisible = { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false };
+  const defaultVisible = { ...DEFAULT_VISIBLE_PAGES };
+  const customerTabDefs = [
+    { key:'all', label:'Hamma mijozlar' },
+    { key:'ahmadtea', label:'Ahmadtea' },
+    { key:'murodbaxsh', label:'Murodbaxsh' },
+    { key:'activeAll', label:'Aktiv (hammasi)' },
+    { key:'activeOwn', label:"Aktiv (o'zimniki)" },
+    { key:'inactive', label:'Nofaol' },
+    { key:'other', label:'Boshqa mijozlar' },
+  ];
 
   const addUser = () => {
     const name = prompt("Yangi login nomi:");
@@ -3922,7 +4005,7 @@ function SettingsPanel({
     setUsers(nextUsers);
     S.set('aq-users', nextUsers);
     setAccess((prev) => {
-      const next = { ...prev, [u]: { scope: 'own', visible: defaultVisible } };
+      const next = { ...prev, [u]: normalizeAccessConfig(u, { scope:'own', activeScope:'own', visible: defaultVisible }) };
       S.set('aq-access', next);
       return next;
     });
@@ -3965,10 +4048,10 @@ function SettingsPanel({
     S.set('aq-users', nextUsers);
 
     setAccess((prev) => {
-      const prevConf = prev[oldLogin] || { scope:'own', visible: defaultVisible };
+      const prevConf = normalizeAccessConfig(oldLogin, prev[oldLogin] || { scope:'own', activeScope:'own', visible: defaultVisible });
       const next = { ...prev };
       if (newLogin !== oldLogin) delete next[oldLogin];
-      next[newLogin] = prevConf;
+      next[newLogin] = normalizeAccessConfig(newLogin, prevConf);
       S.set('aq-access', next);
       return next;
     });
@@ -4018,7 +4101,7 @@ function SettingsPanel({
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:10}}>
             {users.map((u) => {
-              const uc = access[u] || { scope: 'own', visible: {} };
+              const uc = normalizeAccessConfig(u, access[u]);
               return (
                 <div key={u} className="card" style={{padding:12,border:u===sel?'1px solid var(--bl)':'1px solid var(--b2)'}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
@@ -4077,11 +4160,57 @@ function SettingsPanel({
                     <span style={{fontSize:12,color:'var(--t3)'}}>Faqat o'z mijozlari</span>
                     <button className={`toggle${uc.scope==='own'?' on':''}`} onClick={() => {
                       setAccess((prev) => {
-                        const next = { ...prev, [u]: { ...(prev[u] || uc), scope: (prev[u]?.scope || uc.scope) === 'own' ? 'all' : 'own' } };
+                        const confU = normalizeAccessConfig(u, prev[u] || uc);
+                        const nextScope = confU.scope === 'own' ? 'all' : 'own';
+                        const next = { ...prev, [u]: normalizeAccessConfig(u, { ...confU, scope: nextScope }) };
                         S.set('aq-access', next);
                         return next;
                       });
                     }}><span className="knob" /></button>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,gap:8}}>
+                    <span style={{fontSize:12,color:'var(--t3)'}}>Aktiv mijozlar</span>
+                    <select
+                      className="select"
+                      value={uc.activeScope || 'all'}
+                      onChange={(e) => {
+                        const v = e.target.value === 'own' ? 'own' : 'all';
+                        setAccess((prev) => {
+                          const confU = normalizeAccessConfig(u, prev[u] || uc);
+                          const next = { ...prev, [u]: normalizeAccessConfig(u, { ...confU, activeScope: v }) };
+                          S.set('aq-access', next);
+                          return next;
+                        });
+                      }}
+                    >
+                      <option value="all">Hammasi</option>
+                      <option value="own">Faqat o'zimniki</option>
+                    </select>
+                  </div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:6}}>Mijozlar bo'limlari</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
+                    {customerTabDefs.map((t) => {
+                      const onTab = ((uc.customerTabs || {})[t.key] ?? true);
+                      return (
+                        <div key={t.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--s3)',borderRadius:8,padding:'6px 8px'}}>
+                          <span style={{fontSize:11,color:'var(--t2)'}}>{t.label}</span>
+                          <button className={`toggle${onTab?' on':''}`} onClick={() => {
+                            setAccess((prev) => {
+                              const confU = normalizeAccessConfig(u, prev[u] || uc);
+                              const next = {
+                                ...prev,
+                                [u]: normalizeAccessConfig(u, {
+                                  ...confU,
+                                  customerTabs: { ...(confU.customerTabs || {}), [t.key]: !onTab },
+                                }),
+                              };
+                              S.set('aq-access', next);
+                              return next;
+                            });
+                          }}><span className="knob" /></button>
+                        </div>
+                      );
+                    })}
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
                     {pages.map((p) => {
@@ -4091,9 +4220,9 @@ function SettingsPanel({
                         <span style={{fontSize:11,color:'var(--t2)'}}>{p}</span>
                         <button className={`toggle${on?' on':''}`} onClick={() => {
                           setAccess((prev) => {
-                            const confU = prev[u] || uc;
+                            const confU = normalizeAccessConfig(u, prev[u] || uc);
                             const currentOn = ((confU.visible || {})[p] ?? defaultVisible[p] ?? true);
-                            const next = { ...prev, [u]: { ...confU, visible: { ...(confU.visible || {}), [p]: !currentOn } } };
+                            const next = { ...prev, [u]: normalizeAccessConfig(u, { ...confU, visible: { ...(confU.visible || {}), [p]: !currentOn } }) };
                             S.set('aq-access', next);
                             return next;
                           });
@@ -4471,7 +4600,7 @@ export default function App() {
   }, [sendToWebhook]);
 
   const rawD = data || { customers:[], orders:[], cashbox:[], contacts:[], rawOrders:[], rawCash:[], ordersByMId:{}, cashByMId:{}, kulerInstallments:[], assignmentById:{}, debtorsByBalance:[] };
-  const currentAccess = access[currentUser] || DEFAULT_ACCESS.Admin;
+  const currentAccess = normalizeAccessConfig(currentUser, access[currentUser] || DEFAULT_ACCESS[currentUser] || DEFAULT_ACCESS.Admin);
   const scopeOwn = currentAccess.scope === 'own';
   const ownIds = new Set(Object.entries(rawD.assignmentById || {}).filter(([,op]) => op === currentUser).map(([id]) => id));
   const D = useMemo(() => {
@@ -4644,7 +4773,7 @@ export default function App() {
             ) : (
               <>
                 {page==='dash'    && <Dashboard D={D}/>}
-                {page==='cust'    && <Customers D={rawD} currentUser={currentUser}/>}
+                {page==='cust'    && <Customers D={rawD} currentUser={currentUser} currentAccess={currentAccess} assignmentById={rawD.assignmentById || {}}/>}
                 {page==='orders'  && <Orders    D={D}/>}
                 {page==='kassa'   && <Kassa     D={D}/>}
                 {page==='obzvon'  && <Obzvon    D={D} allRows={obzvonAllRows} onAppendAllRow={appendObzvonAllRow} onReloadAll={()=>loadObzvonAll(obzvonSheetUrl, { full:true, force:true })} webhookUrl={obzvonWebhook} currentUser={currentUser} records={obzvonRecords} setRecords={setObzvonRecords} />}
