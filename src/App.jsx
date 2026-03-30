@@ -92,6 +92,34 @@ const fmt  = (n) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
 const fmtM = (n) =>
   n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' :
   n >= 1e3 ? (n / 1e3).toFixed(0) + 'K' : fmt(n);
+const E = {
+  upload: '\u{1F4C2}',
+  excel: '\u{1F4CA}',
+  sheets: '\u{1F517}',
+  ok: '\u2705',
+  find: '\u{1F50D}',
+  refresh: '\u{1F504}',
+  pay: '\u{1F4B0}',
+  top: '\u{1F3C6}',
+  late: '\u{1F55B}',
+  order: '\u{1F4E6}',
+  area: '\u{1F5FA}',
+  my: '\u{1F464}',
+  all: '\u{1F465}',
+  driver: '\u{1F69A}',
+  settings: '\u2699\uFE0F',
+  ret: '\u21A9',
+  home: '\u{1F3E0}',
+  users: '\u{1F465}',
+  phone: '\u{1F4DE}',
+  doc: '\u{1F4C4}',
+  report: '\u{1F4CA}',
+  water: '\u{1F4A7}',
+  uzs: '\u{1F4B4}',
+  usd: '\u{1F4B5}',
+  tara: '\u{1F9F4}',
+  sv: '\u{1F4CB}',
+};
 
 function toDate(v) {
   if (!v) return null;
@@ -1111,14 +1139,14 @@ function UploadModal({
       <div className="modal ani" style={{maxWidth:600}}>
         <div className="mhdr">
           <div>
-            <div style={{fontWeight:800,fontSize:16}}>[UPLOAD] Ma'lumot yuklash</div>
+            <div style={{fontWeight:800,fontSize:16}}>{E.upload} Ma'lumot yuklash</div>
             <div style={{fontSize:12,color:'var(--t3)',marginTop:3}}>Excel yoki Google Sheets dan</div>
           </div>
           {hasData && onClose && <button className="btn btn-gh btn-sm" onClick={onClose}>X</button>}
         </div>
         <div className="mbdy">
           <div className="tabs" style={{marginBottom:18}}>
-            {[['excel','[EXCEL] Excel fayl'],['sheets','[SHEETS] Google Sheets']].map(([t,l]) => (
+            {[['excel',`${E.excel} Excel fayl`],['sheets',`${E.sheets} Google Sheets`]].map(([t,l]) => (
               <button key={t} className={`tab${tab===t?' on':''}`} onClick={()=>setTab(t)}>{l}</button>
             ))}
           </div>
@@ -1131,7 +1159,7 @@ function UploadModal({
                 </div>
                 <div className={`drop-z${files.main?' done':''}`}
                   onClick={()=>!loading&&pickFile('main')} style={{padding:'20px',textAlign:'center'}}>
-                  <div style={{fontSize:28,marginBottom:6}}>{files.main?'[OK]':'[EXCEL]'}</div>
+                  <div style={{fontSize:28,marginBottom:6}}>{files.main?E.ok:E.excel}</div>
                   {files.main
                     ? <div style={{fontWeight:700,color:'var(--gr)',fontSize:13}}>{files.main.name}</div>
                     : <div>
@@ -1147,7 +1175,7 @@ function UploadModal({
                 </div>
                 <div className={`drop-z${files.integration?' done':''}`}
                   onClick={()=>!loading&&pickFile('integration')} style={{padding:'16px',textAlign:'center'}}>
-                  <div style={{fontSize:22,marginBottom:4}}>{files.integration?'[OK]':'[SHEETS]'}</div>
+                  <div style={{fontSize:22,marginBottom:4}}>{files.integration?E.ok:E.sheets}</div>
                   {files.integration
                     ? <div style={{fontWeight:700,color:'var(--gr)',fontSize:13}}>{files.integration.name}</div>
                     : <div>
@@ -1166,7 +1194,7 @@ function UploadModal({
               <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
                 {hasData && onClose && <button className="btn btn-gh" onClick={onClose}>Bekor</button>}
                 <button className="btn btn-bl" onClick={doLoadExcel} disabled={loading||!files.main} style={{minWidth:140}}>
-                  {loading?'O Yuklanmoqda...':'[OK] Yuklash'}
+                  {loading?'O Yuklanmoqda...':`${E.ok} Yuklash`}
                 </button>
               </div>
             </>
@@ -1184,7 +1212,7 @@ function UploadModal({
                 <div style={{fontSize:11,color:'var(--t3)',marginTop:5}}>
                   Bu URL avtomatik ishlatiladi. Barcha listlar bir faylda bo'lishi kerak.
                 </div>
-                {sheetId && <div style={{fontSize:11,color:'var(--gr)',marginTop:5,fontFamily:'var(--mono)'}}>[OK] ID: {sheetId}</div>}
+                {sheetId && <div style={{fontSize:11,color:'var(--gr)',marginTop:5,fontFamily:'var(--mono)'}}>{E.ok} ID: {sheetId}</div>}
               </div>
               <div style={{background:'var(--s3)',border:'1px solid var(--b1)',borderRadius:8,padding:'10px 12px',marginBottom:12,fontSize:12,color:'var(--t2)'}}>
                 Kerakli listlar:
@@ -1215,7 +1243,7 @@ function UploadModal({
               <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
                 {hasData && onClose && <button className="btn btn-gh" onClick={onClose}>Bekor</button>}
                 <button className="btn btn-bl" onClick={doLoadSheets} disabled={loading||!sheetId} style={{minWidth:160}}>
-                  {loading?'O Ulanmoqda...':'[SHEETS] Ulash'}
+                  {loading?'O Ulanmoqda...':`${E.sheets} Ulash`}
                 </button>
               </div>
             </>
@@ -1288,7 +1316,7 @@ function CustomerDetail({ c, D, onClose }) {
           </div>
 
           <div className="tabs" style={{marginBottom:14,display:'inline-flex'}}>
-            {[['sverka','[SV] Sverka'],['orders','[ORDER] Zakazlar'],['returns','[RET] Vozvratlar'],['pays',"[PAY] To'lovlar"]].map(([t,l]) => (
+            {[['sverka',`${E.sv} Sverka`],['orders',`${E.order} Zakazlar`],['returns',`${E.ret} Vozvratlar`],['pays',`${E.pay} To'lovlar`]].map(([t,l]) => (
               <button key={t} className={`tab${activeTab===t?' on':''}`} onClick={()=>setTab(t)}>{l}</button>
             ))}
           </div>
@@ -1296,11 +1324,11 @@ function CustomerDetail({ c, D, onClose }) {
           {activeTab==='sverka' && (
             <div>
               <div style={{background:'var(--s3)',border:'1px solid var(--b1)',borderRadius:8,padding:'8px 14px',marginBottom:12,fontSize:12,color:'var(--t3)',display:'flex',gap:16,flexWrap:'wrap'}}>
-                <span>[ORDER] Yetkazilgan: <strong style={{color:'var(--bl)'}}>{c.totalWaterQ} ta</strong></span>
-                <span>[RET] Qaytarilgan: <strong style={{color:'var(--or)'}}>{c.vozvratQ} ta</strong></span>
-                <span>[TARA] Mijozda: <strong style={{color:c.tara<0?'var(--rd)':'var(--gr)'}}>{c.tara} ta</strong></span>
-                <span>[UZS] Balans UZS: <strong style={{color:balColor(finalBalUZS)}}>{fmt(Math.abs(finalBalUZS))} so'm</strong></span>
-                <span>[USD] Balans USD: <strong style={{color:balColor(finalBalUSD)}}>{fmt(Math.abs(finalBalUSD))} $</strong></span>
+                <span>{E.order} Yetkazilgan: <strong style={{color:'var(--bl)'}}>{c.totalWaterQ} ta</strong></span>
+                <span>{E.ret} Qaytarilgan: <strong style={{color:'var(--or)'}}>{c.vozvratQ} ta</strong></span>
+                <span>{E.tara} Mijozda: <strong style={{color:c.tara<0?'var(--rd)':'var(--gr)'}}>{c.tara} ta</strong></span>
+                <span>{E.uzs} Balans UZS: <strong style={{color:balColor(finalBalUZS)}}>{fmt(Math.abs(finalBalUZS))} so'm</strong></span>
+                <span>{E.usd} Balans USD: <strong style={{color:balColor(finalBalUSD)}}>{fmt(Math.abs(finalBalUSD))} $</strong></span>
               </div>
               <div style={{overflow:'auto',maxHeight:'52vh',borderRadius:9,border:'1px solid var(--b2)'}}>
                 <table className="tbl sv-tbl" style={{minWidth:1000}}>
@@ -1609,7 +1637,7 @@ function Dashboard({ D }) {
       </div>
       <div className="g2">
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>[PAY] Oylik to'lovlar (so'm)</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.pay} Oylik to'lovlar (so'm)</div>
           {monthly.length===0
             ? <div style={{color:'var(--t3)',textAlign:'center',padding:24,fontSize:13}}>To'lov ma'lumoti yo'q</div>
             : <ResponsiveContainer width="100%" height={200}>
@@ -1625,7 +1653,7 @@ function Dashboard({ D }) {
         </div>
         <div className="card" style={{padding:16}}>
           <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',marginBottom:12}}>
-            <div style={{fontWeight:700,fontSize:13}}>[TOP] Agentlar reytingi</div>
+            <div style={{fontWeight:700,fontSize:13}}>{E.top} Agentlar reytingi</div>
             <select className="select" value={agentMonth} onChange={(e)=>setAgentMonth(e.target.value)} style={{padding:'4px 8px',fontSize:12}}>
               <option value="all">Hammasi</option>
               {monthOptions.slice().reverse().map((m)=><option key={m} value={m}>{m}</option>)}
@@ -1647,9 +1675,9 @@ function Dashboard({ D }) {
       </div>
       <div className="g2">
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>[TOP] Top qarzdorlar</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.top} Top qarzdorlar</div>
           {debtors.length===0
-            ? <div style={{color:'var(--t3)',textAlign:'center',padding:20,fontSize:13}}>Qarzdor yo'q [OK]</div>
+            ? <div style={{color:'var(--t3)',textAlign:'center',padding:20,fontSize:13}}>Qarzdor yo'q {E.ok}</div>
             : debtors.sort((a,b)=>a.balanceUZS-b.balanceUZS).slice(0,8).map((c,i) => (
               <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,padding:'6px 0',borderBottom:'1px solid var(--b2)'}}>
                 <div style={{minWidth:0,flex:1}}>
@@ -1665,7 +1693,7 @@ function Dashboard({ D }) {
           }
         </div>
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>[LATE] 2+ oy suv olmaganlar</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.late} 2+ oy suv olmaganlar</div>
           {stale2m.slice(0,8).map((c,i) => (
             <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--b2)'}}>
               <div style={{flex:1,minWidth:0}}>
@@ -1774,8 +1802,8 @@ function Customers({ D, currentUser='Admin' }) {
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
       <div className="tabs" style={{display:'inline-flex'}}>
-        <button className={`tab${tab==='own'?' on':''}`} onClick={()=>setTab('own')}>[MY] O'z mijozlarim</button>
-        <button className={`tab${tab==='all'?' on':''}`} onClick={()=>setTab('all')}>[ALL] Barcha mijozlar</button>
+        <button className={`tab${tab==='own'?' on':''}`} onClick={()=>setTab('own')}>{E.my} O'z mijozlarim</button>
+        <button className={`tab${tab==='all'?' on':''}`} onClick={()=>setTab('all')}>{E.all} Barcha mijozlar</button>
       </div>
       <div className="g4">
         <StatCard l="JAMI MIJOZLAR" v={baseCustomers.length} s={baseCustomers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
@@ -1785,7 +1813,7 @@ function Customers({ D, currentUser='Admin' }) {
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',position:'relative'}}>
         <div className="sb" style={{flex:2,minWidth:200}}>
-          <span style={{color:'var(--t3)'}}>[FIND]</span>
+          <span style={{color:'var(--t3)'}}>{E.find}</span>
           <input placeholder="Ism, telefon, ID bo'yicha..." value={search} onChange={(e)=>setS(e.target.value)}/>
         </div>
         <button className="btn btn-gh btn-sm" onClick={()=>setShowAdv((v)=>!v)}>
@@ -1913,7 +1941,7 @@ function SoDetailModal({ soGroup, onClose }) {
             </div>
             <div style={{fontSize:11,color:'var(--t3)',marginTop:4,fontFamily:'var(--mono)'}}>
               {fmtD(soGroup.orderDate)}  ·  {soGroup.agent||'—'}  ·  {soGroup.items.length} ta mahsulot
-              {soGroup.delivPerson && <span>  ·  [DRV] {soGroup.delivPerson}</span>}
+              {soGroup.delivPerson && <span>  ·  {E.driver} {soGroup.delivPerson}</span>}
             </div>
           </div>
           <button className="btn btn-gh btn-sm" onClick={onClose}>X</button>
@@ -2324,7 +2352,7 @@ function Kassa({ D }) {
       </div>
       <div style={{display:'flex',gap:8,alignItems:'center'}}>
         <div className="sb" style={{flex:1}}>
-          <span style={{color:'var(--t3)'}}>[FIND]</span>
+          <span style={{color:'var(--t3)'}}>{E.find}</span>
           <input placeholder="Mijoz, operatsiya в„–..." value={search} onChange={(e)=>setS(e.target.value)}/>
         </div>
         <div style={{position:'relative'}}>
@@ -2752,7 +2780,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <div className="sb" style={{minWidth:340,flex:1}}>
-              <span style={{color:'var(--t3)'}}>[FIND]</span>
+              <span style={{color:'var(--t3)'}}>{E.find}</span>
               <input placeholder={pickTargetIdx!=null ? "Qator uchun mijoz qidiring..." : "Yangi mijoz qo'shish uchun qidiring..."} value={pickQuery} onChange={(e)=>setPickQuery(e.target.value)} />
             </div>
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{records.length} ta yozuv</span>
@@ -2827,7 +2855,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <div className="sb" style={{maxWidth:420,flex:1}}>
-              <span style={{color:'var(--t3)'}}>[FIND]</span>
+              <span style={{color:'var(--t3)'}}>{E.find}</span>
               <input placeholder="Mijoz / ID / operator..." value={searchAll} onChange={(e)=>setSearchAll(e.target.value)} />
             </div>
             <div style={{position:'relative'}}>
@@ -2879,7 +2907,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
               Qidiruvni tozalash
             </button>
             <button className="btn btn-bl btn-sm" onClick={() => onReloadAll && onReloadAll()}>
-              [REFRESH] Yangilash
+              {E.refresh} Yangilash
             </button>
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{visibleAllRows.length} / {allList.length} ta yozuv</span>
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Qidiruv/filtr hamma yozuv bo'yicha</span>
@@ -2997,7 +3025,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <div className="sb" style={{maxWidth:420,flex:1}}>
-              <span style={{color:'var(--t3)'}}>[FIND]</span>
+              <span style={{color:'var(--t3)'}}>{E.find}</span>
               <input placeholder="ID, mijoz, izoh..." value={opSearch} onChange={(e)=>setOpSearch(e.target.value)} />
             </div>
             <button className={`btn ${opPickMode?'btn-gr':'btn-gh'} btn-sm`} onClick={()=>setOpPickMode((v)=>!v)}>
@@ -3158,8 +3186,8 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
           </div>
 
           <div className="tabs" style={{marginBottom:12,display:'inline-flex'}}>
-            <button className={`tab${tab==='payments'?' on':''}`} onClick={()=>setTab('payments')}>[PAY] To'lovlar</button>
-            <button className={`tab${tab==='settings'?' on':''}`} onClick={()=>setTab('settings')}>[SET] Nastroyka</button>
+            <button className={`tab${tab==='payments'?' on':''}`} onClick={()=>setTab('payments')}>{E.pay} To'lovlar</button>
+            <button className={`tab${tab==='settings'?' on':''}`} onClick={()=>setTab('settings')}>{E.settings} Nastroyka</button>
           </div>
 
           {tab==='payments' && (
@@ -3330,7 +3358,7 @@ function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
 
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
             <div className="sb" style={{flex:2,minWidth:220}}>
-              <span style={{color:'var(--t3)'}}>[FIND]</span>
+              <span style={{color:'var(--t3)'}}>{E.find}</span>
               <input placeholder="Ism, ID, zakaz bo'yicha..." value={search} onChange={(e)=>setSearch(e.target.value)} />
             </div>
             <div style={{position:'relative'}}>
@@ -3637,7 +3665,7 @@ function Reports({ D }) {
       </div>
       {byMonth.length>0 && (
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>[ORDER] Oylik yetkazish (UZS)</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.order} Oylik yetkazish (UZS)</div>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={byMonth}>
               <CartesianGrid strokeDasharray="3 3" stroke="#21262d"/>
@@ -3653,7 +3681,7 @@ function Reports({ D }) {
       )}
       <div className="g2">
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:14}}>[AREA] Rayonlar bo'yicha</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:14}}>{E.area} Rayonlar bo'yicha</div>
           {byDist.slice(0,12).map((d,i) => (
             <div key={i} style={{marginBottom:10}}>
               <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5,marginBottom:3}}>
@@ -3670,7 +3698,7 @@ function Reports({ D }) {
           ))}
         </div>
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>[TOP] Agentlar natijalari</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.top} Agentlar natijalari</div>
           <table className="tbl">
             <thead><tr><th>#</th><th>Agent</th><th>Mijoz</th><th>Dona</th><th>Summa</th></tr></thead>
             <tbody>
@@ -3967,13 +3995,13 @@ function LoginScreen({ users=[], onLogin, onResetCreds }) {
 }
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ ROOT APP в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 const NAV = [
-  { id:'dash',    label:'Dashboard',  icon:'[D]' },
-  { id:'cust',    label:'Mijozlar',   icon:'[M]', badge:'d' },
-  { id:'orders',  label:'Zakazlar',   icon:'[Z]' },
-  { id:'kassa',   label:'Kassa',      icon:'[K]' },
-  { id:'obzvon',  label:'Obzvon',     icon:'[O]', badge:'o' },
-  { id:'doljniki',label:'Doljniki',   icon:'[Q]', badge:'dz' },
-  { id:'reports', label:'Hisobotlar', icon:'[H]' },
+  { id:'dash',    label:'Dashboard',  icon:E.home },
+  { id:'cust',    label:'Mijozlar',   icon:E.users, badge:'d' },
+  { id:'orders',  label:'Zakazlar',   icon:E.order },
+  { id:'kassa',   label:'Kassa',      icon:E.pay },
+  { id:'obzvon',  label:'Obzvon',     icon:E.phone, badge:'o' },
+  { id:'doljniki',label:'Doljniki',   icon:E.doc, badge:'dz' },
+  { id:'reports', label:'Hisobotlar', icon:E.report },
 ];
 
 export default function App() {
@@ -4295,7 +4323,7 @@ export default function App() {
   const debtorCnt  = D.customers.filter((c)=>c.balanceUZS<0).length;
   const doljnikiCnt = doljniki.length;
   const visibleNav = NAV.filter((n) => (currentAccess.visible?.[n.id] ?? true));
-  const pageMeta = NAV.find((n)=>n.id===page) || { id:'settings', icon:'[S]', label:'Nastroyka' };
+  const pageMeta = NAV.find((n)=>n.id===page) || { id:'settings', icon:E.settings, label:'Nastroyka' };
   useEffect(() => {
     if (page === 'settings') return;
     if (!visibleNav.find((n) => n.id === page)) setPage(visibleNav[0]?.id || 'dash');
@@ -4317,7 +4345,7 @@ export default function App() {
         {/* SIDEBAR */}
         <div style={{width:side?215:56,background:'var(--s1)',borderRight:'1px solid var(--b2)',display:'flex',flexDirection:'column',transition:'width .2s',flexShrink:0,overflow:'hidden'}}>
           <div style={{padding:'13px 11px',borderBottom:'1px solid var(--b2)',display:'flex',alignItems:'center',gap:10}}>
-            <div style={{width:30,height:30,background:'linear-gradient(135deg,var(--bl),#1d4ed8)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>A</div>
+            <div style={{width:30,height:30,background:'linear-gradient(135deg,var(--bl),#1d4ed8)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{E.water}</div>
             {side && <span style={{fontWeight:800,fontSize:14,whiteSpace:'nowrap'}}>AquaBiz Pro</span>}
           </div>
           <div style={{flex:1,padding:'8px 6px',overflowY:'auto',overflowX:'hidden'}}>
@@ -4344,7 +4372,7 @@ export default function App() {
             </div>
             {(currentAccess.visible?.settings ?? true) && (
               <div className="nav-i" onClick={()=>setPage('settings')}>
-                <span style={{fontSize:17,flexShrink:0}}>[S]</span>
+                <span style={{fontSize:17,flexShrink:0}}>{E.settings}</span>
                 {side && <span>Nastroyka</span>}
               </div>
             )}
