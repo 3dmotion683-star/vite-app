@@ -152,7 +152,12 @@ const isNameInactiveByPrefix = (name) => {
 const isAhmadteaTag = (v) => normText(v).includes('ahmadtea');
 const isAhmadteaCustomer = (c) => {
   if (!c) return false;
-  return isAhmadteaTag(c.aaTag) || isAhmadteaTag(c.source) || isAhmadteaTag(c.name);
+  // Faqat AA kategoriyasi asosida ajratamiz.
+  return isAhmadteaTag(c.aaTag);
+};
+const isMurodbaxshCustomer = (c) => {
+  const aa = normText(c?.aaTag);
+  return aa !== '' && !isAhmadteaTag(aa);
 };
 const isActiveCustomerName = (name) => {
   const n = String(name || '').trim();
@@ -1877,22 +1882,24 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
       return customers.filter((c) => isAhmadteaCustomer(c));
     }
     if (segment === 'aa_other') {
-      return customers.filter((c) => !isAhmadteaCustomer(c));
+      return customers.filter((c) => isMurodbaxshCustomer(c));
     }
     if (segment === 'active_all') {
-      if (activeScope === 'own') return activeBase.filter((c) => ownIds.has(c.id));
-      return activeBase;
+      const rows = activeBase.filter((c) => !isAhmadteaCustomer(c));
+      if (activeScope === 'own') return rows.filter((c) => ownIds.has(c.id));
+      return rows;
     }
     if (segment === 'active_own') {
-      return activeBase.filter((c) => ownIds.has(c.id));
+      return activeBase.filter((c) => ownIds.has(c.id) && !isAhmadteaCustomer(c));
     }
     if (segment === 'inactive') {
-      return customers.filter((c) => isNameInactiveByPrefix(c.name));
+      return customers.filter((c) => isNameInactiveByPrefix(c.name) && !isAhmadteaCustomer(c));
     }
     if (segment === 'other_customers') {
-      return customers.filter((c) => isExcludedZCategory(c.source));
+      return customers.filter((c) => isExcludedZCategory(c.source) && !isAhmadteaCustomer(c));
     }
-    return customers;
+    // Hamma mijozlar: Ahmadtea bu yerga kirmaydi (faqat o'z tabida).
+    return customers.filter((c) => !isAhmadteaCustomer(c));
   }, [customers, segment, activeBase, ownIds, activeScope]);
 
   const toRange = (v, from, to) => {
