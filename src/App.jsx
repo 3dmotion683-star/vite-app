@@ -151,7 +151,7 @@ const isNameInactiveByPrefix = (name) => {
 };
 const isAhmadteaTag = (v) => {
   const s = normText(v).replace(/[\s._-]+/g, '');
-  return s.includes('ahmadtea');
+  return s === 'ahmadtea';
 };
 const isAhmadteaCustomer = (c) => {
   if (!c) return false;
@@ -1923,22 +1923,24 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
       const q = search.toLowerCase();
       r = r.filter((c) => c.name.toLowerCase().includes(q)||c.phone.includes(q)||c.id.includes(q)||(c.district||'').toLowerCase().includes(q));
     }
-
-    if (adv.districts.length) r = r.filter((c) => adv.districts.includes(c.district));
-    if (adv.sources.length) r = r.filter((c) => adv.sources.includes(c.source));
-    if (adv.agents.length) r = r.filter((c) => adv.agents.includes(c.lastAgent));
-    r = r.filter((c) => toRange(c.balanceUZS, adv.uzsFrom, adv.uzsTo));
-    r = r.filter((c) => toRange(c.balanceUSD, adv.usdFrom, adv.usdTo));
-    r = r.filter((c) => toRange(c.tara, adv.taraFrom, adv.taraTo));
-    r = r.filter((c) => toRange(c.daysAgo ?? 0, adv.daysFrom, adv.daysTo));
-    if (adv.lastFrom) r = r.filter((c) => {
-      const d = toDate(c.lastOrderDate); const f = toDate(adv.lastFrom);
-      return d && f ? d >= f : false;
-    });
-    if (adv.lastTo) r = r.filter((c) => {
-      const d = toDate(c.lastOrderDate); const t = toDate(adv.lastTo);
-      return d && t ? d <= t : false;
-    });
+    // Hamma mijozlar bo'limi har doim to'liq ro'yxat bo'ladi.
+    if (segment !== 'all') {
+      if (adv.districts.length) r = r.filter((c) => adv.districts.includes(c.district));
+      if (adv.sources.length) r = r.filter((c) => adv.sources.includes(c.source));
+      if (adv.agents.length) r = r.filter((c) => adv.agents.includes(c.lastAgent));
+      r = r.filter((c) => toRange(c.balanceUZS, adv.uzsFrom, adv.uzsTo));
+      r = r.filter((c) => toRange(c.balanceUSD, adv.usdFrom, adv.usdTo));
+      r = r.filter((c) => toRange(c.tara, adv.taraFrom, adv.taraTo));
+      r = r.filter((c) => toRange(c.daysAgo ?? 0, adv.daysFrom, adv.daysTo));
+      if (adv.lastFrom) r = r.filter((c) => {
+        const d = toDate(c.lastOrderDate); const f = toDate(adv.lastFrom);
+        return d && f ? d >= f : false;
+      });
+      if (adv.lastTo) r = r.filter((c) => {
+        const d = toDate(c.lastOrderDate); const t = toDate(adv.lastTo);
+        return d && t ? d <= t : false;
+      });
+    }
 
     return [...r].sort((a,b) => {
       let av=a[sort.col]??0, bv=b[sort.col]??0;
@@ -1946,7 +1948,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
       if (typeof bv==='string') bv=bv.toLowerCase();
       return sort.dir==='asc'?(av>bv?1:-1):av<bv?1:-1;
     });
-  }, [segmentCustomers,search,sort,adv]);
+  }, [segmentCustomers,search,sort,adv,segment]);
 
   const activeFilters = useMemo(() => {
     let count = 0;
