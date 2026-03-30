@@ -205,7 +205,13 @@ const normId = (v) => {
   const compact = s.replace(/\s/g, '');
   const m = compact.match(/^(\d+)[.,]0+$/);
   if (m) return m[1];
-  return '';
+  // Agar ID aralash formatda bo'lsa ham tushirib yubormaymiz.
+  // 1) uzun raqam ketma-ketligi bo'lsa uni olamiz
+  const seq = compact.match(/(\d{4,})/);
+  if (seq) return seq[1];
+  // 2) umuman raqam bo'lmasa ham original qiymatni qaytaramiz
+  //    (public.view_merchants dagi qator yo'qolib ketmasligi uchun)
+  return s;
 };
 const normText = (v) => String(v || '').trim().toLowerCase();
 const isOrderDoc = (v) => {
