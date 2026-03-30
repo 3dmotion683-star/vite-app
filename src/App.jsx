@@ -108,7 +108,7 @@ function toDate(v) {
   const d = new Date(s);
   return isNaN(d) ? null : d;
 }
-const fmtD = (v) => { const d = toDate(v); return d ? d.toLocaleDateString('ru-RU') : 'вЂ”'; };
+const fmtD = (v) => { const d = toDate(v); return d ? d.toLocaleDateString('ru-RU') : '—'; };
 const daysAgo = (v) => {
   const d = toDate(v); if (!d) return null;
   const n = new Date(); n.setHours(0,0,0,0); d.setHours(0,0,0,0);
@@ -126,26 +126,38 @@ const toNum = (v) => {
 const normText = (v) => String(v || '').trim().toLowerCase();
 const isOrderDoc = (v) => {
   const t = normText(v);
-  return t === 'Р·Р°РєР°Р·' || t === 'zakaz' || t === 'СЂвЂ”СЂВ°СЂС”СЂВ°СЂВ·';
+  return ['заказ', 'р·р°рєр°р·', 'zakaz'].includes(t);
 };
 const isReturnDoc = (v) => {
   const t = normText(v);
-  return t === 'РІРѕР·РІСЂР°С‚' || t === 'vozvrat' || t === 'СЂвЂ™СЂС•СЂВ·СЂС–СЂвЂљСЂВ°СЃвЂљ';
+  return ['возврат', 'ріѕр·рі°с‚', 'vozvrat'].includes(t);
 };
 const isPaymentFromCounterparty = (v) => {
   const t = normText(v);
-  return t === 'РѕРїР»Р°С‚Р° РѕС‚ РєРѕРЅС‚СЂР°РіРµРЅС‚Р°' || t === 'oplata ot kontragenta' || t.includes('РєРѕРЅС‚СЂР°РіРµРЅС‚Р°');
+  return (
+    t === 'оплата от контрагента' ||
+    t === 'рѕрїр»р°с‚р° рѕс‚ рєрѕрѕс‚сђр°рірµрѕс‚р°' ||
+    t === 'oplata ot kontragenta' ||
+    t.includes('контрагента') ||
+    t.includes('рєрѕрѕс‚сђр°рірµрѕс‚р°')
+  );
 };
 const isPaymentToCounterparty = (v) => {
   const t = normText(v);
-  return t === 'РѕРїР»Р°С‚Р° РєРѕРЅС‚СЂР°РіРµРЅС‚Сѓ' || t === 'oplata kontragentu' || t.includes('РєРѕРЅС‚СЂР°РіРµРЅС‚Сѓ');
+  return (
+    t === 'оплата контрагенту' ||
+    t === 'рѕрїр»р°с‚р° рєрѕрѕс‚сђр°рірµрѕс‚сѓ' ||
+    t === 'oplata kontragentu' ||
+    t.includes('контрагенту') ||
+    t.includes('рєрѕрѕс‚сђр°рірµрѕс‚сѓ')
+  );
 };
 function parseObzvonAllRows(rows = []) {
   if (!Array.isArray(rows) || rows.length < 2) return [];
   const headerIdx = rows.findIndex((r) => {
     const c0 = String((r || [])[0] || '').trim().toLowerCase();
     const c1 = String((r || [])[1] || '').trim().toLowerCase();
-    return c0 === 'в„–' || c0 === 'no' || c1.includes('РєРѕРЅС‚СЂР°РіРµРЅС‚') || c1.includes('kontragent');
+    return c0 === '№' || c0 === 'в„–' || c0 === 'no' || c1.includes('контрагент') || c1.includes('рєрѕрѕс‚сђр°рірµрѕс‚') || c1.includes('kontragent');
   });
   const start = headerIdx >= 0 ? headerIdx + 1 : 0;
   return rows.slice(start)
@@ -167,11 +179,19 @@ function parseObzvonAllRows(rows = []) {
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ STATUS HELPERS в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 // Р”РћРЎРўРђР’Р›Р•Рќ va РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР” вЂ” ikkisi ham yetkazilgan hisoblanadi
 const isDeliveredStatus = (s) => {
-  const st = (s || '').trim();
-  return st === 'Р”РћРЎРўРђР’Р›Р•Рќ' || st === 'РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР”';
+  const st = normText(s);
+  return (
+    st === 'доставлен' ||
+    st === 'получен на склад' ||
+    st === 'р”рћрўрђр’р›р•рќ' ||
+    st === 'рџрћр›рѓс‡р•рќ рќрђ рўрљр›рђр”'
+  );
 };
 // Bekor qilingan
-const isCancelledStatus = (s) => (s || '').trim() === 'РћРўРњР•РќР•РќРћ';
+const isCancelledStatus = (s) => {
+  const st = normText(s);
+  return st === 'отменено' || st === 'рћс‚рњр•рќр•рќрћ';
+};
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ MAHSULOT ANIQLASH в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 // Tara ga ta'sir qiladigan 3 ta mahsulot (zakaz=+, vozvrat=-)
@@ -322,17 +342,26 @@ async function fetchSheetOpenSheet(sheetId, sheetName, label) {
 async function loadFromGoogleSheets(sheetId, gids, onProgress, mode='gid') {
   if (mode === 'named') {
     const byName = [
-      { key:'public.view_merchants', label:'Mijozlar', sheet:'public.view_merchants' },
-      { key:'public.view_current_merchant_event_balance', label:'Balans', sheet:'public.view_current_merchant_event_balance' },
-      { key:'public.view_item_basket', label:'Zakazlar', sheet:'public.view_item_basket' },
-      { key:'public.view_cashbox_documents', label:'Kassa', sheet:'public.view_cashbox_documents' },
-      { key:'intigratsiya', label:'Integratsiya', sheet:'intigratsiya' },
-      { key:'mijozlar', label:'Mijoz biriktiruv', sheet:'mijozlar' },
+      { key:'public.view_merchants', label:'Mijozlar', sheet:'public.view_merchants', required:true },
+      { key:'public.view_current_merchant_event_balance', label:'Balans', sheet:'public.view_current_merchant_event_balance', required:false },
+      { key:'public.view_item_basket', label:'Zakazlar', sheet:'public.view_item_basket', required:false },
+      { key:'public.view_cashbox_documents', label:'Kassa', sheet:'public.view_cashbox_documents', required:false },
+      { key:'intigratsiya', label:'Integratsiya', sheet:'intigratsiya', required:false },
+      { key:'mijozlar', label:'Mijoz biriktiruv', sheet:'mijozlar', required:false },
     ];
     const sheets = {};
     for (const s of byName) {
       onProgress(`${s.label} yuklanmoqda...`);
-      sheets[s.key] = await fetchSheetCsvByName(sheetId, s.sheet, s.label);
+      try {
+        sheets[s.key] = await fetchSheetCsvByName(sheetId, s.sheet, s.label);
+      } catch (e1) {
+        try {
+          sheets[s.key] = await fetchSheetOpenSheet(sheetId, s.sheet, s.label);
+        } catch (e2) {
+          if (s.required) throw e2;
+          sheets[s.key] = [];
+        }
+      }
     }
     if (!sheets['public.view_merchants']) throw new Error('Mijozlar varaqi topilmadi!');
     return { sheets };
@@ -3938,13 +3967,13 @@ function LoginScreen({ users=[], onLogin, onResetCreds }) {
 }
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ ROOT APP в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 const NAV = [
-  { id:'dash',    label:'Dashboard',  icon:'рџЏ ' },
-  { id:'cust',    label:'Mijozlar',   icon:'рџ‘Ґ', badge:'d' },
-  { id:'orders',  label:'Zakazlar',   icon:'рџ“¦' },
-  { id:'kassa',   label:'Kassa',      icon:'рџ’°' },
-  { id:'obzvon',  label:'Obzvon',     icon:'рџ“ћ', badge:'o' },
-  { id:'doljniki',label:'Doljniki',   icon:'рџ§ѕ', badge:'dz' },
-  { id:'reports', label:'Hisobotlar', icon:'рџ“Љ' },
+  { id:'dash',    label:'Dashboard',  icon:'[D]' },
+  { id:'cust',    label:'Mijozlar',   icon:'[M]', badge:'d' },
+  { id:'orders',  label:'Zakazlar',   icon:'[Z]' },
+  { id:'kassa',   label:'Kassa',      icon:'[K]' },
+  { id:'obzvon',  label:'Obzvon',     icon:'[O]', badge:'o' },
+  { id:'doljniki',label:'Doljniki',   icon:'[Q]', badge:'dz' },
+  { id:'reports', label:'Hisobotlar', icon:'[H]' },
 ];
 
 export default function App() {
@@ -4073,7 +4102,7 @@ export default function App() {
   const handleLoad = (result) => {
     setData(result);
     setUp(false);
-    notify(`вњ… ${result.customers.length} mijoz В· ${result.rawOrders.length} zakaz В· ${result.cashbox.length} kassa`);
+    notify(`OK: ${result.customers.length} mijoz · ${result.rawOrders.length} zakaz · ${result.cashbox.length} kassa`);
   };
 
   const loadFromConfig = useCallback(async () => {
@@ -4089,10 +4118,10 @@ export default function App() {
       const d = processAll(raw);
       setData(d);
       setAutoLoad({ loading:false, progress:'', error:'' });
-      notify(`вњ… ${d.customers.length} mijoz В· ${d.rawOrders.length} zakaz`);
+      notify(`OK: ${d.customers.length} mijoz · ${d.rawOrders.length} zakaz`);
     } catch (e) {
       setAutoLoad({ loading:false, progress:'', error:e.message });
-      notify('вќЊ '+e.message, 'err');
+      notify('Xato: '+e.message, 'err');
     }
   }, [mainSheetUrl]);
 
@@ -4112,7 +4141,7 @@ export default function App() {
       if (!sid) return;
 
       let rows = null;
-      const nameCandidates = ['РћР±Р·РІРѕРЅ Р’РЎР•', 'РћР±Р·РІРѕРЅ BSE', 'Barcha Obzvon', 'РћР±Р·РІРѕРЅ'];
+      const nameCandidates = ['Обзвон ВСЕ', 'Обзвон BSE', 'Barcha Obzvon', 'Обзвон', 'РћР±Р·РІРѕРЅ Р’РЎР•'];
       for (const nm of nameCandidates) {
         try {
           rows = await fetchSheetCsvByName(sid, nm, nm);
@@ -4266,7 +4295,7 @@ export default function App() {
   const debtorCnt  = D.customers.filter((c)=>c.balanceUZS<0).length;
   const doljnikiCnt = doljniki.length;
   const visibleNav = NAV.filter((n) => (currentAccess.visible?.[n.id] ?? true));
-  const pageMeta = NAV.find((n)=>n.id===page) || { id:'settings', icon:'вљ™пёЏ', label:'Nastroyka' };
+  const pageMeta = NAV.find((n)=>n.id===page) || { id:'settings', icon:'[S]', label:'Nastroyka' };
   useEffect(() => {
     if (page === 'settings') return;
     if (!visibleNav.find((n) => n.id === page)) setPage(visibleNav[0]?.id || 'dash');
@@ -4288,7 +4317,7 @@ export default function App() {
         {/* SIDEBAR */}
         <div style={{width:side?215:56,background:'var(--s1)',borderRight:'1px solid var(--b2)',display:'flex',flexDirection:'column',transition:'width .2s',flexShrink:0,overflow:'hidden'}}>
           <div style={{padding:'13px 11px',borderBottom:'1px solid var(--b2)',display:'flex',alignItems:'center',gap:10}}>
-            <div style={{width:30,height:30,background:'linear-gradient(135deg,var(--bl),#1d4ed8)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>рџ’§</div>
+            <div style={{width:30,height:30,background:'linear-gradient(135deg,var(--bl),#1d4ed8)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>A</div>
             {side && <span style={{fontWeight:800,fontSize:14,whiteSpace:'nowrap'}}>AquaBiz Pro</span>}
           </div>
           <div style={{flex:1,padding:'8px 6px',overflowY:'auto',overflowX:'hidden'}}>
@@ -4310,12 +4339,12 @@ export default function App() {
           </div>
           <div style={{padding:6,borderTop:'1px solid var(--b2)'}}>
             <div className="nav-i" onClick={()=>setUp(true)} style={{ opacity: autoLoad.loading ? 0.6 : 1 }}>
-              <span style={{fontSize:17,flexShrink:0}}>рџ”„</span>
+              <span style={{fontSize:17,flexShrink:0}}>R</span>
               {side && <span>Yangilash</span>}
             </div>
             {(currentAccess.visible?.settings ?? true) && (
               <div className="nav-i" onClick={()=>setPage('settings')}>
-                <span style={{fontSize:17,flexShrink:0}}>вљ™пёЏ</span>
+                <span style={{fontSize:17,flexShrink:0}}>[S]</span>
                 {side && <span>Nastroyka</span>}
               </div>
             )}
@@ -4327,7 +4356,7 @@ export default function App() {
           <div style={{background:'var(--s1)',borderBottom:'1px solid var(--b2)',padding:'0 18px',height:48,display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
               <button className="nav-i" onClick={()=>setSide(!side)} style={{padding:'4px 8px',border:'none',background:'transparent',cursor:'pointer'}}>
-                <span style={{fontSize:17,display:'inline-block',transform:side?'none':'rotate(180deg)',transition:'transform .2s'}}>в—Ђ</span>
+                <span style={{fontSize:17,display:'inline-block',transform:side?'none':'rotate(180deg)',transition:'transform .2s'}}>{'<'}</span>
               </button>
               <span style={{fontWeight:700,fontSize:14}}>
                 {pageMeta.icon} {pageMeta.label}
@@ -4350,7 +4379,7 @@ export default function App() {
               <button className="btn btn-gh btn-sm" onClick={logout}>Chiqish</button>
               {obzvonCnt>0 && (
                 <button className="btn btn-sm" style={{background:'var(--rd2)',color:'var(--rd)',border:'1px solid var(--rd2)'}} onClick={()=>setPage('obzvon')}>
-                  рџ“ћ {obzvonCnt} obzvon
+                  Obzvon {obzvonCnt}
                 </button>
               )}
             </div>
@@ -4362,25 +4391,25 @@ export default function App() {
                 <div style={{textAlign:'center',maxWidth:440}}>
                   {autoLoad.loading ? (
                     <>
-                      <div style={{fontSize:56,marginBottom:16,animation:'spin 1.2s linear infinite',display:'inline-block'}}>вџі</div>
+                      <div style={{fontSize:22,marginBottom:16,animation:'spin 1.2s linear infinite',display:'inline-block'}}>O</div>
                       <div style={{fontSize:18,fontWeight:700,marginBottom:12}}>Ma'lumot yuklanmoqda</div>
                       <div style={{color:'var(--bl)',fontSize:14,fontFamily:'var(--mono)',marginBottom:20}}>{autoLoad.progress}</div>
                     </>
                   ) : autoLoad.error ? (
                     <>
-                      <div style={{fontSize:56,marginBottom:16}}>вљ пёЏ</div>
+                      <div style={{fontSize:56,marginBottom:16}}>!</div>
                       <div style={{fontSize:18,fontWeight:700,marginBottom:12,color:'var(--rd)'}}>Yuklash xatosi</div>
                       <div style={{color:'var(--t3)',fontSize:13,marginBottom:8,background:'var(--rd2)',border:'1px solid var(--rd)',borderRadius:9,padding:'12px 16px',textAlign:'left'}}>{autoLoad.error}</div>
                       <div style={{display:'flex',gap:10,justifyContent:'center',marginTop:16}}>
-                        <button className="btn btn-bl" onClick={()=>loadFromConfig()}>рџ”„ Qayta urinish</button>
-                        <button className="btn btn-gh" onClick={()=>setUp(true)}>рџ“‚ Excel yuklash</button>
+                        <button className="btn btn-bl" onClick={()=>loadFromConfig()}>Qayta urinish</button>
+                        <button className="btn btn-gh" onClick={()=>setUp(true)}>Excel yuklash</button>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div style={{fontSize:56,marginBottom:16}}>рџ“Љ</div>
+                      <div style={{fontSize:56,marginBottom:16}}>i</div>
                       <div style={{fontSize:18,fontWeight:700,marginBottom:12}}>Ma'lumot yuklanmagan</div>
-                      <button className="btn btn-gh" onClick={()=>setUp(true)}>рџ“‚ Excel fayl yuklash</button>
+                      <button className="btn btn-gh" onClick={()=>setUp(true)}>Excel fayl yuklash</button>
                     </>
                   )}
                 </div>
