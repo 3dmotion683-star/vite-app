@@ -156,8 +156,7 @@ const isAhmadteaCustomer = (c) => {
   return isAhmadteaTag(c.aaTag);
 };
 const isMurodbaxshCustomer = (c) => {
-  const aa = normText(c?.aaTag);
-  return aa !== '' && !isAhmadteaTag(aa);
+  return !isAhmadteaCustomer(c);
 };
 const isActiveCustomerName = (name) => {
   const n = String(name || '').trim();
@@ -1873,9 +1872,17 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     if (!availableTabs.some((t) => t.id === segment)) setSegment(availableTabs[0].id);
   }, [availableTabs, segment]);
 
-  const activeBase = useMemo(
-    () => customers.filter((c) => !isExcludedZCategory(c.source) && !isNameInactiveByPrefix(c.name)),
+  const nonAhmadtea = useMemo(
+    () => customers.filter((c) => !isAhmadteaCustomer(c)),
     [customers]
+  );
+  const nonAhmadteaNonZ = useMemo(
+    () => nonAhmadtea.filter((c) => !isExcludedZCategory(c.source)),
+    [nonAhmadtea]
+  );
+  const activeBase = useMemo(
+    () => nonAhmadteaNonZ.filter((c) => !isNameInactiveByPrefix(c.name)),
+    [nonAhmadteaNonZ]
   );
   const segmentCustomers = useMemo(() => {
     if (segment === 'aa_ahmadtea') {
@@ -1885,22 +1892,21 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
       return customers.filter((c) => isMurodbaxshCustomer(c));
     }
     if (segment === 'active_all') {
-      const rows = activeBase.filter((c) => !isAhmadteaCustomer(c));
-      if (activeScope === 'own') return rows.filter((c) => ownIds.has(c.id));
-      return rows;
+      return activeBase;
     }
     if (segment === 'active_own') {
-      return activeBase.filter((c) => ownIds.has(c.id) && !isAhmadteaCustomer(c));
+      if (activeScope === 'all') return activeBase;
+      return activeBase.filter((c) => ownIds.has(c.id));
     }
     if (segment === 'inactive') {
-      return customers.filter((c) => isNameInactiveByPrefix(c.name) && !isAhmadteaCustomer(c));
+      return nonAhmadteaNonZ.filter((c) => isNameInactiveByPrefix(c.name));
     }
     if (segment === 'other_customers') {
-      return customers.filter((c) => isExcludedZCategory(c.source) && !isAhmadteaCustomer(c));
+      return nonAhmadtea.filter((c) => isExcludedZCategory(c.source));
     }
-    // Hamma mijozlar: Ahmadtea bu yerga kirmaydi (faqat o'z tabida).
-    return customers.filter((c) => !isAhmadteaCustomer(c));
-  }, [customers, segment, activeBase, ownIds, activeScope]);
+    // Hamma mijozlar: public.view_merchants dagi hamma mijoz.
+    return customers;
+  }, [customers, segment, activeBase, ownIds, activeScope, nonAhmadtea, nonAhmadteaNonZ]);
 
   const toRange = (v, from, to) => {
     if (from !== '' && Number(v) < Number(from)) return false;
