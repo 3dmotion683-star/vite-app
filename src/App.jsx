@@ -177,14 +177,14 @@ function parseObzvonAllRows(rows = []) {
 }
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ STATUS HELPERS в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
-// Р”РћРЎРўРђР’Р›Р•Рќ va РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР” вЂ” ikkisi ham yetkazilgan hisoblanadi
+// Р”РћРЎРўРђР’Р›Р•Рќ va РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР” — ikkisi ham yetkazilgan hisoblanadi
 const isDeliveredStatus = (s) => {
   const st = normText(s);
   return (
     st === 'доставлен' ||
     st === 'получен на склад' ||
     st === 'р”рћрўрђр’р›р•рќ' ||
-    st === 'рџрћр›рѓс‡р•рќ рќрђ рўрљр›рђр”'
+    st === 'poluchen na sklad'
   );
 };
 // Bekor qilingan
@@ -427,7 +427,7 @@ function processAll(mainData) {
                   String(r[21] || '').split(';')[0].trim(),
         source,
         merchantNote: merchNote,
-        eskiId:   String(r[24] || '').trim(), // Y ustun вЂ” eski ID (integratsiya uchun)
+        eskiId:   String(r[24] || '').trim(), // Y ustun — eski ID (integratsiya uchun)
       });
     });
   }
@@ -612,7 +612,7 @@ function processAll(mainData) {
     return {
       id: c.id,
       name: c.name,
-      phone: c.phone || 'вЂ”',
+      phone: c.phone || '—',
       district: c.district,
       source: c.source,
       merchantNote: c.merchantNote || '',
@@ -732,8 +732,8 @@ function processAll(mainData) {
       source: customer?.source || 'KULER',
       note: customer?.merchantNote || '',
       purchaseDate: firstOrder?.orderDate || '',
-      orderNo: firstOrder?.soNum || 'вЂ”',
-      operator: firstOrder?.agent || 'вЂ”',
+      orderNo: firstOrder?.soNum || '—',
+      operator: firstOrder?.agent || '—',
       product: firstOrder?.product || 'Kuler',
       payments: [...k.payments].sort((a,b) => (toDate(a.sana)||0) - (toDate(b.sana)||0)),
       months,
@@ -803,7 +803,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
         currency: row.currency || 'UZS',
         agent: row.agent,
         note: '',
-        driver: row.delivPerson, // X ustun вЂ” dostavchik ismi
+        driver: row.delivPerson, // X ustun — dostavchik ismi
         status: row.status,
         _isVoz: isVoz,
         _isTara: isTara,
@@ -1111,14 +1111,14 @@ function UploadModal({
       <div className="modal ani" style={{maxWidth:600}}>
         <div className="mhdr">
           <div>
-            <div style={{fontWeight:800,fontSize:16}}>рџ“‚ Ma'lumot yuklash</div>
+            <div style={{fontWeight:800,fontSize:16}}>[UPLOAD] Ma'lumot yuklash</div>
             <div style={{fontSize:12,color:'var(--t3)',marginTop:3}}>Excel yoki Google Sheets dan</div>
           </div>
-          {hasData && onClose && <button className="btn btn-gh btn-sm" onClick={onClose}>вњ•</button>}
+          {hasData && onClose && <button className="btn btn-gh btn-sm" onClick={onClose}>X</button>}
         </div>
         <div className="mbdy">
           <div className="tabs" style={{marginBottom:18}}>
-            {[['excel','рџ“Љ Excel fayl'],['sheets','рџ”— Google Sheets']].map(([t,l]) => (
+            {[['excel','[EXCEL] Excel fayl'],['sheets','[SHEETS] Google Sheets']].map(([t,l]) => (
               <button key={t} className={`tab${tab===t?' on':''}`} onClick={()=>setTab(t)}>{l}</button>
             ))}
           </div>
@@ -1131,7 +1131,7 @@ function UploadModal({
                 </div>
                 <div className={`drop-z${files.main?' done':''}`}
                   onClick={()=>!loading&&pickFile('main')} style={{padding:'20px',textAlign:'center'}}>
-                  <div style={{fontSize:28,marginBottom:6}}>{files.main?'вњ…':'рџ“Љ'}</div>
+                  <div style={{fontSize:28,marginBottom:6}}>{files.main?'[OK]':'[EXCEL]'}</div>
                   {files.main
                     ? <div style={{fontWeight:700,color:'var(--gr)',fontSize:13}}>{files.main.name}</div>
                     : <div>
@@ -1143,30 +1143,30 @@ function UploadModal({
               </div>
               <div style={{marginBottom:14}}>
                 <div style={{fontSize:11.5,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:8}}>
-                  Integratsiya fayli (ixtiyoriy вЂ” eski baza ostatkasi)
+                  Integratsiya fayli (ixtiyoriy — eski baza ostatkasi)
                 </div>
                 <div className={`drop-z${files.integration?' done':''}`}
                   onClick={()=>!loading&&pickFile('integration')} style={{padding:'16px',textAlign:'center'}}>
-                  <div style={{fontSize:22,marginBottom:4}}>{files.integration?'вњ…':'рџ”—'}</div>
+                  <div style={{fontSize:22,marginBottom:4}}>{files.integration?'[OK]':'[SHEETS]'}</div>
                   {files.integration
                     ? <div style={{fontWeight:700,color:'var(--gr)',fontSize:13}}>{files.integration.name}</div>
                     : <div>
                         <div style={{fontWeight:700,fontSize:13,marginBottom:3}}>Integratsiya faylini tanlang</div>
-                        <div style={{fontSize:11,color:'var(--t3)'}}>A=eski ID В· H=tara ostatkasi В· Varaq nomi: "intigratsiya"</div>
+                        <div style={{fontSize:11,color:'var(--t3)'}}>A=eski ID  ·  H=tara ostatkasi  ·  Varaq nomi: "intigratsiya"</div>
                       </div>
                   }
                 </div>
               </div>
               {loading && (
                 <div style={{background:'var(--bl3)',border:'1px solid var(--bl2)',borderRadius:8,padding:'9px 14px',marginBottom:12,display:'flex',alignItems:'center',gap:10,color:'var(--bl)'}}>
-                  <span style={{display:'inline-block',animation:'spin .7s linear infinite'}}>вџі</span>
+                  <span style={{display:'inline-block',animation:'spin .7s linear infinite'}}>O</span>
                   <span style={{fontSize:13,fontWeight:600}}>{progress}</span>
                 </div>
               )}
               <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
                 {hasData && onClose && <button className="btn btn-gh" onClick={onClose}>Bekor</button>}
                 <button className="btn btn-bl" onClick={doLoadExcel} disabled={loading||!files.main} style={{minWidth:140}}>
-                  {loading?'вџі Yuklanmoqda...':'вњ“ Yuklash'}
+                  {loading?'O Yuklanmoqda...':'[OK] Yuklash'}
                 </button>
               </div>
             </>
@@ -1184,7 +1184,7 @@ function UploadModal({
                 <div style={{fontSize:11,color:'var(--t3)',marginTop:5}}>
                   Bu URL avtomatik ishlatiladi. Barcha listlar bir faylda bo'lishi kerak.
                 </div>
-                {sheetId && <div style={{fontSize:11,color:'var(--gr)',marginTop:5,fontFamily:'var(--mono)'}}>вњ“ ID: {sheetId}</div>}
+                {sheetId && <div style={{fontSize:11,color:'var(--gr)',marginTop:5,fontFamily:'var(--mono)'}}>[OK] ID: {sheetId}</div>}
               </div>
               <div style={{background:'var(--s3)',border:'1px solid var(--b1)',borderRadius:8,padding:'10px 12px',marginBottom:12,fontSize:12,color:'var(--t2)'}}>
                 Kerakli listlar:
@@ -1200,22 +1200,22 @@ function UploadModal({
                   placeholder="https://docs.google.com/spreadsheets/d/..."
                   value={fixedObzvonUrl} readOnly/>
                 <div style={{fontSize:11,color:'var(--t3)',marginTop:5}}>
-                  "РћР±Р·РІРѕРЅ Р’РЎР•" listi shu faylda bo'lishi kerak
+                  "Обзвон ВСЕ" listi shu faylda bo'lishi kerak
                 </div>
               </div>
               <div style={{background:'var(--yl2)',border:'1px solid var(--yl)',borderRadius:8,padding:'9px 14px',marginBottom:14,fontSize:12,color:'var(--yl)'}}>
-                вљ пёЏ Fayl <strong>Fayl в†’ Veb-da nashr qilish</strong> qilingan bo'lishi kerak
+                Eslatma: Fayl <strong>Fayl → Veb-da nashr qilish</strong> qilingan bo'lishi kerak
               </div>
               {loading && (
                 <div style={{background:'var(--bl3)',border:'1px solid var(--bl2)',borderRadius:8,padding:'9px 14px',marginBottom:12,display:'flex',alignItems:'center',gap:10,color:'var(--bl)'}}>
-                  <span style={{display:'inline-block',animation:'spin .7s linear infinite'}}>вџі</span>
+                  <span style={{display:'inline-block',animation:'spin .7s linear infinite'}}>O</span>
                   <span style={{fontSize:13,fontWeight:600}}>{progress}</span>
                 </div>
               )}
               <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
                 {hasData && onClose && <button className="btn btn-gh" onClick={onClose}>Bekor</button>}
                 <button className="btn btn-bl" onClick={doLoadSheets} disabled={loading||!sheetId} style={{minWidth:160}}>
-                  {loading?'вџі Ulanmoqda...':'рџ”— Ulash'}
+                  {loading?'O Ulanmoqda...':'[SHEETS] Ulash'}
                 </button>
               </div>
             </>
@@ -1260,12 +1260,12 @@ function CustomerDetail({ c, D, onClose }) {
               {c.name}
             </div>
             <div style={{fontSize:11,color:'var(--t3)',fontFamily:'var(--mono)',marginTop:2}}>
-              ID: {c.id} В· {c.district} В· {c.phone}
+              ID: {c.id}  ·  {c.district}  ·  {c.phone}
             </div>
           </div>
           <div style={{display:'flex',gap:8,flexShrink:0,marginLeft:12}}>
-            <button className="btn btn-gr btn-sm" onClick={()=>exportSverkaExcel(c,sverkaRows)}>в¬‡ Excel</button>
-            <button className="btn btn-gh btn-sm" onClick={onClose}>вњ•</button>
+            <button className="btn btn-gr btn-sm" onClick={()=>exportSverkaExcel(c,sverkaRows)}>Excel</button>
+            <button className="btn btn-gh btn-sm" onClick={onClose}>X</button>
           </div>
         </div>
         <div className="mbdy">
@@ -1288,7 +1288,7 @@ function CustomerDetail({ c, D, onClose }) {
           </div>
 
           <div className="tabs" style={{marginBottom:14,display:'inline-flex'}}>
-            {[['sverka','рџ“‹ Sverka'],['orders','рџ“¦ Zakazlar'],['returns','в†© Vozvratlar'],['pays',"рџ’° To'lovlar"]].map(([t,l]) => (
+            {[['sverka','[SV] Sverka'],['orders','[ORDER] Zakazlar'],['returns','[RET] Vozvratlar'],['pays',"[PAY] To'lovlar"]].map(([t,l]) => (
               <button key={t} className={`tab${activeTab===t?' on':''}`} onClick={()=>setTab(t)}>{l}</button>
             ))}
           </div>
@@ -1296,11 +1296,11 @@ function CustomerDetail({ c, D, onClose }) {
           {activeTab==='sverka' && (
             <div>
               <div style={{background:'var(--s3)',border:'1px solid var(--b1)',borderRadius:8,padding:'8px 14px',marginBottom:12,fontSize:12,color:'var(--t3)',display:'flex',gap:16,flexWrap:'wrap'}}>
-                <span>рџ“¦ Yetkazilgan: <strong style={{color:'var(--bl)'}}>{c.totalWaterQ} ta</strong></span>
-                <span>в†© Qaytarilgan: <strong style={{color:'var(--or)'}}>{c.vozvratQ} ta</strong></span>
-                <span>рџЏ  Mijozda: <strong style={{color:c.tara<0?'var(--rd)':'var(--gr)'}}>{c.tara} ta</strong></span>
-                <span>рџ’ґ Balans UZS: <strong style={{color:balColor(finalBalUZS)}}>{fmt(Math.abs(finalBalUZS))} so'm</strong></span>
-                <span>рџ’µ Balans USD: <strong style={{color:balColor(finalBalUSD)}}>{fmt(Math.abs(finalBalUSD))} $</strong></span>
+                <span>[ORDER] Yetkazilgan: <strong style={{color:'var(--bl)'}}>{c.totalWaterQ} ta</strong></span>
+                <span>[RET] Qaytarilgan: <strong style={{color:'var(--or)'}}>{c.vozvratQ} ta</strong></span>
+                <span>[TARA] Mijozda: <strong style={{color:c.tara<0?'var(--rd)':'var(--gr)'}}>{c.tara} ta</strong></span>
+                <span>[UZS] Balans UZS: <strong style={{color:balColor(finalBalUZS)}}>{fmt(Math.abs(finalBalUZS))} so'm</strong></span>
+                <span>[USD] Balans USD: <strong style={{color:balColor(finalBalUSD)}}>{fmt(Math.abs(finalBalUSD))} $</strong></span>
               </div>
               <div style={{overflow:'auto',maxHeight:'52vh',borderRadius:9,border:'1px solid var(--b2)'}}>
                 <table className="tbl sv-tbl" style={{minWidth:1000}}>
@@ -1342,23 +1342,23 @@ function CustomerDetail({ c, D, onClose }) {
                           </td>
                           <td style={{maxWidth:175,color:'var(--t1)',fontWeight:row._type==='payment'?400:500}}>
                             <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:173}}>
-                              {row.produkt||'вЂ”'}
+                              {row.produkt||'—'}
                             </span>
                           </td>
                           <td style={{textAlign:'center',fontWeight:700,color:row.qty!=null?(row._isVoz?'var(--or)':row.qty>0?'var(--t1)':'var(--t3)'):'var(--t3)'}}>
-                            {row.qty!=null?(row._isVoz?'-':'')+Math.abs(row.qty):'вЂ”'}
+                            {row.qty!=null?(row._isVoz?'-':'')+Math.abs(row.qty):'—'}
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>
-                            {row.narx?fmt(Math.round(row.narx)):'вЂ”'}
+                            {row.narx?fmt(Math.round(row.narx)):'—'}
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:row.summa?'var(--rd)':'var(--t4)'}}>
-                            {row.summa?'-'+fmt(row.summa):'вЂ”'}
+                            {row.summa?'-'+fmt(row.summa):'—'}
                           </td>
                           <td style={{textAlign:'center'}}>
                             <span className={row.currency==='USD'?'cur-usd':'cur-uzs'}>{row.currency||'UZS'}</span>
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:row.tolov?'var(--gr)':'var(--t4)'}}>
-                            {row.tolov?'+'+fmt(row.tolov):'вЂ”'}
+                            {row.tolov?'+'+fmt(row.tolov):'—'}
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:row.balansUZS<0?'var(--rd)':row.balansUZS>0?'var(--gr)':'var(--t3)'}}>
                             {row.balansUZS<0?'-':row.balansUZS>0?'+':''}{fmt(Math.abs(row.balansUZS))}
@@ -1366,15 +1366,15 @@ function CustomerDetail({ c, D, onClose }) {
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:row.balansUSD<0?'var(--rd)':row.balansUSD>0?'var(--gr)':'var(--t3)',fontSize:11}}>
                             {row.balansUSD<0?'-':row.balansUSD>0?'+':''}{fmt(Math.abs(row.balansUSD))}$
                           </td>
-                          <td style={{fontSize:11,color:'var(--t3)'}}>{row.agent||'вЂ”'}</td>
-                          <td style={{fontSize:11,color:'var(--t2)'}}>{row.driver||'вЂ”'}</td>
+                          <td style={{fontSize:11,color:'var(--t3)'}}>{row.agent||'—'}</td>
+                          <td style={{fontSize:11,color:'var(--t2)'}}>{row.driver||'—'}</td>
                           <td>
                             <span className="tag" style={{
                               background: row.status==='Р”РћРЎРўРђР’Р›Р•Рќ'?'var(--gr2)':row.status==='РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР”'?'var(--gr2)':row.status==='РћРўРњР•РќР•РќРћ'?'var(--rd2)':'var(--s3)',
                               color:      row.status==='Р”РћРЎРўРђР’Р›Р•Рќ'?'var(--gr)':row.status==='РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР”'?'var(--gr)':row.status==='РћРўРњР•РќР•РќРћ'?'var(--t4)':'var(--t3)',
                               fontSize:9.5,
                             }}>
-                              {row.status||'вЂ”'}
+                              {row.status||'—'}
                             </span>
                           </td>
                         </tr>
@@ -1385,12 +1385,12 @@ function CustomerDetail({ c, D, onClose }) {
               </div>
               {sverkaRows.length>0 && (
                 <div style={{marginTop:10,fontSize:12,color:'var(--t3)',textAlign:'right'}}>
-                  Jami {sverkaRows.length} ta yozuv В·{' '}
-                  {sverkaRows.filter((r)=>r._type==='order'&&!r._isCancelled).length} ta zakaz В·{' '}
+                  Jami {sverkaRows.length} ta yozuv  · {' '}
+                  {sverkaRows.filter((r)=>r._type==='order'&&!r._isCancelled).length} ta zakaz  · {' '}
                   {sverkaRows.filter((r)=>r._type==='payment').length} ta to'lov
                   {sverkaRows.some((r)=>r._isCancelled) && (
                     <span style={{color:'var(--rd)',marginLeft:8}}>
-                      В· {sverkaRows.filter((r)=>r._isCancelled).length} ta otmena
+                       ·  {sverkaRows.filter((r)=>r._isCancelled).length} ta otmena
                     </span>
                   )}
                 </div>
@@ -1419,11 +1419,11 @@ function CustomerDetail({ c, D, onClose }) {
                           <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178}}>{o.product}</span>
                         </td>
                         <td style={{textAlign:'center',fontWeight:700}}>{Math.abs(o.qty)}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'вЂ”'}</td>
-                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{o.sum?fmt(o.sum):'вЂ”'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'—'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{o.sum?fmt(o.sum):'—'}</td>
                         <td><span className={o.currency==='USD'?'cur-usd':'cur-uzs'}>{o.currency||'UZS'}</span></td>
-                        <td style={{fontSize:11}}>{o.agent||'вЂ”'}</td>
-                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'вЂ”'}</td>
+                        <td style={{fontSize:11}}>{o.agent||'—'}</td>
+                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'—'}</td>
                         <td>
                           <span className="tag" style={{
                             background:o.status==='Р”РћРЎРўРђР’Р›Р•Рќ'||o.status==='РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР”'?'var(--gr2)':o.status==='РћРўРњР•РќР•РќРћ'?'var(--rd2)':'var(--s3)',
@@ -1460,11 +1460,11 @@ function CustomerDetail({ c, D, onClose }) {
                           <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178}}>{o.product}</span>
                         </td>
                         <td style={{textAlign:'center',fontWeight:700,color:'var(--or)'}}>-{Math.abs(o.qty)}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'вЂ”'}</td>
-                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--or)'}}>{o.sum?fmt(Math.abs(o.sum)):'вЂ”'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'—'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--or)'}}>{o.sum?fmt(Math.abs(o.sum)):'—'}</td>
                         <td><span className={o.currency==='USD'?'cur-usd':'cur-uzs'}>{o.currency||'UZS'}</span></td>
-                        <td style={{fontSize:11}}>{o.agent||'вЂ”'}</td>
-                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'вЂ”'}</td>
+                        <td style={{fontSize:11}}>{o.agent||'—'}</td>
+                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'—'}</td>
                         <td>
                           <span className="tag" style={{
                             background:o.status==='Р”РћРЎРўРђР’Р›Р•Рќ'||o.status==='РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР”'?'var(--gr2)':o.status==='РћРўРњР•РќР•РќРћ'?'var(--rd2)':'var(--s3)',
@@ -1495,9 +1495,9 @@ function CustomerDetail({ c, D, onClose }) {
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(p.sana)}</td>
                         <td style={{fontFamily:'var(--mono)',fontWeight:800,color:'var(--gr)'}}>+{fmt(p.amount)}</td>
                         <td><span className={p.currency==='USD'?'cur-usd':'cur-uzs'}>{p.currency||'UZS'}</span></td>
-                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.kassa||'вЂ”'}</td>
-                        <td style={{fontSize:11}}>{p.operator||'вЂ”'}</td>
-                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.note||'вЂ”'}</td>
+                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.kassa||'—'}</td>
+                        <td style={{fontSize:11}}>{p.operator||'—'}</td>
+                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.note||'—'}</td>
                       </tr>
                     ))
                   }
@@ -1565,7 +1565,7 @@ function Dashboard({ D }) {
       ? wDel
       : wDel.filter((o) => monthKey(o.orderDate) === agentMonth);
     source.forEach((o) => {
-      const a=o.agent||'вЂ”';
+      const a=o.agent||'—';
       if (!m[a]) m[a]={name:a,qty:0,sum:0};
       m[a].qty+=Math.abs(o.qty); m[a].sum+=o.sum;
     });
@@ -1609,7 +1609,7 @@ function Dashboard({ D }) {
       </div>
       <div className="g2">
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>рџ’° Oylik to'lovlar (so'm)</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>[PAY] Oylik to'lovlar (so'm)</div>
           {monthly.length===0
             ? <div style={{color:'var(--t3)',textAlign:'center',padding:24,fontSize:13}}>To'lov ma'lumoti yo'q</div>
             : <ResponsiveContainer width="100%" height={200}>
@@ -1625,7 +1625,7 @@ function Dashboard({ D }) {
         </div>
         <div className="card" style={{padding:16}}>
           <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',marginBottom:12}}>
-            <div style={{fontWeight:700,fontSize:13}}>рџЏ† Agentlar reytingi</div>
+            <div style={{fontWeight:700,fontSize:13}}>[TOP] Agentlar reytingi</div>
             <select className="select" value={agentMonth} onChange={(e)=>setAgentMonth(e.target.value)} style={{padding:'4px 8px',fontSize:12}}>
               <option value="all">Hammasi</option>
               {monthOptions.slice().reverse().map((m)=><option key={m} value={m}>{m}</option>)}
@@ -1647,14 +1647,14 @@ function Dashboard({ D }) {
       </div>
       <div className="g2">
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>вљ пёЏ Top qarzdorlar</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>[TOP] Top qarzdorlar</div>
           {debtors.length===0
-            ? <div style={{color:'var(--t3)',textAlign:'center',padding:20,fontSize:13}}>Qarzdor yo'q вњ“</div>
+            ? <div style={{color:'var(--t3)',textAlign:'center',padding:20,fontSize:13}}>Qarzdor yo'q [OK]</div>
             : debtors.sort((a,b)=>a.balanceUZS-b.balanceUZS).slice(0,8).map((c,i) => (
               <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,padding:'6px 0',borderBottom:'1px solid var(--b2)'}}>
                 <div style={{minWidth:0,flex:1}}>
                   <div style={{fontWeight:600,fontSize:12.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
-                  <div style={{fontSize:11,color:'var(--t3)'}}>{c.district} В· <a href={`tel:${c.phone}`} style={{color:'var(--bl)',textDecoration:'none'}}>{c.phone}</a></div>
+                  <div style={{fontSize:11,color:'var(--t3)'}}>{c.district}  ·  <a href={`tel:${c.phone}`} style={{color:'var(--bl)',textDecoration:'none'}}>{c.phone}</a></div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0}}>
                   {c.balanceUZS<0 && <div><span className="tag" style={{background:'var(--rd2)',color:'var(--rd)'}}>-{fmt(Math.abs(c.balanceUZS))} so'm</span></div>}
@@ -1665,7 +1665,7 @@ function Dashboard({ D }) {
           }
         </div>
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>рџ•’ 2+ oy suv olmaganlar</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>[LATE] 2+ oy suv olmaganlar</div>
           {stale2m.slice(0,8).map((c,i) => (
             <div key={i} style={{display:'flex',justifyContent:'space-between',padding:'6px 0',borderBottom:'1px solid var(--b2)'}}>
               <div style={{flex:1,minWidth:0}}>
@@ -1766,16 +1766,16 @@ function Customers({ D, currentUser='Admin' }) {
 
   const tog = (col) => setSort((s) => s.col===col?{col,dir:s.dir==='asc'?'desc':'asc'}:{col,dir:'asc'});
   const SI = ({c:col}) => sort.col===col
-    ? <span style={{marginLeft:3}}>{sort.dir==='asc'?'в†‘':'в†“'}</span>
-    : <span style={{marginLeft:3,opacity:.2}}>в†•</span>;
+    ? <span style={{marginLeft:3}}>{sort.dir==='asc'?'↑':'↓'}</span>
+    : <span style={{marginLeft:3,opacity:.2}}>↕</span>;
   const balColor = (v) => v<0?'var(--rd)':v>0?'var(--gr)':'var(--t3)';
   const debt = getDebtStats(baseCustomers);
 
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
       <div className="tabs" style={{display:'inline-flex'}}>
-        <button className={`tab${tab==='own'?' on':''}`} onClick={()=>setTab('own')}>рџ‘¤ O'z mijozlarim</button>
-        <button className={`tab${tab==='all'?' on':''}`} onClick={()=>setTab('all')}>рџ‘Ґ Barcha mijozlar</button>
+        <button className={`tab${tab==='own'?' on':''}`} onClick={()=>setTab('own')}>[MY] O'z mijozlarim</button>
+        <button className={`tab${tab==='all'?' on':''}`} onClick={()=>setTab('all')}>[ALL] Barcha mijozlar</button>
       </div>
       <div className="g4">
         <StatCard l="JAMI MIJOZLAR" v={baseCustomers.length} s={baseCustomers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
@@ -1785,7 +1785,7 @@ function Customers({ D, currentUser='Admin' }) {
       </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',position:'relative'}}>
         <div className="sb" style={{flex:2,minWidth:200}}>
-          <span style={{color:'var(--t3)'}}>рџ”Ќ</span>
+          <span style={{color:'var(--t3)'}}>[FIND]</span>
           <input placeholder="Ism, telefon, ID bo'yicha..." value={search} onChange={(e)=>setS(e.target.value)}/>
         </div>
         <button className="btn btn-gh btn-sm" onClick={()=>setShowAdv((v)=>!v)}>
@@ -1794,7 +1794,7 @@ function Customers({ D, currentUser='Admin' }) {
           </svg>
           Filtr ({activeFilters})
         </button>
-        <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(baseCustomers)}>в¬‡ Excel hisobot</button>
+        <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(baseCustomers)}>Excel hisobot</button>
 
         {showAdv && (
           <div className="card" style={{position:'absolute',top:40,right:0,zIndex:30,width:520,padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)'}}>
@@ -1879,15 +1879,15 @@ function Customers({ D, currentUser='Admin' }) {
                       {c.address && <div style={{fontSize:10.5,color:'var(--t3)',maxWidth:205,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.address}</div>}
                     </td>
                     <td><a href={`tel:${c.phone}`} onClick={(e)=>e.stopPropagation()} style={{color:'var(--bl)',textDecoration:'none',fontFamily:'var(--mono)',fontSize:11.5}}>{c.phone}</a></td>
-                    <td style={{fontSize:12}}>{c.district||'вЂ”'}</td>
+                    <td style={{fontSize:12}}>{c.district||'—'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:balColor(c.balanceUZS)}}>{c.balanceUZS<0?'-':c.balanceUZS>0?'+':''}{fmt(Math.abs(c.balanceUZS))}</td>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:balColor(c.balanceUSD)}}>{c.balanceUSD!==0?<>{c.balanceUSD<0?'-':c.balanceUSD>0?'+':''}{fmt(Math.abs(c.balanceUSD))}$</>:'вЂ”'}</td>
-                    <td style={{textAlign:'center',fontWeight:700,color:c.tara<0?'var(--rd)':'var(--bl)'}}>{c.tara!==0?(c.tara<0?'-':'')+Math.abs(c.tara):'вЂ”'}</td>
-                    <td style={{textAlign:'center'}}>{c.kulers>0?<span className="tag" style={{background:'var(--yl2)',color:'var(--yl)'}}>{c.kulers}</span>:'вЂ”'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:balColor(c.balanceUSD)}}>{c.balanceUSD!==0?<>{c.balanceUSD<0?'-':c.balanceUSD>0?'+':''}{fmt(Math.abs(c.balanceUSD))}$</>:'—'}</td>
+                    <td style={{textAlign:'center',fontWeight:700,color:c.tara<0?'var(--rd)':'var(--bl)'}}>{c.tara!==0?(c.tara<0?'-':'')+Math.abs(c.tara):'—'}</td>
+                    <td style={{textAlign:'center'}}>{c.kulers>0?<span className="tag" style={{background:'var(--yl2)',color:'var(--yl)'}}>{c.kulers}</span>:'—'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.lastOrderDate)}</td>
-                    <td>{c.daysAgo!=null&&c.daysAgo>=0 ? <span className="tag" style={{background:c.daysAgo>30?'var(--rd2)':c.daysAgo>14?'var(--yl2)':c.daysAgo>7?'var(--or2)':'var(--s3)',color:c.daysAgo>30?'var(--rd)':c.daysAgo>14?'var(--yl)':c.daysAgo>7?'var(--or)':'var(--t3)'}}>{c.daysAgo}k</span> : 'вЂ”'}</td>
-                    <td style={{textAlign:'center'}}>{c.lastQty||'вЂ”'}</td>
-                    <td style={{fontSize:12}}>{c.lastAgent||'вЂ”'}</td>
+                    <td>{c.daysAgo!=null&&c.daysAgo>=0 ? <span className="tag" style={{background:c.daysAgo>30?'var(--rd2)':c.daysAgo>14?'var(--yl2)':c.daysAgo>7?'var(--or2)':'var(--s3)',color:c.daysAgo>30?'var(--rd)':c.daysAgo>14?'var(--yl)':c.daysAgo>7?'var(--or)':'var(--t3)'}}>{c.daysAgo}k</span> : '—'}</td>
+                    <td style={{textAlign:'center'}}>{c.lastQty||'—'}</td>
+                    <td style={{fontSize:12}}>{c.lastAgent||'—'}</td>
                   </tr>
                 ))
               }
@@ -1912,11 +1912,11 @@ function SoDetailModal({ soGroup, onClose }) {
               <span style={{fontSize:13,color:'var(--t2)',fontWeight:500}}>{soGroup.contName}</span>
             </div>
             <div style={{fontSize:11,color:'var(--t3)',marginTop:4,fontFamily:'var(--mono)'}}>
-              {fmtD(soGroup.orderDate)} В· {soGroup.agent||'вЂ”'} В· {soGroup.items.length} ta mahsulot
-              {soGroup.delivPerson && <span> В· рџљљ {soGroup.delivPerson}</span>}
+              {fmtD(soGroup.orderDate)}  ·  {soGroup.agent||'—'}  ·  {soGroup.items.length} ta mahsulot
+              {soGroup.delivPerson && <span>  ·  [DRV] {soGroup.delivPerson}</span>}
             </div>
           </div>
-          <button className="btn btn-gh btn-sm" onClick={onClose}>вњ•</button>
+          <button className="btn btn-gh btn-sm" onClick={onClose}>X</button>
         </div>
         <div className="mbdy">
           <div style={{overflow:'auto',borderRadius:8,border:'1px solid var(--b2)'}}>
@@ -1935,8 +1935,8 @@ function SoDetailModal({ soGroup, onClose }) {
                   <tr key={i}>
                     <td style={{fontWeight:500,color:'var(--t1)'}}>{item.product}</td>
                     <td style={{textAlign:'center',fontWeight:700,color:item.qty<0?'var(--or)':'var(--t1)'}}>{item.qty}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{item.price?fmt(Math.round(item.price)):'вЂ”'}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{item.sum?fmt(item.sum):'вЂ”'}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{item.price?fmt(Math.round(item.price)):'—'}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{item.sum?fmt(item.sum):'—'}</td>
                     <td style={{textAlign:'center'}}><span className={item.currency==='USD'?'cur-usd':'cur-uzs'}>{item.currency||'UZS'}</span></td>
                   </tr>
                 ))}
@@ -1947,7 +1947,7 @@ function SoDetailModal({ soGroup, onClose }) {
             <span className="tag" style={{
               background:isDeliveredStatus(soGroup.status)?'var(--gr2)':soGroup.status==='РћРўРњР•РќР•РќРћ'?'var(--rd2)':'var(--s3)',
               color:isDeliveredStatus(soGroup.status)?'var(--gr)':soGroup.status==='РћРўРњР•РќР•РќРћ'?'var(--t4)':'var(--t3)',
-            }}>{soGroup.status||'вЂ”'}</span>
+            }}>{soGroup.status||'—'}</span>
             <div style={{display:'flex',gap:12,fontWeight:700,fontSize:13}}>
               {soGroup.totalSumUZS>0 && <span style={{color:'var(--gr)'}}>{fmt(soGroup.totalSumUZS)} so'm</span>}
               {soGroup.totalSumUSD>0 && <span style={{color:'var(--yl)'}}>{fmt(soGroup.totalSumUSD)} $</span>}
@@ -2324,7 +2324,7 @@ function Kassa({ D }) {
       </div>
       <div style={{display:'flex',gap:8,alignItems:'center'}}>
         <div className="sb" style={{flex:1}}>
-          <span style={{color:'var(--t3)'}}>рџ”Ќ</span>
+          <span style={{color:'var(--t3)'}}>[FIND]</span>
           <input placeholder="Mijoz, operatsiya в„–..." value={search} onChange={(e)=>setS(e.target.value)}/>
         </div>
         <div style={{position:'relative'}}>
@@ -2409,15 +2409,15 @@ function Kassa({ D }) {
                         </span>
                       </td>
                       <td style={{fontSize:11.5,color:'var(--t3)',maxWidth:110}}>
-                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:108}}>{c.kassa||'вЂ”'}</span>
+                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:108}}>{c.kassa||'—'}</span>
                       </td>
                       <td style={{maxWidth:220}}>
-                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:218,fontSize:12}}>{c.contName||'вЂ”'}</span>
+                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:218,fontSize:12}}>{c.contName||'—'}</span>
                       </td>
                       <td style={{fontFamily:'var(--mono)',fontWeight:700,color:isIn?'var(--gr)':isPaymentToCounterparty(c.opType)?'var(--rd)':'var(--t2)'}}>
                         {isIn?'+':isPaymentToCounterparty(c.opType)?'-':''}{fmt(c.amount)}
                       </td>
-                      <td style={{fontSize:11.5,color:'var(--t3)'}}>{c.operator||'вЂ”'}</td>
+                      <td style={{fontSize:11.5,color:'var(--t3)'}}>{c.operator||'—'}</td>
                     </tr>
                   );
                 })
@@ -2674,7 +2674,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
         lastCallDate: lastCall?.callDate || '',
         lastNote: lastCall?.note || '',
         nextDate: lastCall?.nextDate || '',
-        operator: D.assignmentById?.[c.id] || 'вЂ”',
+        operator: D.assignmentById?.[c.id] || '—',
       };
     });
     if (currentUser !== 'Admin') rows = rows.filter((r) => r.operator === currentUser);
@@ -2752,7 +2752,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <div className="sb" style={{minWidth:340,flex:1}}>
-              <span style={{color:'var(--t3)'}}>рџ”Ќ</span>
+              <span style={{color:'var(--t3)'}}>[FIND]</span>
               <input placeholder={pickTargetIdx!=null ? "Qator uchun mijoz qidiring..." : "Yangi mijoz qo'shish uchun qidiring..."} value={pickQuery} onChange={(e)=>setPickQuery(e.target.value)} />
             </div>
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{records.length} ta yozuv</span>
@@ -2784,7 +2784,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
                   {records.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Obzvon yozuvlari yo'q</td></tr> :
                     records.map((r,i)=>(
                       <tr key={i}>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id || 'вЂ”'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id || '—'}</td>
                         <td style={{minWidth:250}}>
                           <div style={{display:'flex',gap:6,alignItems:'center'}}>
                             <input
@@ -2809,7 +2809,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
                         <td><input className="input" value={r.orderCount||''} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,orderCount:e.target.value}:x))} style={{maxWidth:90}} /></td>
                         <td><input className="input" type="date" value={String(r.orderDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,orderDate:e.target.value}:x))} /></td>
                         <td>{r.operator || currentUser}</td>
-                        <td><button className="btn btn-gh btn-sm" onClick={()=>saveRecords(records.filter((_,j)=>j!==i))}>вњ•</button></td>
+                        <td><button className="btn btn-gh btn-sm" onClick={()=>saveRecords(records.filter((_,j)=>j!==i))}>X</button></td>
                       </tr>
                     ))
                   }
@@ -2827,7 +2827,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <div className="sb" style={{maxWidth:420,flex:1}}>
-              <span style={{color:'var(--t3)'}}>рџ”Ќ</span>
+              <span style={{color:'var(--t3)'}}>[FIND]</span>
               <input placeholder="Mijoz / ID / operator..." value={searchAll} onChange={(e)=>setSearchAll(e.target.value)} />
             </div>
             <div style={{position:'relative'}}>
@@ -2879,7 +2879,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
               Qidiruvni tozalash
             </button>
             <button className="btn btn-bl btn-sm" onClick={() => onReloadAll && onReloadAll()}>
-              рџ”„ Yangilash
+              [REFRESH] Yangilash
             </button>
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{visibleAllRows.length} / {allList.length} ta yozuv</span>
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Qidiruv/filtr hamma yozuv bo'yicha</span>
@@ -2898,15 +2898,15 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
                     visibleAllRows.map((r,i)=>(
                       <tr key={i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || i+1}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || 'вЂ”'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || '—'}</td>
                         <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || `ID: ${r.customerId}`}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.callDate)}</td>
-                        <td>{r.topic || 'вЂ”'}</td>
-                        <td style={{maxWidth:300}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || 'вЂ”'}</span></td>
+                        <td>{r.topic || '—'}</td>
+                        <td style={{maxWidth:300}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '—'}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.nextDate)}</td>
-                        <td>{r.orderCount || 'вЂ”'}</td>
+                        <td>{r.orderCount || '—'}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.orderDate)}</td>
-                        <td>{r.operator || 'вЂ”'}</td>
+                        <td>{r.operator || '—'}</td>
                       </tr>
                     ))
                   }
@@ -2997,7 +2997,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <div className="sb" style={{maxWidth:420,flex:1}}>
-              <span style={{color:'var(--t3)'}}>рџ”Ќ</span>
+              <span style={{color:'var(--t3)'}}>[FIND]</span>
               <input placeholder="ID, mijoz, izoh..." value={opSearch} onChange={(e)=>setOpSearch(e.target.value)} />
             </div>
             <button className={`btn ${opPickMode?'btn-gr':'btn-gh'} btn-sm`} onClick={()=>setOpPickMode((v)=>!v)}>
@@ -3022,7 +3022,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
                         <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</span></td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.balance<0?'var(--rd)':r.balance>0?'var(--gr)':'var(--t3)'}}>{fmt(r.balance)}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.ord1)} {r.lastQty?`В· ${r.lastQty} ta`:''}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.ord1)} {r.lastQty?` ·  ${r.lastQty} ta`:''}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.lastCallDate)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.nextDate)}</td>
                         <td>{r.operator}</td>
@@ -3086,9 +3086,9 @@ function DoljnikModal({ row, D, onClose }) {
         <div className="mhdr">
           <div>
             <div style={{fontWeight:800,fontSize:14}}>{row.name}</div>
-            <div style={{fontSize:11,color:'var(--t3)'}}>ID: {row.id} В· Qarz zakaz: {row.orderNo || 'вЂ”'}</div>
+            <div style={{fontSize:11,color:'var(--t3)'}}>ID: {row.id}  ·  Qarz zakaz: {row.orderNo || '—'}</div>
           </div>
-          <button className="btn btn-gh btn-sm" onClick={onClose}>вњ•</button>
+          <button className="btn btn-gh btn-sm" onClick={onClose}>X</button>
         </div>
         <div className="mbdy">
           <div style={{overflow:'auto',maxHeight:'62vh',border:'1px solid var(--b2)',borderRadius:8}}>
@@ -3101,9 +3101,9 @@ function DoljnikModal({ row, D, onClose }) {
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.kod}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.sana}</td>
                       <td>{r.dokument}</td>
-                      <td style={{maxWidth:280,overflow:'hidden',textOverflow:'ellipsis'}}>{r.produkt || 'вЂ”'}</td>
-                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.summa?'var(--rd)':'var(--t4)'}}>{r.summa?'-'+fmt(r.summa):'вЂ”'}</td>
-                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.tolov?'var(--gr)':'var(--t4)'}}>{r.tolov?'+'+fmt(r.tolov):'вЂ”'}</td>
+                      <td style={{maxWidth:280,overflow:'hidden',textOverflow:'ellipsis'}}>{r.produkt || '—'}</td>
+                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.summa?'var(--rd)':'var(--t4)'}}>{r.summa?'-'+fmt(r.summa):'—'}</td>
+                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.tolov?'var(--gr)':'var(--t4)'}}>{r.tolov?'+'+fmt(r.tolov):'—'}</td>
                       <td style={{fontFamily:'var(--mono)',textAlign:'right',fontWeight:700,color:r.balansUZS<0?'var(--rd)':r.balansUZS>0?'var(--gr)':'var(--t3)'}}>{r.balansUZS<0?'-':r.balansUZS>0?'+':''}{fmt(Math.abs(r.balansUZS))}</td>
                     </tr>
                   ))
@@ -3139,12 +3139,12 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
           <div>
             <div style={{fontWeight:800,fontSize:14}}>{row.customerName}</div>
             <div style={{fontSize:11,color:'var(--t3)'}}>
-              ID: {row.customerId} В· Zakaz: {row.orderNo} В· Olingan: {fmtD(row.purchaseDate)}
+              ID: {row.customerId}  ·  Zakaz: {row.orderNo}  ·  Olingan: {fmtD(row.purchaseDate)}
             </div>
           </div>
           <div style={{display:'flex',gap:8}}>
-            <button className="btn btn-gr btn-sm" onClick={() => customer && exportSverkaExcel(customer, sverkaRows)}>в¬‡ Excel</button>
-            <button className="btn btn-gh btn-sm" onClick={onClose}>вњ•</button>
+            <button className="btn btn-gr btn-sm" onClick={() => customer && exportSverkaExcel(customer, sverkaRows)}>Excel</button>
+            <button className="btn btn-gh btn-sm" onClick={onClose}>X</button>
           </div>
         </div>
         <div className="mbdy">
@@ -3158,8 +3158,8 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
           </div>
 
           <div className="tabs" style={{marginBottom:12,display:'inline-flex'}}>
-            <button className={`tab${tab==='payments'?' on':''}`} onClick={()=>setTab('payments')}>рџ’° To'lovlar</button>
-            <button className={`tab${tab==='settings'?' on':''}`} onClick={()=>setTab('settings')}>вљ™пёЏ Nastroyka</button>
+            <button className={`tab${tab==='payments'?' on':''}`} onClick={()=>setTab('payments')}>[PAY] To'lovlar</button>
+            <button className={`tab${tab==='settings'?' on':''}`} onClick={()=>setTab('settings')}>[SET] Nastroyka</button>
           </div>
 
           {tab==='payments' && (
@@ -3172,9 +3172,9 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
                   ) : kulerPayments.map((p, i) => (
                     <tr key={i}>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(p.sana)}</td>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{p.opNum||'вЂ”'}</td>
-                      <td>{p.operator||'вЂ”'}</td>
-                      <td>{p.kassa||'вЂ”'}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{p.opNum||'—'}</td>
+                      <td>{p.operator||'—'}</td>
+                      <td>{p.kassa||'—'}</td>
                       <td style={{fontFamily:'var(--mono)',color:'var(--gr)',fontWeight:700}}>+{fmt(p.amount)} so'm</td>
                     </tr>
                   ))}
@@ -3330,7 +3330,7 @@ function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
 
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
             <div className="sb" style={{flex:2,minWidth:220}}>
-              <span style={{color:'var(--t3)'}}>рџ”Ќ</span>
+              <span style={{color:'var(--t3)'}}>[FIND]</span>
               <input placeholder="Ism, ID, zakaz bo'yicha..." value={search} onChange={(e)=>setSearch(e.target.value)} />
             </div>
             <div style={{position:'relative'}}>
@@ -3409,16 +3409,16 @@ function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
                       <td style={{maxWidth:280}}>
                         <div style={{fontWeight:700,fontSize:12.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
-                        <div style={{fontSize:10.5,color:'var(--t3)'}}>Qarz zakaz: {r.orderNo || 'вЂ”'} {r.lastOrderProduct ? `В· ${r.lastOrderProduct}` : ''}</div>
+                        <div style={{fontSize:10.5,color:'var(--t3)'}}>Qarz zakaz: {r.orderNo || '—'} {r.lastOrderProduct ? ` ·  ${r.lastOrderProduct}` : ''}</div>
                       </td>
                       <td style={{fontSize:11.5,color:'var(--t2)'}}>{r.category}</td>
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--rd)'}}>-{fmt(Math.abs(r.debtUZS))}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.lastOrderDate)}</td>
                       <td style={{textAlign:'center'}}>
-                        {r.days != null ? <span className="tag" style={{background:r.days>30?'var(--rd2)':r.days>15?'var(--yl2)':'var(--s3)',color:r.days>30?'var(--rd)':r.days>15?'var(--yl)':'var(--t3)'}}>{r.days}k</span> : 'вЂ”'}
+                        {r.days != null ? <span className="tag" style={{background:r.days>30?'var(--rd2)':r.days>15?'var(--yl2)':'var(--s3)',color:r.days>30?'var(--rd)':r.days>15?'var(--yl)':'var(--t3)'}}>{r.days}k</span> : '—'}
                       </td>
                       <td style={{maxWidth:260}}>
-                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11,color:'var(--t3)'}}>{r.note || 'вЂ”'}</span>
+                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11,color:'var(--t3)'}}>{r.note || '—'}</span>
                       </td>
                     </tr>
                   ))}
@@ -3552,7 +3552,7 @@ function Reports({ D }) {
   const byAgent = useMemo(() => {
     const m = {};
     reportOrders.forEach((o) => {
-      const a=o.agent||'вЂ”';
+      const a=o.agent||'—';
       if (!m[a]) m[a]={name:a,qty:0,sum:0,custs:new Set()};
       m[a].qty+=Math.abs(o.qty); m[a].sum+=o.sum; m[a].custs.add(o.mId);
     });
@@ -3637,7 +3637,7 @@ function Reports({ D }) {
       </div>
       {byMonth.length>0 && (
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>рџ“¦ Oylik yetkazish (UZS)</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>[ORDER] Oylik yetkazish (UZS)</div>
           <ResponsiveContainer width="100%" height={180}>
             <BarChart data={byMonth}>
               <CartesianGrid strokeDasharray="3 3" stroke="#21262d"/>
@@ -3653,7 +3653,7 @@ function Reports({ D }) {
       )}
       <div className="g2">
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:14}}>рџ—єпёЏ Rayonlar bo'yicha</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:14}}>[AREA] Rayonlar bo'yicha</div>
           {byDist.slice(0,12).map((d,i) => (
             <div key={i} style={{marginBottom:10}}>
               <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5,marginBottom:3}}>
@@ -3670,7 +3670,7 @@ function Reports({ D }) {
           ))}
         </div>
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>рџЏ† Agentlar natijalari</div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>[TOP] Agentlar natijalari</div>
           <table className="tbl">
             <thead><tr><th>#</th><th>Agent</th><th>Mijoz</th><th>Dona</th><th>Summa</th></tr></thead>
             <tbody>
@@ -3853,7 +3853,7 @@ function SettingsPanel({
                           style={{padding:'6px 8px',fontSize:12,flex:1}}
                         />
                         <button className="btn btn-gh btn-sm" onClick={()=>setShowPassword((v)=>!v)} type="button">
-                          {showPassword ? "рџ™€ Yop" : "рџ‘Ѓ Ko'r"}
+                          {showPassword ? "Yop" : "Ko'r"}
                         </button>
                         <button className="btn btn-gh btn-sm" onClick={()=>setEditPassword('')} type="button" disabled={!isAdminSession}>
                           Tozalash
@@ -4277,17 +4277,17 @@ export default function App() {
       .filter((c) => c.balanceUZS < 0)
       .map((c) => ({
         lastOrderProduct: ((D.ordersByMId?.[c.id] || []).find((o) => o.soNum === c.lastDocNum)?.product) || '',
-        id: c.id || 'вЂ”',
-        category: c.source || 'вЂ”',
-        name: c.name || 'вЂ”',
+        id: c.id || '—',
+        category: c.source || '—',
+        name: c.name || '—',
         debtUZS: c.balanceUZS,
         lastOrderDate: c.lastOrderDate || '',
         days: c.daysAgo,
-        orderNo: c.lastDocNum || 'вЂ”',
+        orderNo: c.lastDocNum || '—',
         qty: c.lastQty || 0,
         lastSum: c.lastSum || 0,
-        agent: c.lastAgent || 'вЂ”',
-        note: c.merchantNote || 'вЂ”',
+        agent: c.lastAgent || '—',
+        note: c.merchantNote || '—',
       }))
       .sort((a, b) => a.debtUZS - b.debtUZS);
   }, [D.customers, D.ordersByMId]);
@@ -4450,6 +4450,7 @@ export default function App() {
     </>
   );
 }
+
 
 
 
