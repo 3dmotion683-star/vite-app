@@ -181,6 +181,15 @@ const toNum = (v) => {
   const n = parseFloat(String(v).replace(/[\s\xa0]/g,'').replace(',','.'));
   return isNaN(n) ? 0 : n;
 };
+const normId = (v) => {
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  if (/^\d+$/.test(s)) return s;
+  const compact = s.replace(/\s/g, '');
+  const m = compact.match(/^(\d+)[.,]0+$/);
+  if (m) return m[1];
+  return '';
+};
 const normText = (v) => String(v || '').trim().toLowerCase();
 const isOrderDoc = (v) => {
   const t = normText(v);
@@ -468,9 +477,8 @@ function processAll(mainData) {
   const allMerchants = [];
   if (merchantSheet) {
     merchantSheet.slice(1).forEach((r) => {
-      const id = String(r[0] || '').trim();
+      const id = normId(r[0]);
       if (!id) return;
-      if (!/^\d+$/.test(id)) return;
       const name = String(r[2] || '').trim();
       const source = String(r[25] || '').trim(); // Z ustun
       const merchNote = String(r[19] || '').trim(); // T ustun = primechaniya
@@ -506,10 +514,9 @@ function processAll(mainData) {
     mainData.sheets['public.view_current_merchant_event_balance'] ||
     mainData.sheets['Balans'];
   if (balSheet) {
-    balSheet.slice(7).forEach((r) => {
-      const mid = String(r[6] || '').trim(); // G ustun
+    balSheet.forEach((r) => {
+      const mid = normId(r[6]); // G ustun
       if (!mid) return;
-      if (!/^\d+$/.test(mid)) return;
       balMapUZS[mid] = toNum(r[3]); // D ustun = UZS balans
       balMapUSD[mid] = toNum(r[2]); // C ustun = USD balans
     });
@@ -552,7 +559,7 @@ function processAll(mainData) {
       const agent      = String(r[21] || '').trim();
       const delivPerson= String(r[23] || '').trim(); // X ustun = dostavchik ismi
       const orderDate  = String(r[24] || '').trim(); // Y ustun = zakaz/vozvrat sanasi
-      const mId        = String(r[29] || '').trim();
+      const mId        = normId(r[29]);
       const price      = qty && qty !== 0 ? Math.abs(sum / qty) : 0;
 
       if (!soNum || soNum === 'id') return;
@@ -583,7 +590,7 @@ function processAll(mainData) {
       const operator = String(r[18] || '').trim();
       const contName = String(r[19] || r[3] || '').trim();
       const kassa    = String(r[20] || '').trim();
-      const mId      = String(r[23] || '').trim();
+      const mId      = normId(r[23]);
       const note     = String(r[13] || '').trim();
 
       if (!opNum || opNum === 'РќРѕРјРµСЂ РѕРїРµСЂР°С†РёРё') return;
@@ -610,9 +617,8 @@ function processAll(mainData) {
   if (assignSheet) {
     assignSheet.slice(1).forEach((r) => {
       const code = String(r[0] || '').trim();
-      const id = String(r[1] || '').trim();
+      const id = normId(r[1]);
       if (!id) return;
-      if (!/^\d+$/.test(id)) return;
       let operator = '';
       if (code === 'Op3' || code === '5') operator = 'Dildora';
       if (code === 'Op2' || code === '4') operator = 'Dilfuza';
@@ -812,10 +818,15 @@ function processAll(mainData) {
       overdueAmount,
     };
   }).filter((x) => x.principal > 0);
+  const customerById = {};
+  customers.forEach((c) => { customerById[c.id] = c; });
+  const debtorsByBalance = Object.keys(balMapUZS)
+    .filter((id) => (balMapUZS[id] ?? 0) < 0 && customerById[id])
+    .map((id) => customerById[id]);
 
   return {
     customers, orders: rawOrders, cashbox: rawCash, contacts,
-    rawOrders, rawCash, ordersByMId, cashByMId, kulerInstallments, assignmentById,
+    rawOrders, rawCash, ordersByMId, cashByMId, kulerInstallments, assignmentById, debtorsByBalance,
   };
 }
 
@@ -1597,14 +1608,17 @@ function StatCard({ l, v, s, c }) {
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ DASHBOARD в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 function Dashboard({ D }) {
-  const { customers, cashbox, rawOrders } = D;
+  const { customers, cashbox, rawOrders, debtorsByBalance=[] } = D;
   const now = new Date();
   const curMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const wDel = (rawOrders||[]).filter((o) => isWaterProduct(o.product) && isOrderDoc(o.docType) && isDeliveredStatus(o.status));
   const wDelThisMonth = wDel.filter((o) => monthKey(o.orderDate)===curMonthKey);
   const pays = (cashbox||[]).filter((c) => isPaymentFromCounterparty(c.opType));
-  const debtors = customers.filter((c) => c.balanceUZS < 0);
-  const debt = getDebtStats(customers);
+  const debtors = debtorsByBalance.length ? debtorsByBalance : customers.filter((c) => c.balanceUZS < 0);
+  const debt = {
+    uzsCount: debtors.length,
+    uzsSum: debtors.reduce((s, c) => s + Math.abs(c.balanceUZS || 0), 0),
+  };
   const stale2m = customers
     .filter((c) => c.hasOrders && c.daysAgo != null && c.daysAgo >= 60 && isActiveCustomerName(c.name))
     .sort((a,b) => (b.daysAgo || 0) - (a.daysAgo || 0));
@@ -4434,7 +4448,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [sendToWebhook]);
 
-  const rawD = data || { customers:[], orders:[], cashbox:[], contacts:[], rawOrders:[], rawCash:[], ordersByMId:{}, cashByMId:{}, kulerInstallments:[], assignmentById:{} };
+  const rawD = data || { customers:[], orders:[], cashbox:[], contacts:[], rawOrders:[], rawCash:[], ordersByMId:{}, cashByMId:{}, kulerInstallments:[], assignmentById:{}, debtorsByBalance:[] };
   const currentAccess = access[currentUser] || DEFAULT_ACCESS.Admin;
   const scopeOwn = currentAccess.scope === 'own';
   const ownIds = new Set(Object.entries(rawD.assignmentById || {}).filter(([,op]) => op === currentUser).map(([id]) => id));
@@ -4456,11 +4470,14 @@ export default function App() {
       ordersByMId,
       cashByMId,
       kulerInstallments: (rawD.kulerInstallments || []).filter((k)=>idSet.has(k.customerId)),
+      debtorsByBalance: (rawD.debtorsByBalance || []).filter((c)=>idSet.has(c.id)),
     };
   }, [rawD, scopeOwn, ownIds]);
+  const debtorsByBalance = (D.debtorsByBalance && D.debtorsByBalance.length)
+    ? D.debtorsByBalance
+    : (D.customers || []).filter((c) => c.balanceUZS < 0);
   const doljniki = useMemo(() => {
-    return (D.customers || [])
-      .filter((c) => c.balanceUZS < 0)
+    return debtorsByBalance
       .map((c) => ({
         lastOrderProduct: ((D.ordersByMId?.[c.id] || []).find((o) => o.soNum === c.lastDocNum)?.product) || '',
         id: c.id || '—',
@@ -4476,9 +4493,9 @@ export default function App() {
         note: c.merchantNote || '—',
       }))
       .sort((a, b) => a.debtUZS - b.debtUZS);
-  }, [D.customers, D.ordersByMId]);
+  }, [debtorsByBalance, D.ordersByMId]);
   const obzvonCnt  = D.customers.filter((c)=>c.daysAgo!=null&&c.daysAgo>14).length;
-  const debtorCnt  = D.customers.filter((c)=>c.balanceUZS<0).length;
+  const debtorCnt  = debtorsByBalance.length;
   const doljnikiCnt = doljniki.length;
   const visibleNav = NAV.filter((n) => (currentAccess.visible?.[n.id] ?? true));
   const pageMeta = NAV.find((n)=>n.id===page) || { id:'settings', icon:E.settings, label:'Nastroyka' };
