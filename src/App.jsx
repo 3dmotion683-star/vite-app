@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useCallback, useEffect, useDeferredValue } from 'react';
+﻿import { useState, useMemo, useCallback, useEffect, useDeferredValue, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import {
   BarChart, Bar, AreaChart, Area,
@@ -120,6 +120,36 @@ const E = {
   tara: '\u{1F9F4}',
   sv: '\u{1F4CB}',
 };
+const FILTER_CHECK_LABEL_STYLE = {
+  display: 'grid',
+  gridTemplateColumns: '14px minmax(0,1fr)',
+  gap: 6,
+  fontSize: 12,
+  alignItems: 'start',
+  minWidth: 0,
+  padding: '3px 0',
+};
+const FILTER_CHECK_TEXT_STYLE = {
+  display: 'block',
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+const isNameExcludedForActiveStats = (name) => {
+  const n = String(name || '').trim().toUpperCase();
+  if (!n) return true;
+  if (n.startsWith('Я TUGATILDI') || n.startsWith('РЇ TUGATILDI')) return true;
+  if (n.startsWith('Я ESKI') || n.startsWith('РЇ ESKI')) return true;
+  if (/^[KК]\b/.test(n)) return true;
+  return false;
+};
+const isActiveCustomerName = (name) => {
+  const n = String(name || '').trim();
+  if (!n) return false;
+  if (isNameExcludedForActiveStats(n)) return false;
+  return /^\d/.test(n);
+};
 
 function toDate(v) {
   if (!v) return null;
@@ -222,19 +252,24 @@ const isCancelledStatus = (s) => {
 };
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ MAHSULOT ANIQLASH в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
-// Tara ga ta'sir qiladigan 3 ta mahsulot (zakaz=+, vozvrat=-)
+const normProduct = (p) => normText(p).replace(/\s+/g, ' ');
+// Tara ga ta'sir qiladigan mahsulotlar (zakaz=+, vozvrat=-)
 const isTaraAffectingProduct = (p) => {
-  const pl = (p || '').trim();
+  const pl = normProduct(p);
+  if (isWaterProduct(pl)) return true;
+  if (!pl.includes('18.9l')) return false;
   return (
-    pl === 'Murodbaxsh 18.9L' ||
-    pl === 'Р‘РћРќРЈРЎ Murodbaxsh 18.9L' ||
-    pl === 'РўР°СЂР° 18.9L (РїСѓСЃС‚РѕР№)'
+    pl.includes('tara') ||
+    pl.includes('тара') ||
+    pl.includes('рўр°сђр°') ||
+    pl.includes('пустой') ||
+    pl.includes('empty')
   );
 };
 // Faqat suv mahsulotlari (daromad hisoblash uchun)
 const isWaterProduct = (p) => {
-  const pl = (p || '').trim();
-  return pl === 'Murodbaxsh 18.9L' || pl === 'Р‘РћРќРЈРЎ Murodbaxsh 18.9L';
+  const pl = normProduct(p);
+  return pl.includes('murodbaxsh 18.9l') || pl.includes('murodbash 18.9l');
 };
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ EXCEL READER в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
@@ -595,20 +630,22 @@ function processAll(mainData) {
       (o) => isWaterProduct(o.product) && isOrderDoc(o.docType) && isDeliveredStatus(o.status)
     );
 
-    // TARA +: 3 mahsulotdan biri, zakaz turi, yetkazilgan в†’ mijozda tara ko'payadi
-    const taraPlus = myOrders.filter(
-      (o) => isTaraAffectingProduct(o.product) && isOrderDoc(o.docType) && isDeliveredStatus(o.status)
+    const deliveredTaraRows = myOrders.filter(
+      (o) => isTaraAffectingProduct(o.product) && isDeliveredStatus(o.status)
     );
-    // TARA -: 3 mahsulotdan biri, vozvrat turi, qabul qilingan в†’ mijozda tara kamayadi
-    const taraMinus = myOrders.filter(
-      (o) => isTaraAffectingProduct(o.product) && isReturnDoc(o.docType) && isDeliveredStatus(o.status)
-    );
-
     // Boshlang'ich tara: merchants.eskiId в†’ intigratsiya.A в†’ intigratsiya.H
     const integTara  = c.eskiId ? (integTaraByEskiId[c.eskiId] || 0) : 0;
-    const taraPlusQ  = taraPlus.reduce((s, o) => s + Math.abs(o.qty), 0);
-    const taraMinusQ = taraMinus.reduce((s, o) => s + Math.abs(o.qty), 0);
-    const tara       = integTara + taraPlusQ - taraMinusQ;
+    const taraDelta = deliveredTaraRows.reduce((s, o) => {
+      const q = Math.abs(toNum(o.qty));
+      if (!q) return s;
+      if (isReturnDoc(o.docType)) return s - q;
+      if (isOrderDoc(o.docType)) return s + (toNum(o.qty) < 0 ? -q : q);
+      return s;
+    }, 0);
+    const taraMinusQ = deliveredTaraRows
+      .filter((o) => isReturnDoc(o.docType))
+      .reduce((s, o) => s + Math.abs(toNum(o.qty)), 0);
+    const tara       = integTara + taraDelta;
 
     const totalWaterQ     = waterDelivered.reduce((s, o) => s + Math.abs(o.qty), 0);
     const totalWaterS_uzs = waterDelivered.filter((o) => o.currency !== 'USD').reduce((s, o) => s + o.sum, 0);
@@ -1258,6 +1295,7 @@ function UploadModal({
 function CustomerDetail({ c, D, onClose }) {
   const { ordersByMId, cashByMId } = D;
   const [activeTab, setTab] = useState('sverka');
+  const sverkaWrapRef = useRef(null);
 
   const sverkaRows = useMemo(
     () => buildSverka(c, ordersByMId || {}, cashByMId || {}),
@@ -1278,6 +1316,12 @@ function CustomerDetail({ c, D, onClose }) {
 
   const balColor = (v) => v < 0 ? 'var(--rd)' : v > 0 ? 'var(--gr)' : 'var(--t3)';
   const taraColor = c.tara < 0 ? 'var(--rd)' : 'var(--bl)';
+  useEffect(() => {
+    if (activeTab !== 'sverka') return;
+    const el = sverkaWrapRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [activeTab, sverkaRows.length, c.id]);
 
   return (
     <div className="modal-ov fade" onClick={(e)=>e.target===e.currentTarget&&onClose()}>
@@ -1330,7 +1374,7 @@ function CustomerDetail({ c, D, onClose }) {
                 <span>{E.uzs} Balans UZS: <strong style={{color:balColor(finalBalUZS)}}>{fmt(Math.abs(finalBalUZS))} so'm</strong></span>
                 <span>{E.usd} Balans USD: <strong style={{color:balColor(finalBalUSD)}}>{fmt(Math.abs(finalBalUSD))} $</strong></span>
               </div>
-              <div style={{overflow:'auto',maxHeight:'52vh',borderRadius:9,border:'1px solid var(--b2)'}}>
+              <div ref={sverkaWrapRef} style={{overflow:'auto',maxHeight:'52vh',borderRadius:9,border:'1px solid var(--b2)'}}>
                 <table className="tbl sv-tbl" style={{minWidth:1000}}>
                   <thead>
                     <tr>
@@ -1562,7 +1606,7 @@ function Dashboard({ D }) {
   const debtors = customers.filter((c) => c.balanceUZS < 0);
   const debt = getDebtStats(customers);
   const stale2m = customers
-    .filter((c) => c.hasOrders && c.daysAgo != null && c.daysAgo >= 60)
+    .filter((c) => c.hasOrders && c.daysAgo != null && c.daysAgo >= 60 && isActiveCustomerName(c.name))
     .sort((a,b) => (b.daysAgo || 0) - (a.daysAgo || 0));
 
   const monthOptions = useMemo(() => {
@@ -1825,24 +1869,24 @@ function Customers({ D, currentUser='Admin' }) {
         <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(baseCustomers)}>Excel hisobot</button>
 
         {showAdv && (
-          <div className="card" style={{position:'absolute',top:40,right:0,zIndex:30,width:520,padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)'}}>
+            <div className="card" style={{position:'absolute',top:40,right:0,zIndex:30,width:520,padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)',overflow:'hidden'}}>
             <div className="g2" style={{marginBottom:8}}>
               <div>
                 <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Rayon</div>
                 <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                  {dists.map((d)=><label key={d} style={{display:'flex',gap:6,fontSize:12}}><input type="checkbox" checked={adv.districts.includes(d)} onChange={(e)=>setAdv((p)=>({...p,districts:e.target.checked?[...p.districts,d]:p.districts.filter((x)=>x!==d)}))}/>{d}</label>)}
+                  {dists.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.districts.includes(d)} onChange={(e)=>setAdv((p)=>({...p,districts:e.target.checked?[...p.districts,d]:p.districts.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
                 </div>
               </div>
               <div>
                 <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Manba</div>
                 <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                  {sources.map((d)=><label key={d} style={{display:'flex',gap:6,fontSize:12}}><input type="checkbox" checked={adv.sources.includes(d)} onChange={(e)=>setAdv((p)=>({...p,sources:e.target.checked?[...p.sources,d]:p.sources.filter((x)=>x!==d)}))}/>{d}</label>)}
+                  {sources.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.sources.includes(d)} onChange={(e)=>setAdv((p)=>({...p,sources:e.target.checked?[...p.sources,d]:p.sources.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
                 </div>
               </div>
               <div>
                 <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Agent</div>
                 <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                  {agents.map((d)=><label key={d} style={{display:'flex',gap:6,fontSize:12}}><input type="checkbox" checked={adv.agents.includes(d)} onChange={(e)=>setAdv((p)=>({...p,agents:e.target.checked?[...p.agents,d]:p.agents.filter((x)=>x!==d)}))}/>{d}</label>)}
+                  {agents.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.agents.includes(d)} onChange={(e)=>setAdv((p)=>({...p,agents:e.target.checked?[...p.agents,d]:p.agents.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
                 </div>
               </div>
               <div style={{display:'grid',gap:6}}>
@@ -2125,24 +2169,24 @@ function Orders({ D }) {
             Filtr{activeFilterCount>0?` (${activeFilterCount})`:''}
           </button>
           {showFilter && (
-            <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:380,padding:10}}>
+            <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:380,padding:10,overflow:'hidden'}}>
               <div className="g2" style={{gap:10}}>
                 <div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Agent</div>
                   <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                    {options.agents.map((x)=><label key={x} style={{display:'flex',gap:6,fontSize:12}}><input type="checkbox" checked={fAgents.includes(x)} onChange={()=>toggleIn(setAgents,x)}/>{x}</label>)}
+                    {options.agents.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={fAgents.includes(x)} onChange={()=>toggleIn(setAgents,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
                   </div>
                 </div>
                 <div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Status</div>
                   <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                    {options.statuses.map((x)=><label key={x} style={{display:'flex',gap:6,fontSize:12}}><input type="checkbox" checked={fStatuses.includes(x)} onChange={()=>toggleIn(setStatuses,x)}/>{x}</label>)}
+                    {options.statuses.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={fStatuses.includes(x)} onChange={()=>toggleIn(setStatuses,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
                   </div>
                 </div>
                 <div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Valyuta</div>
                   <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                    {options.currencies.map((x)=><label key={x} style={{display:'flex',gap:6,fontSize:12}}><input type="checkbox" checked={fCurrencies.includes(x)} onChange={()=>toggleIn(setCurrencies,x)}/>{x}</label>)}
+                    {options.currencies.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={fCurrencies.includes(x)} onChange={()=>toggleIn(setCurrencies,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
                   </div>
                 </div>
                 <div style={{display:'grid',gap:6}}>
@@ -2363,24 +2407,24 @@ function Kassa({ D }) {
             Filtr{activeFilterCount>0?` (${activeFilterCount})`:''}
           </button>
           {showFilter && (
-            <div className="card" style={{position:'absolute',top:34,right:0,zIndex:20,width:380,padding:10}}>
+            <div className="card" style={{position:'absolute',top:34,right:0,zIndex:20,width:380,padding:10,overflow:'hidden'}}>
               <div className="g2" style={{gap:10}}>
                 <div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Operator</div>
                   <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                    {options.operators.map((x)=><label key={x} style={{display:'flex',gap:6,fontSize:12}}><input type="checkbox" checked={fOperators.includes(x)} onChange={()=>toggleIn(setOperators,x)}/>{x}</label>)}
+                    {options.operators.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={fOperators.includes(x)} onChange={()=>toggleIn(setOperators,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
                   </div>
                 </div>
                 <div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Tur</div>
                   <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                    {options.opTypes.map((x)=><label key={x} style={{display:'flex',gap:6,fontSize:12}}><input type="checkbox" checked={fOpTypes.includes(x)} onChange={()=>toggleIn(setOpTypes,x)}/>{x}</label>)}
+                    {options.opTypes.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={fOpTypes.includes(x)} onChange={()=>toggleIn(setOpTypes,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
                   </div>
                 </div>
                 <div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Kassa</div>
                   <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                    {options.kassas.map((x)=><label key={x} style={{display:'flex',gap:6,fontSize:12}}><input type="checkbox" checked={fKassas.includes(x)} onChange={()=>toggleIn(setKassas,x)}/>{x}</label>)}
+                    {options.kassas.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={fKassas.includes(x)} onChange={()=>toggleIn(setKassas,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
                   </div>
                 </div>
                 <div style={{display:'grid',gap:6}}>
@@ -2473,6 +2517,14 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
   const [opLimit, setOpLimit] = useState(500);
   const [pickTargetIdx, setPickTargetIdx] = useState(null);
   const [opSearch, setOpSearch] = useState('');
+  const [opFilterOpen, setOpFilterOpen] = useState(false);
+  const [opFilterOperators, setOpFilterOperators] = useState([]);
+  const [opBalFrom, setOpBalFrom] = useState('');
+  const [opBalTo, setOpBalTo] = useState('');
+  const [opLastCallFrom, setOpLastCallFrom] = useState('');
+  const [opLastCallTo, setOpLastCallTo] = useState('');
+  const [opNextFrom, setOpNextFrom] = useState('');
+  const [opNextTo, setOpNextTo] = useState('');
   const [opPickMode, setOpPickMode] = useState(false);
   const [opSelectedIds, setOpSelectedIds] = useState({});
   const [duePickMode, setDuePickMode] = useState(false);
@@ -2643,8 +2695,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
       const shouldIn = Math.max(1, Math.floor(lastQty / daily) - 1);
       const c = customers.find((x)=>x.id===mid);
       if (!c) return;
-      const nm = (c.name || '').trim().toUpperCase();
-      if (nm.startsWith('РЇ TUGATILDI') || nm.startsWith('РЇ ESKI')) return;
+      if (!isActiveCustomerName(c.name)) return;
       const passed = c.daysAgo ?? 0;
       if (passed >= shouldIn) {
         out.push({
@@ -2687,7 +2738,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
     return out;
   }, [D.ordersByMId]);
 
-  const operatorTableRows = useMemo(() => {
+  const operatorTableBaseRows = useMemo(() => {
     let rows = (D.customers || []).map((c) => {
       const lastCall = latestCallByCustomer[c.id];
       const ord = latestOrdersByCustomer[c.id] || { ord1:'', ord2:'', lastQty:0 };
@@ -2706,6 +2757,37 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
       };
     });
     if (currentUser !== 'Admin') rows = rows.filter((r) => r.operator === currentUser);
+    return rows;
+  }, [D.customers, D.assignmentById, latestCallByCustomer, latestOrdersByCustomer, currentUser]);
+  const operatorOptions = useMemo(
+    () => [...new Set(operatorTableBaseRows.map((r) => r.operator).filter(Boolean))].sort(),
+    [operatorTableBaseRows]
+  );
+  const inNumRange = (v, from, to) => {
+    const n = Number(v || 0);
+    if (from !== '' && n < Number(from)) return false;
+    if (to !== '' && n > Number(to)) return false;
+    return true;
+  };
+  const inDateRange = (v, from, to) => {
+    const d = toDate(v);
+    if (!d) return false;
+    if (from) {
+      const f = toDate(from);
+      if (f && d < f) return false;
+    }
+    if (to) {
+      const t = toDate(to);
+      if (t && d > t) return false;
+    }
+    return true;
+  };
+  const operatorTableRows = useMemo(() => {
+    let rows = [...operatorTableBaseRows];
+    if (opFilterOperators.length) rows = rows.filter((r) => opFilterOperators.includes(r.operator || ''));
+    rows = rows.filter((r) => inNumRange(r.balance, opBalFrom, opBalTo));
+    if (opLastCallFrom || opLastCallTo) rows = rows.filter((r) => inDateRange(r.lastCallDate, opLastCallFrom, opLastCallTo));
+    if (opNextFrom || opNextTo) rows = rows.filter((r) => inDateRange(r.nextDate, opNextFrom, opNextTo));
     if (deferredOpSearch) {
       const q = deferredOpSearch.toLowerCase();
       rows = rows.filter((r) =>
@@ -2716,7 +2798,25 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
       );
     }
     return rows;
-  }, [D, latestCallByCustomer, latestOrdersByCustomer, currentUser, deferredOpSearch]);
+  }, [
+    operatorTableBaseRows,
+    deferredOpSearch,
+    opFilterOperators,
+    opBalFrom,
+    opBalTo,
+    opLastCallFrom,
+    opLastCallTo,
+    opNextFrom,
+    opNextTo,
+  ]);
+  const activeOpFilterCount = useMemo(() => {
+    let c = 0;
+    if (opFilterOperators.length) c++;
+    if (opBalFrom !== '' || opBalTo !== '') c++;
+    if (opLastCallFrom || opLastCallTo) c++;
+    if (opNextFrom || opNextTo) c++;
+    return c;
+  }, [opFilterOperators, opBalFrom, opBalTo, opLastCallFrom, opLastCallTo, opNextFrom, opNextTo]);
 
   useEffect(() => {
     setOpLimit(500);
@@ -2866,22 +2966,22 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
                 Filtr{activeAllFilterCount>0?` (${activeAllFilterCount})`:''}
               </button>
               {allFilterOpen && (
-                <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:340,padding:10}}>
+                <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:340,padding:10,overflow:'hidden'}}>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:6,fontWeight:700}}>Operator</div>
                   <div style={{maxHeight:90,overflow:'auto',marginBottom:8}}>
                     {operators.map((o)=>(
-                      <label key={o} style={{display:'flex',alignItems:'center',gap:7,padding:'3px 0',fontSize:12}}>
+                      <label key={o} style={FILTER_CHECK_LABEL_STYLE}>
                         <input type="checkbox" checked={allFilterOps.includes(o)} onChange={()=>toggleInList(setAllFilterOps, o)} />
-                        <span>{o}</span>
+                        <span style={FILTER_CHECK_TEXT_STYLE}>{o}</span>
                       </label>
                     ))}
                   </div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:6,fontWeight:700}}>Mavzu</div>
                   <div style={{maxHeight:90,overflow:'auto',marginBottom:8}}>
                     {topics.map((t)=>(
-                      <label key={t} style={{display:'flex',alignItems:'center',gap:7,padding:'3px 0',fontSize:12}}>
+                      <label key={t} style={FILTER_CHECK_LABEL_STYLE}>
                         <input type="checkbox" checked={allFilterTopics.includes(t)} onChange={()=>toggleInList(setAllFilterTopics, t)} />
-                        <span>{t}</span>
+                        <span style={FILTER_CHECK_TEXT_STYLE}>{t}</span>
                       </label>
                     ))}
                   </div>
@@ -3027,6 +3127,50 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
             <div className="sb" style={{maxWidth:420,flex:1}}>
               <span style={{color:'var(--t3)'}}>{E.find}</span>
               <input placeholder="ID, mijoz, izoh..." value={opSearch} onChange={(e)=>setOpSearch(e.target.value)} />
+            </div>
+            <div style={{position:'relative'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setOpFilterOpen((v)=>!v)}>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                </svg>
+                Filtr{activeOpFilterCount>0?` (${activeOpFilterCount})`:''}
+              </button>
+              {opFilterOpen && (
+                <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:380,padding:10,overflow:'hidden'}}>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Operator</div>
+                  <div style={{maxHeight:110,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6,marginBottom:8}}>
+                    {operatorOptions.map((x)=>(
+                      <label key={x} style={FILTER_CHECK_LABEL_STYLE}>
+                        <input type="checkbox" checked={opFilterOperators.includes(x)} onChange={()=>setOpFilterOperators((prev)=>prev.includes(x)?prev.filter((v)=>v!==x):[...prev,x])}/>
+                        <span style={FILTER_CHECK_TEXT_STYLE}>{x}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
+                    <input className="input" placeholder="Balans dan" value={opBalFrom} onChange={(e)=>setOpBalFrom(e.target.value)} />
+                    <input className="input" placeholder="Balans gacha" value={opBalTo} onChange={(e)=>setOpBalTo(e.target.value)} />
+                  </div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Oxirgi qo'ng'iroq sanasi</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
+                    <input className="input" type="date" value={opLastCallFrom} onChange={(e)=>setOpLastCallFrom(e.target.value)} />
+                    <input className="input" type="date" value={opLastCallTo} onChange={(e)=>setOpLastCallTo(e.target.value)} />
+                  </div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Keyingi sana</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
+                    <input className="input" type="date" value={opNextFrom} onChange={(e)=>setOpNextFrom(e.target.value)} />
+                    <input className="input" type="date" value={opNextTo} onChange={(e)=>setOpNextTo(e.target.value)} />
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between'}}>
+                    <button className="btn btn-gh btn-sm" onClick={()=>{
+                      setOpFilterOperators([]);
+                      setOpBalFrom(''); setOpBalTo('');
+                      setOpLastCallFrom(''); setOpLastCallTo('');
+                      setOpNextFrom(''); setOpNextTo('');
+                    }}>Tozalash</button>
+                    <button className="btn btn-bl btn-sm" onClick={()=>setOpFilterOpen(false)}>Qo'llash</button>
+                  </div>
+                </div>
+              )}
             </div>
             <button className={`btn ${opPickMode?'btn-gr':'btn-gh'} btn-sm`} onClick={()=>setOpPickMode((v)=>!v)}>
               + Obzvonga qo'shish
@@ -3369,17 +3513,17 @@ function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
                 Filtr{activeFilterCount>0?` (${activeFilterCount})`:''}
               </button>
               {showFilter && (
-                <div className="card" style={{position:'absolute',top:34,right:0,zIndex:20,width:360,padding:10}}>
+                <div className="card" style={{position:'absolute',top:34,right:0,zIndex:20,width:360,padding:10,overflow:'hidden'}}>
                   <input className="input" placeholder="Kategoriya qidirish..." value={catQuery} onChange={(e)=>setCatQuery(e.target.value)} />
                   <div style={{maxHeight:180,overflow:'auto',marginTop:8,paddingRight:4}}>
                     {shownCats.map((c) => (
-                      <label key={c} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',fontSize:12}}>
+                      <label key={c} style={FILTER_CHECK_LABEL_STYLE}>
                         <input
                           type="checkbox"
                           checked={fCats.includes(c)}
                           onChange={(e)=>setCats((prev)=>e.target.checked?[...prev,c]:prev.filter((x)=>x!==c))}
                         />
-                        <span>{c}</span>
+                        <span style={FILTER_CHECK_TEXT_STYLE}>{c}</span>
                       </label>
                     ))}
                   </div>
@@ -3627,7 +3771,7 @@ function Reports({ D }) {
               Filtr{activeFilterCount>0?` (${activeFilterCount})`:''}
             </button>
             {showFilter && (
-              <div className="card" style={{position:'absolute',top:34,right:0,zIndex:20,width:360,padding:10}}>
+              <div className="card" style={{position:'absolute',top:34,right:0,zIndex:20,width:360,padding:10,overflow:'hidden'}}>
                 <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Oy</div>
                 <select className="select" style={{width:'100%',marginBottom:8}} value={repMonth} onChange={(e)=>setRepMonth(e.target.value)}>
                   <option value="all">Hammasi</option>
@@ -3637,13 +3781,13 @@ function Reports({ D }) {
                   <div>
                     <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Rayon</div>
                     <div style={{maxHeight:130,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                      {filterOptions.districts.map((x)=><label key={x} style={{display:'flex',gap:6,fontSize:12}}><input type="checkbox" checked={repDistricts.includes(x)} onChange={()=>toggleIn(setRepDistricts,x)}/>{x}</label>)}
+                      {filterOptions.districts.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={repDistricts.includes(x)} onChange={()=>toggleIn(setRepDistricts,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
                     </div>
                   </div>
                   <div>
                     <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Agent</div>
                     <div style={{maxHeight:130,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                      {filterOptions.agents.map((x)=><label key={x} style={{display:'flex',gap:6,fontSize:12}}><input type="checkbox" checked={repAgents.includes(x)} onChange={()=>toggleIn(setRepAgents,x)}/>{x}</label>)}
+                      {filterOptions.agents.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={repAgents.includes(x)} onChange={()=>toggleIn(setRepAgents,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
                     </div>
                   </div>
                 </div>
