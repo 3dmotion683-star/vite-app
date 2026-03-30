@@ -147,12 +147,7 @@ const isNameExcludedForActiveStats = (name) => {
 const isNameInactiveByPrefix = (name) => {
   const n = String(name || '').trim().toUpperCase();
   if (!n) return false;
-  return (
-    n.startsWith('Я TUGATILDI') ||
-    n.startsWith('РЇ TUGATILDI') ||
-    n.startsWith('Я ESKI') ||
-    n.startsWith('РЇ ESKI')
-  );
+  return n.startsWith('Я') || n.startsWith('РЇ');
 };
 const isActiveCustomerName = (name) => {
   const n = String(name || '').trim();
@@ -1815,7 +1810,10 @@ function Customers({ D, currentUser='Admin' }) {
       return customers.filter((c) => !isExcludedZCategory(c.source) && !isNameInactiveByPrefix(c.name));
     }
     if (segment === 'inactive') {
-      return customers.filter((c) => isExcludedZCategory(c.source) || isNameInactiveByPrefix(c.name));
+      return customers.filter((c) => isNameInactiveByPrefix(c.name));
+    }
+    if (segment === 'other_customers') {
+      return customers.filter((c) => isExcludedZCategory(c.source));
     }
     return customers;
   }, [customers, segment]);
@@ -1881,10 +1879,11 @@ function Customers({ D, currentUser='Admin' }) {
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
       <div className="tabs" style={{display:'inline-flex'}}>
         <button className={`tab${segment==='all'?' on':''}`} onClick={()=>setSegment('all')}>{E.all} Hamma mijozlar</button>
-        <button className={`tab${segment==='aa_ahmadtea'?' on':''}`} onClick={()=>setSegment('aa_ahmadtea')}>AA: Ahmadtea</button>
+        <button className={`tab${segment==='aa_ahmadtea'?' on':''}`} onClick={()=>setSegment('aa_ahmadtea')}>Ahmadtea</button>
         <button className={`tab${segment==='aa_other'?' on':''}`} onClick={()=>setSegment('aa_other')}>Murodbaxsh</button>
         <button className={`tab${segment==='active'?' on':''}`} onClick={()=>setSegment('active')}>Aktiv mijozlar</button>
         <button className={`tab${segment==='inactive'?' on':''}`} onClick={()=>setSegment('inactive')}>Nofaol mijozlar</button>
+        <button className={`tab${segment==='other_customers'?' on':''}`} onClick={()=>setSegment('other_customers')}>Boshqa mijozlar</button>
       </div>
       <div className="g4">
         <StatCard l="JAMI MIJOZLAR" v={segmentCustomers.length} s={segmentCustomers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
