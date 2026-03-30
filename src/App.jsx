@@ -149,7 +149,10 @@ const isNameInactiveByPrefix = (name) => {
   if (!n) return false;
   return n.startsWith('Я') || n.startsWith('РЇ');
 };
-const isAhmadteaTag = (v) => normText(v).includes('ahmadtea');
+const isAhmadteaTag = (v) => {
+  const s = normText(v).replace(/[\s._-]+/g, '');
+  return s.includes('ahmadtea');
+};
 const isAhmadteaCustomer = (c) => {
   if (!c) return false;
   // Faqat AA kategoriyasi asosida ajratamiz.
