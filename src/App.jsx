@@ -144,6 +144,16 @@ const isNameExcludedForActiveStats = (name) => {
   if (/^[KК]\b/.test(n)) return true;
   return false;
 };
+const isNameInactiveByPrefix = (name) => {
+  const n = String(name || '').trim().toUpperCase();
+  if (!n) return false;
+  return (
+    n.startsWith('Я TUGATILDI') ||
+    n.startsWith('РЇ TUGATILDI') ||
+    n.startsWith('Я ESKI') ||
+    n.startsWith('РЇ ESKI')
+  );
+};
 const isActiveCustomerName = (name) => {
   const n = String(name || '').trim();
   if (!n) return false;
@@ -1802,10 +1812,10 @@ function Customers({ D, currentUser='Admin' }) {
       return customers.filter((c) => !normText(c.aaTag).includes('ahmadtea'));
     }
     if (segment === 'active') {
-      return customers.filter((c) => !isExcludedZCategory(c.source));
+      return customers.filter((c) => !isExcludedZCategory(c.source) && !isNameInactiveByPrefix(c.name));
     }
-    if (segment === 'z_filtered') {
-      return customers.filter((c) => isExcludedZCategory(c.source));
+    if (segment === 'inactive') {
+      return customers.filter((c) => isExcludedZCategory(c.source) || isNameInactiveByPrefix(c.name));
     }
     return customers;
   }, [customers, segment]);
@@ -1874,7 +1884,7 @@ function Customers({ D, currentUser='Admin' }) {
         <button className={`tab${segment==='aa_ahmadtea'?' on':''}`} onClick={()=>setSegment('aa_ahmadtea')}>AA: Ahmadtea</button>
         <button className={`tab${segment==='aa_other'?' on':''}`} onClick={()=>setSegment('aa_other')}>Murodbaxsh</button>
         <button className={`tab${segment==='active'?' on':''}`} onClick={()=>setSegment('active')}>Aktiv mijozlar</button>
-        <button className={`tab${segment==='z_filtered'?' on':''}`} onClick={()=>setSegment('z_filtered')}>Z filtrlangan</button>
+        <button className={`tab${segment==='inactive'?' on':''}`} onClick={()=>setSegment('inactive')}>Nofaol mijozlar</button>
       </div>
       <div className="g4">
         <StatCard l="JAMI MIJOZLAR" v={segmentCustomers.length} s={segmentCustomers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
