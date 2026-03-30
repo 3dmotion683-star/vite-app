@@ -98,7 +98,7 @@ const E = {
   sheets: '\u{1F517}',
   ok: '\u2705',
   find: '\u{1F50D}',
-  refresh: '\u{1F504}',
+  refresh: '\u21BB',
   pay: '\u{1F4B0}',
   top: '\u{1F3C6}',
   late: '\u{1F55B}',
@@ -1045,9 +1045,9 @@ const S = {
 const DEFAULT_USERS = ['Dildora', 'Dilfuza', 'Admin'];
 const DEFAULT_USER_CREDS = { Dildora:'Dildora', Dilfuza:'Dilfuza', Admin:'12345' };
 const DEFAULT_ACCESS = {
-  Dildora: { scope: 'own', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, settings:false } },
-  Dilfuza: { scope: 'own', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, settings:false } },
-  Admin:   { scope: 'all', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, settings:true } },
+  Dildora: { scope: 'own', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false } },
+  Dilfuza: { scope: 'own', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false } },
+  Admin:   { scope: 'all', visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:true } },
 };
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ UPLOAD MODAL в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
@@ -3730,8 +3730,8 @@ function SettingsPanel({
   const [editPassword, setEditPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const conf = access[sel] || { scope: 'all', visible: {} };
-  const pages = ['dash','cust','orders','kassa','obzvon','doljniki','reports','settings'];
-  const defaultVisible = { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, settings:false };
+  const pages = ['dash','cust','orders','kassa','obzvon','doljniki','reports','refresh','settings'];
+  const defaultVisible = { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false };
 
   const addUser = () => {
     const name = prompt("Yangi login nomi:");
@@ -3904,19 +3904,22 @@ function SettingsPanel({
                     }}><span className="knob" /></button>
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                    {pages.map((p) => (
+                    {pages.map((p) => {
+                      const on = ((uc.visible||{})[p] ?? defaultVisible[p] ?? true);
+                      return (
                       <div key={p} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--s3)',borderRadius:8,padding:'6px 8px'}}>
                         <span style={{fontSize:11,color:'var(--t2)'}}>{p}</span>
-                        <button className={`toggle${(uc.visible||{})[p]?' on':''}`} onClick={() => {
+                        <button className={`toggle${on?' on':''}`} onClick={() => {
                           setAccess((prev) => {
                             const confU = prev[u] || uc;
-                            const next = { ...prev, [u]: { ...confU, visible: { ...(confU.visible || {}), [p]: !(confU.visible || {})[p] } } };
+                            const currentOn = ((confU.visible || {})[p] ?? defaultVisible[p] ?? true);
+                            const next = { ...prev, [u]: { ...confU, visible: { ...(confU.visible || {}), [p]: !currentOn } } };
                             S.set('aq-access', next);
                             return next;
                           });
                         }}><span className="knob" /></button>
                       </div>
-                    ))}
+                    )})}
                   </div>
                 </div>
               );
@@ -4018,8 +4021,8 @@ export default function App() {
     return DEFAULT_USER_CREDS;
   });
   const [currentUser,setCurrentUser] = useState(() => S.get('aq-current-user', 'Admin'));
-  const [sessionUser,setSessionUser] = useState('');
-  const [isLoggedIn,setIsLoggedIn] = useState(false);
+  const [sessionUser,setSessionUser] = useState(() => S.get('aq-session-user', ''));
+  const [isLoggedIn,setIsLoggedIn] = useState(() => !!S.get('aq-session-user', ''));
   const [mainSheetUrl, setMainSheetUrl] = useState(() => SHEET_CONFIG.url || '');
   const [obzvonSheetUrl, setObzvonSheetUrl] = useState(() => OBZVON_ALL_SHEET_URL || '');
   const [obzvonWebhook,setObzvonWebhook] = useState(() => S.get('aq-obzvon-webhook', OBZVON_WEBHOOK_DEFAULT));
@@ -4051,6 +4054,7 @@ export default function App() {
     setTimeout(() => setNotif(null), 5000);
   };
   useEffect(() => { S.set('aq-current-user', currentUser); }, [currentUser]);
+  useEffect(() => { S.set('aq-session-user', sessionUser || ''); }, [sessionUser]);
   useEffect(() => { S.set('aq-obzvon-webhook', obzvonWebhook); }, [obzvonWebhook]);
   useEffect(() => { S.set('aq-main-url', mainSheetUrl || ''); }, [mainSheetUrl]);
   useEffect(() => { S.set('aq-obzvon-url', obzvonSheetUrl || ''); }, [obzvonSheetUrl]);
@@ -4080,8 +4084,16 @@ export default function App() {
     if (sessionUser && !users.includes(sessionUser)) {
       setSessionUser('');
       setIsLoggedIn(false);
+      S.set('aq-session-user', '');
+      return;
     }
-  }, [users, currentUser, sessionUser]);
+    if (sessionUser && users.includes(sessionUser)) {
+      if (!isLoggedIn) setIsLoggedIn(true);
+      if (!currentUser || !users.includes(currentUser)) setCurrentUser(sessionUser);
+    } else if (isLoggedIn) {
+      setIsLoggedIn(false);
+    }
+  }, [users, currentUser, sessionUser, isLoggedIn]);
 
   const authenticate = useCallback((loginName, password) => {
     const user = String(loginName || '').trim();
@@ -4103,6 +4115,7 @@ export default function App() {
     setSessionUser(user);
     setCurrentUser(user);
     setIsLoggedIn(true);
+    S.set('aq-session-user', user);
     return true;
   }, [users, getEffectiveCreds]);
 
@@ -4119,6 +4132,7 @@ export default function App() {
   const logout = useCallback(() => {
     setIsLoggedIn(false);
     setSessionUser('');
+    S.set('aq-session-user', '');
   }, []);
 
   const switchUser = (nextUser) => {
@@ -4366,10 +4380,12 @@ export default function App() {
             })}
           </div>
           <div style={{padding:6,borderTop:'1px solid var(--b2)'}}>
-            <div className="nav-i" onClick={()=>setUp(true)} style={{ opacity: autoLoad.loading ? 0.6 : 1 }}>
-              <span style={{fontSize:17,flexShrink:0}}>R</span>
-              {side && <span>Yangilash</span>}
-            </div>
+            {(currentAccess.visible?.refresh ?? true) && (
+              <div className="nav-i" onClick={()=>setUp(true)} style={{ opacity: autoLoad.loading ? 0.6 : 1 }}>
+                <span style={{fontSize:17,flexShrink:0}}>{E.refresh}</span>
+                {side && <span>Yangilash</span>}
+              </div>
+            )}
             {(currentAccess.visible?.settings ?? true) && (
               <div className="nav-i" onClick={()=>setPage('settings')}>
                 <span style={{fontSize:17,flexShrink:0}}>{E.settings}</span>
