@@ -4457,6 +4457,8 @@ export default function App() {
   const [notif,setNotif]   = useState(null);
   const [side,setSide]     = useState(true);
   const [autoLoad,setAutoLoad] = useState({ loading:false, progress:'', error:'' });
+  const [remoteAccessLoaded, setRemoteAccessLoaded] = useState(false);
+  const skipCloudPushRef = useRef(false);
   const buildDefaultCreds = useCallback((baseUsers) => {
     const m = {};
     (baseUsers || []).forEach((u) => { m[u] = u; });
@@ -4475,6 +4477,68 @@ export default function App() {
     });
     return merged;
   }, [users, userCreds, buildDefaultCreds]);
+  const applyRemoteAccessConfig = useCallback((payload) => {
+    if (!payload || typeof payload !== 'object') return false;
+    const srcUsers = Array.isArray(payload.users)
+      ? payload.users.map((u) => String(u || '').trim()).filter(Boolean)
+      : [];
+    const nextUsers = srcUsers.length ? [...new Set(srcUsers)] : users;
+    if (!nextUsers.length) return false;
+
+    const rawAccess = payload.access && typeof payload.access === 'object' ? payload.access : {};
+    const rawCreds = payload.userCreds && typeof payload.userCreds === 'object' ? payload.userCreds : {};
+
+    const nextAccess = {};
+    const nextCreds = {};
+    nextUsers.forEach((u) => {
+      nextAccess[u] = normalizeAccessConfig(u, rawAccess[u] || access[u] || DEFAULT_ACCESS[u]);
+      const fromRemote = String(rawCreds[u] ?? '').trim();
+      const fromLocal = String((userCreds || {})[u] ?? '').trim();
+      nextCreds[u] = fromRemote || fromLocal || DEFAULT_USER_CREDS[u] || u;
+    });
+
+    skipCloudPushRef.current = true;
+    setUsers(nextUsers);
+    setAccess(nextAccess);
+    setUserCreds(nextCreds);
+    S.set('aq-users', nextUsers);
+    S.set('aq-access', nextAccess);
+    S.set('aq-user-creds', nextCreds);
+    return true;
+  }, [users, access, userCreds]);
+
+  const loadRemoteAccessConfig = useCallback(async () => {
+    if (!obzvonWebhook) {
+      setRemoteAccessLoaded(true);
+      return;
+    }
+    try {
+      const sep = obzvonWebhook.includes('?') ? '&' : '?';
+      const url = `${obzvonWebhook}${sep}action=access_get&_=${Date.now()}`;
+      const r = await fetch(url);
+      if (r.ok) {
+        const j = await r.json();
+        if (j?.ok && j?.accessConfig) {
+          applyRemoteAccessConfig(j.accessConfig);
+        }
+      }
+    } catch {}
+    setRemoteAccessLoaded(true);
+  }, [obzvonWebhook, applyRemoteAccessConfig]);
+
+  const pushRemoteAccessConfig = useCallback(async (payload) => {
+    if (!obzvonWebhook) return;
+    try {
+      await fetch(obzvonWebhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'access_set',
+          accessConfig: payload,
+        }),
+      });
+    } catch {}
+  }, [obzvonWebhook]);
 
   const notify = (msg, type='ok') => {
     setNotif({ msg, type });
@@ -4495,6 +4559,36 @@ export default function App() {
   }, [obzvonSheetUrl]);
   useEffect(() => { S.set('aq-obzvon-records', obzvonRecords || []); }, [obzvonRecords]);
   useEffect(() => { S.set('aq-user-creds', userCreds || {}); }, [userCreds]);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    setRemoteAccessLoaded(false);
+    loadRemoteAccessConfig();
+  }, [isLoggedIn, loadRemoteAccessConfig]);
+  useEffect(() => {
+    if (!isLoggedIn || !obzvonWebhook) return;
+    const t = setInterval(() => {
+      loadRemoteAccessConfig();
+    }, 60000);
+    return () => clearInterval(t);
+  }, [isLoggedIn, obzvonWebhook, loadRemoteAccessConfig]);
+  useEffect(() => {
+    if (!isLoggedIn || sessionUser !== 'Admin' || !remoteAccessLoaded) return;
+    if (skipCloudPushRef.current) {
+      skipCloudPushRef.current = false;
+      return;
+    }
+    const payload = {
+      users,
+      access,
+      userCreds,
+      updatedAt: new Date().toISOString(),
+      updatedBy: sessionUser,
+    };
+    const t = setTimeout(() => {
+      pushRemoteAccessConfig(payload);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [users, access, userCreds, isLoggedIn, sessionUser, remoteAccessLoaded, pushRemoteAccessConfig]);
 
   useEffect(() => {
     if (users.length === 0) return;
