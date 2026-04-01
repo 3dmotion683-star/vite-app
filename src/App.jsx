@@ -4607,16 +4607,23 @@ export default function App() {
   useEffect(() => { S.set('aq-user-creds', userCreds || {}); }, [userCreds]);
   useEffect(() => {
     if (!isLoggedIn) return;
+    // Admin sessiyada local sozlamalar authoritative:
+    // remote pull bilan lokal qo'shilgan loginlar bekor bo'lib qolmasin.
+    if (sessionUser === 'Admin') {
+      setRemoteAccessLoaded(true);
+      return;
+    }
     setRemoteAccessLoaded(false);
     loadRemoteAccessConfig();
-  }, [isLoggedIn, loadRemoteAccessConfig]);
+  }, [isLoggedIn, sessionUser, loadRemoteAccessConfig]);
   useEffect(() => {
-    if (!isLoggedIn || !obzvonWebhook) return;
+    // Admin uchun interval pull kerak emas (faqat push ishlaydi).
+    if (!isLoggedIn || !obzvonWebhook || sessionUser === 'Admin') return;
     const t = setInterval(() => {
       loadRemoteAccessConfig();
     }, 60000);
     return () => clearInterval(t);
-  }, [isLoggedIn, obzvonWebhook, loadRemoteAccessConfig]);
+  }, [isLoggedIn, obzvonWebhook, sessionUser, loadRemoteAccessConfig]);
   useEffect(() => {
     if (!isLoggedIn || sessionUser !== 'Admin' || !remoteAccessLoaded) return;
     if (skipCloudPushRef.current) {
