@@ -156,15 +156,16 @@ const FILTER_CHECK_TEXT_STYLE = {
 const isNameExcludedForActiveStats = (name) => {
   const n = String(name || '').trim().toUpperCase();
   if (!n) return true;
-  if (n.startsWith('Я TUGATILDI') || n.startsWith('РЇ TUGATILDI')) return true;
-  if (n.startsWith('Я ESKI') || n.startsWith('РЇ ESKI')) return true;
+  if (isNameInactiveByPrefix(n)) return true;
   if (/^[KК]\b/.test(n)) return true;
   return false;
 };
 const isNameInactiveByPrefix = (name) => {
-  const n = String(name || '').trim().toUpperCase();
+  const n = String(name || '').trim().toUpperCase().replace(/\s+/g, ' ');
   if (!n) return false;
-  return n.startsWith('Я') || n.startsWith('РЇ');
+  if (n.startsWith('Я') || n.startsWith('РЇ') || n.startsWith('YA')) return true;
+  if ((n.includes('TUGATILDI') || n.includes('ESKI')) && (n.includes('Я') || n.includes('РЇ') || n.includes('YA'))) return true;
+  return false;
 };
 const isAhmadteaTag = (v) => {
   const s = normText(v).replace(/[\s._-]+/g, '');
