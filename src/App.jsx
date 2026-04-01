@@ -1178,12 +1178,15 @@ function normalizeAccessConfig(user, cfg) {
     ? { scope:'all', activeScope:'all', customerTabs:{ ...DEFAULT_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true } }
     : { scope:'own', activeScope:'own', customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false } };
   const scope = src.scope || base.scope;
-  return {
+  const normalized = {
     scope,
     activeScope: src.activeScope || (scope === 'own' ? 'own' : base.activeScope),
     visible: { ...base.visible, ...(src.visible || {}) },
     customerTabs: { ...base.customerTabs, ...(src.customerTabs || {}) },
   };
+  // Admin always keeps Settings access to avoid accidental lockout.
+  if (isAdmin) normalized.visible.settings = true;
+  return normalized;
 }
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ UPLOAD MODAL в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
@@ -4513,7 +4516,12 @@ export default function App() {
     }
     if (sessionUser && users.includes(sessionUser)) {
       if (!isLoggedIn) setIsLoggedIn(true);
-      if (!currentUser || !users.includes(currentUser)) setCurrentUser(sessionUser);
+      // Non-admin login must always work with its own profile/ruxsatlar.
+      if (sessionUser !== 'Admin' && currentUser !== sessionUser) {
+        setCurrentUser(sessionUser);
+      } else if (!currentUser || !users.includes(currentUser)) {
+        setCurrentUser(sessionUser);
+      }
     } else if (isLoggedIn) {
       setIsLoggedIn(false);
     }
@@ -4676,6 +4684,7 @@ export default function App() {
   }, [appendObzvonAllRow]);
   const sendToWebhook = useCallback(async () => {
     if (!obzvonWebhook || !obzvonRecords.length) return;
+    const webhookUser = sessionUser === 'Admin' ? currentUser : (sessionUser || currentUser || 'Admin');
     const payload = obzvonRecords.map((r) => ({
       mijozId: r.id || '',
       mijozIsmi: r.customer || '',
@@ -4685,7 +4694,7 @@ export default function App() {
       keyingiSana: r.nextDate || '',
       zakazSoni: r.orderCount || '',
       zakazSanasi: r.orderDate || '',
-      operator: r.operator || currentUser || '',
+      operator: r.operator || webhookUser,
     }));
     try {
       await fetch(obzvonWebhook, {
@@ -4694,7 +4703,7 @@ export default function App() {
         body: JSON.stringify(payload),
       });
     } catch {}
-  }, [obzvonWebhook, obzvonRecords, currentUser]);
+  }, [obzvonWebhook, obzvonRecords, currentUser, sessionUser]);
 
   useEffect(() => {
     loadFromConfig();
@@ -4717,9 +4726,16 @@ export default function App() {
   }, [sendToWebhook]);
 
   const rawD = data || { customers:[], orders:[], cashbox:[], contacts:[], rawOrders:[], rawCash:[], ordersByMId:{}, cashByMId:{}, kulerInstallments:[], assignmentById:{}, debtorsByBalance:[], otherDebtorsByBalance:[] };
-  const currentAccess = normalizeAccessConfig(currentUser, access[currentUser] || DEFAULT_ACCESS[currentUser] || DEFAULT_ACCESS.Admin);
+  // Effective profile: Admin can switch users, others are locked to their own login.
+  const effectiveUser = sessionUser === 'Admin'
+    ? currentUser
+    : (sessionUser || currentUser || 'Admin');
+  const currentAccess = normalizeAccessConfig(
+    effectiveUser,
+    access[effectiveUser] || DEFAULT_ACCESS[effectiveUser] || DEFAULT_ACCESS.Admin
+  );
   const scopeOwn = currentAccess.scope === 'own';
-  const ownIds = new Set(Object.entries(rawD.assignmentById || {}).filter(([,op]) => op === currentUser).map(([id]) => id));
+  const ownIds = new Set(Object.entries(rawD.assignmentById || {}).filter(([,op]) => op === effectiveUser).map(([id]) => id));
   const D = useMemo(() => {
     if (!scopeOwn) return rawD;
     const customers = (rawD.customers || []).filter((c) => ownIds.has(c.id));
@@ -4795,12 +4811,14 @@ export default function App() {
   const obzvonCnt  = D.customers.filter((c)=>c.daysAgo!=null&&c.daysAgo>14).length;
   const debtorCnt  = debtorsByBalance.length;
   const doljnikiCnt = doljniki.length;
-  const visibleNav = NAV.filter((n) => (currentAccess.visible?.[n.id] ?? true));
+  const canViewPage = useCallback((id) => (currentAccess.visible?.[id] ?? true), [currentAccess]);
+  const visibleNav = NAV.filter((n) => canViewPage(n.id));
   const pageMeta = NAV.find((n)=>n.id===page) || { id:'settings', icon:E.settings, label:'Nastroyka' };
   useEffect(() => {
-    if (page === 'settings') return;
-    if (!visibleNav.find((n) => n.id === page)) setPage(visibleNav[0]?.id || 'dash');
-  }, [visibleNav, page]);
+    if (canViewPage(page)) return;
+    const fallback = visibleNav[0]?.id || (canViewPage('settings') ? 'settings' : 'dash');
+    setPage(fallback);
+  }, [visibleNav, page, canViewPage]);
 
   if (!isLoggedIn) {
     return (
@@ -4877,7 +4895,7 @@ export default function App() {
                   {users.map((u)=><option key={u}>{u}</option>)}
                 </select>
               ) : (
-                <span className="tag" style={{background:'var(--s3)',color:'var(--t2)'}}>{currentUser}</span>
+                <span className="tag" style={{background:'var(--s3)',color:'var(--t2)'}}>{effectiveUser}</span>
               )}
               <button className="btn btn-gh btn-sm" onClick={logout}>Chiqish</button>
               {obzvonCnt>0 && (
@@ -4919,14 +4937,14 @@ export default function App() {
               </div>
             ) : (
               <>
-                {page==='dash'    && <Dashboard D={D}/>}
-                {page==='cust'    && <Customers D={rawD} currentUser={currentUser} currentAccess={currentAccess} assignmentById={rawD.assignmentById || {}}/>}
-                {page==='orders'  && <Orders    D={D}/>}
-                {page==='kassa'   && <Kassa     D={D}/>}
-                {page==='obzvon'  && <Obzvon    D={D} allRows={obzvonAllRows} onAppendAllRow={appendObzvonAllRow} onReloadAll={()=>loadObzvonAll(obzvonSheetUrl, { full:true, force:true })} webhookUrl={obzvonWebhook} currentUser={currentUser} records={obzvonRecords} setRecords={setObzvonRecords} />}
-                {page==='doljniki'&& <Doljniki rows={doljniki} otherRows={otherDoljniki} D={D} kulerRows={D.kulerInstallments || []} onAddToObzvon={addObzvonRows} currentUser={currentUser} />}
-                {page==='reports' && <Reports   D={D}/>}
-                {page==='settings'&& <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} />}
+                {page==='dash'    && canViewPage('dash') && <Dashboard D={D}/>}
+                {page==='cust'    && canViewPage('cust') && <Customers D={rawD} currentUser={effectiveUser} currentAccess={currentAccess} assignmentById={rawD.assignmentById || {}}/>}
+                {page==='orders'  && canViewPage('orders') && <Orders    D={D}/>}
+                {page==='kassa'   && canViewPage('kassa') && <Kassa     D={D}/>}
+                {page==='obzvon'  && canViewPage('obzvon') && <Obzvon    D={D} allRows={obzvonAllRows} onAppendAllRow={appendObzvonAllRow} onReloadAll={()=>loadObzvonAll(obzvonSheetUrl, { full:true, force:true })} webhookUrl={obzvonWebhook} currentUser={effectiveUser} records={obzvonRecords} setRecords={setObzvonRecords} />}
+                {page==='doljniki'&& canViewPage('doljniki') && <Doljniki rows={doljniki} otherRows={otherDoljniki} D={D} kulerRows={D.kulerInstallments || []} onAddToObzvon={addObzvonRows} currentUser={effectiveUser} />}
+                {page==='reports' && canViewPage('reports') && <Reports   D={D}/>}
+                {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} />}
               </>
             )}
           </div>
