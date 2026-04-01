@@ -589,7 +589,7 @@ function processAll(mainData) {
      A(r[0])=ZakazNom  D(r[3])=Mahsulot  H(r[7])=Miqdor  I(r[8])=Summa
      J(r[9])=Kat  K(r[10])=KontragentNom  L(r[11])=Valyuta
      M(r[12])=HujjatTuri  N(r[13])=Status  R(r[17])=UniqueID
-     V(r[21])=Agent  X(r[23])=DostavchikIsmi  Y(r[24])=Sana  AD(r[29])=MijozID */
+     V(r[21])=Agent  W(r[22])=Yetib borgan sana  X(r[23])=DostavchikIsmi  AD(r[29])=MijozID */
   const orderSheet = mainData.sheets['public.view_item_basket'];
   const rawOrders = [];
   if (orderSheet) {
@@ -606,7 +606,7 @@ function processAll(mainData) {
       const uniqueId   = String(r[17] || '').trim();
       const agent      = String(r[21] || '').trim();
       const delivPerson= String(r[23] || '').trim(); // X ustun = dostavchik ismi
-      const orderDate  = String(r[24] || '').trim(); // Y ustun = zakaz/vozvrat sanasi
+      const orderDate  = String(r[22] || '').trim(); // W ustun = yetib borgan sana
       const mId        = normId(r[29]);
       const price      = qty && qty !== 0 ? Math.abs(sum / qty) : 0;
 
