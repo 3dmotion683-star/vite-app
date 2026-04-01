@@ -869,10 +869,11 @@ function processAll(mainData) {
     };
   }).filter((x) => x.principal > 0);
   const debtorsByBalance = customers.filter((c) => !isExcludedZCategory(c.source) && (c.balanceUZS ?? 0) < 0);
+  const otherDebtorsByBalance = customers.filter((c) => isExcludedZCategory(c.source) && (c.balanceUZS ?? 0) < 0);
 
   return {
     customers, orders: rawOrders, cashbox: rawCash, contacts,
-    rawOrders, rawCash, ordersByMId, cashByMId, kulerInstallments, assignmentById, debtorsByBalance,
+    rawOrders, rawCash, ordersByMId, cashByMId, kulerInstallments, assignmentById, debtorsByBalance, otherDebtorsByBalance,
   };
 }
 
@@ -1928,7 +1929,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
       return nonAhmadteaNonZ.filter((c) => isNameInactiveByPrefix(c.name));
     }
     if (segment === 'other_customers') {
-      return nonAhmadtea.filter((c) => isExcludedZCategory(c.source));
+      return nonAhmadtea.filter((c) => isExcludedZCategory(c.source) && !isNameInactiveByPrefix(c.name));
     }
     // Hamma mijozlar: public.view_merchants dagi hamma mijoz.
     return customers;
@@ -3580,7 +3581,7 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
   );
 }
 
-function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
+function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUser }) {
   const [tab, setTab] = useState('qarz');
   const [search, setSearch] = useState('');
   const [fCats, setCats] = useState([]);
@@ -3594,11 +3595,12 @@ function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
   const [pickMode, setPickMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState({});
   const [kulerMonthsCfg, setKulerMonthsCfg] = useState(() => S.get('aq-kuler-months', {}));
-  const categories = [...new Set(rows.map((r) => r.category).filter(Boolean))].sort();
+  const activeDebtRows = useMemo(() => (tab === 'other_qarz' ? (otherRows || []) : (rows || [])), [tab, rows, otherRows]);
+  const categories = [...new Set(activeDebtRows.map((r) => r.category).filter(Boolean))].sort();
   const shownCats = categories.filter((c) => c.toLowerCase().includes(catQuery.toLowerCase()));
 
   const list = useMemo(() => {
-    let r = rows;
+    let r = activeDebtRows;
     const q = search.toLowerCase();
     if (q) r = r.filter((x)=> (x.name||'').toLowerCase().includes(q) || String(x.id||'').toLowerCase().includes(q) || (x.orderNo||'').toLowerCase().includes(q));
     if (fCats.length) r = r.filter((x) => fCats.includes(x.category));
@@ -3606,7 +3608,7 @@ function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
     if (fDayTo !== '') r = r.filter((x) => (x.days ?? 0) <= Number(fDayTo));
     if (fNote) r = r.filter((x) => (x.note || '').toLowerCase().includes(fNote.toLowerCase()));
     return r;
-  }, [rows, search, fCats, fDayFrom, fDayTo, fNote]);
+  }, [activeDebtRows, search, fCats, fDayFrom, fDayTo, fNote]);
 
   const debtSum = list.reduce((s, r) => s + Math.abs(r.debtUZS), 0);
   const d15 = list.filter((r) => (r.days ?? 0) > 15);
@@ -3701,12 +3703,13 @@ function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
       <div className="tabs" style={{display:'inline-flex'}}>
         <button className={`tab${tab==='qarz'?' on':''}`} onClick={()=>setTab('qarz')}>Doljniki</button>
+        <button className={`tab${tab==='other_qarz'?' on':''}`} onClick={()=>setTab('other_qarz')}>Boshqa qarzdorli</button>
         <button className={`tab${tab==='kuler'?' on':''}`} onClick={()=>setTab('kuler')}>Kuler Nasiya</button>
       </div>
-      {tab==='qarz' ? (
+      {tab!=='kuler' ? (
         <>
           <div className="g4">
-            <StatCard l="QARZDORLAR" v={list.length+' ta'} s="UZS bo'yicha" c="var(--rd)"/>
+            <StatCard l={tab==='other_qarz' ? "BOSHQA QARZDORLAR" : "QARZDORLAR"} v={list.length+' ta'} s="UZS bo'yicha" c="var(--rd)"/>
             <StatCard l="JAMI QARZ" v={fmt(debtSum)+" so'm"} s="faqat UZS" c="var(--or)"/>
             <StatCard l="15+ KUN QARZDOR" v={d15.length+' ta'} s={fmt(d15Sum)+" so'm"} c="var(--yl)"/>
             <StatCard l="QARZ RO'YXATI" v={fmt(debtSum)+" so'm"} s={`${list.length} ta mijoz`} c="var(--bl)"/>
@@ -4712,7 +4715,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [sendToWebhook]);
 
-  const rawD = data || { customers:[], orders:[], cashbox:[], contacts:[], rawOrders:[], rawCash:[], ordersByMId:{}, cashByMId:{}, kulerInstallments:[], assignmentById:{}, debtorsByBalance:[] };
+  const rawD = data || { customers:[], orders:[], cashbox:[], contacts:[], rawOrders:[], rawCash:[], ordersByMId:{}, cashByMId:{}, kulerInstallments:[], assignmentById:{}, debtorsByBalance:[], otherDebtorsByBalance:[] };
   const currentAccess = normalizeAccessConfig(currentUser, access[currentUser] || DEFAULT_ACCESS[currentUser] || DEFAULT_ACCESS.Admin);
   const scopeOwn = currentAccess.scope === 'own';
   const ownIds = new Set(Object.entries(rawD.assignmentById || {}).filter(([,op]) => op === currentUser).map(([id]) => id));
@@ -4735,11 +4738,13 @@ export default function App() {
       cashByMId,
       kulerInstallments: (rawD.kulerInstallments || []).filter((k)=>idSet.has(k.customerId)),
       debtorsByBalance: (rawD.debtorsByBalance || []).filter((c)=>idSet.has(c.id)),
+      otherDebtorsByBalance: (rawD.otherDebtorsByBalance || []).filter((c)=>idSet.has(c.id)),
     };
   }, [rawD, scopeOwn, ownIds]);
   const debtorsByBalance = (D.debtorsByBalance && D.debtorsByBalance.length)
     ? D.debtorsByBalance
     : (D.customers || []).filter((c) => c.balanceUZS < 0);
+  const otherDebtorsByBalance = D.otherDebtorsByBalance || [];
   const doljniki = useMemo(() => {
     return debtorsByBalance
       .map((c) => {
@@ -4763,6 +4768,29 @@ export default function App() {
       })
       .sort((a, b) => a.debtUZS - b.debtUZS);
   }, [debtorsByBalance, D.ordersByMId]);
+  const otherDoljniki = useMemo(() => {
+    return otherDebtorsByBalance
+      .map((c) => {
+        const related = (D.ordersByMId?.[c.id] || []);
+        const debtOrder = related.find((o) => o.soNum === c.lastDocNum);
+        const debtOrderDate = debtOrder?.orderDate || c.lastOrderDate || '';
+        return {
+          lastOrderProduct: debtOrder?.product || '',
+          id: c.id || '—',
+          category: c.source || '—',
+          name: c.name || '—',
+          debtUZS: c.balanceUZS,
+          lastOrderDate: debtOrderDate,
+          days: debtOrderDate ? daysAgo(debtOrderDate) : c.daysAgo,
+          orderNo: c.lastDocNum || '—',
+          qty: c.lastQty || 0,
+          lastSum: c.lastSum || 0,
+          agent: c.lastAgent || '—',
+          note: c.merchantNote || '—',
+        };
+      })
+      .sort((a, b) => a.debtUZS - b.debtUZS);
+  }, [otherDebtorsByBalance, D.ordersByMId]);
   const obzvonCnt  = D.customers.filter((c)=>c.daysAgo!=null&&c.daysAgo>14).length;
   const debtorCnt  = debtorsByBalance.length;
   const doljnikiCnt = doljniki.length;
@@ -4895,7 +4923,7 @@ export default function App() {
                 {page==='orders'  && <Orders    D={D}/>}
                 {page==='kassa'   && <Kassa     D={D}/>}
                 {page==='obzvon'  && <Obzvon    D={D} allRows={obzvonAllRows} onAppendAllRow={appendObzvonAllRow} onReloadAll={()=>loadObzvonAll(obzvonSheetUrl, { full:true, force:true })} webhookUrl={obzvonWebhook} currentUser={currentUser} records={obzvonRecords} setRecords={setObzvonRecords} />}
-                {page==='doljniki'&& <Doljniki rows={doljniki} D={D} kulerRows={D.kulerInstallments || []} onAddToObzvon={addObzvonRows} currentUser={currentUser} />}
+                {page==='doljniki'&& <Doljniki rows={doljniki} otherRows={otherDoljniki} D={D} kulerRows={D.kulerInstallments || []} onAddToObzvon={addObzvonRows} currentUser={currentUser} />}
                 {page==='reports' && <Reports   D={D}/>}
                 {page==='settings'&& <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} />}
               </>
