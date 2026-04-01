@@ -4145,6 +4145,10 @@ function SettingsPanel({
   ];
 
   const addUser = () => {
+    if (!isAdminSession) {
+      alert('Yangi login qo‘shish faqat Admin uchun ochiq');
+      return;
+    }
     const name = prompt("Yangi login nomi:");
     if (!name || !name.trim()) return;
     const u = name.trim();
@@ -4245,7 +4249,7 @@ function SettingsPanel({
             ) : (
               <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{currentUser}</span>
             )}
-            <button className="btn btn-gh btn-sm" onClick={addUser}>+ Login qo'shish</button>
+            <button className="btn btn-gh btn-sm" onClick={addUser} disabled={!isAdminSession}>+ Login qo'shish</button>
           </div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:10}}>
             {users.map((u) => {
@@ -4866,7 +4870,11 @@ export default function App() {
         {/* SIDEBAR */}
         <div style={{width:side?215:56,background:'var(--s1)',borderRight:'1px solid var(--b2)',display:'flex',flexDirection:'column',transition:'width .2s',flexShrink:0,overflow:'hidden'}}>
           <div style={{padding:'13px 11px',borderBottom:'1px solid var(--b2)',display:'flex',alignItems:'center',gap:10}}>
-            <div style={{width:30,height:30,background:'linear-gradient(135deg,var(--bl),#1d4ed8)',borderRadius:8,display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{E.water}</div>
+            <img
+              src="/New.png"
+              alt="AquaBiz logo"
+              style={{width:30,height:30,borderRadius:8,objectFit:'cover',flexShrink:0,display:'block'}}
+            />
             {side && <span style={{fontWeight:800,fontSize:14,whiteSpace:'nowrap'}}>AquaBiz Pro</span>}
           </div>
           <div style={{flex:1,padding:'8px 6px',overflowY:'auto',overflowX:'hidden'}}>
