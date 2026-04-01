@@ -100,9 +100,9 @@ const SHEET_CONFIG = {
 const OBZVON_ALL_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=0#gid=0';
 const OBZVON_ALL_LIMIT = 100;
 const OBZVON_ALL_INSTALLED_KEY = 'aq-obzvon-all-installed';
-// Apps Script Web App URL ni shu yerga qo'ying (Deploy qilingandan keyin):
-// Misol: https://script.google.com/macros/s/AKfycb.../exec
-const OBZVON_WEBHOOK_DEFAULT = 'https://script.google.com/macros/s/AKfycbyi1OP_a_5C7-TBujLuo9dDast0RLVelhQsTiO6dlN_mefi55vnTHm_ZRXpDFFTTXb7qA/exec';
+const ACCESS_SYNC_URL_KEY = 'aq-access-api-url';
+// Access konfiguratsiya sinxroni uchun Cloudflare Worker API URL:
+const OBZVON_WEBHOOK_DEFAULT = 'https://solitary-brook-4889aquabiz-api.3dmotion683.workers.dev';
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ HELPERS в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 const fmt  = (n) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
@@ -282,6 +282,47 @@ function parseObzvonAllRows(rows = []) {
       orderDate: r[10] || '',
     }))
     .filter((x) => x.customer || x.customerId || x.no);
+}
+
+const ACCESS_SYNC_TOPIC = 'AQ_ACCESS';
+const ACCESS_SYNC_CUSTOMER = '__AQCFG__';
+const ACCESS_SYNC_OPERATOR = 'AQ_SYNC';
+
+function encodeAccessConfig(payload) {
+  try {
+    const raw = JSON.stringify(payload || {});
+    return btoa(unescape(encodeURIComponent(raw)));
+  } catch {
+    return '';
+  }
+}
+function decodeAccessConfig(encoded) {
+  try {
+    if (!encoded) return null;
+    const json = decodeURIComponent(escape(atob(String(encoded))));
+    const obj = JSON.parse(json);
+    return obj && typeof obj === 'object' ? obj : null;
+  } catch {
+    return null;
+  }
+}
+function isAccessSyncRow(r) {
+  if (!r) return false;
+  const topic = String(r.topic || '').trim();
+  const customer = String(r.customer || '').trim();
+  const op = String(r.operator || '').trim();
+  return topic === ACCESS_SYNC_TOPIC || customer === ACCESS_SYNC_CUSTOMER || op === ACCESS_SYNC_OPERATOR;
+}
+function extractAccessConfigFromRows(rows = []) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const candidates = rows.filter((r) => isAccessSyncRow(r));
+  if (!candidates.length) return null;
+  const latest = candidates[candidates.length - 1];
+  const encoded = String(latest.note || latest.callDate || latest.customerId || '').trim();
+  const decoded = decodeAccessConfig(encoded);
+  if (!decoded || typeof decoded !== 'object') return null;
+  if (!Array.isArray(decoded.users) || !decoded.users.length) return null;
+  return decoded;
 }
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ STATUS HELPERS в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
@@ -1192,7 +1233,6 @@ function normalizeAccessConfig(user, cfg) {
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ UPLOAD MODAL в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 function UploadModal({
   onLoad,
-  onLoadObzvonAll,
   hasData,
   onClose,
   mainSheetUrl,
@@ -1249,23 +1289,18 @@ function UploadModal({
 
   const doLoadSheets = async () => {
     const usedMainUrl = fixedMainUrl || mainSheetUrl || '';
-    const usedObzvonUrl = fixedObzvonUrl || obzvonSheetUrl || '';
     const usedSheetId = extractSheetId(usedMainUrl);
-    const usedObzvonSheetId = extractSheetId(usedObzvonUrl);
     if (!usedSheetId) { alert("Google Sheets URL kodda sozlanmagan!"); return; }
     setLoad(true);
     try {
       if (setMainSheetUrl) setMainSheetUrl(usedMainUrl);
-      if (setObzvonSheetUrl) setObzvonSheetUrl(usedObzvonUrl);
       S.set('aq-main-url', usedMainUrl);
-      S.set('aq-obzvon-url', usedObzvonUrl);
       const raw = await loadFromGoogleSheets(usedSheetId, gids, setProg, 'named');
       setProg('Hisoblanmoqda...');
       setTimeout(() => {
         try {
           const data = processAll(raw);
           onLoad(data);
-          if (usedObzvonSheetId && onLoadObzvonAll) onLoadObzvonAll(usedObzvonUrl);
           setProg('');
         } catch (e2) { alert('Hisoblash xatosi: '+e2.message); setLoad(false); setProg(''); }
       }, 50);
@@ -2659,8 +2694,9 @@ function Kassa({ D }) {
 }
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ OBZVON в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
-function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', currentUser='Admin', records=[], setRecords=()=>{} }) {
+function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
   const { customers, rawOrders=[] } = D;
+  const onReloadAll = () => {};
   const [tab, setTab] = useState('main');
   const [searchAll, setSearchAll] = useState('');
   const [pickQuery, setPickQuery] = useState('');
@@ -2725,16 +2761,11 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
     };
     const next = [row, ...records];
     saveRecords(next);
-    if (onAppendAllRow) onAppendAllRow(row);
-    if (webhookUrl) {
-      try { await fetch(webhookUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(row) }); } catch {}
-    }
   };
   const archiveCurrentUserRows = () => {
     const mine = (records || []).filter((r) => (r.operator || currentUser) === currentUser);
     const archived = mine.filter((r) => (r.customer || r.id) && String(r.note || '').trim());
     if (!archived.length) return;
-    archived.forEach((r) => onAppendAllRow?.(r));
     const left = (records || []).filter((r) => {
       if ((r.operator || currentUser) !== currentUser) return true;
       return !(r.customer || r.id) || !String(r.note || '').trim();
@@ -2757,7 +2788,9 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
         customerId: r.id,
         orderDate: r.orderDate,
       }));
-    let base = [...localRows, ...allRows].map((r) => {
+    let base = [...localRows]
+      .filter((r) => !isAccessSyncRow(r))
+      .map((r) => {
       const cid = String(r.customerId || r.id || '').trim();
       const liveName = cid ? (customerNameById[cid] || '') : '';
       return {
@@ -2779,7 +2812,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
       return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
     });
     return base;
-  }, [allRows, records, customerNameById]);
+  }, [records, customerNameById]);
 
   const allList = useMemo(() => {
     const q = deferredSearchAll.toLowerCase();
@@ -3052,7 +3085,6 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12}}>
       <div className="tabs" style={{display:'inline-flex'}}>
         <button className={`tab${tab==='main'?' on':''}`} onClick={()=>setTab('main')}>Obzvon</button>
-        <button className={`tab${tab==='all'?' on':''}`} onClick={()=>setTab('all')}>Barcha Obzvon</button>
         <button className={`tab${tab==='due'?' on':''}`} onClick={()=>setTab('due')}>Vaqti Kelgan</button>
         <button className={`tab${tab==='op'?' on':''}`} onClick={()=>setTab('op')}>Operator jadvali</button>
       </div>
@@ -3318,7 +3350,6 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
                     operator: currentUser,
                   }));
                   saveRecords([...rows, ...records]);
-                  rows.forEach((x)=>onAppendAllRow?.(x));
                   setDueSelectedIds({});
                   setDuePickMode(false);
                   setTab('main');
@@ -3447,7 +3478,6 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
                     operator: currentUser,
                   }));
                   saveRecords([...rows, ...records]);
-                  rows.forEach((x)=>onAppendAllRow?.(x));
                   setOpSelectedIds({});
                   setOpPickMode(false);
                   setTab('main');
@@ -4357,9 +4387,9 @@ function SettingsPanel({
 
       {tab==='app' && (
         <div className="card" style={{padding:14}}>
-          <div style={{fontWeight:700,marginBottom:8}}>Obzvon webhook URL</div>
-          <input className="input" placeholder="https://script.google.com/macros/s/.../exec" value={webhookUrl} onChange={(e)=>setWebhookUrl(e.target.value)} />
-          <div style={{fontSize:11,color:'var(--t3)',marginTop:8}}>Bu URL ga Tab 1 obzvon yozuvlari yuboriladi (real-time va 07:00 sinxron).</div>
+          <div style={{fontWeight:700,marginBottom:8}}>Access API URL</div>
+          <input className="input" placeholder="https://your-access-api.workers.dev" value={webhookUrl} onChange={(e)=>setWebhookUrl(e.target.value)} />
+          <div style={{fontSize:11,color:'var(--t3)',marginTop:8}}>Bu URL faqat login, parol va ruxsatlarni barcha kompyuterlarda bir xil saqlash uchun ishlatiladi.</div>
           <div style={{marginTop:14,padding:10,border:'1px dashed var(--b1)',borderRadius:8,color:'var(--t3)',fontSize:12}}>Kelajak sozlamalari uchun joy.</div>
         </div>
       )}
@@ -4437,8 +4467,6 @@ const NAV = [
 export default function App() {
   const [page,setPage]     = useState('dash');
   const [data,setData]     = useState(null);
-  const [obzvonAllRows,setObzvonAllRows] = useState(() => S.get('aq-obzvon-all-cache', []) || []);
-  const [obzvonAllInstalled,setObzvonAllInstalled] = useState(() => !!S.get(OBZVON_ALL_INSTALLED_KEY, false));
   const [obzvonRecords,setObzvonRecords] = useState(() => S.get('aq-obzvon-records', []));
   const [users,setUsers] = useState(() => S.get('aq-users', DEFAULT_USERS));
   const [access,setAccess] = useState(() => S.get('aq-access', DEFAULT_ACCESS));
@@ -4452,7 +4480,9 @@ export default function App() {
   const [isLoggedIn,setIsLoggedIn] = useState(() => !!S.get('aq-session-user', ''));
   const [mainSheetUrl, setMainSheetUrl] = useState(() => SHEET_CONFIG.url || '');
   const [obzvonSheetUrl, setObzvonSheetUrl] = useState(() => OBZVON_ALL_SHEET_URL || '');
-  const [obzvonWebhook,setObzvonWebhook] = useState(() => S.get('aq-obzvon-webhook', OBZVON_WEBHOOK_DEFAULT));
+  const [obzvonWebhook,setObzvonWebhook] = useState(() =>
+    S.get(ACCESS_SYNC_URL_KEY, S.get('aq-obzvon-webhook', OBZVON_WEBHOOK_DEFAULT))
+  );
   const [showUp,setUp]     = useState(false);
   const [notif,setNotif]   = useState(null);
   const [side,setSide]     = useState(true);
@@ -4478,15 +4508,19 @@ export default function App() {
     return merged;
   }, [users, userCreds, buildDefaultCreds]);
   const applyRemoteAccessConfig = useCallback((payload) => {
-    if (!payload || typeof payload !== 'object') return false;
-    const srcUsers = Array.isArray(payload.users)
-      ? payload.users.map((u) => String(u || '').trim()).filter(Boolean)
+    let cfg = payload;
+    if (typeof cfg === 'string') {
+      try { cfg = JSON.parse(cfg); } catch { return false; }
+    }
+    if (!cfg || typeof cfg !== 'object') return false;
+    const srcUsers = Array.isArray(cfg.users)
+      ? cfg.users.map((u) => String(u || '').trim()).filter(Boolean)
       : [];
     const nextUsers = srcUsers.length ? [...new Set(srcUsers)] : users;
     if (!nextUsers.length) return false;
 
-    const rawAccess = payload.access && typeof payload.access === 'object' ? payload.access : {};
-    const rawCreds = payload.userCreds && typeof payload.userCreds === 'object' ? payload.userCreds : {};
+    const rawAccess = cfg.access && typeof cfg.access === 'object' ? cfg.access : {};
+    const rawCreds = cfg.userCreds && typeof cfg.userCreds === 'object' ? cfg.userCreds : {};
 
     const nextAccess = {};
     const nextCreds = {};
@@ -4496,6 +4530,11 @@ export default function App() {
       const fromLocal = String((userCreds || {})[u] ?? '').trim();
       nextCreds[u] = fromRemote || fromLocal || DEFAULT_USER_CREDS[u] || u;
     });
+
+    const sameUsers = JSON.stringify(nextUsers) === JSON.stringify(users);
+    const sameAccess = JSON.stringify(nextAccess) === JSON.stringify(access || {});
+    const sameCreds = JSON.stringify(nextCreds) === JSON.stringify(userCreds || {});
+    if (sameUsers && sameAccess && sameCreds) return true;
 
     skipCloudPushRef.current = true;
     setUsers(nextUsers);
@@ -4520,6 +4559,8 @@ export default function App() {
         const j = await r.json();
         if (j?.ok && j?.accessConfig) {
           applyRemoteAccessConfig(j.accessConfig);
+          setRemoteAccessLoaded(true);
+          return;
         }
       }
     } catch {}
@@ -4529,7 +4570,7 @@ export default function App() {
   const pushRemoteAccessConfig = useCallback(async (payload) => {
     if (!obzvonWebhook) return;
     try {
-      await fetch(obzvonWebhook, {
+      const r = await fetch(obzvonWebhook, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -4537,6 +4578,8 @@ export default function App() {
           accessConfig: payload,
         }),
       });
+      const j = await r.json().catch(() => ({}));
+      if (j?.ok && (j?.saved || j?.accessConfig || j?.mode === 'access_set')) return;
     } catch {}
   }, [obzvonWebhook]);
 
@@ -4546,7 +4589,10 @@ export default function App() {
   };
   useEffect(() => { S.set('aq-current-user', currentUser); }, [currentUser]);
   useEffect(() => { S.set('aq-session-user', sessionUser || ''); }, [sessionUser]);
-  useEffect(() => { S.set('aq-obzvon-webhook', obzvonWebhook); }, [obzvonWebhook]);
+  useEffect(() => {
+    S.set(ACCESS_SYNC_URL_KEY, obzvonWebhook || '');
+    S.set('aq-obzvon-webhook', obzvonWebhook || ''); // legacy key
+  }, [obzvonWebhook]);
   useEffect(() => { S.set('aq-main-url', mainSheetUrl || ''); }, [mainSheetUrl]);
   useEffect(() => { S.set('aq-obzvon-url', obzvonSheetUrl || ''); }, [obzvonSheetUrl]);
   useEffect(() => {
@@ -4693,131 +4739,14 @@ export default function App() {
     }
   }, [mainSheetUrl]);
 
-  const loadObzvonAll = useCallback(async (sheetUrl, opts = {}) => {
-    const full = !!opts.full;
-    const force = !!opts.force;
-    const cached = S.get('aq-obzvon-all-cache', []) || [];
-    if (full && !force && cached.length > 0) {
-      setObzvonAllRows(cached);
-      setObzvonAllInstalled(true);
-      return;
-    }
-    try {
-      const configuredObzvonUrl = sheetUrl || obzvonSheetUrl || OBZVON_ALL_SHEET_URL || '';
-      const sid = extractSheetId(configuredObzvonUrl);
-      const gid = extractGid(configuredObzvonUrl);
-      if (!sid) return;
-
-      let rows = null;
-      const nameCandidates = ['Обзвон ВСЕ', 'Обзвон BSE', 'Barcha Obzvon', 'Обзвон', 'РћР±Р·РІРѕРЅ Р’РЎР•'];
-      for (const nm of nameCandidates) {
-        try {
-          rows = await fetchSheetCsvByName(sid, nm, nm);
-          if (rows?.length > 1) break;
-        } catch {}
-      }
-      if ((!rows || rows.length < 2) && gid) {
-        try {
-          rows = await fetchSheetCsv(sid, gid, `gid:${gid}`);
-        } catch {}
-      }
-      if (!rows || rows.length < 2) {
-        for (const nm of nameCandidates) {
-          try {
-            rows = await fetchSheetOpenSheet(sid, nm, nm);
-            if (rows?.length > 1) break;
-          } catch {}
-        }
-      }
-
-      const parsedAll = parseObzvonAllRows(rows || []);
-      const parsed = full ? parsedAll : parsedAll.slice(0, OBZVON_ALL_LIMIT);
-      if (parsedAll.length > 0) {
-        if (full) {
-          setObzvonAllRows(parsedAll);
-          S.set('aq-obzvon-all-cache', parsedAll);
-          S.set(OBZVON_ALL_INSTALLED_KEY, true);
-          setObzvonAllInstalled(true);
-        } else {
-          setObzvonAllRows(parsed);
-          if (!obzvonAllInstalled) S.set('aq-obzvon-all-cache', parsed);
-        }
-      } else if (cached.length) {
-        setObzvonAllRows(cached);
-        setObzvonAllInstalled(true);
-      }
-    } catch (e) {
-      const cached = S.get('aq-obzvon-all-cache', []);
-      if (cached.length) {
-        setObzvonAllRows(cached);
-        setObzvonAllInstalled(true);
-      }
-      notify(`Barcha Obzvon yuklanmadi: ${e?.message || 'xato'}`, 'err');
-    }
-  }, [obzvonSheetUrl, obzvonAllInstalled]);
-  const appendObzvonAllRow = useCallback((row) => {
-    if (!(row?.customer || row?.id || row?.customerId)) return;
-    if (!String(row?.note || '').trim()) return;
-    setObzvonAllRows((prev) => [{
-      no: '',
-      customer: row.customer,
-      callDate: row.callDate,
-      topic: row.topic,
-      note: row.note,
-      nextDate: row.nextDate,
-      orderCount: row.orderCount,
-      orderDate: row.orderDate,
-      operator: row.operator,
-      customerId: row.id,
-    }, ...prev]);
-  }, []);
   const addObzvonRows = useCallback((rows) => {
     if (!rows?.length) return;
     setObzvonRecords((prev) => [...rows, ...prev]);
-    rows.forEach((r) => appendObzvonAllRow(r));
-  }, [appendObzvonAllRow]);
-  const sendToWebhook = useCallback(async () => {
-    if (!obzvonWebhook || !obzvonRecords.length) return;
-    const webhookUser = sessionUser === 'Admin' ? currentUser : (sessionUser || currentUser || 'Admin');
-    const payload = obzvonRecords.map((r) => ({
-      mijozId: r.id || '',
-      mijozIsmi: r.customer || '',
-      sana: r.callDate || '',
-      maqsad: r.topic || '',
-      izoh: r.note || '',
-      keyingiSana: r.nextDate || '',
-      zakazSoni: r.orderCount || '',
-      zakazSanasi: r.orderDate || '',
-      operator: r.operator || webhookUser,
-    }));
-    try {
-      await fetch(obzvonWebhook, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-    } catch {}
-  }, [obzvonWebhook, obzvonRecords, currentUser, sessionUser]);
+  }, []);
 
   useEffect(() => {
     loadFromConfig();
-    if (obzvonAllInstalled && obzvonAllRows.length > 0) return;
-    loadObzvonAll(obzvonSheetUrl || OBZVON_ALL_SHEET_URL, { full: true, force: true });
-  }, [loadFromConfig, loadObzvonAll, obzvonAllInstalled, obzvonAllRows.length, obzvonSheetUrl]);
-  useEffect(() => {
-    const checkAndSync = () => {
-      const now = new Date();
-      const lastSync = S.get('aq-last-sync', '');
-      const todayKey = now.toISOString().slice(0,10);
-      if (now.getHours() >= 7 && lastSync !== todayKey) {
-        sendToWebhook();
-        S.set('aq-last-sync', todayKey);
-      }
-    };
-    const interval = setInterval(checkAndSync, 60000);
-    checkAndSync();
-    return () => clearInterval(interval);
-  }, [sendToWebhook]);
+  }, [loadFromConfig]);
 
   const rawD = data || { customers:[], orders:[], cashbox:[], contacts:[], rawOrders:[], rawCash:[], ordersByMId:{}, cashByMId:{}, kulerInstallments:[], assignmentById:{}, debtorsByBalance:[], otherDebtorsByBalance:[] };
   // Effective profile: Admin can switch users, others are locked to their own login.
@@ -5035,7 +4964,7 @@ export default function App() {
                 {page==='cust'    && canViewPage('cust') && <Customers D={rawD} currentUser={effectiveUser} currentAccess={currentAccess} assignmentById={rawD.assignmentById || {}}/>}
                 {page==='orders'  && canViewPage('orders') && <Orders    D={D}/>}
                 {page==='kassa'   && canViewPage('kassa') && <Kassa     D={D}/>}
-                {page==='obzvon'  && canViewPage('obzvon') && <Obzvon    D={D} allRows={obzvonAllRows} onAppendAllRow={appendObzvonAllRow} onReloadAll={()=>loadObzvonAll(obzvonSheetUrl, { full:true, force:true })} webhookUrl={obzvonWebhook} currentUser={effectiveUser} records={obzvonRecords} setRecords={setObzvonRecords} />}
+                {page==='obzvon'  && canViewPage('obzvon') && <Obzvon    D={D} currentUser={effectiveUser} records={obzvonRecords} setRecords={setObzvonRecords} />}
                 {page==='doljniki'&& canViewPage('doljniki') && <Doljniki rows={doljniki} otherRows={otherDoljniki} D={D} kulerRows={D.kulerInstallments || []} onAddToObzvon={addObzvonRows} currentUser={effectiveUser} />}
                 {page==='reports' && canViewPage('reports') && <Reports   D={D}/>}
                 {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} />}
@@ -5048,7 +4977,6 @@ export default function App() {
       {showUp && (
         <UploadModal
           onLoad={handleLoad}
-          onLoadObzvonAll={(url)=>loadObzvonAll(url, { full:true, force:true })}
           hasData={!!data}
           onClose={data?()=>setUp(false):null}
           mainSheetUrl={mainSheetUrl}
