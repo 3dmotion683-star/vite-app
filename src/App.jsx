@@ -3112,6 +3112,13 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
                               id:'',
                               callDate:(x.callDate || (String(e.target.value || '').trim() ? todayIso() : x.callDate)),
                             }:x))}
+                            onInput={(e)=>{ setPickTargetIdx(i); setPickQuery(e.currentTarget.value || ''); }}
+                            onKeyDown={(e)=>{
+                              if (e.key === 'Escape') {
+                                setPickTargetIdx(null);
+                                setPickQuery('');
+                              }
+                            }}
                           />
                         </td>
                         <td><input className="input" type="date" value={String(r.callDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,callDate:e.target.value}:x))} /></td>
