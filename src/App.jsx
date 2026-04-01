@@ -8,7 +8,7 @@ import {
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ EXCLUDED MERCHANT KEYWORDS в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 const EXCLUDED_KEYWORDS = [
   'Dividend','UOS','Rasxod','Rasxodnik','Postavshik',
-  'Personal','Dolg','VIP','KULER','Ofis','Neus',
+  'Personal','Dolg','VIP','KULER','Ofis',
 ];
 const isExcludedMerchant = (name) => {
   const nl = (name || '').toLowerCase();
@@ -27,7 +27,6 @@ const EXCLUDED_Z_CATEGORIES = [
   'vip',
   'kuler',
   'ofis',
-  'neus',
 ];
 const isAllowedAA = (v) => {
   const s = String(v || '').trim().toLowerCase();
@@ -50,6 +49,18 @@ function getDebtStats(customers = []) {
     uzsSum: debtorsUZS.reduce((s, c) => s + Math.abs(c.balanceUZS), 0),
   };
 }
+function addMonthsByAnchorDay(date, monthsToAdd) {
+  const src = new Date(date);
+  if (Number.isNaN(src.getTime())) return null;
+  const targetMonthIndex = src.getMonth() + Number(monthsToAdd || 0);
+  const targetYear = src.getFullYear() + Math.floor(targetMonthIndex / 12);
+  const targetMonth = ((targetMonthIndex % 12) + 12) % 12;
+  const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const day = Math.min(src.getDate(), lastDay);
+  const out = new Date(targetYear, targetMonth, day);
+  out.setHours(0, 0, 0, 0);
+  return out;
+}
 function recalcInstallment(row, monthsRaw) {
   const months = Math.max(1, Math.min(60, Number(monthsRaw) || 6));
   const principal = Math.max(0, row.principal || 0);
@@ -65,11 +76,17 @@ function recalcInstallment(row, monthsRaw) {
     const start = toDate(row.purchaseDate);
     if (start) {
       const now = new Date();
-      const elapsed = Math.max(0, (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()) + 1);
-      const shouldPayMonths = Math.min(months, elapsed);
-      const shouldPaid = shouldPayMonths * monthly;
+      now.setHours(0, 0, 0, 0);
+      let shouldPayMonths = 0;
+      for (let i = 1; i <= months; i++) {
+        const dueDate = addMonthsByAnchorDay(start, i);
+        if (!dueDate) break;
+        if (now >= dueDate) shouldPayMonths = i;
+        else break;
+      }
+      const shouldPaid = Math.min(principal, shouldPayMonths * monthly);
       overdueAmount = Math.max(0, Math.min(principal, shouldPaid) - paid);
-      dueCount = overdueAmount > 0 ? 1 : 0;
+      dueCount = overdueAmount > 0 ? Math.max(1, shouldPayMonths - paidMonths) : 0;
     }
   }
   return { ...row, months, monthly, remaining, paidMonths, monthsLeft, dueCount, overdueAmount };
@@ -2665,6 +2682,12 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
   const [dueSelectedIds, setDueSelectedIds] = useState({});
   const deferredSearchAll = useDeferredValue(searchAll);
   const deferredOpSearch = useDeferredValue(opSearch);
+  const todayIso = () => new Date().toISOString().slice(0,10);
+  const customerNameById = useMemo(() => {
+    const m = {};
+    (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c.name || ''; });
+    return m;
+  }, [customers]);
   const saveRecords = (next) => {
     setRecords(next);
     S.set('aq-obzvon-records', next);
@@ -2673,7 +2696,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
     const rows = Array.from({ length:count }, () => ({
       id: '',
       customer: '',
-      callDate: new Date().toISOString().slice(0,10),
+      callDate: todayIso(),
       topic: 'Buyurtma olish',
       note: '',
       nextDate: '',
@@ -2687,7 +2710,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
     const row = {
       id: customer.id,
       customer: customer.name,
-      callDate: new Date().toISOString().slice(0,10),
+      callDate: todayIso(),
       topic,
       note: '',
       nextDate: '',
@@ -2702,10 +2725,21 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
       try { await fetch(webhookUrl, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(row) }); } catch {}
     }
   };
+  const archiveCurrentUserRows = () => {
+    const mine = (records || []).filter((r) => (r.operator || currentUser) === currentUser);
+    const archived = mine.filter((r) => (r.customer || r.id) && String(r.note || '').trim());
+    if (!archived.length) return;
+    archived.forEach((r) => onAppendAllRow?.(r));
+    const left = (records || []).filter((r) => {
+      if ((r.operator || currentUser) !== currentUser) return true;
+      return !(r.customer || r.id) || !String(r.note || '').trim();
+    });
+    saveRecords(left);
+  };
 
   const mergedAllRows = useMemo(() => {
     const localRows = records
-      .filter((r) => r.id || r.customer)
+      .filter((r) => (r.id || r.customer) && String(r.note || '').trim())
       .map((r, i) => ({
         no: String(i + 1),
         customer: r.customer,
@@ -2718,10 +2752,18 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
         customerId: r.id,
         orderDate: r.orderDate,
       }));
-    let base = [...localRows, ...allRows];
+    let base = [...localRows, ...allRows].map((r) => {
+      const cid = String(r.customerId || r.id || '').trim();
+      const liveName = cid ? (customerNameById[cid] || '') : '';
+      return {
+        ...r,
+        customerId: cid,
+        customer: liveName || r.customer || (cid ? `ID: ${cid}` : ''),
+      };
+    });
     const seen = new Set();
     base = base.filter((r) => {
-      const k = `${r.customerId || ''}|${r.customer || ''}|${r.callDate || ''}|${r.topic || ''}|${r.note || ''}|${r.operator || ''}`;
+      const k = `${r.customerId || ''}|${r.callDate || ''}|${r.topic || ''}|${r.note || ''}|${r.operator || ''}`;
       if (seen.has(k)) return false;
       seen.add(k);
       return true;
@@ -2732,7 +2774,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
       return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
     });
     return base;
-  }, [allRows, records]);
+  }, [allRows, records, customerNameById]);
 
   const allList = useMemo(() => {
     const q = deferredSearchAll.toLowerCase();
@@ -2774,6 +2816,8 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
     const raw = mergedAllRows.map((r) => ({ topic: r.topic }));
     return [...new Set(raw.map((r) => r.topic).filter(Boolean))];
   }, [mergedAllRows]);
+  const allOpsSelected = operators.length > 0 && operators.every((o) => allFilterOps.includes(o));
+  const allTopicsSelected = topics.length > 0 && topics.every((t) => allFilterTopics.includes(t));
   const activeAllFilterCount = useMemo(() => {
     let c = 0;
     if (allFilterOps.length) c++;
@@ -2897,6 +2941,7 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
     () => [...new Set(operatorTableBaseRows.map((r) => r.operator).filter(Boolean))].sort(),
     [operatorTableBaseRows]
   );
+  const allOperatorFilterSelected = operatorOptions.length > 0 && operatorOptions.every((o) => opFilterOperators.includes(o));
   const inNumRange = (v, from, to) => {
     const n = Number(v || 0);
     if (from !== '' && n < Number(from)) return false;
@@ -3019,13 +3064,21 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
             </div>
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{records.length} ta yozuv</span>
             <button className="btn btn-gh btn-sm" onClick={()=>appendRows(1)}>+ Qator</button>
+            <button className="btn btn-gh btn-sm" onClick={archiveCurrentUserRows}>
+              Kun yakunlash
+            </button>
           </div>
           {suggestions.length>0 && (
             <div className="card" style={{padding:10,maxHeight:160,overflow:'auto'}}>
               {suggestions.map((s) => (
                 <div key={s.id} className="nav-i" style={{padding:'6px 8px'}} onClick={()=>{
                   if (pickTargetIdx != null) {
-                    saveRecords(records.map((x,j)=>j===pickTargetIdx?{...x,id:s.id,customer:s.name}:x));
+                    saveRecords(records.map((x,j)=>j===pickTargetIdx?{
+                      ...x,
+                      id:s.id,
+                      customer:s.name,
+                      callDate:(x.callDate || todayIso()),
+                    }:x));
                     setPickTargetIdx(null);
                   } else {
                     addRecord(s);
@@ -3048,15 +3101,18 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
                       <tr key={i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id || '—'}</td>
                         <td style={{minWidth:250}}>
-                          <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                            <input
-                              className="input"
-                              value={r.customer || ''}
-                              placeholder="Mijoz"
-                              onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,customer:e.target.value,id:''}:x))}
-                            />
-                            <button className="btn btn-gh btn-sm" onClick={()=>{ setPickTargetIdx(i); setPickQuery(r.customer || ''); }}>Tanlash</button>
-                          </div>
+                          <input
+                            className="input"
+                            value={r.customer || ''}
+                            placeholder="Mijoz (ustiga bosing va qidiring)"
+                            onFocus={()=>{ setPickTargetIdx(i); setPickQuery(r.customer || ''); }}
+                            onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{
+                              ...x,
+                              customer:e.target.value,
+                              id:'',
+                              callDate:(x.callDate || (String(e.target.value || '').trim() ? todayIso() : x.callDate)),
+                            }:x))}
+                          />
                         </td>
                         <td><input className="input" type="date" value={String(r.callDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,callDate:e.target.value}:x))} /></td>
                         <td>
@@ -3101,6 +3157,14 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
               </button>
               {allFilterOpen && (
                 <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:340,padding:10,overflow:'hidden'}}>
+                  <div style={{display:'flex',gap:6,marginBottom:8}}>
+                    <button className="btn btn-gh btn-sm" onClick={()=>setAllFilterOps(allOpsSelected ? [] : operators)}>
+                      {allOpsSelected ? "Operator: bekor" : "Operator: hammasi"}
+                    </button>
+                    <button className="btn btn-gh btn-sm" onClick={()=>setAllFilterTopics(allTopicsSelected ? [] : topics)}>
+                      {allTopicsSelected ? "Mavzu: bekor" : "Mavzu: hammasi"}
+                    </button>
+                  </div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:6,fontWeight:700}}>Operator</div>
                   <div style={{maxHeight:90,overflow:'auto',marginBottom:8}}>
                     {operators.map((o)=>(
@@ -3271,6 +3335,11 @@ function Obzvon({ D, allRows=[], onAppendAllRow, onReloadAll, webhookUrl='', cur
               </button>
               {opFilterOpen && (
                 <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:380,padding:10,overflow:'hidden'}}>
+                  <div style={{display:'flex',gap:6,marginBottom:6}}>
+                    <button className="btn btn-gh btn-sm" onClick={()=>setOpFilterOperators(allOperatorFilterSelected ? [] : operatorOptions)}>
+                      {allOperatorFilterSelected ? "Operator: bekor" : "Operator: hammasi"}
+                    </button>
+                  </div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Operator</div>
                   <div style={{maxHeight:110,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6,marginBottom:8}}>
                     {operatorOptions.map((x)=>(
@@ -3545,6 +3614,8 @@ function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
   const kulerActive = kulerComputed.filter((k) => k.remaining > 0);
   const kulerRemain = kulerActive.reduce((s, k) => s + k.remaining, 0);
   const kulerDue = kulerActive.filter((k) => k.overdueAmount > 0).length;
+  const kulerDueAmount = kulerActive.reduce((s, k) => s + (k.overdueAmount > 0 ? k.overdueAmount : 0), 0);
+  const allCatsSelected = categories.length > 0 && categories.every((c) => fCats.includes(c));
   const saveKulerMonths = (row, monthsValue) => {
     const m = Math.max(1, Math.min(60, Number(monthsValue) || 6));
     const key = `${row.customerId}__${row.orderNo}`;
@@ -3631,7 +3702,7 @@ function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
             <StatCard l="QARZDORLAR" v={list.length+' ta'} s="UZS bo'yicha" c="var(--rd)"/>
             <StatCard l="JAMI QARZ" v={fmt(debtSum)+" so'm"} s="faqat UZS" c="var(--or)"/>
             <StatCard l="15+ KUN QARZDOR" v={d15.length+' ta'} s={fmt(d15Sum)+" so'm"} c="var(--yl)"/>
-            <StatCard l="KULER TO'LOVCHILAR" v={kulerActive.length+' ta'} s={fmt(kulerRemain)+" so'm"} c="var(--bl)"/>
+            <StatCard l="QARZ RO'YXATI" v={fmt(debtSum)+" so'm"} s={`${list.length} ta mijoz`} c="var(--bl)"/>
           </div>
 
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
@@ -3649,6 +3720,14 @@ function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
               {showFilter && (
                 <div className="card" style={{position:'absolute',top:34,right:0,zIndex:20,width:360,padding:10,overflow:'hidden'}}>
                   <input className="input" placeholder="Kategoriya qidirish..." value={catQuery} onChange={(e)=>setCatQuery(e.target.value)} />
+                  <div style={{display:'flex',gap:6,marginTop:8}}>
+                    <button className="btn btn-gh btn-sm" onClick={()=>setCats(allCatsSelected ? [] : categories)}>
+                      {allCatsSelected ? "Hammasini bekor" : "Hammasini belgilash"}
+                    </button>
+                    <button className="btn btn-gh btn-sm" onClick={()=>setCats([])}>
+                      Tozalash
+                    </button>
+                  </div>
                   <div style={{maxHeight:180,overflow:'auto',marginTop:8,paddingRight:4}}>
                     {shownCats.map((c) => (
                       <label key={c} style={FILTER_CHECK_LABEL_STYLE}>
@@ -3743,10 +3822,11 @@ function Doljniki({ rows, D, kulerRows, onAddToObzvon, currentUser }) {
         </>
       ) : (
         <>
-          <div className="g4">
+          <div className="g5">
             <StatCard l="KULER TO'LOVCHILAR" v={kulerActive.length+' ta'} s="nasiya mijozlar" c="var(--bl)"/>
             <StatCard l="KULER QOLDIQ" v={fmt(kulerRemain)+" so'm"} s="umumiy qoldiq" c="var(--or)"/>
             <StatCard l="MUDDATI KELGAN" v={kulerDue+' ta'} s="to'lov vaqti kelgan" c="var(--rd)"/>
+            <StatCard l="TO'LASHI KERAK" v={fmt(kulerDueAmount)+" so'm"} s={`${kulerDue} ta mijoz`} c="var(--yl)"/>
             <StatCard l="KULER QARZDORLAR" v={kulerActive.filter((k)=>k.remaining>0).length+' ta'} s="qoldiq bor mijoz" c="var(--yl)"/>
           </div>
           <div style={{display:'flex',justifyContent:'flex-end'}}>
@@ -4563,6 +4643,8 @@ export default function App() {
     }
   }, [obzvonSheetUrl, obzvonAllInstalled]);
   const appendObzvonAllRow = useCallback((row) => {
+    if (!(row?.customer || row?.id || row?.customerId)) return;
+    if (!String(row?.note || '').trim()) return;
     setObzvonAllRows((prev) => [{
       no: '',
       customer: row.customer,
@@ -4653,20 +4735,25 @@ export default function App() {
     : (D.customers || []).filter((c) => c.balanceUZS < 0);
   const doljniki = useMemo(() => {
     return debtorsByBalance
-      .map((c) => ({
-        lastOrderProduct: ((D.ordersByMId?.[c.id] || []).find((o) => o.soNum === c.lastDocNum)?.product) || '',
-        id: c.id || '—',
-        category: c.source || '—',
-        name: c.name || '—',
-        debtUZS: c.balanceUZS,
-        lastOrderDate: c.lastOrderDate || '',
-        days: c.daysAgo,
-        orderNo: c.lastDocNum || '—',
-        qty: c.lastQty || 0,
-        lastSum: c.lastSum || 0,
-        agent: c.lastAgent || '—',
-        note: c.merchantNote || '—',
-      }))
+      .map((c) => {
+        const related = (D.ordersByMId?.[c.id] || []);
+        const debtOrder = related.find((o) => o.soNum === c.lastDocNum);
+        const debtOrderDate = debtOrder?.orderDate || c.lastOrderDate || '';
+        return {
+          lastOrderProduct: debtOrder?.product || '',
+          id: c.id || '—',
+          category: c.source || '—',
+          name: c.name || '—',
+          debtUZS: c.balanceUZS,
+          lastOrderDate: debtOrderDate,
+          days: debtOrderDate ? daysAgo(debtOrderDate) : c.daysAgo,
+          orderNo: c.lastDocNum || '—',
+          qty: c.lastQty || 0,
+          lastSum: c.lastSum || 0,
+          agent: c.lastAgent || '—',
+          note: c.merchantNote || '—',
+        };
+      })
       .sort((a, b) => a.debtUZS - b.debtUZS);
   }, [debtorsByBalance, D.ordersByMId]);
   const obzvonCnt  = D.customers.filter((c)=>c.daysAgo!=null&&c.daysAgo>14).length;
