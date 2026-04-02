@@ -97,9 +97,8 @@ const SHEET_CONFIG = {
   url: 'https://docs.google.com/spreadsheets/d/1RND6D5JIWh6vnk8i_FO1mx1if4hx182VNaPzGQtKuQM/edit?gid=1272423090#gid=1272423090',
   gids: { merchants: '', balans: '', orders: '', cashbox: '', integration: '', mijozlar: '' },
 };
+const OBZVON_ALL_LOCAL_XLSX = '/obzvon-vse.xlsx';
 const OBZVON_ALL_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=0#gid=0';
-const OBZVON_ALL_LIMIT = 100;
-const OBZVON_ALL_INSTALLED_KEY = 'aq-obzvon-all-installed';
 const ACCESS_SYNC_URL_KEY = 'aq-access-api-url';
 // Access konfiguratsiya sinxroni uchun Cloudflare Worker API URL:
 const OBZVON_WEBHOOK_DEFAULT = 'https://solitary-brook-4889aquabiz-api.3dmotion683.workers.dev';
@@ -153,6 +152,7 @@ const FILTER_CHECK_TEXT_STYLE = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
 };
+const createRowRid = () => `r_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
 const isNameExcludedForActiveStats = (name) => {
   const n = String(name || '').trim().toUpperCase();
   if (!n) return true;
@@ -2694,11 +2694,21 @@ function Kassa({ D }) {
 }
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ OBZVON в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
-function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
+function Obzvon({
+  D,
+  currentUser='Admin',
+  records=[],
+  setRecords=()=>{},
+  allRows=[],
+  newRows=[],
+  onReloadAll=()=>{},
+  onAppendAllRows=()=>{},
+  onUpsertNewRows=()=>{},
+}) {
   const { customers, rawOrders=[] } = D;
-  const onReloadAll = () => {};
   const [tab, setTab] = useState('main');
   const [searchAll, setSearchAll] = useState('');
+  const [searchAllNew, setSearchAllNew] = useState('');
   const [pickQuery, setPickQuery] = useState('');
   const [allShowMode, setAllShowMode] = useState('smart');
   const [allFilterOpen, setAllFilterOpen] = useState(false);
@@ -2722,6 +2732,7 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
   const [duePickMode, setDuePickMode] = useState(false);
   const [dueSelectedIds, setDueSelectedIds] = useState({});
   const deferredSearchAll = useDeferredValue(searchAll);
+  const deferredSearchAllNew = useDeferredValue(searchAllNew);
   const deferredOpSearch = useDeferredValue(opSearch);
   const todayIso = () => new Date().toISOString().slice(0,10);
   const customerNameById = useMemo(() => {
@@ -2730,8 +2741,28 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
     return m;
   }, [customers]);
   const saveRecords = (next) => {
-    setRecords(next);
-    S.set('aq-obzvon-records', next);
+    const prepared = (next || []).map((r) => ({
+      ...r,
+      _rid: r?._rid || createRowRid(),
+    }));
+    setRecords(prepared);
+    S.set('aq-obzvon-records', prepared);
+    const freshRows = prepared
+      .filter((r) => (r.id || r.customer) && String(r.note || '').trim())
+      .map((r, i) => ({
+        rid: r._rid,
+        no: String(r.no || i + 1),
+        customer: r.customer || '',
+        callDate: r.callDate || '',
+        topic: r.topic || '',
+        note: r.note || '',
+        nextDate: r.nextDate || '',
+        orderCount: r.orderCount || '',
+        operator: r.operator || currentUser,
+        customerId: r.id || '',
+        orderDate: r.orderDate || '',
+      }));
+    if (freshRows.length) onUpsertNewRows(freshRows);
   };
   const appendRows = (count=1) => {
     const rows = Array.from({ length:count }, () => ({
@@ -2766,6 +2797,19 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
     const mine = (records || []).filter((r) => (r.operator || currentUser) === currentUser);
     const archived = mine.filter((r) => (r.customer || r.id) && String(r.note || '').trim());
     if (!archived.length) return;
+    const normalized = archived.map((r, i) => ({
+      no: String(i + 1),
+      customer: r.customer || '',
+      callDate: r.callDate || '',
+      topic: r.topic || '',
+      note: r.note || '',
+      nextDate: r.nextDate || '',
+      orderCount: r.orderCount || '',
+      operator: r.operator || currentUser,
+      customerId: r.id || '',
+      orderDate: r.orderDate || '',
+    }));
+    onAppendAllRows(normalized);
     const left = (records || []).filter((r) => {
       if ((r.operator || currentUser) !== currentUser) return true;
       return !(r.customer || r.id) || !String(r.note || '').trim();
@@ -2773,25 +2817,73 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
     saveRecords(left);
   };
 
-  const mergedAllRows = useMemo(() => {
-    const localRows = records
-      .filter((r) => (r.id || r.customer) && String(r.note || '').trim())
+  const historicalAllRows = useMemo(() => {
+    const rows = (allRows || [])
       .map((r, i) => ({
-        no: String(i + 1),
-        customer: r.customer,
-        callDate: r.callDate,
-        topic: r.topic,
-        note: r.note,
-        nextDate: r.nextDate,
-        orderCount: r.orderCount,
-        operator: r.operator,
-        customerId: r.id,
-        orderDate: r.orderDate,
-      }));
-    let base = [...localRows]
+        no: String(r.no || i + 1),
+        customer: r.customer || '',
+        callDate: r.callDate || '',
+        topic: r.topic || '',
+        note: r.note || '',
+        nextDate: r.nextDate || '',
+        orderCount: r.orderCount || '',
+        operator: r.operator || '',
+        customerId: r.customerId || r.id || '',
+        orderDate: r.orderDate || '',
+      }))
       .filter((r) => !isAccessSyncRow(r))
       .map((r) => {
-      const cid = String(r.customerId || r.id || '').trim();
+        const cid = String(r.customerId || r.id || '').trim();
+        const liveName = cid ? (customerNameById[cid] || '') : '';
+        return {
+          ...r,
+          customerId: cid,
+          customer: liveName || r.customer || (cid ? `ID: ${cid}` : ''),
+        };
+      });
+    rows.sort((a, b) => {
+      const da = toDate(a.callDate);
+      const db = toDate(b.callDate);
+      return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
+    });
+    return rows;
+  }, [allRows, customerNameById]);
+
+  const appAllNewRows = useMemo(() => {
+    const fromNew = (newRows || []).map((r, i) => ({
+      rid: r.rid || r._rid || `nr_${i}`,
+      no: String(r.no || i + 1),
+      customer: r.customer || '',
+      callDate: r.callDate || '',
+      topic: r.topic || '',
+      note: r.note || '',
+      nextDate: r.nextDate || '',
+      orderCount: r.orderCount || '',
+      operator: r.operator || '',
+      customerId: r.customerId || r.id || '',
+      orderDate: r.orderDate || '',
+    }));
+    const fromCurrent = (records || [])
+      .filter((r) => (r.id || r.customer) && String(r.note || '').trim())
+      .map((r, i) => ({
+        rid: r._rid || `cr_${i}`,
+        no: String(r.no || i + 1),
+        customer: r.customer || '',
+        callDate: r.callDate || '',
+        topic: r.topic || '',
+        note: r.note || '',
+        nextDate: r.nextDate || '',
+        orderCount: r.orderCount || '',
+        operator: r.operator || '',
+        customerId: r.id || '',
+        orderDate: r.orderDate || '',
+      }));
+    const m = new Map();
+    [...fromNew, ...fromCurrent].forEach((r) => {
+      m.set(r.rid, r);
+    });
+    const rows = Array.from(m.values()).map((r) => {
+      const cid = String(r.customerId || '').trim();
       const liveName = cid ? (customerNameById[cid] || '') : '';
       return {
         ...r,
@@ -2799,24 +2891,17 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
         customer: liveName || r.customer || (cid ? `ID: ${cid}` : ''),
       };
     });
-    const seen = new Set();
-    base = base.filter((r) => {
-      const k = `${r.customerId || ''}|${r.callDate || ''}|${r.topic || ''}|${r.note || ''}|${r.operator || ''}`;
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
-    base.sort((a, b) => {
+    rows.sort((a, b) => {
       const da = toDate(a.callDate);
       const db = toDate(b.callDate);
       return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
     });
-    return base;
-  }, [records, customerNameById]);
+    return rows;
+  }, [newRows, records, customerNameById]);
 
-  const allList = useMemo(() => {
-    const q = deferredSearchAll.toLowerCase();
-    let base = mergedAllRows;
+  const applyAllFilters = useCallback((baseRows, qRaw) => {
+    const q = String(qRaw || '').toLowerCase();
+    let base = [...(baseRows || [])];
     if (allFilterOps.length) base = base.filter((r) => allFilterOps.includes(r.operator || ''));
     if (allFilterTopics.length) base = base.filter((r) => allFilterTopics.includes(r.topic || ''));
     if (allFilterDateFrom) {
@@ -2840,20 +2925,34 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
       (r.operator || '').toLowerCase().includes(q) ||
       (r.note || '').toLowerCase().includes(q)
     );
-  }, [mergedAllRows, deferredSearchAll, allFilterOps, allFilterTopics, allFilterDateFrom, allFilterDateTo]);
+  }, [allFilterOps, allFilterTopics, allFilterDateFrom, allFilterDateTo]);
+
+  const allList = useMemo(
+    () => applyAllFilters(historicalAllRows, deferredSearchAll),
+    [historicalAllRows, deferredSearchAll, applyAllFilters]
+  );
+  const allNewList = useMemo(
+    () => applyAllFilters(appAllNewRows, deferredSearchAllNew),
+    [appAllNewRows, deferredSearchAllNew, applyAllFilters]
+  );
 
   const visibleAllRows = useMemo(
     () => allShowMode === 'all' ? allList : allList.slice(0, 500),
     [allList, allShowMode]
   );
+  const visibleAllNewRows = useMemo(
+    () => allShowMode === 'all' ? allNewList : allNewList.slice(0, 500),
+    [allNewList, allShowMode]
+  );
+  const allFilterSourceRows = tab === 'all_new' ? appAllNewRows : historicalAllRows;
   const operators = useMemo(() => {
-    const raw = mergedAllRows.map((r) => ({ operator: r.operator }));
+    const raw = allFilterSourceRows.map((r) => ({ operator: r.operator }));
     return [...new Set(raw.map((r) => r.operator).filter(Boolean))];
-  }, [mergedAllRows]);
+  }, [allFilterSourceRows]);
   const topics = useMemo(() => {
-    const raw = mergedAllRows.map((r) => ({ topic: r.topic }));
+    const raw = allFilterSourceRows.map((r) => ({ topic: r.topic }));
     return [...new Set(raw.map((r) => r.topic).filter(Boolean))];
-  }, [mergedAllRows]);
+  }, [allFilterSourceRows]);
   const allOpsSelected = operators.length > 0 && operators.every((o) => allFilterOps.includes(o));
   const allTopicsSelected = topics.length > 0 && topics.every((t) => allFilterTopics.includes(t));
   const activeAllFilterCount = useMemo(() => {
@@ -2883,6 +2982,7 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
   }, [pickQuery, customers]);
 
   const dueCandidates = useMemo(() => {
+    const assignment = D.assignmentById || {};
     const grouped = {};
     rawOrders.forEach((o) => {
       if (!isOrderDoc(o.docType)) return;
@@ -2912,6 +3012,10 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
       const c = customers.find((x)=>x.id===mid);
       if (!c) return;
       if (!isActiveCustomerName(c.name)) return;
+      if (currentUser !== 'Admin') {
+        const owner = assignment[mid] || '';
+        if (owner && owner !== currentUser) return;
+      }
       const passed = c.daysAgo ?? 0;
       if (passed >= shouldIn) {
         out.push({
@@ -2923,10 +3027,11 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
       }
     });
     return out.sort((a,b)=>(b.passed-a.passed));
-  }, [rawOrders, customers]);
+  }, [rawOrders, customers, currentUser, D.assignmentById]);
   const latestCallByCustomer = useMemo(() => {
+    const callRows = [...historicalAllRows, ...appAllNewRows];
     const m = {};
-    for (const r of mergedAllRows) {
+    for (const r of callRows) {
       const cid = String(r.customerId || r.id || '').trim();
       if (!cid) continue;
       const d = toDate(r.callDate);
@@ -2936,7 +3041,7 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
       if (!prev || t >= prevT) m[cid] = r;
     }
     return m;
-  }, [mergedAllRows]);
+  }, [historicalAllRows, appAllNewRows]);
 
   const latestOrdersByCustomer = useMemo(() => {
     const out = {};
@@ -3057,8 +3162,17 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
       exportAoaExcel({
         fileName: `Barcha_obzvon_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'BarchaObzvon',
-        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Zakaz', 'Zakaz sanasi', 'Operator'],
+        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Suv soni', 'Zakaz sanasi', 'Operator'],
         rows: allList.map((r, i) => [r.no || i + 1, r.customerId || '', r.customer || '', fmtD(r.callDate), r.topic || '', r.note || '', fmtD(r.nextDate), r.orderCount || '', fmtD(r.orderDate), r.operator || '']),
+      });
+      return;
+    }
+    if (tab === 'all_new') {
+      exportAoaExcel({
+        fileName: `Barcha_obzvon_yangi_${new Date().toISOString().slice(0,10)}.xlsx`,
+        sheetName: 'BarchaObzvonYangi',
+        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Suv soni', 'Zakaz sanasi', 'Operator'],
+        rows: allNewList.map((r, i) => [r.no || i + 1, r.customerId || '', r.customer || '', fmtD(r.callDate), r.topic || '', r.note || '', fmtD(r.nextDate), r.orderCount || '', fmtD(r.orderDate), r.operator || '']),
       });
       return;
     }
@@ -3085,6 +3199,8 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12}}>
       <div className="tabs" style={{display:'inline-flex'}}>
         <button className={`tab${tab==='main'?' on':''}`} onClick={()=>setTab('main')}>Obzvon</button>
+        <button className={`tab${tab==='all'?' on':''}`} onClick={()=>setTab('all')}>Barcha Obzvon</button>
+        <button className={`tab${tab==='all_new'?' on':''}`} onClick={()=>setTab('all_new')}>Barcha Obzvon Yangi</button>
         <button className={`tab${tab==='due'?' on':''}`} onClick={()=>setTab('due')}>Vaqti Kelgan</button>
         <button className={`tab${tab==='op'?' on':''}`} onClick={()=>setTab('op')}>Operator jadvali</button>
       </div>
@@ -3262,11 +3378,110 @@ function Obzvon({ D, currentUser='Admin', records=[], setRecords=()=>{} }) {
           <div className="card" style={{overflow:'hidden',flex:1}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 230px)'}}>
               <table className="tbl">
-                <thead><tr><th>в„–</th><th>ID</th><th>Kontragent</th><th>Sana</th><th>Mavzu</th><th>Izoh</th><th>Keyingi sana</th><th>Zakaz</th><th>Zakaz sanasi</th><th>Operator</th></tr></thead>
+                <thead><tr><th>No</th><th>ID</th><th>Kontragent</th><th>Sana</th><th>Mavzu</th><th>Izoh</th><th>Keyingi sana</th><th>Suv soni</th><th>Zakaz sanasi</th><th>Operator</th></tr></thead>
                 <tbody>
                   {allList.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:32,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
                     visibleAllRows.map((r,i)=>(
                       <tr key={i}>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || i+1}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || '—'}</td>
+                        <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || `ID: ${r.customerId}`}</span></td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.callDate)}</td>
+                        <td>{r.topic || '—'}</td>
+                        <td style={{maxWidth:300}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '—'}</span></td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.nextDate)}</td>
+                        <td>{r.orderCount || '—'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.orderDate)}</td>
+                        <td>{r.operator || '—'}</td>
+                      </tr>
+                    ))
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {tab==='all_new' && (
+        <>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <div className="sb" style={{maxWidth:420,flex:1}}>
+              <span style={{color:'var(--t3)'}}>{E.find}</span>
+              <input placeholder="Mijoz / ID / operator..." value={searchAllNew} onChange={(e)=>setSearchAllNew(e.target.value)} />
+            </div>
+            <div style={{position:'relative'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setAllFilterOpen((v)=>!v)}>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                </svg>
+                Filtr{activeAllFilterCount>0?` (${activeAllFilterCount})`:''}
+              </button>
+              {allFilterOpen && (
+                <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:340,padding:10,overflow:'hidden'}}>
+                  <div style={{display:'flex',gap:6,marginBottom:8}}>
+                    <button className="btn btn-gh btn-sm" onClick={()=>setAllFilterOps(allOpsSelected ? [] : operators)}>
+                      {allOpsSelected ? "Operator: bekor" : "Operator: hammasi"}
+                    </button>
+                    <button className="btn btn-gh btn-sm" onClick={()=>setAllFilterTopics(allTopicsSelected ? [] : topics)}>
+                      {allTopicsSelected ? "Mavzu: bekor" : "Mavzu: hammasi"}
+                    </button>
+                  </div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:6,fontWeight:700}}>Operator</div>
+                  <div style={{maxHeight:90,overflow:'auto',marginBottom:8}}>
+                    {operators.map((o)=>(
+                      <label key={o} style={FILTER_CHECK_LABEL_STYLE}>
+                        <input type="checkbox" checked={allFilterOps.includes(o)} onChange={()=>toggleInList(setAllFilterOps, o)} />
+                        <span style={FILTER_CHECK_TEXT_STYLE}>{o}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:6,fontWeight:700}}>Mavzu</div>
+                  <div style={{maxHeight:90,overflow:'auto',marginBottom:8}}>
+                    {topics.map((t)=>(
+                      <label key={t} style={FILTER_CHECK_LABEL_STYLE}>
+                        <input type="checkbox" checked={allFilterTopics.includes(t)} onChange={()=>toggleInList(setAllFilterTopics, t)} />
+                        <span style={FILTER_CHECK_TEXT_STYLE}>{t}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="g2" style={{gap:6,marginBottom:8}}>
+                    <input className="input" type="date" value={allFilterDateFrom} onChange={(e)=>setAllFilterDateFrom(e.target.value)} />
+                    <input className="input" type="date" value={allFilterDateTo} onChange={(e)=>setAllFilterDateTo(e.target.value)} />
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',gap:6}}>
+                    <button className="btn btn-gh btn-sm" onClick={() => {
+                      setAllFilterOps([]);
+                      setAllFilterTopics([]);
+                      setAllFilterDateFrom('');
+                      setAllFilterDateTo('');
+                    }}>
+                      Tozalash
+                    </button>
+                    <button className="btn btn-bl btn-sm" onClick={()=>setAllFilterOpen(false)}>Qo'llash</button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button className="btn btn-gh btn-sm" onClick={() => setSearchAllNew('')}>
+              Qidiruvni tozalash
+            </button>
+            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{visibleAllNewRows.length} / {allNewList.length} ta yozuv</span>
+            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Ilovadan yozilgan yangi obzvonlar</span>
+            {allNewList.length > 500 && (
+              <button className="btn btn-gh btn-sm" onClick={()=>setAllShowMode((m)=>m==='all'?'smart':'all')}>
+                {allShowMode==='all' ? "Faqat 500 ta ko'rsatish" : "Hammasini ko'rsatish"}
+              </button>
+            )}
+          </div>
+          <div className="card" style={{overflow:'hidden',flex:1}}>
+            <div style={{overflow:'auto',maxHeight:'calc(100vh - 230px)'}}>
+              <table className="tbl">
+                <thead><tr><th>No</th><th>ID</th><th>Kontragent</th><th>Sana</th><th>Mavzu</th><th>Izoh</th><th>Keyingi sana</th><th>Suv soni</th><th>Zakaz sanasi</th><th>Operator</th></tr></thead>
+                <tbody>
+                  {allNewList.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:32,color:'var(--t3)'}}>Yangi obzvon yozuvlari yo'q</td></tr> :
+                    visibleAllNewRows.map((r,i)=>(
+                      <tr key={r.rid || i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || i+1}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || '—'}</td>
                         <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || `ID: ${r.customerId}`}</span></td>
@@ -4472,6 +4687,8 @@ export default function App() {
   const [page,setPage]     = useState('dash');
   const [data,setData]     = useState(null);
   const [obzvonRecords,setObzvonRecords] = useState(() => S.get('aq-obzvon-records', []));
+  const [obzvonAllRows,setObzvonAllRows] = useState(() => S.get('aq-obzvon-all-rows', []));
+  const [obzvonAllNewRows,setObzvonAllNewRows] = useState(() => S.get('aq-obzvon-all-new-rows', []));
   const [users,setUsers] = useState(() => S.get('aq-users', DEFAULT_USERS));
   const [access,setAccess] = useState(() => S.get('aq-access', DEFAULT_ACCESS));
   const [userCreds,setUserCreds] = useState(() => {
@@ -4492,6 +4709,7 @@ export default function App() {
   const [side,setSide]     = useState(true);
   const [autoLoad,setAutoLoad] = useState({ loading:false, progress:'', error:'' });
   const [remoteAccessLoaded, setRemoteAccessLoaded] = useState(false);
+  const [obzvonAllLoaded, setObzvonAllLoaded] = useState(false);
   const skipCloudPushRef = useRef(false);
   const buildDefaultCreds = useCallback((baseUsers) => {
     const m = {};
@@ -4587,6 +4805,94 @@ export default function App() {
     } catch {}
   }, [obzvonWebhook]);
 
+  const normalizeObzvonAllRow = useCallback((r, i = 0) => ({
+    no: String(r?.no || i + 1),
+    customer: String(r?.customer || '').trim(),
+    callDate: String(r?.callDate || '').trim(),
+    topic: String(r?.topic || '').trim(),
+    note: String(r?.note || '').trim(),
+    nextDate: String(r?.nextDate || '').trim(),
+    orderCount: String(r?.orderCount || '').trim(),
+    operator: String(r?.operator || '').trim(),
+    customerId: String(r?.customerId || r?.id || '').trim(),
+    orderDate: String(r?.orderDate || '').trim(),
+  }), []);
+  const normalizeObzvonNewRow = useCallback((r, i = 0) => ({
+    rid: String(r?.rid || r?._rid || `nr_${Date.now()}_${i}`),
+    no: String(r?.no || i + 1),
+    customer: String(r?.customer || '').trim(),
+    callDate: String(r?.callDate || '').trim(),
+    topic: String(r?.topic || '').trim(),
+    note: String(r?.note || '').trim(),
+    nextDate: String(r?.nextDate || '').trim(),
+    orderCount: String(r?.orderCount || '').trim(),
+    operator: String(r?.operator || '').trim(),
+    customerId: String(r?.customerId || r?.id || '').trim(),
+    orderDate: String(r?.orderDate || '').trim(),
+  }), []);
+
+  const loadObzvonAllRemote = useCallback(async () => {
+    try {
+      const r = await fetch(OBZVON_ALL_LOCAL_XLSX, { cache:'no-store' });
+      if (!r.ok) return false;
+      const arr = await r.arrayBuffer();
+      const wb = XLSX.read(arr, { type:'array', cellDates:false, raw:true });
+      const firstSheet = wb.SheetNames?.[0];
+      if (!firstSheet) return false;
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header:1, defval:'', raw:true });
+      const body = rows
+        .slice(1)
+        .map((row, i) => normalizeObzvonAllRow({
+          no: row?.[0] ?? (i + 1),                 // A
+          customer: row?.[9] || row?.[1] || '',    // J (prioritet), bo'sh bo'lsa B
+          callDate: row?.[2] || '',                // C
+          topic: row?.[3] || '',                   // D
+          note: row?.[4] || '',                    // E
+          nextDate: row?.[5] || '',                // F
+          orderCount: row?.[6] || '',              // G
+          operator: row?.[7] || '',                // H
+          customerId: row?.[8] || '',              // I
+          orderDate: '',                            // Bu faylda yo'q
+        }, i))
+        .filter((x) => x.customer || x.customerId || x.note || x.topic || x.callDate);
+      setObzvonAllRows(body || []);
+      setObzvonAllLoaded(true);
+      S.set('aq-obzvon-all-rows', body || []);
+      return true;
+    } catch {}
+    return false;
+  }, [normalizeObzvonAllRow]);
+
+  const appendObzvonAllRemote = useCallback(async (rows = []) => {
+    const normalizedRows = (rows || []).map((row, i) => normalizeObzvonAllRow(row, i)).filter((r) => (r.customerId || r.customer) && r.note);
+    if (!normalizedRows.length) return;
+    setObzvonAllRows((prev) => {
+      const next = [...normalizedRows, ...(prev || [])];
+      S.set('aq-obzvon-all-rows', next);
+      return next;
+    });
+  }, [normalizeObzvonAllRow]);
+
+  const upsertObzvonAllNewRows = useCallback((rows = []) => {
+    const normalizedRows = (rows || [])
+      .map((row, i) => normalizeObzvonNewRow(row, i))
+      .filter((r) => (r.customerId || r.customer) && r.note);
+    if (!normalizedRows.length) return;
+    setObzvonAllNewRows((prev) => {
+      const m = new Map((prev || []).map((r) => [String(r.rid || ''), normalizeObzvonNewRow(r)]));
+      normalizedRows.forEach((r) => {
+        m.set(String(r.rid), { ...(m.get(String(r.rid)) || {}), ...r });
+      });
+      const next = Array.from(m.values()).sort((a, b) => {
+        const da = toDate(a.callDate);
+        const db = toDate(b.callDate);
+        return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
+      });
+      S.set('aq-obzvon-all-new-rows', next);
+      return next;
+    });
+  }, [normalizeObzvonNewRow]);
+
   const notify = (msg, type='ok') => {
     setNotif({ msg, type });
     setTimeout(() => setNotif(null), 5000);
@@ -4608,7 +4914,19 @@ export default function App() {
     if (obzvonSheetUrl !== fixed) setObzvonSheetUrl(fixed);
   }, [obzvonSheetUrl]);
   useEffect(() => { S.set('aq-obzvon-records', obzvonRecords || []); }, [obzvonRecords]);
+  useEffect(() => { S.set('aq-obzvon-all-rows', obzvonAllRows || []); }, [obzvonAllRows]);
+  useEffect(() => { S.set('aq-obzvon-all-new-rows', obzvonAllNewRows || []); }, [obzvonAllNewRows]);
   useEffect(() => { S.set('aq-user-creds', userCreds || {}); }, [userCreds]);
+  useEffect(() => {
+    if (!Array.isArray(obzvonRecords) || !obzvonRecords.length) return;
+    let changed = false;
+    const next = obzvonRecords.map((r) => {
+      if (r?._rid) return r;
+      changed = true;
+      return { ...r, _rid: createRowRid() };
+    });
+    if (changed) setObzvonRecords(next);
+  }, [obzvonRecords]);
   useEffect(() => {
     if (!isLoggedIn) return;
     // Admin sessiyada local sozlamalar authoritative:
@@ -4646,6 +4964,14 @@ export default function App() {
     }, 350);
     return () => clearTimeout(t);
   }, [users, access, userCreds, isLoggedIn, sessionUser, remoteAccessLoaded, pushRemoteAccessConfig]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    if (obzvonAllLoaded) return;
+    loadObzvonAllRemote().then((ok) => {
+      if (!ok) setObzvonAllLoaded(true);
+    });
+  }, [isLoggedIn, obzvonAllLoaded, loadObzvonAllRemote]);
 
   useEffect(() => {
     if (users.length === 0) return;
@@ -4752,7 +5078,10 @@ export default function App() {
 
   const addObzvonRows = useCallback((rows) => {
     if (!rows?.length) return;
-    setObzvonRecords((prev) => [...rows, ...prev]);
+    setObzvonRecords((prev) => [
+      ...rows.map((r) => ({ ...r, _rid: r?._rid || createRowRid() })),
+      ...(prev || []),
+    ]);
   }, []);
 
   useEffect(() => {
@@ -4979,7 +5308,19 @@ export default function App() {
                 {page==='cust'    && canViewPage('cust') && <Customers D={rawD} currentUser={effectiveUser} currentAccess={currentAccess} assignmentById={rawD.assignmentById || {}}/>}
                 {page==='orders'  && canViewPage('orders') && <Orders    D={D}/>}
                 {page==='kassa'   && canViewPage('kassa') && <Kassa     D={D}/>}
-                {page==='obzvon'  && canViewPage('obzvon') && <Obzvon    D={D} currentUser={effectiveUser} records={obzvonRecords} setRecords={setObzvonRecords} />}
+                {page==='obzvon'  && canViewPage('obzvon') && (
+                  <Obzvon
+                  D={D}
+                  currentUser={effectiveUser}
+                  records={obzvonRecords}
+                  setRecords={setObzvonRecords}
+                  allRows={obzvonAllRows}
+                  newRows={obzvonAllNewRows}
+                  onReloadAll={loadObzvonAllRemote}
+                  onAppendAllRows={appendObzvonAllRemote}
+                  onUpsertNewRows={upsertObzvonAllNewRows}
+                />
+              )}
                 {page==='doljniki'&& canViewPage('doljniki') && <Doljniki rows={doljniki} otherRows={otherDoljniki} D={D} kulerRows={D.kulerInstallments || []} onAddToObzvon={addObzvonRows} currentUser={effectiveUser} />}
                 {page==='reports' && canViewPage('reports') && <Reports   D={D}/>}
                 {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} />}
