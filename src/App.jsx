@@ -153,6 +153,31 @@ const FILTER_CHECK_TEXT_STYLE = {
   whiteSpace: 'nowrap',
 };
 const createRowRid = () => `r_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+const isInvalidObzvonCustomerText = (v) => {
+  const s = String(v ?? '').trim();
+  if (!s) return true;
+  const up = s.toUpperCase();
+  return (
+    up.startsWith('#') ||
+    up === '#REF!' ||
+    up === '#REF' ||
+    up === '#N/A' ||
+    up === 'N/A' ||
+    up === 'NA' ||
+    up === '#NA' ||
+    up === 'NULL' ||
+    up === 'UNDEFINED'
+  );
+};
+const sanitizeObzvonCell = (v) => {
+  const s = String(v ?? '').trim();
+  return isInvalidObzvonCustomerText(s) ? '' : s;
+};
+const pickObzvonCustomerName = (row) => {
+  const fromJ = sanitizeObzvonCell(row?.[9]);
+  const fromB = sanitizeObzvonCell(row?.[1]);
+  return fromJ || fromB;
+};
 const isNameExcludedForActiveStats = (name) => {
   const n = String(name || '').trim().toUpperCase();
   if (!n) return true;
@@ -3385,7 +3410,7 @@ function Obzvon({
                       <tr key={i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || i+1}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || '—'}</td>
-                        <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || `ID: ${r.customerId}`}</span></td>
+                        <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : '—')}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.callDate)}</td>
                         <td>{r.topic || '—'}</td>
                         <td style={{maxWidth:300}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '—'}</span></td>
@@ -3484,7 +3509,7 @@ function Obzvon({
                       <tr key={r.rid || i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || i+1}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || '—'}</td>
-                        <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || `ID: ${r.customerId}`}</span></td>
+                        <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : '—')}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.callDate)}</td>
                         <td>{r.topic || '—'}</td>
                         <td style={{maxWidth:300}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '—'}</span></td>
@@ -4806,29 +4831,29 @@ export default function App() {
   }, [obzvonWebhook]);
 
   const normalizeObzvonAllRow = useCallback((r, i = 0) => ({
-    no: String(r?.no || i + 1),
-    customer: String(r?.customer || '').trim(),
-    callDate: String(r?.callDate || '').trim(),
-    topic: String(r?.topic || '').trim(),
-    note: String(r?.note || '').trim(),
-    nextDate: String(r?.nextDate || '').trim(),
-    orderCount: String(r?.orderCount || '').trim(),
-    operator: String(r?.operator || '').trim(),
-    customerId: String(r?.customerId || r?.id || '').trim(),
-    orderDate: String(r?.orderDate || '').trim(),
+    no: sanitizeObzvonCell(r?.no) || String(i + 1),
+    customer: sanitizeObzvonCell(r?.customer),
+    callDate: sanitizeObzvonCell(r?.callDate),
+    topic: sanitizeObzvonCell(r?.topic),
+    note: sanitizeObzvonCell(r?.note),
+    nextDate: sanitizeObzvonCell(r?.nextDate),
+    orderCount: sanitizeObzvonCell(r?.orderCount),
+    operator: sanitizeObzvonCell(r?.operator),
+    customerId: sanitizeObzvonCell(r?.customerId || r?.id),
+    orderDate: sanitizeObzvonCell(r?.orderDate),
   }), []);
   const normalizeObzvonNewRow = useCallback((r, i = 0) => ({
-    rid: String(r?.rid || r?._rid || `nr_${Date.now()}_${i}`),
-    no: String(r?.no || i + 1),
-    customer: String(r?.customer || '').trim(),
-    callDate: String(r?.callDate || '').trim(),
-    topic: String(r?.topic || '').trim(),
-    note: String(r?.note || '').trim(),
-    nextDate: String(r?.nextDate || '').trim(),
-    orderCount: String(r?.orderCount || '').trim(),
-    operator: String(r?.operator || '').trim(),
-    customerId: String(r?.customerId || r?.id || '').trim(),
-    orderDate: String(r?.orderDate || '').trim(),
+    rid: sanitizeObzvonCell(r?.rid || r?._rid) || `nr_${Date.now()}_${i}`,
+    no: sanitizeObzvonCell(r?.no) || String(i + 1),
+    customer: sanitizeObzvonCell(r?.customer),
+    callDate: sanitizeObzvonCell(r?.callDate),
+    topic: sanitizeObzvonCell(r?.topic),
+    note: sanitizeObzvonCell(r?.note),
+    nextDate: sanitizeObzvonCell(r?.nextDate),
+    orderCount: sanitizeObzvonCell(r?.orderCount),
+    operator: sanitizeObzvonCell(r?.operator),
+    customerId: sanitizeObzvonCell(r?.customerId || r?.id),
+    orderDate: sanitizeObzvonCell(r?.orderDate),
   }), []);
 
   const loadObzvonAllRemote = useCallback(async () => {
@@ -4844,7 +4869,7 @@ export default function App() {
         .slice(1)
         .map((row, i) => normalizeObzvonAllRow({
           no: row?.[0] ?? (i + 1),                 // A
-          customer: row?.[9] || row?.[1] || '',    // J (prioritet), bo'sh bo'lsa B
+          customer: pickObzvonCustomerName(row),    // J (prioritet), xato/bo'sh bo'lsa B
           callDate: row?.[2] || '',                // C
           topic: row?.[3] || '',                   // D
           note: row?.[4] || '',                    // E
@@ -4854,7 +4879,7 @@ export default function App() {
           customerId: row?.[8] || '',              // I
           orderDate: '',                            // Bu faylda yo'q
         }, i))
-        .filter((x) => x.customer || x.customerId || x.note || x.topic || x.callDate);
+        .filter((x) => x.customer || x.customerId);
       setObzvonAllRows(body || []);
       setObzvonAllLoaded(true);
       S.set('aq-obzvon-all-rows', body || []);
@@ -4892,6 +4917,15 @@ export default function App() {
       return next;
     });
   }, [normalizeObzvonNewRow]);
+  useEffect(() => {
+    if (!Array.isArray(obzvonAllRows) || !obzvonAllRows.length) return;
+    const cleaned = obzvonAllRows
+      .map((r, i) => normalizeObzvonAllRow(r, i))
+      .filter((r) => r.customer || r.customerId);
+    if (JSON.stringify(cleaned) !== JSON.stringify(obzvonAllRows)) {
+      setObzvonAllRows(cleaned);
+    }
+  }, [obzvonAllRows, normalizeObzvonAllRow]);
 
   const notify = (msg, type='ok') => {
     setNotif({ msg, type });
