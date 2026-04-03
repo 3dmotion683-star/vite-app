@@ -41,6 +41,34 @@ const normCurrency = (v) => {
   if (['USD', '$', 'Р”РћР›Р›РђР '].includes(s)) return 'USD';
   return 'UZS';
 };
+const isCommonDistrictLabel = (v) => {
+  const s = String(v || '').trim().toLowerCase();
+  if (!s) return false;
+  // Normal Cyrillic + ehtimoliy buzilgan kodirovka ko'rinishlari
+  return (
+    s.includes('общая территория') ||
+    s.includes('общая') ||
+    s.includes('territoriya') ||
+    s.includes('territoria') ||
+    s.includes('рћр±с‰р°сџ') ||
+    s.includes('рћр±с‰') ||
+    s.includes('obshaya')
+  );
+};
+const pickPreferredDistrict = (raw) => {
+  const parts = String(raw || '')
+    .split(';')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!parts.length) return '';
+  const preferred = parts.find((p) => !isCommonDistrictLabel(p));
+  return preferred || '';
+};
+const normalizeAccessApiUrl = (v) => {
+  const s = String(v || '').trim();
+  if (!s) return OBZVON_WEBHOOK_DEFAULT;
+  return /workers\.dev/i.test(s) ? s : OBZVON_WEBHOOK_DEFAULT;
+};
 function getDebtStats(customers = []) {
   const debtorsUZS = customers.filter((c) => c.balanceUZS < 0);
   return {
@@ -258,6 +286,16 @@ const normId = (v) => {
   return s;
 };
 const normText = (v) => String(v || '').trim().toLowerCase();
+const cleanDistrictDisplay = (v) => {
+  const raw = String(v || '').trim();
+  if (!raw) return '';
+  const parts = raw.split(';').map((x) => String(x || '').trim()).filter(Boolean);
+  const filtered = parts.filter((p) => {
+    const n = p.toLowerCase();
+    return !n.includes('общая территория') && n !== 'общая';
+  });
+  return filtered[0] || '';
+};
 const isOrderDoc = (v) => {
   const t = normText(v);
   return ['заказ', 'р·р°рєр°р·', 'zakaz'].includes(t);
@@ -598,9 +636,7 @@ function processAll(mainData) {
         phone:    String(r[3]  || '').trim().replace(/[^+\d]/g,'').slice(0,13),
         contact:  String(r[4]  || '').trim(),
         address:  String(r[14] || '').trim(),
-        district: String(r[21] || '').split(';').map((s)=>s.trim()).filter(Boolean)
-                    .find((s) => !s.includes('РћР±С‰Р°СЏ')) ||
-                  String(r[21] || '').split(';')[0].trim(),
+        district: pickPreferredDistrict(r[21]),
         source,
         aaTag: aaValue,
         merchantNote: merchNote,
@@ -3156,7 +3192,7 @@ function Obzvon({
       return {
         id: c.id,
         name: c.name,
-        district: c.district || '',
+        district: pickPreferredDistrict(c.district || ''),
         tara: c.tara,
         balance: c.balanceUZS,
         ord1: ord.ord1,
@@ -4793,6 +4829,7 @@ function SettingsPanel({
             <button
               className={`btn btn-sm ${uiConf.ui?.theme === 'dark' ? 'btn-bl' : 'btn-gh'}`}
               onClick={() => {
+                S.set(`aq-ui-theme-${currentUser}`, 'dark');
                 setAccess((prev) => {
                   const confU = normalizeAccessConfig(currentUser, prev[currentUser] || uiConf);
                   const next = {
@@ -4812,6 +4849,7 @@ function SettingsPanel({
             <button
               className={`btn btn-sm ${uiConf.ui?.theme === 'light' ? 'btn-bl' : 'btn-gh'}`}
               onClick={() => {
+                S.set(`aq-ui-theme-${currentUser}`, 'light');
                 setAccess((prev) => {
                   const confU = normalizeAccessConfig(currentUser, prev[currentUser] || uiConf);
                   const next = {
@@ -4926,6 +4964,7 @@ export default function App() {
   const [obzvonWebhook,setObzvonWebhook] = useState(() =>
     S.get(ACCESS_SYNC_URL_KEY, S.get('aq-obzvon-webhook', OBZVON_WEBHOOK_DEFAULT))
   );
+  const accessApiUrl = useMemo(() => normalizeAccessApiUrl(obzvonWebhook), [obzvonWebhook]);
   const [showUp,setUp]     = useState(false);
   const [notif,setNotif]   = useState(null);
   const [side,setSide]     = useState(true);
@@ -5010,13 +5049,13 @@ export default function App() {
   }, [users, access, userCreds]);
 
   const loadRemoteAccessConfig = useCallback(async () => {
-    if (!obzvonWebhook) {
+    if (!accessApiUrl) {
       setRemoteAccessLoaded(true);
       return;
     }
     try {
-      const sep = obzvonWebhook.includes('?') ? '&' : '?';
-      const url = `${obzvonWebhook}${sep}action=access_get&_=${Date.now()}`;
+      const sep = accessApiUrl.includes('?') ? '&' : '?';
+      const url = `${accessApiUrl}${sep}action=access_get&_=${Date.now()}`;
       const r = await fetch(url);
       if (r.ok) {
         const j = await r.json();
@@ -5028,12 +5067,12 @@ export default function App() {
       }
     } catch {}
     setRemoteAccessLoaded(true);
-  }, [obzvonWebhook, applyRemoteAccessConfig]);
+  }, [accessApiUrl, applyRemoteAccessConfig]);
 
   const pushRemoteAccessConfig = useCallback(async (payload) => {
-    if (!obzvonWebhook) return;
+    if (!accessApiUrl) return;
     try {
-      const r = await fetch(obzvonWebhook, {
+      const r = await fetch(accessApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -5044,7 +5083,7 @@ export default function App() {
       const j = await r.json().catch(() => ({}));
       if (j?.ok && (j?.saved || j?.accessConfig || j?.mode === 'access_set')) return;
     } catch {}
-  }, [obzvonWebhook]);
+  }, [accessApiUrl]);
 
   const normalizeObzvonAllRow = useCallback((r, i = 0) => ({
     no: sanitizeObzvonCell(r?.no) || String(i + 1),
@@ -5146,10 +5185,10 @@ export default function App() {
   }, [normalizeObzvonAllRow, hasObzvonRowPayload]);
 
   const pullRemoteObzvonNewRows = useCallback(async () => {
-    if (!obzvonWebhook) return false;
+    if (!accessApiUrl) return false;
     try {
-      const sep = obzvonWebhook.includes('?') ? '&' : '?';
-      const url = `${obzvonWebhook}${sep}action=obzvon_new_get&_=${Date.now()}`;
+      const sep = accessApiUrl.includes('?') ? '&' : '?';
+      const url = `${accessApiUrl}${sep}action=obzvon_new_get&_=${Date.now()}`;
       const r = await fetch(url, { cache:'no-store' });
       if (!r.ok) return false;
       const j = await r.json().catch(() => ({}));
@@ -5165,16 +5204,16 @@ export default function App() {
       return true;
     } catch {}
     return false;
-  }, [obzvonWebhook, normalizeObzvonNewRow, hasObzvonRowPayload, mergeObzvonNewRows]);
+  }, [accessApiUrl, normalizeObzvonNewRow, hasObzvonRowPayload, mergeObzvonNewRows]);
 
   const pushRemoteObzvonNewRows = useCallback(async (rows = []) => {
-    if (!obzvonWebhook) return false;
+    if (!accessApiUrl) return false;
     const payloadRows = (rows || [])
       .map((x, i) => normalizeObzvonNewRow(x, i))
       .filter((x) => (x.customerId || x.customer) && hasObzvonRowPayload(x));
     if (!payloadRows.length) return false;
     try {
-      const r = await fetch(obzvonWebhook, {
+      const r = await fetch(accessApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -5187,7 +5226,7 @@ export default function App() {
       return !!j?.ok;
     } catch {}
     return false;
-  }, [obzvonWebhook, normalizeObzvonNewRow, hasObzvonRowPayload, sessionUser, currentUser]);
+  }, [accessApiUrl, normalizeObzvonNewRow, hasObzvonRowPayload, sessionUser, currentUser]);
 
   const upsertObzvonAllNewRows = useCallback((rows = []) => {
     const normalizedRows = (rows || [])
@@ -5218,8 +5257,9 @@ export default function App() {
   useEffect(() => { S.set('aq-current-user', currentUser); }, [currentUser]);
   useEffect(() => { S.set('aq-session-user', sessionUser || ''); }, [sessionUser]);
   useEffect(() => {
-    S.set(ACCESS_SYNC_URL_KEY, obzvonWebhook || '');
-    S.set('aq-obzvon-webhook', obzvonWebhook || ''); // legacy key
+    const normalized = normalizeAccessApiUrl(obzvonWebhook);
+    S.set(ACCESS_SYNC_URL_KEY, normalized || '');
+    S.set('aq-obzvon-webhook', normalized || ''); // legacy key
   }, [obzvonWebhook]);
   useEffect(() => { S.set('aq-main-url', mainSheetUrl || ''); }, [mainSheetUrl]);
   useEffect(() => { S.set('aq-obzvon-url', obzvonSheetUrl || ''); }, [obzvonSheetUrl]);
@@ -5232,9 +5272,10 @@ export default function App() {
     if (obzvonSheetUrl !== fixed) setObzvonSheetUrl(fixed);
   }, [obzvonSheetUrl]);
   useEffect(() => {
-    // Eski lokal saqlovda webhook bo'sh qolib ketgan bo'lsa, default URL ni qayta tiklaymiz.
-    if (!String(obzvonWebhook || '').trim() && OBZVON_WEBHOOK_DEFAULT) {
-      setObzvonWebhook(OBZVON_WEBHOOK_DEFAULT);
+    // Access sync URL doim Workers URL bo'lsin (boshqa URL kirsa defaultga qaytariladi).
+    const normalized = normalizeAccessApiUrl(obzvonWebhook);
+    if (normalized !== String(obzvonWebhook || '').trim()) {
+      setObzvonWebhook(normalized);
     }
   }, [obzvonWebhook]);
   useEffect(() => { S.set('aq-obzvon-records', obzvonRecords || []); }, [obzvonRecords]);
@@ -5257,12 +5298,12 @@ export default function App() {
     loadRemoteAccessConfig();
   }, [isLoggedIn, sessionUser, loadRemoteAccessConfig]);
   useEffect(() => {
-    if (!isLoggedIn || !obzvonWebhook) return;
+    if (!isLoggedIn || !accessApiUrl) return;
     const t = setInterval(() => {
       loadRemoteAccessConfig();
     }, 60000);
     return () => clearInterval(t);
-  }, [isLoggedIn, obzvonWebhook, loadRemoteAccessConfig]);
+  }, [isLoggedIn, accessApiUrl, loadRemoteAccessConfig]);
   useEffect(() => {
     if (!isLoggedIn || sessionUser !== 'Admin' || !remoteAccessLoaded) return;
     if (skipCloudPushRef.current) {
@@ -5293,13 +5334,13 @@ export default function App() {
   }, [isLoggedIn, obzvonAllLoaded, loadObzvonAllRemote]);
 
   useEffect(() => {
-    if (!isLoggedIn || !obzvonWebhook) return;
+    if (!isLoggedIn || !accessApiUrl) return;
     pullRemoteObzvonNewRows();
     const t = setInterval(() => {
       pullRemoteObzvonNewRows();
     }, 15000);
     return () => clearInterval(t);
-  }, [isLoggedIn, obzvonWebhook, pullRemoteObzvonNewRows]);
+  }, [isLoggedIn, accessApiUrl, pullRemoteObzvonNewRows]);
 
   useEffect(() => {
     if (users.length === 0) return;
@@ -5519,7 +5560,12 @@ export default function App() {
   const canViewPage = useCallback((id) => (currentAccess.visible?.[id] ?? true), [currentAccess]);
   const visibleNav = NAV.filter((n) => canViewPage(n.id));
   const pageMeta = NAV.find((n)=>n.id===page) || { id:'settings', icon:E.settings, label:'Nastroyka' };
-  const currentTheme = currentAccess.ui?.theme === 'light' ? 'light' : 'dark';
+  const localThemeOverride = String(S.get(`aq-ui-theme-${effectiveUser}`, '') || '').toLowerCase();
+  const currentTheme = localThemeOverride === 'light'
+    ? 'light'
+    : localThemeOverride === 'dark'
+    ? 'dark'
+    : (currentAccess.ui?.theme === 'light' ? 'light' : 'dark');
   const themeVars = currentTheme === 'light' ? LIGHT_THEME_VARS : {};
   useEffect(() => {
     if (canViewPage(page)) return;
