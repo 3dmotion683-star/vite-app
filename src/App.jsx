@@ -181,6 +181,242 @@ const FILTER_CHECK_TEXT_STYLE = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
 };
+const UNIVERSAL_FILTER_MODES = [
+  { value: 'show', label: "Ko'rsatsin" },
+  { value: 'hide', label: "Ko'rsatmasin" },
+  { value: 'to', label: 'Gacha' },
+  { value: 'from', label: 'Keyin' },
+];
+const makeUniversalColState = () => ({
+  mode: 'show',
+  value: '',
+  selected: [],
+  optionsOpen: false,
+  optionQuery: '',
+});
+const ensureUniversalFilterState = (columns = [], prev = {}) => {
+  const out = { ...(prev || {}) };
+  (columns || []).forEach((c) => {
+    if (!out[c.key]) out[c.key] = makeUniversalColState();
+    else {
+      out[c.key] = {
+        ...makeUniversalColState(),
+        ...out[c.key],
+        selected: Array.isArray(out[c.key].selected) ? out[c.key].selected : [],
+      };
+    }
+  });
+  return out;
+};
+const countUniversalFilters = (state = {}) =>
+  Object.values(state || {}).reduce((s, st) => {
+    const hasSel = Array.isArray(st?.selected) && st.selected.length > 0;
+    const hasVal = String(st?.value ?? '').trim() !== '';
+    return s + (hasSel || hasVal ? 1 : 0);
+  }, 0);
+const getUniversalColValue = (row, col) => {
+  if (!col) return '';
+  if (typeof col.getValue === 'function') return col.getValue(row);
+  return row?.[col.key];
+};
+const normalizeUniversalOptionValue = (value, type = 'text') => {
+  if (type === 'number') {
+    const n = Number(value || 0);
+    return Number.isFinite(n) ? String(n) : '';
+  }
+  if (type === 'date') {
+    const d = toDate(value);
+    return d ? d.toISOString().slice(0, 10) : '';
+  }
+  return String(value ?? '').trim();
+};
+const universalRowPasses = (row, columns = [], state = {}) => {
+  for (const col of (columns || [])) {
+    const st = state?.[col.key];
+    if (!st) continue;
+    const mode = st.mode || 'show';
+    const selected = Array.isArray(st.selected) ? st.selected : [];
+    const rawInput = String(st.value ?? '').trim();
+    const hasSelected = selected.length > 0;
+    const hasInput = rawInput !== '';
+    if (!hasSelected && !hasInput) continue;
+
+    const type = col.type || 'text';
+    const raw = getUniversalColValue(row, col);
+
+    if (type === 'number') {
+      const n = Number(raw || 0);
+      const selectedNums = selected.map((x) => Number(x)).filter((x) => Number.isFinite(x));
+      if (hasSelected) {
+        const inSet = selectedNums.includes(n);
+        if (mode === 'hide' ? inSet : !inSet) return false;
+        continue;
+      }
+      const target = Number(rawInput);
+      if (!Number.isFinite(target)) continue;
+      if (mode === 'from' && !(n >= target)) return false;
+      else if (mode === 'to' && !(n <= target)) return false;
+      else if (mode === 'hide' && n === target) return false;
+      else if (mode === 'show' && n !== target) return false;
+      continue;
+    }
+
+    if (type === 'date') {
+      const d = toDate(raw);
+      if (!d) return false;
+      const dKey = d.toISOString().slice(0, 10);
+      if (hasSelected) {
+        const inSet = selected.includes(dKey);
+        if (mode === 'hide' ? inSet : !inSet) return false;
+        continue;
+      }
+      const t = toDate(rawInput);
+      if (!t) continue;
+      const tMs = t.getTime();
+      const dMs = d.getTime();
+      if (mode === 'from' && !(dMs >= tMs)) return false;
+      else if (mode === 'to' && !(dMs <= tMs)) return false;
+      else if (mode === 'hide' && dKey === t.toISOString().slice(0,10)) return false;
+      else if (mode === 'show' && dKey !== t.toISOString().slice(0,10)) return false;
+      continue;
+    }
+
+    const txt = String(raw ?? '').trim().toLowerCase();
+    if (hasSelected) {
+      const normalizedSelected = selected.map((x) => String(x ?? '').trim().toLowerCase());
+      const inSet = normalizedSelected.includes(txt);
+      if (mode === 'hide' ? inSet : !inSet) return false;
+      continue;
+    }
+    const q = rawInput.toLowerCase();
+    if (mode === 'hide' && txt.includes(q)) return false;
+    else if (mode === 'from' && !(txt >= q)) return false;
+    else if (mode === 'to' && !(txt <= q)) return false;
+    else if (mode === 'show' && !txt.includes(q)) return false;
+  }
+  return true;
+};
+const applyUniversalFilters = (rows = [], columns = [], state = {}) =>
+  (rows || []).filter((r) => universalRowPasses(r, columns, state));
+
+function UniversalFilterPanel({
+  open,
+  title = 'Universal filtr',
+  columns = [],
+  rows = [],
+  state = {},
+  setState = () => {},
+  onClose = () => {},
+  width = 560,
+}) {
+  const optionsByKey = useMemo(() => {
+    const out = {};
+    (columns || []).forEach((col) => {
+      const set = new Set();
+      (rows || []).forEach((row) => {
+        const raw = getUniversalColValue(row, col);
+        const val = normalizeUniversalOptionValue(raw, col.type || 'text');
+        if (val !== '') set.add(val);
+      });
+      const arr = Array.from(set);
+      if ((col.type || 'text') === 'number') arr.sort((a, b) => Number(a) - Number(b));
+      else arr.sort((a, b) => a.localeCompare(b));
+      out[col.key] = arr;
+    });
+    return out;
+  }, [columns, rows]);
+
+  if (!open) return null;
+  const safeState = ensureUniversalFilterState(columns, state);
+  const upd = (key, patch) => {
+    setState((prev) => ({
+      ...ensureUniversalFilterState(columns, prev),
+      [key]: { ...(ensureUniversalFilterState(columns, prev)[key] || makeUniversalColState()), ...patch },
+    }));
+  };
+  const setAll = (mode = 'select') => {
+    setState((prev) => {
+      const next = ensureUniversalFilterState(columns, prev);
+      columns.forEach((c) => {
+        next[c.key] = {
+          ...(next[c.key] || makeUniversalColState()),
+          selected: mode === 'select' ? [...(optionsByKey[c.key] || [])] : [],
+          value: mode === 'select' ? '' : '',
+        };
+      });
+      return { ...next };
+    });
+  };
+
+  return (
+    <div className="card" style={{position:'absolute',top:40,right:0,zIndex:40,width,padding:12,boxShadow:'0 24px 60px rgba(0,0,0,.6)',backdropFilter:'blur(10px)',overflow:'hidden'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+        <div style={{fontWeight:700,fontSize:13}}>{title}</div>
+        <div style={{display:'flex',gap:6}}>
+          <button className="btn btn-gh btn-sm" onClick={()=>setAll('select')}>Hammasini belgilash</button>
+          <button className="btn btn-gh btn-sm" onClick={()=>setAll('clear')}>Hammasini tozalash</button>
+        </div>
+      </div>
+      <div style={{maxHeight:'56vh',overflow:'auto',paddingRight:2}}>
+        {columns.map((col) => {
+          const st = safeState[col.key] || makeUniversalColState();
+          const opts = optionsByKey[col.key] || [];
+          const shownOpts = opts.filter((o) => o.toLowerCase().includes(String(st.optionQuery || '').toLowerCase()));
+          return (
+            <div key={col.key} className="card" style={{padding:8,marginBottom:8,background:'var(--s3)',border:'1px solid var(--b1)'}}>
+              <div style={{fontSize:10.5,color:'var(--t3)',fontWeight:700,marginBottom:6}}>{col.label}</div>
+              <div style={{display:'grid',gridTemplateColumns:'120px 1fr auto',gap:6,marginBottom:6}}>
+                <select className="select" value={st.mode || 'show'} onChange={(e)=>upd(col.key, { mode:e.target.value })}>
+                  {UNIVERSAL_FILTER_MODES.map((m)=><option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+                <input
+                  className="input"
+                  type={col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : 'text'}
+                  value={st.value || ''}
+                  placeholder={col.type === 'number' ? 'son kiriting' : col.type === 'date' ? 'sanani tanlang' : 'qiymat yozing'}
+                  onChange={(e)=>upd(col.key, { value:e.target.value })}
+                />
+                <button className="btn btn-gh btn-sm" onClick={()=>upd(col.key, { optionsOpen: !st.optionsOpen })}>{st.optionsOpen ? 'Yop' : "Ro'yxat"}</button>
+              </div>
+              {st.optionsOpen && (
+                <div className="card" style={{padding:8,border:'1px solid var(--b1)'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr auto auto',gap:6,marginBottom:6}}>
+                    <input className="input" placeholder="Qidirish..." value={st.optionQuery || ''} onChange={(e)=>upd(col.key, { optionQuery: e.target.value })} />
+                    <button className="btn btn-gh btn-sm" onClick={()=>upd(col.key, { selected:[...opts] })}>Hammasi</button>
+                    <button className="btn btn-gh btn-sm" onClick={()=>upd(col.key, { selected:[] })}>Tozalash</button>
+                  </div>
+                  <div style={{maxHeight:120,overflow:'auto'}}>
+                    {shownOpts.map((opt) => {
+                      const checked = (st.selected || []).includes(opt);
+                      return (
+                        <label key={opt} style={FILTER_CHECK_LABEL_STYLE}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e)=>upd(col.key, {
+                              selected: e.target.checked
+                                ? [...(st.selected || []), opt]
+                                : (st.selected || []).filter((x)=>x!==opt),
+                            })}
+                          />
+                          <span style={{...FILTER_CHECK_TEXT_STYLE,color:checked?'var(--bl)':'var(--t2)'}}>{opt}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{display:'flex',justifyContent:'flex-end',gap:6}}>
+        <button className="btn btn-gh btn-sm" onClick={onClose}>Yopish</button>
+        <button className="btn btn-bl btn-sm" onClick={onClose}>Qo'llash</button>
+      </div>
+    </div>
+  );
+}
 const createRowRid = () => `r_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
 const isInvalidObzvonCustomerText = (v) => {
   const s = String(v ?? '').trim();
@@ -1996,6 +2232,8 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   const [sort,setSort]  = useState({ col:'name', dir:'asc' });
   const [det,setDet]    = useState(null);
   const [showAdv, setShowAdv] = useState(false);
+  const [uFilterOpen, setUFilterOpen] = useState(false);
+  const [uFilterState, setUFilterState] = useState({});
   const [adv, setAdv] = useState({
     districts: [], sources: [], agents: [],
     uzsFrom: '', uzsTo: '', usdFrom: '', usdTo: '',
@@ -2072,6 +2310,25 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     return true;
   };
 
+  const customerFilterColumns = useMemo(() => ([
+    { key:'id', label:'ID', type:'text' },
+    { key:'name', label:'Kontragent', type:'text' },
+    { key:'phone', label:'Telefon', type:'text' },
+    { key:'district', label:'Rayon', type:'text' },
+    { key:'source', label:'Manba', type:'text' },
+    { key:'balanceUZS', label:'Balans UZS', type:'number' },
+    { key:'balanceUSD', label:'Balans USD', type:'number' },
+    { key:'tara', label:'Idish', type:'number' },
+    { key:'kulers', label:'Kuler', type:'number' },
+    { key:'lastOrderDate', label:'Oxirgi zakaz', type:'date' },
+    { key:'daysAgo', label:'Kun', type:'number' },
+    { key:'lastQty', label:'Dona', type:'number' },
+    { key:'lastAgent', label:'Agent', type:'text' },
+  ]), []);
+  useEffect(() => {
+    setUFilterState((prev) => ensureUniversalFilterState(customerFilterColumns, prev));
+  }, [customerFilterColumns]);
+
   const list = useMemo(() => {
     let r = segmentCustomers;
     if (search) {
@@ -2096,6 +2353,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
         return d && t ? d <= t : false;
       });
     }
+    r = applyUniversalFilters(r, customerFilterColumns, uFilterState);
 
     return [...r].sort((a,b) => {
       let av=a[sort.col]??0, bv=b[sort.col]??0;
@@ -2103,7 +2361,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
       if (typeof bv==='string') bv=bv.toLowerCase();
       return sort.dir==='asc'?(av>bv?1:-1):av<bv?1:-1;
     });
-  }, [segmentCustomers,search,sort,adv,segment]);
+  }, [segmentCustomers,search,sort,adv,segment,customerFilterColumns,uFilterState]);
 
   const activeFilters = useMemo(() => {
     let count = 0;
@@ -2117,6 +2375,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     if (adv.lastFrom !== '' || adv.lastTo !== '') count++;
     return count;
   }, [adv]);
+  const universalFilterCount = useMemo(() => countUniversalFilters(uFilterState), [uFilterState]);
 
   const tog = (col) => setSort((s) => s.col===col?{col,dir:s.dir==='asc'?'desc':'asc'}:{col,dir:'asc'});
   const SI = ({c:col}) => sort.col===col
@@ -2143,13 +2402,23 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
           <span style={{color:'var(--t3)'}}>{E.find}</span>
           <input placeholder="Ism, telefon, ID bo'yicha..." value={search} onChange={(e)=>setS(e.target.value)}/>
         </div>
-        <button className="btn btn-gh btn-sm" onClick={()=>setShowAdv((v)=>!v)}>
+        <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
           </svg>
-          Filtr ({activeFilters})
+          Filtr ({universalFilterCount})
         </button>
         <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
+        <UniversalFilterPanel
+          open={uFilterOpen}
+          title="Mijozlar filtri"
+          columns={customerFilterColumns}
+          rows={segmentCustomers}
+          state={uFilterState}
+          setState={setUFilterState}
+          onClose={()=>setUFilterOpen(false)}
+          width={620}
+        />
 
         {showAdv && (
             <div className="card" style={{position:'absolute',top:40,right:0,zIndex:30,width:520,padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)',overflow:'hidden'}}>
@@ -2316,10 +2585,12 @@ function SoDetailModal({ soGroup, onClose }) {
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ ZAKAZLAR в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 function Orders({ D }) {
-  const { rawOrders=[] } = D;
+  const { rawOrders=[], customers=[] } = D;
   const [search,setS]  = useState('');
   const [fType,setT]   = useState('zakaz');
   const [showFilter, setShowFilter] = useState(false);
+  const [uFilterOpen, setUFilterOpen] = useState(false);
+  const [uFilterState, setUFilterState] = useState({});
   const [fAgents, setAgents] = useState([]);
   const [fStatuses, setStatuses] = useState([]);
   const [fCurrencies, setCurrencies] = useState([]);
@@ -2330,6 +2601,11 @@ function Orders({ D }) {
   const [fSumFrom, setSumFrom] = useState('');
   const [fSumTo, setSumTo] = useState('');
   const [selectedSO,setSelectedSO] = useState(null);
+  const districtById = useMemo(() => {
+    const m = {};
+    (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c.district || ''; });
+    return m;
+  }, [customers]);
 
   const soGroups = useMemo(() => {
     const groups = {};
@@ -2338,6 +2614,7 @@ function Orders({ D }) {
       if (!groups[o.soNum]) {
         groups[o.soNum] = {
           soNum: o.soNum, contName: o.contName, mId: o.mId,
+          district: districtById[String(o.mId || '').trim()] || '',
           orderDate: o.orderDate, delivPerson: o.delivPerson,
           agent: o.agent, docType: o.docType, status: o.status,
           currency: o.currency||'UZS', items: [],
@@ -2351,7 +2628,7 @@ function Orders({ D }) {
       else g.totalSumUZS+=o.sum||0;
     });
     return Object.values(groups);
-  }, [rawOrders]);
+  }, [rawOrders, districtById]);
 
   const allZakaz   = soGroups.filter((g)=>isOrderDoc(g.docType));
   const allVozvrat = soGroups.filter((g)=>isReturnDoc(g.docType));
@@ -2368,6 +2645,24 @@ function Orders({ D }) {
     return true;
   };
   const toggleIn = (setter, val) => setter((prev) => prev.includes(val) ? prev.filter((x)=>x!==val) : [...prev, val]);
+  const orderFilterColumns = useMemo(() => ([
+    { key:'soNum', label:'Zakaz No', type:'text' },
+    { key:'contName', label:'Kontragent', type:'text' },
+    { key:'mId', label:'Mijoz ID', type:'text' },
+    { key:'district', label:'Rayon', type:'text' },
+    { key:'orderDate', label:'Sana', type:'date' },
+    { key:'delivPerson', label:'Dostavchik', type:'text' },
+    { key:'totalQty', label:'Dona', type:'number' },
+    { key:'totalSumUZS', label:'Summa UZS', type:'number' },
+    { key:'totalSumUSD', label:'Summa USD', type:'number' },
+    { key:'docType', label:'Tur', type:'text' },
+    { key:'status', label:'Status', type:'text' },
+    { key:'agent', label:'Agent', type:'text' },
+    { key:'currency', label:'Valyuta', type:'text' },
+  ]), []);
+  useEffect(() => {
+    setUFilterState((prev) => ensureUniversalFilterState(orderFilterColumns, prev));
+  }, [orderFilterColumns]);
 
   const list = useMemo(() => {
     let r = base;
@@ -2392,11 +2687,12 @@ function Orders({ D }) {
     }
     r = r.filter((g)=>inRange(g.totalQty, fQtyFrom, fQtyTo));
     r = r.filter((g)=>inRange(g.totalSumUZS, fSumFrom, fSumTo));
+    r = applyUniversalFilters(r, orderFilterColumns, uFilterState);
     return [...r].sort((a,b) => {
       const da=toDate(a.orderDate), db=toDate(b.orderDate);
       return da&&db?db-da:0;
     });
-  }, [base,search,fAgents,fStatuses,fCurrencies,fDateFrom,fDateTo,fQtyFrom,fQtyTo,fSumFrom,fSumTo]);
+  }, [base,search,fAgents,fStatuses,fCurrencies,fDateFrom,fDateTo,fQtyFrom,fQtyTo,fSumFrom,fSumTo,orderFilterColumns,uFilterState]);
 
   const activeFilterCount = useMemo(() => {
     let c = 0;
@@ -2408,6 +2704,7 @@ function Orders({ D }) {
     if (fSumFrom !== '' || fSumTo !== '') c++;
     return c;
   }, [fAgents, fStatuses, fCurrencies, fDateFrom, fDateTo, fQtyFrom, fQtyTo, fSumFrom, fSumTo]);
+  const universalFilterCount = useMemo(() => countUniversalFilters(uFilterState), [uFilterState]);
 
   const exportOrders = () => {
     exportAoaExcel({
@@ -2445,12 +2742,22 @@ function Orders({ D }) {
           ))}
         </div>
         <div style={{position:'relative'}}>
-          <button className="btn btn-gh btn-sm" onClick={()=>setShowFilter((v)=>!v)}>
+          <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
             </svg>
-            Filtr{activeFilterCount>0?` (${activeFilterCount})`:''}
+            Filtr{universalFilterCount>0?` (${universalFilterCount})`:''}
           </button>
+          <UniversalFilterPanel
+            open={uFilterOpen}
+            title="Zakazlar filtri"
+            columns={orderFilterColumns}
+            rows={base}
+            state={uFilterState}
+            setState={setUFilterState}
+            onClose={()=>setUFilterOpen(false)}
+            width={620}
+          />
           {showFilter && (
             <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:380,padding:10,overflow:'hidden'}}>
               <div className="g2" style={{gap:10}}>
@@ -2506,7 +2813,7 @@ function Orders({ D }) {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Zakaz №</th><th>Kontragent</th><th>Sana</th>
+                <th>Zakaz №</th><th>Kontragent</th><th>Rayon</th><th>Sana</th>
                 <th>Dostavchik</th><th style={{textAlign:'center'}}>Dona</th>
                 <th style={{textAlign:'right'}}>Summa UZS</th>
                 <th style={{textAlign:'right'}}>Summa USD</th>
@@ -2516,13 +2823,14 @@ function Orders({ D }) {
             </thead>
             <tbody>
               {list.length===0
-                ? <tr><td colSpan={11} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
+                ? <tr><td colSpan={12} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
                 : list.slice(0,600).map((g,i) => (
                   <tr key={i} onClick={()=>setSelectedSO(g)}>
                     <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.soNum}</td>
                     <td style={{maxWidth:180,fontWeight:600}}>
                       <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178,fontSize:12}}>{g.contName}</span>
                     </td>
+                    <td style={{fontSize:11,color:'var(--t3)'}}>{g.district || '—'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(g.orderDate)}</td>
                     <td style={{fontSize:11,color:'var(--t2)'}}>{g.delivPerson||'—'}</td>
                     <td style={{textAlign:'center',fontWeight:700,color:'var(--t1)'}}>{g.totalQty}</td>
@@ -2576,10 +2884,12 @@ function KassaFilterBtn({ active, label, color, dot, onClick }) {
 }
 
 function Kassa({ D }) {
-  const { cashbox=[] } = D;
+  const { cashbox=[], customers=[] } = D;
   const [fType,setT]  = useState('all');
   const [search,setS] = useState('');
   const [showFilter,setShowFilter] = useState(false);
+  const [uFilterOpen,setUFilterOpen] = useState(false);
+  const [uFilterState,setUFilterState] = useState({});
   const [fOperators,setOperators] = useState([]);
   const [fOpTypes,setOpTypes] = useState([]);
   const [fKassas,setKassas] = useState([]);
@@ -2587,6 +2897,11 @@ function Kassa({ D }) {
   const [fDateTo,setDateTo] = useState('');
   const [fAmountFrom,setAmountFrom] = useState('');
   const [fAmountTo,setAmountTo] = useState('');
+  const districtById = useMemo(() => {
+    const m = {};
+    (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c.district || ''; });
+    return m;
+  }, [customers]);
   const now = new Date();
   const curMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const pays   = cashbox.filter((c)=>isPaymentFromCounterparty(c.opType));
@@ -2603,6 +2918,22 @@ function Kassa({ D }) {
     kassas: [...new Set(cashbox.map((x)=>x.kassa).filter(Boolean))].sort(),
   }), [cashbox]);
   const toggleIn = (setter, val) => setter((prev) => prev.includes(val) ? prev.filter((x)=>x!==val) : [...prev, val]);
+  const kassaFilterColumns = useMemo(() => ([
+    { key:'sana', label:'Sana', type:'date' },
+    { key:'opNum', label:'Op No', type:'text' },
+    { key:'opType', label:'Tur', type:'text' },
+    { key:'kassa', label:'Kassa', type:'text' },
+    { key:'contName', label:'Kontragent', type:'text' },
+    { key:'mId', label:'Mijoz ID', type:'text' },
+    { key:'district', label:'Rayon', type:'text', getValue:(r)=>districtById[String(r.mId || '').trim()] || '' },
+    { key:'amount', label:'Summa', type:'number' },
+    { key:'operator', label:'Operator', type:'text' },
+    { key:'opStatus', label:'Status', type:'text' },
+    { key:'currency', label:'Valyuta', type:'text' },
+  ]), [districtById]);
+  useEffect(() => {
+    setUFilterState((prev) => ensureUniversalFilterState(kassaFilterColumns, prev));
+  }, [kassaFilterColumns]);
   const inRange = (v, from, to) => {
     const n = Number(v || 0);
     if (from !== '' && n < Number(from)) return false;
@@ -2634,11 +2965,12 @@ function Kassa({ D }) {
       });
     }
     r = r.filter((c)=>inRange(c.amount, fAmountFrom, fAmountTo));
+    r = applyUniversalFilters(r, kassaFilterColumns, uFilterState);
     return [...r].sort((a,b) => {
       const da=toDate(a.sana), db=toDate(b.sana);
       return da&&db?db-da:0;
     });
-  }, [base,search,fOperators,fOpTypes,fKassas,fDateFrom,fDateTo,fAmountFrom,fAmountTo]);
+  }, [base,search,fOperators,fOpTypes,fKassas,fDateFrom,fDateTo,fAmountFrom,fAmountTo,kassaFilterColumns,uFilterState]);
   const activeFilterCount = useMemo(() => {
     let c = 0;
     if (fOperators.length) c++;
@@ -2648,6 +2980,7 @@ function Kassa({ D }) {
     if (fAmountFrom !== '' || fAmountTo !== '') c++;
     return c;
   }, [fOperators, fOpTypes, fKassas, fDateFrom, fDateTo, fAmountFrom, fAmountTo]);
+  const universalFilterCount = useMemo(() => countUniversalFilters(uFilterState), [uFilterState]);
   const exportKassa = () => {
     exportAoaExcel({
       fileName: `Kassa_${new Date().toISOString().slice(0,10)}.xlsx`,
@@ -2683,12 +3016,22 @@ function Kassa({ D }) {
           <input placeholder="Mijoz, operatsiya в„–..." value={search} onChange={(e)=>setS(e.target.value)}/>
         </div>
         <div style={{position:'relative'}}>
-          <button className="btn btn-gh btn-sm" onClick={()=>setShowFilter((v)=>!v)}>
+          <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
             </svg>
-            Filtr{activeFilterCount>0?` (${activeFilterCount})`:''}
+            Filtr{universalFilterCount>0?` (${universalFilterCount})`:''}
           </button>
+          <UniversalFilterPanel
+            open={uFilterOpen}
+            title="Kassa filtri"
+            columns={kassaFilterColumns}
+            rows={base}
+            state={uFilterState}
+            setState={setUFilterState}
+            onClose={()=>setUFilterOpen(false)}
+            width={620}
+          />
           {showFilter && (
             <div className="card" style={{position:'absolute',top:34,right:0,zIndex:20,width:380,padding:10,overflow:'hidden'}}>
               <div className="g2" style={{gap:10}}>
@@ -2745,12 +3088,12 @@ function Kassa({ D }) {
             <thead>
               <tr>
                 <th>Sana</th><th>Op в„–</th><th>Tur</th>
-                <th>Kassa</th><th>Kontragent</th><th>Summa</th><th>Operator</th>
+                <th>Kassa</th><th>Kontragent</th><th>Rayon</th><th>Summa</th><th>Operator</th>
               </tr>
             </thead>
             <tbody>
               {list.length===0
-                ? <tr><td colSpan={7} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
+                ? <tr><td colSpan={8} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
                 : list.slice(0,600).map((c,i) => {
                   const isIn = isPaymentFromCounterparty(c.opType);
                   return (
@@ -2769,6 +3112,7 @@ function Kassa({ D }) {
                       <td style={{maxWidth:220}}>
                         <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:218,fontSize:12}}>{c.contName||'—'}</span>
                       </td>
+                      <td style={{fontSize:11.5,color:'var(--t3)'}}>{districtById[String(c.mId || '').trim()] || '—'}</td>
                       <td style={{fontFamily:'var(--mono)',fontWeight:700,color:isIn?'var(--gr)':isPaymentToCounterparty(c.opType)?'var(--rd)':'var(--t2)'}}>
                         {isIn?'+':isPaymentToCounterparty(c.opType)?'-':''}{fmt(c.amount)}
                       </td>
@@ -2812,6 +3156,8 @@ function Obzvon({
   const [pickTargetIdx, setPickTargetIdx] = useState(null);
   const [opSearch, setOpSearch] = useState('');
   const [opFilterOpen, setOpFilterOpen] = useState(false);
+  const [opIdFilter, setOpIdFilter] = useState('');
+  const [opNameFilter, setOpNameFilter] = useState('');
   const [opFilterOperators, setOpFilterOperators] = useState([]);
   const [opFilterDistricts, setOpFilterDistricts] = useState([]);
   const [opBalFrom, setOpBalFrom] = useState('');
@@ -3243,6 +3589,14 @@ function Obzvon({
   };
   const operatorTableRows = useMemo(() => {
     let rows = [...operatorTableBaseRows];
+    if (opIdFilter.trim()) {
+      const q = opIdFilter.trim().toLowerCase();
+      rows = rows.filter((r) => String(r.id || '').toLowerCase().includes(q));
+    }
+    if (opNameFilter.trim()) {
+      const q = opNameFilter.trim().toLowerCase();
+      rows = rows.filter((r) => String(r.name || '').toLowerCase().includes(q));
+    }
     if (opFilterOperators.length) rows = rows.filter((r) => opFilterOperators.includes(r.operator || ''));
     if (opFilterDistricts.length) rows = rows.filter((r) => opFilterDistricts.includes(String(r.district || '').trim()));
     rows = rows.filter((r) => inNumRange(r.balance, opBalFrom, opBalTo));
@@ -3264,6 +3618,8 @@ function Obzvon({
   }, [
     operatorTableBaseRows,
     deferredOpSearch,
+    opIdFilter,
+    opNameFilter,
     opFilterOperators,
     opFilterDistricts,
     opBalFrom,
@@ -3279,6 +3635,8 @@ function Obzvon({
   ]);
   const activeOpFilterCount = useMemo(() => {
     let c = 0;
+    if (opIdFilter.trim()) c++;
+    if (opNameFilter.trim()) c++;
     if (opFilterOperators.length) c++;
     if (opFilterDistricts.length) c++;
     if (opBalFrom !== '' || opBalTo !== '') c++;
@@ -3288,6 +3646,8 @@ function Obzvon({
     if (opNextFrom || opNextTo) c++;
     return c;
   }, [
+    opIdFilter,
+    opNameFilter,
     opFilterOperators,
     opFilterDistricts,
     opBalFrom,
@@ -3773,6 +4133,10 @@ function Obzvon({
               </button>
               {opFilterOpen && (
                 <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:380,padding:10,overflow:'hidden'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
+                    <input className="input" placeholder="ID bo'yicha" value={opIdFilter} onChange={(e)=>setOpIdFilter(e.target.value)} />
+                    <input className="input" placeholder="Mijoz bo'yicha" value={opNameFilter} onChange={(e)=>setOpNameFilter(e.target.value)} />
+                  </div>
                   <div style={{display:'flex',gap:6,marginBottom:6}}>
                     <button className="btn btn-gh btn-sm" onClick={()=>setOpFilterOperators(allOperatorFilterSelected ? [] : operatorOptions)}>
                       {allOperatorFilterSelected ? "Operator: bekor" : "Operator: hammasi"}
@@ -3824,6 +4188,8 @@ function Obzvon({
                   </div>
                   <div style={{display:'flex',justifyContent:'space-between'}}>
                     <button className="btn btn-gh btn-sm" onClick={()=>{
+                      setOpIdFilter('');
+                      setOpNameFilter('');
                       setOpFilterOperators([]);
                       setOpFilterDistricts([]);
                       setOpBalFrom(''); setOpBalTo('');
