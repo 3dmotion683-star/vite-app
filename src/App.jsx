@@ -2765,15 +2765,40 @@ function Obzvon({
     (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c.name || ''; });
     return m;
   }, [customers]);
+  const customerBalanceById = useMemo(() => {
+    const m = {};
+    (customers || []).forEach((c) => {
+      const cid = String(c.id || '').trim();
+      if (!cid) return;
+      m[cid] = Number(c.balanceUZS || 0);
+    });
+    return m;
+  }, [customers]);
+  const getDebtValueText = useCallback((row) => {
+    if ((row?.topic || '') !== 'Qarzdorlik') return String(row?.orderCount || '');
+    const cid = String(row?.id || '').trim();
+    if (!cid) return String(row?.orderCount || '');
+    const bal = Number(customerBalanceById[cid] || 0);
+    return String(Math.round(bal));
+  }, [customerBalanceById]);
+  const hasObzvonPayload = useCallback((row) => {
+    return Boolean(
+      String(row?.note || '').trim() ||
+      String(row?.orderCount || '').trim() ||
+      String(row?.nextDate || '').trim() ||
+      String(row?.orderDate || '').trim()
+    );
+  }, []);
   const saveRecords = (next) => {
     const prepared = (next || []).map((r) => ({
       ...r,
       _rid: r?._rid || createRowRid(),
+      orderCount: getDebtValueText(r),
     }));
     setRecords(prepared);
     S.set('aq-obzvon-records', prepared);
     const freshRows = prepared
-      .filter((r) => (r.id || r.customer) && String(r.note || '').trim())
+      .filter((r) => (r.id || r.customer) && hasObzvonPayload(r))
       .map((r, i) => ({
         rid: r._rid,
         no: String(r.no || i + 1),
@@ -2820,9 +2845,10 @@ function Obzvon({
   };
   const archiveCurrentUserRows = () => {
     const mine = (records || []).filter((r) => (r.operator || currentUser) === currentUser);
-    const archived = mine.filter((r) => (r.customer || r.id) && String(r.note || '').trim());
+    const archived = mine.filter((r) => (r.customer || r.id) && hasObzvonPayload(r));
     if (!archived.length) return;
     const normalized = archived.map((r, i) => ({
+      rid: r._rid || createRowRid(),
       no: String(i + 1),
       customer: r.customer || '',
       callDate: r.callDate || '',
@@ -2834,10 +2860,10 @@ function Obzvon({
       customerId: r.id || '',
       orderDate: r.orderDate || '',
     }));
-    onAppendAllRows(normalized);
+    onUpsertNewRows(normalized);
     const left = (records || []).filter((r) => {
       if ((r.operator || currentUser) !== currentUser) return true;
-      return !(r.customer || r.id) || !String(r.note || '').trim();
+      return !(r.customer || r.id) || !hasObzvonPayload(r);
     });
     saveRecords(left);
   };
@@ -2889,7 +2915,7 @@ function Obzvon({
       orderDate: r.orderDate || '',
     }));
     const fromCurrent = (records || [])
-      .filter((r) => (r.id || r.customer) && String(r.note || '').trim())
+      .filter((r) => (r.id || r.customer) && hasObzvonPayload(r))
       .map((r, i) => ({
         rid: r._rid || `cr_${i}`,
         no: String(r.no || i + 1),
@@ -2922,7 +2948,7 @@ function Obzvon({
       return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
     });
     return rows;
-  }, [newRows, records, customerNameById]);
+  }, [newRows, records, customerNameById, hasObzvonPayload]);
 
   const applyAllFilters = useCallback((baseRows, qRaw) => {
     const q = String(qRaw || '').toLowerCase();
@@ -3054,17 +3080,26 @@ function Obzvon({
     return out.sort((a,b)=>(b.passed-a.passed));
   }, [rawOrders, customers, currentUser, D.assignmentById]);
   const latestCallByCustomer = useMemo(() => {
-    const callRows = [...historicalAllRows, ...appAllNewRows];
+    const isBuyurtma = (x) => String(x?.topic || '').trim() === 'Buyurtma olish';
+    const pickLatest = (rows) => {
+      const m = {};
+      for (const r of (rows || [])) {
+        if (!isBuyurtma(r)) continue;
+        const cid = String(r.customerId || r.id || '').trim();
+        if (!cid) continue;
+        const d = toDate(r.callDate);
+        const t = d ? d.getTime() : 0;
+        const prev = m[cid];
+        const prevT = prev ? ((toDate(prev.callDate)?.getTime()) || 0) : -1;
+        if (!prev || t >= prevT) m[cid] = r;
+      }
+      return m;
+    };
+    const newMap = pickLatest(appAllNewRows);
+    const histMap = pickLatest(historicalAllRows);
     const m = {};
-    for (const r of callRows) {
-      const cid = String(r.customerId || r.id || '').trim();
-      if (!cid) continue;
-      const d = toDate(r.callDate);
-      const t = d ? d.getTime() : 0;
-      const prev = m[cid];
-      const prevT = prev ? ((toDate(prev.callDate)?.getTime()) || 0) : -1;
-      if (!prev || t >= prevT) m[cid] = r;
-    }
+    Object.keys(histMap).forEach((cid) => { m[cid] = histMap[cid]; });
+    Object.keys(newMap).forEach((cid) => { m[cid] = newMap[cid]; }); // Yangi birinchi prioritet
     return m;
   }, [historicalAllRows, appAllNewRows]);
 
@@ -3178,7 +3213,7 @@ function Obzvon({
       exportAoaExcel({
         fileName: `Obzvon_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'Obzvon',
-        headers: ['ID', 'Mijoz', 'Sana', 'Maqsad', 'Izoh', 'Keyingi sana', 'Zakaz soni', 'Zakaz sanasi', 'Operator'],
+        headers: ['ID', 'Mijoz', 'Sana', 'Maqsad', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator'],
         rows: (records || []).map((r) => [r.id || '', r.customer || '', fmtD(r.callDate), r.topic || '', r.note || '', fmtD(r.nextDate), r.orderCount || '', fmtD(r.orderDate), r.operator || '']),
       });
       return;
@@ -3187,7 +3222,7 @@ function Obzvon({
       exportAoaExcel({
         fileName: `Barcha_obzvon_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'BarchaObzvon',
-        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Suv soni', 'Zakaz sanasi', 'Operator'],
+        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator'],
         rows: allList.map((r, i) => [r.no || i + 1, r.customerId || '', r.customer || '', fmtD(r.callDate), r.topic || '', r.note || '', fmtD(r.nextDate), r.orderCount || '', fmtD(r.orderDate), r.operator || '']),
       });
       return;
@@ -3196,7 +3231,7 @@ function Obzvon({
       exportAoaExcel({
         fileName: `Barcha_obzvon_yangi_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'BarchaObzvonYangi',
-        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Suv soni', 'Zakaz sanasi', 'Operator'],
+        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator'],
         rows: allNewList.map((r, i) => [r.no || i + 1, r.customerId || '', r.customer || '', fmtD(r.callDate), r.topic || '', r.note || '', fmtD(r.nextDate), r.orderCount || '', fmtD(r.orderDate), r.operator || '']),
       });
       return;
@@ -3272,7 +3307,7 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'58vh'}}>
               <table className="tbl">
-                <thead><tr><th>ID</th><th>Mijoz</th><th>Sana</th><th>Maqsad</th><th>Izoh</th><th>Keyingi sana</th><th>Zakaz soni</th><th>Zakaz sana</th><th>Operator</th><th></th></tr></thead>
+                <thead><tr><th>ID</th><th>Mijoz</th><th>Sana</th><th>Maqsad</th><th>Izoh</th><th>Keyingi sana</th><th>Z.soni / summa</th><th>Zakaz sana</th><th>Operator</th><th></th></tr></thead>
                 <tbody>
                   {records.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Obzvon yozuvlari yo'q</td></tr> :
                     records.map((r,i)=>(
@@ -3301,7 +3336,17 @@ function Obzvon({
                         </td>
                         <td><input className="input" type="date" value={String(r.callDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,callDate:e.target.value}:x))} /></td>
                         <td>
-                          <select className="select" value={r.topic||'Buyurtma olish'} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,topic:e.target.value}:x))}>
+                          <select
+                            className="select"
+                            value={r.topic||'Buyurtma olish'}
+                            onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{
+                              ...x,
+                              topic:e.target.value,
+                              orderCount:e.target.value === 'Qarzdorlik'
+                                ? String(Math.round(Number(customerBalanceById[String(x.id || '').trim()] || 0)))
+                                : x.orderCount,
+                            }:x))}
+                          >
                             <option>Buyurtma olish</option>
                             <option>Qarzdorlik</option>
                             <option>Tara togrlash</option>
@@ -3309,7 +3354,15 @@ function Obzvon({
                         </td>
                         <td><input className="input" value={r.note||''} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,note:e.target.value}:x))} /></td>
                         <td><input className="input" type="date" value={String(r.nextDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,nextDate:e.target.value}:x))} /></td>
-                        <td><input className="input" value={r.orderCount||''} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,orderCount:e.target.value}:x))} style={{maxWidth:90}} /></td>
+                        <td>
+                          <input
+                            className="input"
+                            value={r.orderCount||''}
+                            readOnly={(r.topic || '') === 'Qarzdorlik'}
+                            onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,orderCount:e.target.value}:x))}
+                            style={{maxWidth:120}}
+                          />
+                        </td>
                         <td><input className="input" type="date" value={String(r.orderDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,orderDate:e.target.value}:x))} /></td>
                         <td>{r.operator || currentUser}</td>
                         <td><button className="btn btn-gh btn-sm" onClick={()=>saveRecords(records.filter((_,j)=>j!==i))}>X</button></td>
@@ -3403,7 +3456,7 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden',flex:1}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 230px)'}}>
               <table className="tbl">
-                <thead><tr><th>No</th><th>ID</th><th>Kontragent</th><th>Sana</th><th>Mavzu</th><th>Izoh</th><th>Keyingi sana</th><th>Suv soni</th><th>Zakaz sanasi</th><th>Operator</th></tr></thead>
+                <thead><tr><th>No</th><th>ID</th><th>Kontragent</th><th>Sana</th><th>Mavzu</th><th>Izoh</th><th>Keyingi sana</th><th>Z.soni / summa</th><th>Zakaz sanasi</th><th>Operator</th></tr></thead>
                 <tbody>
                   {allList.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:32,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
                     visibleAllRows.map((r,i)=>(
@@ -3502,7 +3555,7 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden',flex:1}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 230px)'}}>
               <table className="tbl">
-                <thead><tr><th>No</th><th>ID</th><th>Kontragent</th><th>Sana</th><th>Mavzu</th><th>Izoh</th><th>Keyingi sana</th><th>Suv soni</th><th>Zakaz sanasi</th><th>Operator</th></tr></thead>
+                <thead><tr><th>No</th><th>ID</th><th>Kontragent</th><th>Sana</th><th>Mavzu</th><th>Izoh</th><th>Keyingi sana</th><th>Z.soni / summa</th><th>Zakaz sanasi</th><th>Operator</th></tr></thead>
                 <tbody>
                   {allNewList.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:32,color:'var(--t3)'}}>Yangi obzvon yozuvlari yo'q</td></tr> :
                     visibleAllNewRows.map((r,i)=>(
@@ -3665,9 +3718,9 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
               <table className="tbl">
-                <thead><tr><th>ID</th><th>Mijoz</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi zakaz</th><th>Oxirgi qo'ng'iroq</th><th>Keyingi sana</th><th>Operator</th></tr></thead>
+                <thead><tr><th>ID</th><th>Mijoz</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi zakaz</th><th>Oxirgi qo'ng'iroq</th><th>Oxirgi izoh</th><th>Keyingi sana</th><th>Operator</th></tr></thead>
                 <tbody>
-                  {operatorTableRows.length===0 ? <tr><td colSpan={7} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
+                  {operatorTableRows.length===0 ? <tr><td colSpan={8} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
                     visibleOperatorRows.map((r, i) => (
                       <tr
                         key={i}
@@ -3682,6 +3735,11 @@ function Obzvon({
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.balance<0?'var(--rd)':r.balance>0?'var(--gr)':'var(--t3)'}}>{fmt(r.balance)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.ord1)} {r.lastQty?` ·  ${r.lastQty} ta`:''}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.lastCallDate)}</td>
+                        <td style={{maxWidth:260}}>
+                          <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                            {r.lastNote || '—'}
+                          </span>
+                        </td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.nextDate)}</td>
                         <td>{r.operator}</td>
                       </tr>
@@ -4855,6 +4913,14 @@ export default function App() {
     customerId: sanitizeObzvonCell(r?.customerId || r?.id),
     orderDate: sanitizeObzvonCell(r?.orderDate),
   }), []);
+  const hasObzvonRowPayload = useCallback((r) => {
+    return Boolean(
+      String(r?.note || '').trim() ||
+      String(r?.orderCount || '').trim() ||
+      String(r?.nextDate || '').trim() ||
+      String(r?.orderDate || '').trim()
+    );
+  }, []);
 
   const loadObzvonAllRemote = useCallback(async () => {
     try {
@@ -4889,19 +4955,21 @@ export default function App() {
   }, [normalizeObzvonAllRow]);
 
   const appendObzvonAllRemote = useCallback(async (rows = []) => {
-    const normalizedRows = (rows || []).map((row, i) => normalizeObzvonAllRow(row, i)).filter((r) => (r.customerId || r.customer) && r.note);
+    const normalizedRows = (rows || [])
+      .map((row, i) => normalizeObzvonAllRow(row, i))
+      .filter((r) => (r.customerId || r.customer) && hasObzvonRowPayload(r));
     if (!normalizedRows.length) return;
     setObzvonAllRows((prev) => {
       const next = [...normalizedRows, ...(prev || [])];
       S.set('aq-obzvon-all-rows', next);
       return next;
     });
-  }, [normalizeObzvonAllRow]);
+  }, [normalizeObzvonAllRow, hasObzvonRowPayload]);
 
   const upsertObzvonAllNewRows = useCallback((rows = []) => {
     const normalizedRows = (rows || [])
       .map((row, i) => normalizeObzvonNewRow(row, i))
-      .filter((r) => (r.customerId || r.customer) && r.note);
+      .filter((r) => (r.customerId || r.customer) && hasObzvonRowPayload(r));
     if (!normalizedRows.length) return;
     setObzvonAllNewRows((prev) => {
       const m = new Map((prev || []).map((r) => [String(r.rid || ''), normalizeObzvonNewRow(r)]));
@@ -4916,7 +4984,7 @@ export default function App() {
       S.set('aq-obzvon-all-new-rows', next);
       return next;
     });
-  }, [normalizeObzvonNewRow]);
+  }, [normalizeObzvonNewRow, hasObzvonRowPayload]);
   useEffect(() => {
     if (!Array.isArray(obzvonAllRows) || !obzvonAllRows.length) return;
     const cleaned = obzvonAllRows
