@@ -5207,6 +5207,12 @@ export default function App() {
     const fixed = OBZVON_ALL_SHEET_URL || '';
     if (obzvonSheetUrl !== fixed) setObzvonSheetUrl(fixed);
   }, [obzvonSheetUrl]);
+  useEffect(() => {
+    // Eski lokal saqlovda webhook bo'sh qolib ketgan bo'lsa, default URL ni qayta tiklaymiz.
+    if (!String(obzvonWebhook || '').trim() && OBZVON_WEBHOOK_DEFAULT) {
+      setObzvonWebhook(OBZVON_WEBHOOK_DEFAULT);
+    }
+  }, [obzvonWebhook]);
   useEffect(() => { S.set('aq-obzvon-records', obzvonRecords || []); }, [obzvonRecords]);
   useEffect(() => { S.set('aq-obzvon-all-rows', obzvonAllRows || []); }, [obzvonAllRows]);
   useEffect(() => { S.set('aq-obzvon-all-new-rows', obzvonAllNewRows || []); }, [obzvonAllNewRows]);
@@ -5223,23 +5229,16 @@ export default function App() {
   }, [obzvonRecords]);
   useEffect(() => {
     if (!isLoggedIn) return;
-    // Admin sessiyada local sozlamalar authoritative:
-    // remote pull bilan lokal qo'shilgan loginlar bekor bo'lib qolmasin.
-    if (sessionUser === 'Admin') {
-      setRemoteAccessLoaded(true);
-      return;
-    }
     setRemoteAccessLoaded(false);
     loadRemoteAccessConfig();
   }, [isLoggedIn, sessionUser, loadRemoteAccessConfig]);
   useEffect(() => {
-    // Admin uchun interval pull kerak emas (faqat push ishlaydi).
-    if (!isLoggedIn || !obzvonWebhook || sessionUser === 'Admin') return;
+    if (!isLoggedIn || !obzvonWebhook) return;
     const t = setInterval(() => {
       loadRemoteAccessConfig();
     }, 60000);
     return () => clearInterval(t);
-  }, [isLoggedIn, obzvonWebhook, sessionUser, loadRemoteAccessConfig]);
+  }, [isLoggedIn, obzvonWebhook, loadRemoteAccessConfig]);
   useEffect(() => {
     if (!isLoggedIn || sessionUser !== 'Admin' || !remoteAccessLoaded) return;
     if (skipCloudPushRef.current) {
