@@ -100,6 +100,7 @@ const SHEET_CONFIG = {
 const OBZVON_ALL_LOCAL_XLSX = '/obzvon-vse.xlsx';
 const OBZVON_ALL_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=0#gid=0';
 const ACCESS_SYNC_URL_KEY = 'aq-access-api-url';
+const ACCESS_UPDATED_AT_KEY = 'aq-access-updated-at';
 // Access konfiguratsiya sinxroni uchun Cloudflare Worker API URL:
 const OBZVON_WEBHOOK_DEFAULT = 'https://solitary-brook-4889aquabiz-api.3dmotion683.workers.dev';
 
@@ -3155,6 +3156,7 @@ function Obzvon({
       return {
         id: c.id,
         name: c.name,
+        district: c.district || '',
         tara: c.tara,
         balance: c.balanceUZS,
         ord1: ord.ord1,
@@ -3204,6 +3206,7 @@ function Obzvon({
       rows = rows.filter((r) =>
         String(r.id || '').includes(q) ||
         String(r.name || '').toLowerCase().includes(q) ||
+        String(r.district || '').toLowerCase().includes(q) ||
         String(r.operator || '').toLowerCase().includes(q) ||
         String(r.lastNote || '').toLowerCase().includes(q)
       );
@@ -3278,8 +3281,8 @@ function Obzvon({
       exportAoaExcel({
         fileName: `Operator_jadvali_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'OperatorJadvali',
-        headers: ['ID', 'Mijoz', 'Balans', 'Oxirgi zakaz 1', 'Oxirgi zakaz 2', 'Oxirgi dona', "Oxirgi qongiroq", 'Keyingi sana', 'Izoh', 'Operator'],
-        rows: operatorTableRows.map((r) => [r.id, r.name, r.balance || 0, fmtD(r.ord1), fmtD(r.ord2), r.lastQty || 0, fmtD(r.lastCallDate), fmtD(r.nextDate), r.lastNote || '', r.operator || '']),
+        headers: ['ID', 'Mijoz', 'Rayon', 'Balans', 'Oxirgi zakaz 1', 'Oxirgi zakaz 2', 'Oxirgi dona', "Oxirgi qongiroq", 'Keyingi sana', 'Izoh', 'Operator'],
+        rows: operatorTableRows.map((r) => [r.id, r.name, r.district || '', r.balance || 0, fmtD(r.ord1), fmtD(r.ord2), r.lastQty || 0, fmtD(r.lastCallDate), fmtD(r.nextDate), r.lastNote || '', r.operator || '']),
       });
     }
   };
@@ -3747,9 +3750,9 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
               <table className="tbl">
-                <thead><tr><th>ID</th><th>Mijoz</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi zakaz</th><th>Oxirgi qo'ng'iroq</th><th>Oxirgi izoh</th><th>Keyingi sana</th><th>Operator</th></tr></thead>
+                <thead><tr><th>ID</th><th>Mijoz</th><th>Rayon</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi zakaz</th><th>Oxirgi qo'ng'iroq</th><th>Oxirgi izoh</th><th>Keyingi sana</th><th>Operator</th></tr></thead>
                 <tbody>
-                  {operatorTableRows.length===0 ? <tr><td colSpan={8} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
+                  {operatorTableRows.length===0 ? <tr><td colSpan={9} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
                     visibleOperatorRows.map((r, i) => (
                       <tr
                         key={i}
@@ -3761,6 +3764,7 @@ function Obzvon({
                       >
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
                         <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</span></td>
+                        <td style={{maxWidth:140}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.district || '—'}</span></td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.balance<0?'var(--rd)':r.balance>0?'var(--gr)':'var(--t3)'}}>{fmt(r.balance)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.ord1)} {r.lastQty?` ·  ${r.lastQty} ta`:''}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.lastCallDate)}</td>
@@ -4476,6 +4480,7 @@ function SettingsPanel({
     { key:'other', label:'Boshqa mijozlar' },
   ];
   const viewerConf = normalizeAccessConfig(currentUser, viewerAccess || access[currentUser]);
+  const uiConf = normalizeAccessConfig(currentUser, access[currentUser]);
   const allowedSettingsTabs = useMemo(() => {
     const out = [];
     if ((viewerConf.visible?.settings_staff ?? true)) out.push('staff');
@@ -4786,13 +4791,13 @@ function SettingsPanel({
           </div>
           <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
             <button
-              className={`btn btn-sm ${conf.ui?.theme === 'dark' ? 'btn-bl' : 'btn-gh'}`}
+              className={`btn btn-sm ${uiConf.ui?.theme === 'dark' ? 'btn-bl' : 'btn-gh'}`}
               onClick={() => {
                 setAccess((prev) => {
-                  const confU = normalizeAccessConfig(sel, prev[sel] || conf);
+                  const confU = normalizeAccessConfig(currentUser, prev[currentUser] || uiConf);
                   const next = {
                     ...prev,
-                    [sel]: normalizeAccessConfig(sel, {
+                    [currentUser]: normalizeAccessConfig(currentUser, {
                       ...confU,
                       ui: { ...(confU.ui || {}), theme: 'dark' },
                     }),
@@ -4805,13 +4810,13 @@ function SettingsPanel({
               Qora tema
             </button>
             <button
-              className={`btn btn-sm ${conf.ui?.theme === 'light' ? 'btn-bl' : 'btn-gh'}`}
+              className={`btn btn-sm ${uiConf.ui?.theme === 'light' ? 'btn-bl' : 'btn-gh'}`}
               onClick={() => {
                 setAccess((prev) => {
-                  const confU = normalizeAccessConfig(sel, prev[sel] || conf);
+                  const confU = normalizeAccessConfig(currentUser, prev[currentUser] || uiConf);
                   const next = {
                     ...prev,
-                    [sel]: normalizeAccessConfig(sel, {
+                    [currentUser]: normalizeAccessConfig(currentUser, {
                       ...confU,
                       ui: { ...(confU.ui || {}), theme: 'light' },
                     }),
@@ -4825,7 +4830,7 @@ function SettingsPanel({
             </button>
           </div>
           <div style={{marginTop:12,fontSize:12,color:'var(--t3)'}}>
-            Tanlangan foydalanuvchi: <strong style={{color:'var(--t1)'}}>{sel}</strong> · Joriy tema: <strong style={{color:'var(--bl)'}}>{(conf.ui?.theme || 'dark') === 'light' ? 'Oq' : 'Qora'}</strong>
+            Tanlangan foydalanuvchi: <strong style={{color:'var(--t1)'}}>{currentUser}</strong> · Joriy tema: <strong style={{color:'var(--bl)'}}>{(uiConf.ui?.theme || 'dark') === 'light' ? 'Oq' : 'Qora'}</strong>
           </div>
         </div>
       )}
@@ -4955,16 +4960,34 @@ export default function App() {
     const srcUsers = Array.isArray(cfg.users)
       ? cfg.users.map((u) => String(u || '').trim()).filter(Boolean)
       : [];
-    const nextUsers = srcUsers.length ? [...new Set(srcUsers)] : users;
+    const localUsers = Array.isArray(users) ? users.map((u) => String(u || '').trim()).filter(Boolean) : [];
+    const nextUsers = [...new Set([...(localUsers || []), ...(srcUsers || [])])];
     if (!nextUsers.length) return false;
 
     const rawAccess = cfg.access && typeof cfg.access === 'object' ? cfg.access : {};
     const rawCreds = cfg.userCreds && typeof cfg.userCreds === 'object' ? cfg.userCreds : {};
+    const remoteUpdatedAt = toDate(cfg.updatedAt)?.getTime() || 0;
+    const localUpdatedAt = Number(S.get(ACCESS_UPDATED_AT_KEY, 0)) || 0;
+    // Juda eski remote payload lokalni bosib yubormasin.
+    if (remoteUpdatedAt && localUpdatedAt && remoteUpdatedAt < localUpdatedAt - 1000) {
+      return true;
+    }
 
     const nextAccess = {};
     const nextCreds = {};
     nextUsers.forEach((u) => {
-      nextAccess[u] = normalizeAccessConfig(u, rawAccess[u] || access[u] || DEFAULT_ACCESS[u]);
+      const localConf = normalizeAccessConfig(u, access[u] || DEFAULT_ACCESS[u]);
+      const remoteRaw = (rawAccess[u] && typeof rawAccess[u] === 'object') ? rawAccess[u] : null;
+      const mergedConf = remoteRaw
+        ? {
+            scope: remoteRaw.scope ?? localConf.scope,
+            activeScope: remoteRaw.activeScope ?? localConf.activeScope,
+            visible: { ...(localConf.visible || {}), ...((remoteRaw.visible && typeof remoteRaw.visible === 'object') ? remoteRaw.visible : {}) },
+            customerTabs: { ...(localConf.customerTabs || {}), ...((remoteRaw.customerTabs && typeof remoteRaw.customerTabs === 'object') ? remoteRaw.customerTabs : {}) },
+            ui: { ...(localConf.ui || {}), ...((remoteRaw.ui && typeof remoteRaw.ui === 'object') ? remoteRaw.ui : {}) },
+          }
+        : localConf;
+      nextAccess[u] = normalizeAccessConfig(u, mergedConf);
       const fromRemote = String(rawCreds[u] ?? '').trim();
       const fromLocal = String((userCreds || {})[u] ?? '').trim();
       nextCreds[u] = fromRemote || fromLocal || DEFAULT_USER_CREDS[u] || u;
@@ -4982,6 +5005,7 @@ export default function App() {
     S.set('aq-users', nextUsers);
     S.set('aq-access', nextAccess);
     S.set('aq-user-creds', nextCreds);
+    S.set(ACCESS_UPDATED_AT_KEY, remoteUpdatedAt || Date.now());
     return true;
   }, [users, access, userCreds]);
 
@@ -5245,11 +5269,13 @@ export default function App() {
       skipCloudPushRef.current = false;
       return;
     }
+    const nowTs = Date.now();
+    S.set(ACCESS_UPDATED_AT_KEY, nowTs);
     const payload = {
       users,
       access,
       userCreds,
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date(nowTs).toISOString(),
       updatedBy: sessionUser,
     };
     const t = setTimeout(() => {
