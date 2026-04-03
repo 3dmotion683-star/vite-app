@@ -3147,29 +3147,19 @@ function Obzvon({
   const [searchAllNew, setSearchAllNew] = useState('');
   const [pickQuery, setPickQuery] = useState('');
   const [allShowMode, setAllShowMode] = useState('smart');
-  const [allFilterOpen, setAllFilterOpen] = useState(false);
-  const [allFilterOps, setAllFilterOps] = useState([]);
-  const [allFilterTopics, setAllFilterTopics] = useState([]);
-  const [allFilterDateFrom, setAllFilterDateFrom] = useState('');
-  const [allFilterDateTo, setAllFilterDateTo] = useState('');
+  const [mainFilterOpen, setMainFilterOpen] = useState(false);
+  const [mainFilterState, setMainFilterState] = useState({});
+  const [allUniFilterOpen, setAllUniFilterOpen] = useState(false);
+  const [allUniFilterState, setAllUniFilterState] = useState({});
+  const [allNewUniFilterOpen, setAllNewUniFilterOpen] = useState(false);
+  const [allNewUniFilterState, setAllNewUniFilterState] = useState({});
+  const [dueUniFilterOpen, setDueUniFilterOpen] = useState(false);
+  const [dueUniFilterState, setDueUniFilterState] = useState({});
+  const [opUniFilterOpen, setOpUniFilterOpen] = useState(false);
+  const [opUniFilterState, setOpUniFilterState] = useState({});
   const [opLimit, setOpLimit] = useState(500);
   const [pickTargetIdx, setPickTargetIdx] = useState(null);
   const [opSearch, setOpSearch] = useState('');
-  const [opFilterOpen, setOpFilterOpen] = useState(false);
-  const [opIdFilter, setOpIdFilter] = useState('');
-  const [opNameFilter, setOpNameFilter] = useState('');
-  const [opFilterOperators, setOpFilterOperators] = useState([]);
-  const [opFilterDistricts, setOpFilterDistricts] = useState([]);
-  const [opBalFrom, setOpBalFrom] = useState('');
-  const [opBalTo, setOpBalTo] = useState('');
-  const [opOrdFrom, setOpOrdFrom] = useState('');
-  const [opOrdTo, setOpOrdTo] = useState('');
-  const [opQtyFrom, setOpQtyFrom] = useState('');
-  const [opQtyTo, setOpQtyTo] = useState('');
-  const [opLastCallFrom, setOpLastCallFrom] = useState('');
-  const [opLastCallTo, setOpLastCallTo] = useState('');
-  const [opNextFrom, setOpNextFrom] = useState('');
-  const [opNextTo, setOpNextTo] = useState('');
   const [opPickMode, setOpPickMode] = useState(false);
   const [opSelectedIds, setOpSelectedIds] = useState({});
   const [duePickMode, setDuePickMode] = useState(false);
@@ -3192,6 +3182,57 @@ function Obzvon({
     });
     return m;
   }, [customers]);
+  const mainFilterColumns = useMemo(() => ([
+    { key:'id', label:'ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'callDate', label:'Sana', type:'date' },
+    { key:'topic', label:'Maqsad', type:'text' },
+    { key:'note', label:'Izoh', type:'text' },
+    { key:'nextDate', label:'Keyingi sana', type:'date' },
+    { key:'orderCount', label:'Z.soni / summa', type:'number' },
+    { key:'orderDate', label:'Zakaz sanasi', type:'date' },
+    { key:'operator', label:'Operator', type:'text' },
+  ]), []);
+  const allFilterColumns = useMemo(() => ([
+    { key:'no', label:'No', type:'number' },
+    { key:'customerId', label:'ID', type:'text' },
+    { key:'customer', label:'Kontragent', type:'text' },
+    { key:'callDate', label:'Sana', type:'date' },
+    { key:'topic', label:'Mavzu', type:'text' },
+    { key:'note', label:'Izoh', type:'text' },
+    { key:'nextDate', label:'Keyingi sana', type:'date' },
+    { key:'orderCount', label:'Z.soni / summa', type:'number' },
+    { key:'orderDate', label:'Zakaz sanasi', type:'date' },
+    { key:'operator', label:'Operator', type:'text' },
+  ]), []);
+  const dueFilterColumns = useMemo(() => ([
+    { key:'id', label:'ID', type:'text' },
+    { key:'name', label:'Mijoz', type:'text' },
+    { key:'district', label:'Rayon', type:'text' },
+    { key:'phone', label:'Telefon', type:'text' },
+    { key:'last3Info', label:'Oxirgi 3 zakaz', type:'text' },
+    { key:'passed', label:"O'tgan kun", type:'number' },
+    { key:'shouldIn', label:"Qo'ng'iroq me'yori", type:'number' },
+  ]), []);
+  const opFilterColumns = useMemo(() => ([
+    { key:'id', label:'ID', type:'text' },
+    { key:'name', label:'Mijoz', type:'text' },
+    { key:'district', label:'Rayon', type:'text' },
+    { key:'balance', label:'Balans', type:'number' },
+    { key:'ord1', label:'Oxirgi zakaz', type:'date' },
+    { key:'lastQty', label:'Zakaz soni', type:'number' },
+    { key:'lastCallDate', label:"Oxirgi qo'ng'iroq", type:'date' },
+    { key:'nextDate', label:'Keyingi sana', type:'date' },
+    { key:'operator', label:'Operator', type:'text' },
+    { key:'lastNote', label:'Oxirgi izoh', type:'text' },
+  ]), []);
+  useEffect(() => {
+    setMainFilterState((prev) => ensureUniversalFilterState(mainFilterColumns, prev));
+    setAllUniFilterState((prev) => ensureUniversalFilterState(allFilterColumns, prev));
+    setAllNewUniFilterState((prev) => ensureUniversalFilterState(allFilterColumns, prev));
+    setDueUniFilterState((prev) => ensureUniversalFilterState(dueFilterColumns, prev));
+    setOpUniFilterState((prev) => ensureUniversalFilterState(opFilterColumns, prev));
+  }, [mainFilterColumns, allFilterColumns, dueFilterColumns, opFilterColumns]);
   const getDebtValueText = useCallback((row) => {
     if ((row?.topic || '') !== 'Qarzdorlik') return String(row?.orderCount || '');
     const cid = String(row?.id || '').trim();
@@ -3367,42 +3408,40 @@ function Obzvon({
     return rows;
   }, [newRows, records, customerNameById, hasObzvonPayload]);
 
-  const applyAllFilters = useCallback((baseRows, qRaw) => {
-    const q = String(qRaw || '').toLowerCase();
-    let base = [...(baseRows || [])];
-    if (allFilterOps.length) base = base.filter((r) => allFilterOps.includes(r.operator || ''));
-    if (allFilterTopics.length) base = base.filter((r) => allFilterTopics.includes(r.topic || ''));
-    if (allFilterDateFrom) {
-      const f = toDate(allFilterDateFrom);
-      if (f) base = base.filter((r) => {
-        const d = toDate(r.callDate);
-        return d ? d >= f : false;
-      });
+  const mainRows = useMemo(() => {
+    const base = (records || []).map((r) => ({
+      ...r,
+      _rid: r?._rid || createRowRid(),
+      orderCount: getDebtValueText(r),
+    }));
+    return applyUniversalFilters(base, mainFilterColumns, mainFilterState);
+  }, [records, getDebtValueText, mainFilterColumns, mainFilterState]);
+  const allList = useMemo(() => {
+    const q = String(deferredSearchAll || '').toLowerCase().trim();
+    let base = [...(historicalAllRows || [])];
+    if (q) {
+      base = base.filter((r) =>
+        String(r.customer || '').toLowerCase().includes(q) ||
+        String(r.customerId || '').toLowerCase().includes(q) ||
+        String(r.operator || '').toLowerCase().includes(q) ||
+        String(r.note || '').toLowerCase().includes(q)
+      );
     }
-    if (allFilterDateTo) {
-      const t = toDate(allFilterDateTo);
-      if (t) base = base.filter((r) => {
-        const d = toDate(r.callDate);
-        return d ? d <= t : false;
-      });
+    return applyUniversalFilters(base, allFilterColumns, allUniFilterState);
+  }, [historicalAllRows, deferredSearchAll, allFilterColumns, allUniFilterState]);
+  const allNewList = useMemo(() => {
+    const q = String(deferredSearchAllNew || '').toLowerCase().trim();
+    let base = [...(appAllNewRows || [])];
+    if (q) {
+      base = base.filter((r) =>
+        String(r.customer || '').toLowerCase().includes(q) ||
+        String(r.customerId || '').toLowerCase().includes(q) ||
+        String(r.operator || '').toLowerCase().includes(q) ||
+        String(r.note || '').toLowerCase().includes(q)
+      );
     }
-    if (!q) return base;
-    return base.filter((r) =>
-      (r.customer || '').toLowerCase().includes(q) ||
-      (r.customerId || '').toLowerCase().includes(q) ||
-      (r.operator || '').toLowerCase().includes(q) ||
-      (r.note || '').toLowerCase().includes(q)
-    );
-  }, [allFilterOps, allFilterTopics, allFilterDateFrom, allFilterDateTo]);
-
-  const allList = useMemo(
-    () => applyAllFilters(historicalAllRows, deferredSearchAll),
-    [historicalAllRows, deferredSearchAll, applyAllFilters]
-  );
-  const allNewList = useMemo(
-    () => applyAllFilters(appAllNewRows, deferredSearchAllNew),
-    [appAllNewRows, deferredSearchAllNew, applyAllFilters]
-  );
+    return applyUniversalFilters(base, allFilterColumns, allNewUniFilterState);
+  }, [appAllNewRows, deferredSearchAllNew, allFilterColumns, allNewUniFilterState]);
 
   const visibleAllRows = useMemo(
     () => allShowMode === 'all' ? allList : allList.slice(0, 500),
@@ -3412,32 +3451,13 @@ function Obzvon({
     () => allShowMode === 'all' ? allNewList : allNewList.slice(0, 500),
     [allNewList, allShowMode]
   );
-  const allFilterSourceRows = tab === 'all_new' ? appAllNewRows : historicalAllRows;
-  const operators = useMemo(() => {
-    const raw = allFilterSourceRows.map((r) => ({ operator: r.operator }));
-    return [...new Set(raw.map((r) => r.operator).filter(Boolean))];
-  }, [allFilterSourceRows]);
-  const topics = useMemo(() => {
-    const raw = allFilterSourceRows.map((r) => ({ topic: r.topic }));
-    return [...new Set(raw.map((r) => r.topic).filter(Boolean))];
-  }, [allFilterSourceRows]);
-  const allOpsSelected = operators.length > 0 && operators.every((o) => allFilterOps.includes(o));
-  const allTopicsSelected = topics.length > 0 && topics.every((t) => allFilterTopics.includes(t));
-  const activeAllFilterCount = useMemo(() => {
-    let c = 0;
-    if (allFilterOps.length) c++;
-    if (allFilterTopics.length) c++;
-    if (allFilterDateFrom || allFilterDateTo) c++;
-    return c;
-  }, [allFilterOps, allFilterTopics, allFilterDateFrom, allFilterDateTo]);
+  const mainFilterCount = useMemo(() => countUniversalFilters(mainFilterState), [mainFilterState]);
+  const allFilterCount = useMemo(() => countUniversalFilters(allUniFilterState), [allUniFilterState]);
+  const allNewFilterCount = useMemo(() => countUniversalFilters(allNewUniFilterState), [allNewUniFilterState]);
   const dueSelectedCount = useMemo(
     () => Object.values(dueSelectedIds).filter(Boolean).length,
     [dueSelectedIds]
   );
-  const toggleInList = (setter, value) => {
-    setter((prev) => prev.includes(value) ? prev.filter((x) => x !== value) : [...prev, value]);
-  };
-
   const suggestions = useMemo(() => {
     const q = pickQuery.toLowerCase().trim();
     if (!q) return [];
@@ -3496,6 +3516,11 @@ function Obzvon({
     });
     return out.sort((a,b)=>(b.passed-a.passed));
   }, [rawOrders, customers, currentUser, D.assignmentById]);
+  const filteredDueCandidates = useMemo(
+    () => applyUniversalFilters(dueCandidates, dueFilterColumns, dueUniFilterState),
+    [dueCandidates, dueFilterColumns, dueUniFilterState]
+  );
+  const dueFilterCount = useMemo(() => countUniversalFilters(dueUniFilterState), [dueUniFilterState]);
   const latestCallByCustomer = useMemo(() => {
     const isBuyurtma = (x) => String(x?.topic || '').trim() === 'Buyurtma olish';
     const pickLatest = (rows) => {
@@ -3558,52 +3583,8 @@ function Obzvon({
     if (currentUser !== 'Admin') rows = rows.filter((r) => r.operator === currentUser);
     return rows;
   }, [D.customers, D.assignmentById, latestCallByCustomer, latestOrdersByCustomer, currentUser]);
-  const operatorOptions = useMemo(
-    () => [...new Set(operatorTableBaseRows.map((r) => r.operator).filter(Boolean))].sort(),
-    [operatorTableBaseRows]
-  );
-  const districtOptions = useMemo(
-    () => [...new Set(operatorTableBaseRows.map((r) => String(r.district || '').trim()).filter(Boolean))].sort(),
-    [operatorTableBaseRows]
-  );
-  const allOperatorFilterSelected = operatorOptions.length > 0 && operatorOptions.every((o) => opFilterOperators.includes(o));
-  const allDistrictFilterSelected = districtOptions.length > 0 && districtOptions.every((d) => opFilterDistricts.includes(d));
-  const inNumRange = (v, from, to) => {
-    const n = Number(v || 0);
-    if (from !== '' && n < Number(from)) return false;
-    if (to !== '' && n > Number(to)) return false;
-    return true;
-  };
-  const inDateRange = (v, from, to) => {
-    const d = toDate(v);
-    if (!d) return false;
-    if (from) {
-      const f = toDate(from);
-      if (f && d < f) return false;
-    }
-    if (to) {
-      const t = toDate(to);
-      if (t && d > t) return false;
-    }
-    return true;
-  };
   const operatorTableRows = useMemo(() => {
     let rows = [...operatorTableBaseRows];
-    if (opIdFilter.trim()) {
-      const q = opIdFilter.trim().toLowerCase();
-      rows = rows.filter((r) => String(r.id || '').toLowerCase().includes(q));
-    }
-    if (opNameFilter.trim()) {
-      const q = opNameFilter.trim().toLowerCase();
-      rows = rows.filter((r) => String(r.name || '').toLowerCase().includes(q));
-    }
-    if (opFilterOperators.length) rows = rows.filter((r) => opFilterOperators.includes(r.operator || ''));
-    if (opFilterDistricts.length) rows = rows.filter((r) => opFilterDistricts.includes(String(r.district || '').trim()));
-    rows = rows.filter((r) => inNumRange(r.balance, opBalFrom, opBalTo));
-    rows = rows.filter((r) => inNumRange(r.lastQty, opQtyFrom, opQtyTo));
-    if (opOrdFrom || opOrdTo) rows = rows.filter((r) => inDateRange(r.ord1, opOrdFrom, opOrdTo));
-    if (opLastCallFrom || opLastCallTo) rows = rows.filter((r) => inDateRange(r.lastCallDate, opLastCallFrom, opLastCallTo));
-    if (opNextFrom || opNextTo) rows = rows.filter((r) => inDateRange(r.nextDate, opNextFrom, opNextTo));
     if (deferredOpSearch) {
       const q = deferredOpSearch.toLowerCase();
       rows = rows.filter((r) =>
@@ -3614,53 +3595,14 @@ function Obzvon({
         String(r.lastNote || '').toLowerCase().includes(q)
       );
     }
-    return rows;
+    return applyUniversalFilters(rows, opFilterColumns, opUniFilterState);
   }, [
     operatorTableBaseRows,
     deferredOpSearch,
-    opIdFilter,
-    opNameFilter,
-    opFilterOperators,
-    opFilterDistricts,
-    opBalFrom,
-    opBalTo,
-    opQtyFrom,
-    opQtyTo,
-    opOrdFrom,
-    opOrdTo,
-    opLastCallFrom,
-    opLastCallTo,
-    opNextFrom,
-    opNextTo,
+    opFilterColumns,
+    opUniFilterState,
   ]);
-  const activeOpFilterCount = useMemo(() => {
-    let c = 0;
-    if (opIdFilter.trim()) c++;
-    if (opNameFilter.trim()) c++;
-    if (opFilterOperators.length) c++;
-    if (opFilterDistricts.length) c++;
-    if (opBalFrom !== '' || opBalTo !== '') c++;
-    if (opQtyFrom !== '' || opQtyTo !== '') c++;
-    if (opOrdFrom || opOrdTo) c++;
-    if (opLastCallFrom || opLastCallTo) c++;
-    if (opNextFrom || opNextTo) c++;
-    return c;
-  }, [
-    opIdFilter,
-    opNameFilter,
-    opFilterOperators,
-    opFilterDistricts,
-    opBalFrom,
-    opBalTo,
-    opQtyFrom,
-    opQtyTo,
-    opOrdFrom,
-    opOrdTo,
-    opLastCallFrom,
-    opLastCallTo,
-    opNextFrom,
-    opNextTo,
-  ]);
+  const opUniversalFilterCount = useMemo(() => countUniversalFilters(opUniFilterState), [opUniFilterState]);
 
   useEffect(() => {
     setOpLimit(500);
@@ -3737,7 +3679,25 @@ function Obzvon({
               <span style={{color:'var(--t3)'}}>{E.find}</span>
               <input placeholder={pickTargetIdx!=null ? "Qator uchun mijoz qidiring..." : "Yangi mijoz qo'shish uchun qidiring..."} value={pickQuery} onChange={(e)=>setPickQuery(e.target.value)} />
             </div>
-            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{records.length} ta yozuv</span>
+            <div style={{position:'relative'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setMainFilterOpen((v)=>!v)}>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                </svg>
+                Filtr ({mainFilterCount})
+              </button>
+              <UniversalFilterPanel
+                open={mainFilterOpen}
+                title="Obzvon filtri"
+                columns={mainFilterColumns}
+                rows={records || []}
+                state={mainFilterState}
+                setState={setMainFilterState}
+                onClose={()=>setMainFilterOpen(false)}
+                width={620}
+              />
+            </div>
+            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{mainRows.length} / {records.length} ta yozuv</span>
             <button className="btn btn-gh btn-sm" onClick={()=>appendRows(1)}>+ Qator</button>
             <button className="btn btn-gh btn-sm" onClick={archiveCurrentUserRows}>
               Kun yakunlash
@@ -3771,9 +3731,12 @@ function Obzvon({
               <table className="tbl">
                 <thead><tr><th>ID</th><th>Mijoz</th><th>Sana</th><th>Maqsad</th><th>Izoh</th><th>Keyingi sana</th><th>Z.soni / summa</th><th>Zakaz sana</th><th>Operator</th><th></th></tr></thead>
                 <tbody>
-                  {records.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Obzvon yozuvlari yo'q</td></tr> :
-                    records.map((r,i)=>(
-                      <tr key={i}>
+                  {mainRows.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Obzvon yozuvlari yo'q</td></tr> :
+                    mainRows.map((r)=>{
+                      const i = (records || []).findIndex((x) => (x?._rid || '') === (r?._rid || ''));
+                      if (i < 0) return null;
+                      return (
+                      <tr key={r._rid || i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id || '—'}</td>
                         <td style={{minWidth:250}}>
                           <input
@@ -3829,7 +3792,7 @@ function Obzvon({
                         <td>{r.operator || currentUser}</td>
                         <td><button className="btn btn-gh btn-sm" onClick={()=>saveRecords(records.filter((_,j)=>j!==i))}>X</button></td>
                       </tr>
-                    ))
+                    )})
                   }
                 </tbody>
               </table>
@@ -3849,57 +3812,22 @@ function Obzvon({
               <input placeholder="Mijoz / ID / operator..." value={searchAll} onChange={(e)=>setSearchAll(e.target.value)} />
             </div>
             <div style={{position:'relative'}}>
-              <button className="btn btn-gh btn-sm" onClick={()=>setAllFilterOpen((v)=>!v)}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setAllUniFilterOpen((v)=>!v)}>
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
                 </svg>
-                Filtr{activeAllFilterCount>0?` (${activeAllFilterCount})`:''}
+                Filtr ({allFilterCount})
               </button>
-              {allFilterOpen && (
-                <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:340,padding:10,overflow:'hidden'}}>
-                  <div style={{display:'flex',gap:6,marginBottom:8}}>
-                    <button className="btn btn-gh btn-sm" onClick={()=>setAllFilterOps(allOpsSelected ? [] : operators)}>
-                      {allOpsSelected ? "Operator: bekor" : "Operator: hammasi"}
-                    </button>
-                    <button className="btn btn-gh btn-sm" onClick={()=>setAllFilterTopics(allTopicsSelected ? [] : topics)}>
-                      {allTopicsSelected ? "Mavzu: bekor" : "Mavzu: hammasi"}
-                    </button>
-                  </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:6,fontWeight:700}}>Operator</div>
-                  <div style={{maxHeight:90,overflow:'auto',marginBottom:8}}>
-                    {operators.map((o)=>(
-                      <label key={o} style={FILTER_CHECK_LABEL_STYLE}>
-                        <input type="checkbox" checked={allFilterOps.includes(o)} onChange={()=>toggleInList(setAllFilterOps, o)} />
-                        <span style={FILTER_CHECK_TEXT_STYLE}>{o}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:6,fontWeight:700}}>Mavzu</div>
-                  <div style={{maxHeight:90,overflow:'auto',marginBottom:8}}>
-                    {topics.map((t)=>(
-                      <label key={t} style={FILTER_CHECK_LABEL_STYLE}>
-                        <input type="checkbox" checked={allFilterTopics.includes(t)} onChange={()=>toggleInList(setAllFilterTopics, t)} />
-                        <span style={FILTER_CHECK_TEXT_STYLE}>{t}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="g2" style={{gap:6,marginBottom:8}}>
-                    <input className="input" type="date" value={allFilterDateFrom} onChange={(e)=>setAllFilterDateFrom(e.target.value)} />
-                    <input className="input" type="date" value={allFilterDateTo} onChange={(e)=>setAllFilterDateTo(e.target.value)} />
-                  </div>
-                  <div style={{display:'flex',justifyContent:'space-between',gap:6}}>
-                    <button className="btn btn-gh btn-sm" onClick={() => {
-                      setAllFilterOps([]);
-                      setAllFilterTopics([]);
-                      setAllFilterDateFrom('');
-                      setAllFilterDateTo('');
-                    }}>
-                      Tozalash
-                    </button>
-                    <button className="btn btn-bl btn-sm" onClick={()=>setAllFilterOpen(false)}>Qo'llash</button>
-                  </div>
-                </div>
-              )}
+              <UniversalFilterPanel
+                open={allUniFilterOpen}
+                title="Barcha obzvon filtri"
+                columns={allFilterColumns}
+                rows={historicalAllRows}
+                state={allUniFilterState}
+                setState={setAllUniFilterState}
+                onClose={()=>setAllUniFilterOpen(false)}
+                width={620}
+              />
             </div>
             <button className="btn btn-gh btn-sm" onClick={() => setSearchAll('')}>
               Qidiruvni tozalash
@@ -3951,57 +3879,22 @@ function Obzvon({
               <input placeholder="Mijoz / ID / operator..." value={searchAllNew} onChange={(e)=>setSearchAllNew(e.target.value)} />
             </div>
             <div style={{position:'relative'}}>
-              <button className="btn btn-gh btn-sm" onClick={()=>setAllFilterOpen((v)=>!v)}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setAllNewUniFilterOpen((v)=>!v)}>
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
                 </svg>
-                Filtr{activeAllFilterCount>0?` (${activeAllFilterCount})`:''}
+                Filtr ({allNewFilterCount})
               </button>
-              {allFilterOpen && (
-                <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:340,padding:10,overflow:'hidden'}}>
-                  <div style={{display:'flex',gap:6,marginBottom:8}}>
-                    <button className="btn btn-gh btn-sm" onClick={()=>setAllFilterOps(allOpsSelected ? [] : operators)}>
-                      {allOpsSelected ? "Operator: bekor" : "Operator: hammasi"}
-                    </button>
-                    <button className="btn btn-gh btn-sm" onClick={()=>setAllFilterTopics(allTopicsSelected ? [] : topics)}>
-                      {allTopicsSelected ? "Mavzu: bekor" : "Mavzu: hammasi"}
-                    </button>
-                  </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:6,fontWeight:700}}>Operator</div>
-                  <div style={{maxHeight:90,overflow:'auto',marginBottom:8}}>
-                    {operators.map((o)=>(
-                      <label key={o} style={FILTER_CHECK_LABEL_STYLE}>
-                        <input type="checkbox" checked={allFilterOps.includes(o)} onChange={()=>toggleInList(setAllFilterOps, o)} />
-                        <span style={FILTER_CHECK_TEXT_STYLE}>{o}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:6,fontWeight:700}}>Mavzu</div>
-                  <div style={{maxHeight:90,overflow:'auto',marginBottom:8}}>
-                    {topics.map((t)=>(
-                      <label key={t} style={FILTER_CHECK_LABEL_STYLE}>
-                        <input type="checkbox" checked={allFilterTopics.includes(t)} onChange={()=>toggleInList(setAllFilterTopics, t)} />
-                        <span style={FILTER_CHECK_TEXT_STYLE}>{t}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div className="g2" style={{gap:6,marginBottom:8}}>
-                    <input className="input" type="date" value={allFilterDateFrom} onChange={(e)=>setAllFilterDateFrom(e.target.value)} />
-                    <input className="input" type="date" value={allFilterDateTo} onChange={(e)=>setAllFilterDateTo(e.target.value)} />
-                  </div>
-                  <div style={{display:'flex',justifyContent:'space-between',gap:6}}>
-                    <button className="btn btn-gh btn-sm" onClick={() => {
-                      setAllFilterOps([]);
-                      setAllFilterTopics([]);
-                      setAllFilterDateFrom('');
-                      setAllFilterDateTo('');
-                    }}>
-                      Tozalash
-                    </button>
-                    <button className="btn btn-bl btn-sm" onClick={()=>setAllFilterOpen(false)}>Qo'llash</button>
-                  </div>
-                </div>
-              )}
+              <UniversalFilterPanel
+                open={allNewUniFilterOpen}
+                title="Barcha obzvon yangi filtri"
+                columns={allFilterColumns}
+                rows={appAllNewRows}
+                state={allNewUniFilterState}
+                setState={setAllNewUniFilterState}
+                onClose={()=>setAllNewUniFilterOpen(false)}
+                width={620}
+              />
             </div>
             <button className="btn btn-gh btn-sm" onClick={() => setSearchAllNew('')}>
               Qidiruvni tozalash
@@ -4045,6 +3938,24 @@ function Obzvon({
       {tab==='due' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <div style={{position:'relative'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setDueUniFilterOpen((v)=>!v)}>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                </svg>
+                Filtr ({dueFilterCount})
+              </button>
+              <UniversalFilterPanel
+                open={dueUniFilterOpen}
+                title="Vaqti kelganlar filtri"
+                columns={dueFilterColumns}
+                rows={dueCandidates}
+                state={dueUniFilterState}
+                setState={setDueUniFilterState}
+                onClose={()=>setDueUniFilterOpen(false)}
+                width={620}
+              />
+            </div>
             <button className={`btn ${duePickMode?'btn-gr':'btn-gh'} btn-sm`} onClick={()=>setDuePickMode((v)=>!v)}>
               + Obzvonga qo'shish
             </button>
@@ -4054,8 +3965,8 @@ function Obzvon({
               <table className="tbl">
                 <thead><tr><th>Mijoz</th><th>ID</th><th>Oxirgi 3 zakaz</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
                 <tbody>
-                  {dueCandidates.length===0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Vaqti kelgan mijoz yo'q</td></tr> :
-                    dueCandidates.map((c,i)=>(
+                  {filteredDueCandidates.length===0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Vaqti kelgan mijoz yo'q</td></tr> :
+                    filteredDueCandidates.map((c,i)=>(
                       <tr
                         key={i}
                         onClick={()=>{
@@ -4091,7 +4002,7 @@ function Obzvon({
                 className="btn btn-bl btn-sm"
                 disabled={dueSelectedCount===0}
                 onClick={() => {
-                  const selected = dueCandidates.filter((c) => dueSelectedIds[c.id]);
+                  const selected = filteredDueCandidates.filter((c) => dueSelectedIds[c.id]);
                   if (!selected.length) return;
                   const rows = selected.map((c) => ({
                     id: c.id,
@@ -4125,83 +4036,22 @@ function Obzvon({
               <input placeholder="ID, mijoz, izoh..." value={opSearch} onChange={(e)=>setOpSearch(e.target.value)} />
             </div>
             <div style={{position:'relative'}}>
-              <button className="btn btn-gh btn-sm" onClick={()=>setOpFilterOpen((v)=>!v)}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setOpUniFilterOpen((v)=>!v)}>
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
                 </svg>
-                Filtr{activeOpFilterCount>0?` (${activeOpFilterCount})`:''}
+                Filtr ({opUniversalFilterCount})
               </button>
-              {opFilterOpen && (
-                <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:380,padding:10,overflow:'hidden'}}>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
-                    <input className="input" placeholder="ID bo'yicha" value={opIdFilter} onChange={(e)=>setOpIdFilter(e.target.value)} />
-                    <input className="input" placeholder="Mijoz bo'yicha" value={opNameFilter} onChange={(e)=>setOpNameFilter(e.target.value)} />
-                  </div>
-                  <div style={{display:'flex',gap:6,marginBottom:6}}>
-                    <button className="btn btn-gh btn-sm" onClick={()=>setOpFilterOperators(allOperatorFilterSelected ? [] : operatorOptions)}>
-                      {allOperatorFilterSelected ? "Operator: bekor" : "Operator: hammasi"}
-                    </button>
-                    <button className="btn btn-gh btn-sm" onClick={()=>setOpFilterDistricts(allDistrictFilterSelected ? [] : districtOptions)}>
-                      {allDistrictFilterSelected ? "Rayon: bekor" : "Rayon: hammasi"}
-                    </button>
-                  </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Operator</div>
-                  <div style={{maxHeight:110,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6,marginBottom:8}}>
-                    {operatorOptions.map((x)=>(
-                      <label key={x} style={FILTER_CHECK_LABEL_STYLE}>
-                        <input type="checkbox" checked={opFilterOperators.includes(x)} onChange={()=>setOpFilterOperators((prev)=>prev.includes(x)?prev.filter((v)=>v!==x):[...prev,x])}/>
-                        <span style={FILTER_CHECK_TEXT_STYLE}>{x}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Rayon</div>
-                  <div style={{maxHeight:95,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6,marginBottom:8}}>
-                    {districtOptions.map((x)=>(
-                      <label key={x} style={FILTER_CHECK_LABEL_STYLE}>
-                        <input type="checkbox" checked={opFilterDistricts.includes(x)} onChange={()=>setOpFilterDistricts((prev)=>prev.includes(x)?prev.filter((v)=>v!==x):[...prev,x])}/>
-                        <span style={FILTER_CHECK_TEXT_STYLE}>{x}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
-                    <input className="input" placeholder="Balans dan" value={opBalFrom} onChange={(e)=>setOpBalFrom(e.target.value)} />
-                    <input className="input" placeholder="Balans gacha" value={opBalTo} onChange={(e)=>setOpBalTo(e.target.value)} />
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
-                    <input className="input" placeholder="Zakaz soni dan" value={opQtyFrom} onChange={(e)=>setOpQtyFrom(e.target.value)} />
-                    <input className="input" placeholder="Zakaz soni gacha" value={opQtyTo} onChange={(e)=>setOpQtyTo(e.target.value)} />
-                  </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Oxirgi zakaz sanasi</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
-                    <input className="input" type="date" value={opOrdFrom} onChange={(e)=>setOpOrdFrom(e.target.value)} />
-                    <input className="input" type="date" value={opOrdTo} onChange={(e)=>setOpOrdTo(e.target.value)} />
-                  </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Oxirgi qo'ng'iroq sanasi</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
-                    <input className="input" type="date" value={opLastCallFrom} onChange={(e)=>setOpLastCallFrom(e.target.value)} />
-                    <input className="input" type="date" value={opLastCallTo} onChange={(e)=>setOpLastCallTo(e.target.value)} />
-                  </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Keyingi sana</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
-                    <input className="input" type="date" value={opNextFrom} onChange={(e)=>setOpNextFrom(e.target.value)} />
-                    <input className="input" type="date" value={opNextTo} onChange={(e)=>setOpNextTo(e.target.value)} />
-                  </div>
-                  <div style={{display:'flex',justifyContent:'space-between'}}>
-                    <button className="btn btn-gh btn-sm" onClick={()=>{
-                      setOpIdFilter('');
-                      setOpNameFilter('');
-                      setOpFilterOperators([]);
-                      setOpFilterDistricts([]);
-                      setOpBalFrom(''); setOpBalTo('');
-                      setOpQtyFrom(''); setOpQtyTo('');
-                      setOpOrdFrom(''); setOpOrdTo('');
-                      setOpLastCallFrom(''); setOpLastCallTo('');
-                      setOpNextFrom(''); setOpNextTo('');
-                    }}>Tozalash</button>
-                    <button className="btn btn-bl btn-sm" onClick={()=>setOpFilterOpen(false)}>Qo'llash</button>
-                  </div>
-                </div>
-              )}
+              <UniversalFilterPanel
+                open={opUniFilterOpen}
+                title="Operator jadvali filtri"
+                columns={opFilterColumns}
+                rows={operatorTableBaseRows}
+                state={opUniFilterState}
+                setState={setOpUniFilterState}
+                onClose={()=>setOpUniFilterOpen(false)}
+                width={620}
+              />
             </div>
             <button className={`btn ${opPickMode?'btn-gr':'btn-gh'} btn-sm`} onClick={()=>setOpPickMode((v)=>!v)}>
               + Obzvonga qo'shish
@@ -4410,31 +4260,61 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
 function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUser }) {
   const [tab, setTab] = useState('qarz');
   const [search, setSearch] = useState('');
-  const [fCats, setCats] = useState([]);
-  const [showFilter, setShowFilter] = useState(false);
-  const [catQuery, setCatQuery] = useState('');
-  const [fDayFrom, setDayFrom] = useState('');
-  const [fDayTo, setDayTo] = useState('');
-  const [fNote, setNote] = useState('');
+  const [debtFilterOpen, setDebtFilterOpen] = useState(false);
+  const [debtFilterState, setDebtFilterState] = useState({});
+  const [kulerSearch, setKulerSearch] = useState('');
+  const [kulerFilterOpen, setKulerFilterOpen] = useState(false);
+  const [kulerFilterState, setKulerFilterState] = useState({});
   const [selected, setSelected] = useState(null);
   const [selectedKuler, setSelectedKuler] = useState(null);
   const [pickMode, setPickMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState({});
   const [kulerMonthsCfg, setKulerMonthsCfg] = useState(() => S.get('aq-kuler-months', {}));
   const activeDebtRows = useMemo(() => (tab === 'other_qarz' ? (otherRows || []) : (rows || [])), [tab, rows, otherRows]);
-  const categories = [...new Set(activeDebtRows.map((r) => r.category).filter(Boolean))].sort();
-  const shownCats = categories.filter((c) => c.toLowerCase().includes(catQuery.toLowerCase()));
+  const debtFilterColumns = useMemo(() => ([
+    { key:'id', label:'ID', type:'text' },
+    { key:'name', label:'Kontragent', type:'text' },
+    { key:'category', label:'Kategoriya', type:'text' },
+    { key:'debtUZS', label:'Qarz UZS', type:'number' },
+    { key:'orderNo', label:'Qarz zakaz', type:'text' },
+    { key:'lastOrderProduct', label:'Mahsulot', type:'text' },
+    { key:'lastOrderDate', label:'Sana', type:'date' },
+    { key:'days', label:'Kun', type:'number' },
+    { key:'note', label:'Izoh (T)', type:'text' },
+    { key:'agent', label:'Agent', type:'text' },
+  ]), []);
+  const kulerFilterColumns = useMemo(() => ([
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customerName', label:'Mijoz', type:'text' },
+    { key:'product', label:'Mahsulot', type:'text' },
+    { key:'orderNo', label:'Zakaz', type:'text' },
+    { key:'purchaseDate', label:'Olingan sana', type:'date' },
+    { key:'months', label:'Oylar', type:'number' },
+    { key:'principal', label:'Asosiy summa', type:'number' },
+    { key:'paid', label:"To'langan", type:'number' },
+    { key:'remaining', label:'Qoldiq', type:'number' },
+    { key:'monthly', label:"Oylik to'lov", type:'number' },
+    { key:'overdueAmount', label:'Muddati kelgan', type:'number' },
+  ]), []);
+  useEffect(() => {
+    setDebtFilterState((prev) => ensureUniversalFilterState(debtFilterColumns, prev));
+    setKulerFilterState((prev) => ensureUniversalFilterState(kulerFilterColumns, prev));
+  }, [debtFilterColumns, kulerFilterColumns]);
 
   const list = useMemo(() => {
     let r = activeDebtRows;
-    const q = search.toLowerCase();
-    if (q) r = r.filter((x)=> (x.name||'').toLowerCase().includes(q) || String(x.id||'').toLowerCase().includes(q) || (x.orderNo||'').toLowerCase().includes(q));
-    if (fCats.length) r = r.filter((x) => fCats.includes(x.category));
-    if (fDayFrom !== '') r = r.filter((x) => (x.days ?? 0) >= Number(fDayFrom));
-    if (fDayTo !== '') r = r.filter((x) => (x.days ?? 0) <= Number(fDayTo));
-    if (fNote) r = r.filter((x) => (x.note || '').toLowerCase().includes(fNote.toLowerCase()));
-    return r;
-  }, [activeDebtRows, search, fCats, fDayFrom, fDayTo, fNote]);
+    const q = search.toLowerCase().trim();
+    if (q) {
+      r = r.filter((x) =>
+        (x.name || '').toLowerCase().includes(q) ||
+        String(x.id || '').toLowerCase().includes(q) ||
+        String(x.orderNo || '').toLowerCase().includes(q) ||
+        String(x.category || '').toLowerCase().includes(q) ||
+        String(x.note || '').toLowerCase().includes(q)
+      );
+    }
+    return applyUniversalFilters(r, debtFilterColumns, debtFilterState);
+  }, [activeDebtRows, search, debtFilterColumns, debtFilterState]);
 
   const debtSum = list.reduce((s, r) => s + Math.abs(r.debtUZS), 0);
   const d15 = list.filter((r) => (r.days ?? 0) > 15);
@@ -4447,10 +4327,22 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
     });
   }, [kulerRows, kulerMonthsCfg]);
   const kulerActive = kulerComputed.filter((k) => k.remaining > 0);
+  const kulerList = useMemo(() => {
+    let r = kulerActive;
+    const q = kulerSearch.toLowerCase().trim();
+    if (q) {
+      r = r.filter((k) =>
+        String(k.customerId || '').toLowerCase().includes(q) ||
+        String(k.customerName || '').toLowerCase().includes(q) ||
+        String(k.orderNo || '').toLowerCase().includes(q) ||
+        String(k.product || '').toLowerCase().includes(q)
+      );
+    }
+    return applyUniversalFilters(r, kulerFilterColumns, kulerFilterState);
+  }, [kulerActive, kulerSearch, kulerFilterColumns, kulerFilterState]);
   const kulerRemain = kulerActive.reduce((s, k) => s + k.remaining, 0);
   const kulerDue = kulerActive.filter((k) => k.overdueAmount > 0).length;
   const kulerDueAmount = kulerActive.reduce((s, k) => s + (k.overdueAmount > 0 ? k.overdueAmount : 0), 0);
-  const allCatsSelected = categories.length > 0 && categories.every((c) => fCats.includes(c));
   const saveKulerMonths = (row, monthsValue) => {
     const m = Math.max(1, Math.min(60, Number(monthsValue) || 6));
     const key = `${row.customerId}__${row.orderNo}`;
@@ -4462,13 +4354,8 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
     setSelectedKuler((prev) => (prev ? recalcInstallment(prev, m) : prev));
   };
   const selectedCount = Object.values(selectedIds).filter(Boolean).length;
-  const activeFilterCount = useMemo(() => {
-    let c = 0;
-    if (fCats.length) c++;
-    if (fDayFrom !== '' || fDayTo !== '') c++;
-    if (fNote) c++;
-    return c;
-  }, [fCats, fDayFrom, fDayTo, fNote]);
+  const debtFilterCount = useMemo(() => countUniversalFilters(debtFilterState), [debtFilterState]);
+  const kulerFilterCount = useMemo(() => countUniversalFilters(kulerFilterState), [kulerFilterState]);
   const exportDoljniki = () => {
     exportAoaExcel({
       fileName: `Doljniki_${new Date().toISOString().slice(0,10)}.xlsx`,
@@ -4492,7 +4379,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
       fileName: `Kuler_nasiya_${new Date().toISOString().slice(0,10)}.xlsx`,
       sheetName: 'KulerNasiya',
       headers: ['Mijoz ID', 'Mijoz', 'Zakaz', 'Mahsulot', 'Olingan sana', 'Oylar', 'Asosiy summa', 'Tolangan', 'Qoldiq', 'Oylik tolov', 'Muddati kelgan'],
-      rows: kulerActive.map((k) => [
+      rows: kulerList.map((k) => [
         k.customerId,
         k.customerName,
         k.orderNo,
@@ -4547,50 +4434,22 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
               <input placeholder="Ism, ID, zakaz bo'yicha..." value={search} onChange={(e)=>setSearch(e.target.value)} />
             </div>
             <div style={{position:'relative'}}>
-              <button className="btn btn-gh btn-sm" onClick={()=>setShowFilter((v)=>!v)}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setDebtFilterOpen((v)=>!v)}>
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
                 </svg>
-                Filtr{activeFilterCount>0?` (${activeFilterCount})`:''}
+                Filtr ({debtFilterCount})
               </button>
-              {showFilter && (
-                <div className="card" style={{position:'absolute',top:34,right:0,zIndex:20,width:360,padding:10,overflow:'hidden'}}>
-                  <input className="input" placeholder="Kategoriya qidirish..." value={catQuery} onChange={(e)=>setCatQuery(e.target.value)} />
-                  <div style={{display:'flex',gap:6,marginTop:8}}>
-                    <button className="btn btn-gh btn-sm" onClick={()=>setCats(allCatsSelected ? [] : categories)}>
-                      {allCatsSelected ? "Hammasini bekor" : "Hammasini belgilash"}
-                    </button>
-                    <button className="btn btn-gh btn-sm" onClick={()=>setCats([])}>
-                      Tozalash
-                    </button>
-                  </div>
-                  <div style={{maxHeight:180,overflow:'auto',marginTop:8,paddingRight:4}}>
-                    {shownCats.map((c) => (
-                      <label key={c} style={FILTER_CHECK_LABEL_STYLE}>
-                        <input
-                          type="checkbox"
-                          checked={fCats.includes(c)}
-                          onChange={(e)=>setCats((prev)=>e.target.checked?[...prev,c]:prev.filter((x)=>x!==c))}
-                        />
-                        <span style={FILTER_CHECK_TEXT_STYLE}>{c}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginTop:8}}>
-                    <input className="input" placeholder="ot: kun" value={fDayFrom} onChange={(e)=>setDayFrom(e.target.value)} />
-                    <input className="input" placeholder="do: kun" value={fDayTo} onChange={(e)=>setDayTo(e.target.value)} />
-                  </div>
-                  <div style={{marginTop:8}}>
-                    <input className="input" placeholder="Izoh filter (T ustun)" value={fNote} onChange={(e)=>setNote(e.target.value)} />
-                  </div>
-                  <div style={{display:'flex',justifyContent:'space-between',marginTop:8}}>
-                    <button className="btn btn-gh btn-sm" onClick={()=>{
-                      setCats([]); setDayFrom(''); setDayTo(''); setNote(''); setCatQuery('');
-                    }}>Tozalash</button>
-                    <button className="btn btn-bl btn-sm" onClick={()=>setShowFilter(false)}>Qo'llash</button>
-                  </div>
-                </div>
-              )}
+              <UniversalFilterPanel
+                open={debtFilterOpen}
+                title={tab==='other_qarz' ? "Boshqa qarzdorli filtri" : "Doljniki filtri"}
+                columns={debtFilterColumns}
+                rows={activeDebtRows}
+                state={debtFilterState}
+                setState={setDebtFilterState}
+                onClose={()=>setDebtFilterOpen(false)}
+                width={620}
+              />
             </div>
             <button className="btn btn-gr btn-sm" onClick={exportDoljniki}>⬇ Excel</button>
             <button className={`btn ${pickMode ? 'btn-gr' : 'btn-gh'} btn-sm`} onClick={()=>setPickMode((v)=>!v)}>
@@ -4665,7 +4524,29 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
             <StatCard l="TO'LASHI KERAK" v={fmt(kulerDueAmount)+" so'm"} s={`${kulerDue} ta mijoz`} c="var(--yl)"/>
             <StatCard l="KULER QARZDORLAR" v={kulerActive.filter((k)=>k.remaining>0).length+' ta'} s="qoldiq bor mijoz" c="var(--yl)"/>
           </div>
-          <div style={{display:'flex',justifyContent:'flex-end'}}>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <div className="sb" style={{flex:1,minWidth:220,maxWidth:460}}>
+              <span style={{color:'var(--t3)'}}>{E.find}</span>
+              <input placeholder="Mijoz, ID, zakaz..." value={kulerSearch} onChange={(e)=>setKulerSearch(e.target.value)} />
+            </div>
+            <div style={{position:'relative'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setKulerFilterOpen((v)=>!v)}>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                </svg>
+                Filtr ({kulerFilterCount})
+              </button>
+              <UniversalFilterPanel
+                open={kulerFilterOpen}
+                title="Kuler nasiya filtri"
+                columns={kulerFilterColumns}
+                rows={kulerActive}
+                state={kulerFilterState}
+                setState={setKulerFilterState}
+                onClose={()=>setKulerFilterOpen(false)}
+                width={620}
+              />
+            </div>
             <button className="btn btn-gr btn-sm" onClick={exportKuler}>⬇ Excel</button>
           </div>
           <div className="card" style={{overflow:'hidden',flex:1}}>
@@ -4673,8 +4554,8 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
               <table className="tbl">
                 <thead><tr><th>Mijoz</th><th>Zakaz</th><th>Olingan sana</th><th>Oylar</th><th>To'langan</th><th>Qoldiq</th><th>Muddati kelgan</th></tr></thead>
                 <tbody>
-                  {kulerActive.length===0 ? <tr><td colSpan={7} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Kuler nasiya topilmadi</td></tr> :
-                    kulerActive.map((k,i)=>(
+                  {kulerList.length===0 ? <tr><td colSpan={7} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Kuler nasiya topilmadi</td></tr> :
+                    kulerList.map((k,i)=>(
                       <tr key={i} onClick={()=>setSelectedKuler(k)}>
                         <td style={{width:'66%',textAlign:'left'}}>
                           <div style={{fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{k.customerName}</div>
