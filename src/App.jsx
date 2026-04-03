@@ -1198,6 +1198,27 @@ body,input,select,button{font-family:var(--sans)}
 .toggle .knob{position:absolute;top:1px;left:1px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .16s}
 .toggle.on .knob{left:17px}
 `;
+const LIGHT_THEME_VARS = {
+  '--bg': '#f4f7fb',
+  '--s1': '#ffffff',
+  '--s2': '#edf2f8',
+  '--s3': '#e6ecf5',
+  '--b1': '#c9d3e1',
+  '--b2': '#d9e1ec',
+  '--t1': '#0f1b2d',
+  '--t2': '#33445d',
+  '--t3': '#5f7088',
+  '--t4': '#8a96a9',
+  '--bl': '#1f6feb',
+  '--bl2': '#dbeafe',
+  '--bl3': '#e8f1ff',
+  '--gr2': '#dff7e6',
+  '--gr3': '#effcf3',
+  '--rd2': '#ffe4e4',
+  '--yl2': '#fff2d9',
+  '--or2': '#ffe8d8',
+  '--pu2': '#efe6ff',
+};
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ LOCAL STORAGE в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 const S = {
@@ -1220,19 +1241,22 @@ const DEFAULT_ACCESS = {
     scope: 'own',
     activeScope: 'own',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false },
+    ui: { theme:'dark' },
   },
   Dilfuza: {
     scope: 'own',
     activeScope: 'own',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false },
+    ui: { theme:'dark' },
   },
   Admin:   {
     scope: 'all',
     activeScope: 'all',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:true },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true },
+    ui: { theme:'dark' },
   },
 };
 const DEFAULT_VISIBLE_PAGES = { ...DEFAULT_ACCESS.Admin.visible };
@@ -1241,17 +1265,23 @@ function normalizeAccessConfig(user, cfg) {
   const isAdmin = user === 'Admin';
   const src = cfg || {};
   const base = isAdmin
-    ? { scope:'all', activeScope:'all', customerTabs:{ ...DEFAULT_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true } }
-    : { scope:'own', activeScope:'own', customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false } };
+    ? { scope:'all', activeScope:'all', customerTabs:{ ...DEFAULT_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true, settings_staff:true, settings_app:true, settings_ui:true }, ui:{ theme:'dark' } }
+    : { scope:'own', activeScope:'own', customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false }, ui:{ theme:'dark' } };
   const scope = src.scope || base.scope;
   const normalized = {
     scope,
     activeScope: src.activeScope || (scope === 'own' ? 'own' : base.activeScope),
     visible: { ...base.visible, ...(src.visible || {}) },
     customerTabs: { ...base.customerTabs, ...(src.customerTabs || {}) },
+    ui: { ...base.ui, ...((src.ui && typeof src.ui === 'object') ? src.ui : {}) },
   };
   // Admin always keeps Settings access to avoid accidental lockout.
-  if (isAdmin) normalized.visible.settings = true;
+  if (isAdmin) {
+    normalized.visible.settings = true;
+    normalized.visible.settings_staff = true;
+    normalized.visible.settings_app = true;
+    normalized.visible.settings_ui = true;
+  }
   return normalized;
 }
 
@@ -2781,12 +2811,11 @@ function Obzvon({
     const bal = Number(customerBalanceById[cid] || 0);
     return String(Math.round(bal));
   }, [customerBalanceById]);
+  // Barcha Obzvon Yangi ga tushish sharti: mijoz + izoh to'ldirilgan bo'lishi kerak.
   const hasObzvonPayload = useCallback((row) => {
     return Boolean(
-      String(row?.note || '').trim() ||
-      String(row?.orderCount || '').trim() ||
-      String(row?.nextDate || '').trim() ||
-      String(row?.orderDate || '').trim()
+      String(row?.customer || '').trim() &&
+      String(row?.note || '').trim()
     );
   }, []);
   const saveRecords = (next) => {
@@ -4421,7 +4450,7 @@ function Reports({ D }) {
 
 function SettingsPanel({
   users, setUsers, access, setAccess, currentUser, setCurrentUser,
-  webhookUrl, setWebhookUrl, userCreds, setUserCreds, onSwitchUser, isAdminSession=false,
+  webhookUrl, setWebhookUrl, userCreds, setUserCreds, onSwitchUser, isAdminSession=false, viewerAccess=null,
 }) {
   const [tab, setTab] = useState('staff');
   const [sel, setSel] = useState(currentUser || users[0] || 'Admin');
@@ -4431,6 +4460,11 @@ function SettingsPanel({
   const [showPassword, setShowPassword] = useState(false);
   const conf = normalizeAccessConfig(sel, access[sel]);
   const pages = ['dash','cust','orders','kassa','obzvon','doljniki','reports','refresh','settings'];
+  const settingsSections = [
+    { key:'settings_staff', label:"Hodimlar ruhsatlari" },
+    { key:'settings_app', label:'Ilova sozlamalari' },
+    { key:'settings_ui', label:'Interfeys nastroykasi' },
+  ];
   const defaultVisible = { ...DEFAULT_VISIBLE_PAGES };
   const customerTabDefs = [
     { key:'all', label:'Hamma mijozlar' },
@@ -4441,6 +4475,18 @@ function SettingsPanel({
     { key:'inactive', label:'Nofaol' },
     { key:'other', label:'Boshqa mijozlar' },
   ];
+  const viewerConf = normalizeAccessConfig(currentUser, viewerAccess || access[currentUser]);
+  const allowedSettingsTabs = useMemo(() => {
+    const out = [];
+    if ((viewerConf.visible?.settings_staff ?? true)) out.push('staff');
+    if ((viewerConf.visible?.settings_app ?? true)) out.push('app');
+    if ((viewerConf.visible?.settings_ui ?? true)) out.push('ui');
+    return out;
+  }, [viewerConf]);
+  useEffect(() => {
+    if (!allowedSettingsTabs.length) return;
+    if (!allowedSettingsTabs.includes(tab)) setTab(allowedSettingsTabs[0]);
+  }, [allowedSettingsTabs, tab]);
 
   const addUser = () => {
     if (!isAdminSession) {
@@ -4527,11 +4573,21 @@ function SettingsPanel({
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12}}>
       <div className="tabs" style={{display:'inline-flex'}}>
-        <button className={`tab${tab==='staff'?' on':''}`} onClick={()=>setTab('staff')}>?? Hodimlar ruhsatlari</button>
-        <button className={`tab${tab==='app'?' on':''}`} onClick={()=>setTab('app')}>?? Ilova sozlamalari</button>
+        {(viewerConf.visible?.settings_staff ?? true) && (
+          <button className={`tab${tab==='staff'?' on':''}`} onClick={()=>setTab('staff')}>{E.users} Hodimlar ruhsatlari</button>
+        )}
+        {(viewerConf.visible?.settings_app ?? true) && (
+          <button className={`tab${tab==='app'?' on':''}`} onClick={()=>setTab('app')}>{E.settings} Ilova sozlamalari</button>
+        )}
+        {(viewerConf.visible?.settings_ui ?? true) && (
+          <button className={`tab${tab==='ui'?' on':''}`} onClick={()=>setTab('ui')}>🎨 Interfeys nastroykasi</button>
+        )}
       </div>
+      {!allowedSettingsTabs.length && (
+        <div className="card" style={{padding:14,color:'var(--t3)'}}>Siz uchun nastroyka bo'limlari yopilgan.</div>
+      )}
 
-      {tab==='staff' && (
+      {tab==='staff' && (viewerConf.visible?.settings_staff ?? true) && (
         <>
           <div className="g4">
             <StatCard l="LOGINS" v={users.length+' ta'} c="var(--bl)"/>
@@ -4680,6 +4736,32 @@ function SettingsPanel({
                       </div>
                     )})}
                   </div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginTop:8,marginBottom:6}}>Nastroyka qatorlari</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr',gap:6}}>
+                    {settingsSections.map((s) => {
+                      const on = ((uc.visible || {})[s.key] ?? true);
+                      return (
+                        <div key={s.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--s3)',borderRadius:8,padding:'6px 8px'}}>
+                          <span style={{fontSize:11,color:'var(--t2)'}}>{s.label}</span>
+                          <button className={`toggle${on?' on':''}`} onClick={() => {
+                            setAccess((prev) => {
+                              const confU = normalizeAccessConfig(u, prev[u] || uc);
+                              const currentOn = ((confU.visible || {})[s.key] ?? true);
+                              const next = {
+                                ...prev,
+                                [u]: normalizeAccessConfig(u, {
+                                  ...confU,
+                                  visible: { ...(confU.visible || {}), [s.key]: !currentOn },
+                                }),
+                              };
+                              S.set('aq-access', next);
+                              return next;
+                            });
+                          }}><span className="knob" /></button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               );
             })}
@@ -4687,12 +4769,64 @@ function SettingsPanel({
         </>
       )}
 
-      {tab==='app' && (
+      {tab==='app' && (viewerConf.visible?.settings_app ?? true) && (
         <div className="card" style={{padding:14}}>
           <div style={{fontWeight:700,marginBottom:8}}>Access API URL</div>
           <input className="input" placeholder="https://your-access-api.workers.dev" value={webhookUrl} onChange={(e)=>setWebhookUrl(e.target.value)} />
           <div style={{fontSize:11,color:'var(--t3)',marginTop:8}}>Bu URL faqat login, parol va ruxsatlarni barcha kompyuterlarda bir xil saqlash uchun ishlatiladi.</div>
           <div style={{marginTop:14,padding:10,border:'1px dashed var(--b1)',borderRadius:8,color:'var(--t3)',fontSize:12}}>Kelajak sozlamalari uchun joy.</div>
+        </div>
+      )}
+
+      {tab==='ui' && (viewerConf.visible?.settings_ui ?? true) && (
+        <div className="card" style={{padding:14}}>
+          <div style={{fontWeight:700,marginBottom:10}}>Interfeys nastroykasi</div>
+          <div style={{fontSize:12,color:'var(--t3)',marginBottom:10}}>
+            Rang rejimi foydalanuvchi bo'yicha saqlanadi. Har kim o'zi uchun alohida tanlaydi.
+          </div>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            <button
+              className={`btn btn-sm ${conf.ui?.theme === 'dark' ? 'btn-bl' : 'btn-gh'}`}
+              onClick={() => {
+                setAccess((prev) => {
+                  const confU = normalizeAccessConfig(sel, prev[sel] || conf);
+                  const next = {
+                    ...prev,
+                    [sel]: normalizeAccessConfig(sel, {
+                      ...confU,
+                      ui: { ...(confU.ui || {}), theme: 'dark' },
+                    }),
+                  };
+                  S.set('aq-access', next);
+                  return next;
+                });
+              }}
+            >
+              Qora tema
+            </button>
+            <button
+              className={`btn btn-sm ${conf.ui?.theme === 'light' ? 'btn-bl' : 'btn-gh'}`}
+              onClick={() => {
+                setAccess((prev) => {
+                  const confU = normalizeAccessConfig(sel, prev[sel] || conf);
+                  const next = {
+                    ...prev,
+                    [sel]: normalizeAccessConfig(sel, {
+                      ...confU,
+                      ui: { ...(confU.ui || {}), theme: 'light' },
+                    }),
+                  };
+                  S.set('aq-access', next);
+                  return next;
+                });
+              }}
+            >
+              Oq tema
+            </button>
+          </div>
+          <div style={{marginTop:12,fontSize:12,color:'var(--t3)'}}>
+            Tanlangan foydalanuvchi: <strong style={{color:'var(--t1)'}}>{sel}</strong> · Joriy tema: <strong style={{color:'var(--bl)'}}>{(conf.ui?.theme || 'dark') === 'light' ? 'Oq' : 'Qora'}</strong>
+          </div>
         </div>
       )}
     </div>
@@ -4935,12 +5069,11 @@ export default function App() {
     });
     return Array.from(m.values()).sort((a, b) => obzvonRowUpdatedTs(b) - obzvonRowUpdatedTs(a));
   }, [normalizeObzvonNewRow, obzvonRowUpdatedTs]);
+  // Global sync uchun ham bir xil qoidani saqlaymiz: mijoz + izoh bo'lsa yozuv tayyor.
   const hasObzvonRowPayload = useCallback((r) => {
     return Boolean(
-      String(r?.note || '').trim() ||
-      String(r?.orderCount || '').trim() ||
-      String(r?.nextDate || '').trim() ||
-      String(r?.orderDate || '').trim()
+      String(r?.customer || '').trim() &&
+      String(r?.note || '').trim()
     );
   }, []);
 
@@ -5361,6 +5494,8 @@ export default function App() {
   const canViewPage = useCallback((id) => (currentAccess.visible?.[id] ?? true), [currentAccess]);
   const visibleNav = NAV.filter((n) => canViewPage(n.id));
   const pageMeta = NAV.find((n)=>n.id===page) || { id:'settings', icon:E.settings, label:'Nastroyka' };
+  const currentTheme = currentAccess.ui?.theme === 'light' ? 'light' : 'dark';
+  const themeVars = currentTheme === 'light' ? LIGHT_THEME_VARS : {};
   useEffect(() => {
     if (canViewPage(page)) return;
     const fallback = visibleNav[0]?.id || (canViewPage('settings') ? 'settings' : 'dash');
@@ -5379,7 +5514,7 @@ export default function App() {
   return (
     <>
       <style>{CSS}</style>
-      <div style={{height:'100vh',display:'flex',overflow:'hidden',background:'var(--bg)'}}>
+      <div style={{height:'100vh',display:'flex',overflow:'hidden',background:'var(--bg)', ...themeVars}}>
         {/* SIDEBAR */}
         <div style={{width:side?215:56,background:'var(--s1)',borderRight:'1px solid var(--b2)',display:'flex',flexDirection:'column',transition:'width .2s',flexShrink:0,overflow:'hidden'}}>
           <div style={{padding:'13px 11px',borderBottom:'1px solid var(--b2)',display:'flex',alignItems:'center',gap:10}}>
@@ -5507,7 +5642,7 @@ export default function App() {
               )}
                 {page==='doljniki'&& canViewPage('doljniki') && <Doljniki rows={doljniki} otherRows={otherDoljniki} D={D} kulerRows={D.kulerInstallments || []} onAddToObzvon={addObzvonRows} currentUser={effectiveUser} />}
                 {page==='reports' && canViewPage('reports') && <Reports   D={D}/>}
-                {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} />}
+                {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} />}
               </>
             )}
           </div>
