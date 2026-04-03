@@ -4023,7 +4023,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
       topic: 'Qarzdorlik',
       note: '',
       nextDate: '',
-      orderCount: '',
+      orderCount: String(Math.round(Number(r.debtUZS || 0))),
       orderDate: '',
       operator: currentUser || 'Admin',
     })));
@@ -4912,7 +4912,29 @@ export default function App() {
     operator: sanitizeObzvonCell(r?.operator),
     customerId: sanitizeObzvonCell(r?.customerId || r?.id),
     orderDate: sanitizeObzvonCell(r?.orderDate),
+    updatedAt: sanitizeObzvonCell(r?.updatedAt) || new Date().toISOString(),
   }), []);
+  const obzvonRowUpdatedTs = useCallback((row) => {
+    const d = toDate(row?.updatedAt || row?.callDate || '');
+    return d ? d.getTime() : 0;
+  }, []);
+  const mergeObzvonNewRows = useCallback((prevRows = [], incomingRows = []) => {
+    const m = new Map((prevRows || []).map((r) => [String(r.rid || ''), normalizeObzvonNewRow(r)]));
+    (incomingRows || []).forEach((raw, i) => {
+      const r = normalizeObzvonNewRow(raw, i);
+      const key = String(r.rid || '');
+      if (!key) return;
+      const prev = m.get(key);
+      if (!prev) {
+        m.set(key, r);
+        return;
+      }
+      const prevTs = obzvonRowUpdatedTs(prev);
+      const nextTs = obzvonRowUpdatedTs(r);
+      if (nextTs >= prevTs) m.set(key, { ...prev, ...r });
+    });
+    return Array.from(m.values()).sort((a, b) => obzvonRowUpdatedTs(b) - obzvonRowUpdatedTs(a));
+  }, [normalizeObzvonNewRow, obzvonRowUpdatedTs]);
   const hasObzvonRowPayload = useCallback((r) => {
     return Boolean(
       String(r?.note || '').trim() ||
@@ -4966,25 +4988,62 @@ export default function App() {
     });
   }, [normalizeObzvonAllRow, hasObzvonRowPayload]);
 
+  const pullRemoteObzvonNewRows = useCallback(async () => {
+    if (!obzvonWebhook) return false;
+    try {
+      const sep = obzvonWebhook.includes('?') ? '&' : '?';
+      const url = `${obzvonWebhook}${sep}action=obzvon_new_get&_=${Date.now()}`;
+      const r = await fetch(url, { cache:'no-store' });
+      if (!r.ok) return false;
+      const j = await r.json().catch(() => ({}));
+      if (!j?.ok || !Array.isArray(j?.rows)) return false;
+      const incoming = j.rows
+        .map((x, i) => normalizeObzvonNewRow(x, i))
+        .filter((x) => (x.customerId || x.customer) && hasObzvonRowPayload(x));
+      setObzvonAllNewRows((prev) => {
+        const next = mergeObzvonNewRows(prev || [], incoming);
+        S.set('aq-obzvon-all-new-rows', next);
+        return next;
+      });
+      return true;
+    } catch {}
+    return false;
+  }, [obzvonWebhook, normalizeObzvonNewRow, hasObzvonRowPayload, mergeObzvonNewRows]);
+
+  const pushRemoteObzvonNewRows = useCallback(async (rows = []) => {
+    if (!obzvonWebhook) return false;
+    const payloadRows = (rows || [])
+      .map((x, i) => normalizeObzvonNewRow(x, i))
+      .filter((x) => (x.customerId || x.customer) && hasObzvonRowPayload(x));
+    if (!payloadRows.length) return false;
+    try {
+      const r = await fetch(obzvonWebhook, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'obzvon_new_upsert',
+          rows: payloadRows,
+          by: sessionUser || currentUser || 'unknown',
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      return !!j?.ok;
+    } catch {}
+    return false;
+  }, [obzvonWebhook, normalizeObzvonNewRow, hasObzvonRowPayload, sessionUser, currentUser]);
+
   const upsertObzvonAllNewRows = useCallback((rows = []) => {
     const normalizedRows = (rows || [])
       .map((row, i) => normalizeObzvonNewRow(row, i))
       .filter((r) => (r.customerId || r.customer) && hasObzvonRowPayload(r));
     if (!normalizedRows.length) return;
     setObzvonAllNewRows((prev) => {
-      const m = new Map((prev || []).map((r) => [String(r.rid || ''), normalizeObzvonNewRow(r)]));
-      normalizedRows.forEach((r) => {
-        m.set(String(r.rid), { ...(m.get(String(r.rid)) || {}), ...r });
-      });
-      const next = Array.from(m.values()).sort((a, b) => {
-        const da = toDate(a.callDate);
-        const db = toDate(b.callDate);
-        return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
-      });
+      const next = mergeObzvonNewRows(prev || [], normalizedRows);
       S.set('aq-obzvon-all-new-rows', next);
       return next;
     });
-  }, [normalizeObzvonNewRow, hasObzvonRowPayload]);
+    pushRemoteObzvonNewRows(normalizedRows);
+  }, [normalizeObzvonNewRow, hasObzvonRowPayload, mergeObzvonNewRows, pushRemoteObzvonNewRows]);
   useEffect(() => {
     if (!Array.isArray(obzvonAllRows) || !obzvonAllRows.length) return;
     const cleaned = obzvonAllRows
@@ -5074,6 +5133,15 @@ export default function App() {
       if (!ok) setObzvonAllLoaded(true);
     });
   }, [isLoggedIn, obzvonAllLoaded, loadObzvonAllRemote]);
+
+  useEffect(() => {
+    if (!isLoggedIn || !obzvonWebhook) return;
+    pullRemoteObzvonNewRows();
+    const t = setInterval(() => {
+      pullRemoteObzvonNewRows();
+    }, 15000);
+    return () => clearInterval(t);
+  }, [isLoggedIn, obzvonWebhook, pullRemoteObzvonNewRows]);
 
   useEffect(() => {
     if (users.length === 0) return;
@@ -5180,11 +5248,25 @@ export default function App() {
 
   const addObzvonRows = useCallback((rows) => {
     if (!rows?.length) return;
-    setObzvonRecords((prev) => [
-      ...rows.map((r) => ({ ...r, _rid: r?._rid || createRowRid() })),
-      ...(prev || []),
-    ]);
-  }, []);
+    const prepared = rows.map((r) => ({ ...r, _rid: r?._rid || createRowRid() }));
+    setObzvonRecords((prev) => [...prepared, ...(prev || [])]);
+    upsertObzvonAllNewRows(
+      prepared.map((r, i) => ({
+        rid: r._rid,
+        no: String(i + 1),
+        customer: r.customer || '',
+        callDate: r.callDate || '',
+        topic: r.topic || '',
+        note: r.note || '',
+        nextDate: r.nextDate || '',
+        orderCount: r.orderCount || '',
+        operator: r.operator || currentUser || 'Admin',
+        customerId: r.id || '',
+        orderDate: r.orderDate || '',
+        updatedAt: new Date().toISOString(),
+      }))
+    );
+  }, [upsertObzvonAllNewRows, currentUser]);
 
   useEffect(() => {
     loadFromConfig();
