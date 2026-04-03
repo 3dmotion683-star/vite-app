@@ -2813,8 +2813,13 @@ function Obzvon({
   const [opSearch, setOpSearch] = useState('');
   const [opFilterOpen, setOpFilterOpen] = useState(false);
   const [opFilterOperators, setOpFilterOperators] = useState([]);
+  const [opFilterDistricts, setOpFilterDistricts] = useState([]);
   const [opBalFrom, setOpBalFrom] = useState('');
   const [opBalTo, setOpBalTo] = useState('');
+  const [opOrdFrom, setOpOrdFrom] = useState('');
+  const [opOrdTo, setOpOrdTo] = useState('');
+  const [opQtyFrom, setOpQtyFrom] = useState('');
+  const [opQtyTo, setOpQtyTo] = useState('');
   const [opLastCallFrom, setOpLastCallFrom] = useState('');
   const [opLastCallTo, setOpLastCallTo] = useState('');
   const [opNextFrom, setOpNextFrom] = useState('');
@@ -3211,7 +3216,12 @@ function Obzvon({
     () => [...new Set(operatorTableBaseRows.map((r) => r.operator).filter(Boolean))].sort(),
     [operatorTableBaseRows]
   );
+  const districtOptions = useMemo(
+    () => [...new Set(operatorTableBaseRows.map((r) => String(r.district || '').trim()).filter(Boolean))].sort(),
+    [operatorTableBaseRows]
+  );
   const allOperatorFilterSelected = operatorOptions.length > 0 && operatorOptions.every((o) => opFilterOperators.includes(o));
+  const allDistrictFilterSelected = districtOptions.length > 0 && districtOptions.every((d) => opFilterDistricts.includes(d));
   const inNumRange = (v, from, to) => {
     const n = Number(v || 0);
     if (from !== '' && n < Number(from)) return false;
@@ -3234,7 +3244,10 @@ function Obzvon({
   const operatorTableRows = useMemo(() => {
     let rows = [...operatorTableBaseRows];
     if (opFilterOperators.length) rows = rows.filter((r) => opFilterOperators.includes(r.operator || ''));
+    if (opFilterDistricts.length) rows = rows.filter((r) => opFilterDistricts.includes(String(r.district || '').trim()));
     rows = rows.filter((r) => inNumRange(r.balance, opBalFrom, opBalTo));
+    rows = rows.filter((r) => inNumRange(r.lastQty, opQtyFrom, opQtyTo));
+    if (opOrdFrom || opOrdTo) rows = rows.filter((r) => inDateRange(r.ord1, opOrdFrom, opOrdTo));
     if (opLastCallFrom || opLastCallTo) rows = rows.filter((r) => inDateRange(r.lastCallDate, opLastCallFrom, opLastCallTo));
     if (opNextFrom || opNextTo) rows = rows.filter((r) => inDateRange(r.nextDate, opNextFrom, opNextTo));
     if (deferredOpSearch) {
@@ -3252,8 +3265,13 @@ function Obzvon({
     operatorTableBaseRows,
     deferredOpSearch,
     opFilterOperators,
+    opFilterDistricts,
     opBalFrom,
     opBalTo,
+    opQtyFrom,
+    opQtyTo,
+    opOrdFrom,
+    opOrdTo,
     opLastCallFrom,
     opLastCallTo,
     opNextFrom,
@@ -3262,11 +3280,27 @@ function Obzvon({
   const activeOpFilterCount = useMemo(() => {
     let c = 0;
     if (opFilterOperators.length) c++;
+    if (opFilterDistricts.length) c++;
     if (opBalFrom !== '' || opBalTo !== '') c++;
+    if (opQtyFrom !== '' || opQtyTo !== '') c++;
+    if (opOrdFrom || opOrdTo) c++;
     if (opLastCallFrom || opLastCallTo) c++;
     if (opNextFrom || opNextTo) c++;
     return c;
-  }, [opFilterOperators, opBalFrom, opBalTo, opLastCallFrom, opLastCallTo, opNextFrom, opNextTo]);
+  }, [
+    opFilterOperators,
+    opFilterDistricts,
+    opBalFrom,
+    opBalTo,
+    opQtyFrom,
+    opQtyTo,
+    opOrdFrom,
+    opOrdTo,
+    opLastCallFrom,
+    opLastCallTo,
+    opNextFrom,
+    opNextTo,
+  ]);
 
   useEffect(() => {
     setOpLimit(500);
@@ -3317,8 +3351,8 @@ function Obzvon({
       exportAoaExcel({
         fileName: `Operator_jadvali_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'OperatorJadvali',
-        headers: ['ID', 'Mijoz', 'Rayon', 'Balans', 'Oxirgi zakaz 1', 'Oxirgi zakaz 2', 'Oxirgi dona', "Oxirgi qongiroq", 'Keyingi sana', 'Izoh', 'Operator'],
-        rows: operatorTableRows.map((r) => [r.id, r.name, r.district || '', r.balance || 0, fmtD(r.ord1), fmtD(r.ord2), r.lastQty || 0, fmtD(r.lastCallDate), fmtD(r.nextDate), r.lastNote || '', r.operator || '']),
+        headers: ['ID', 'Mijoz', 'Rayon', 'Balans', 'Oxirgi zakaz sana', 'Zakaz soni', "Oxirgi qongiroq", 'Keyingi sana', 'Operator', 'Oxirgi izoh'],
+        rows: operatorTableRows.map((r) => [r.id, r.name, r.district || '', r.balance || 0, fmtD(r.ord1), r.lastQty || 0, fmtD(r.lastCallDate), fmtD(r.nextDate), r.operator || '', r.lastNote || '']),
       });
     }
   };
@@ -3743,6 +3777,9 @@ function Obzvon({
                     <button className="btn btn-gh btn-sm" onClick={()=>setOpFilterOperators(allOperatorFilterSelected ? [] : operatorOptions)}>
                       {allOperatorFilterSelected ? "Operator: bekor" : "Operator: hammasi"}
                     </button>
+                    <button className="btn btn-gh btn-sm" onClick={()=>setOpFilterDistricts(allDistrictFilterSelected ? [] : districtOptions)}>
+                      {allDistrictFilterSelected ? "Rayon: bekor" : "Rayon: hammasi"}
+                    </button>
                   </div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Operator</div>
                   <div style={{maxHeight:110,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6,marginBottom:8}}>
@@ -3753,9 +3790,27 @@ function Obzvon({
                       </label>
                     ))}
                   </div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Rayon</div>
+                  <div style={{maxHeight:95,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6,marginBottom:8}}>
+                    {districtOptions.map((x)=>(
+                      <label key={x} style={FILTER_CHECK_LABEL_STYLE}>
+                        <input type="checkbox" checked={opFilterDistricts.includes(x)} onChange={()=>setOpFilterDistricts((prev)=>prev.includes(x)?prev.filter((v)=>v!==x):[...prev,x])}/>
+                        <span style={FILTER_CHECK_TEXT_STYLE}>{x}</span>
+                      </label>
+                    ))}
+                  </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
                     <input className="input" placeholder="Balans dan" value={opBalFrom} onChange={(e)=>setOpBalFrom(e.target.value)} />
                     <input className="input" placeholder="Balans gacha" value={opBalTo} onChange={(e)=>setOpBalTo(e.target.value)} />
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
+                    <input className="input" placeholder="Zakaz soni dan" value={opQtyFrom} onChange={(e)=>setOpQtyFrom(e.target.value)} />
+                    <input className="input" placeholder="Zakaz soni gacha" value={opQtyTo} onChange={(e)=>setOpQtyTo(e.target.value)} />
+                  </div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Oxirgi zakaz sanasi</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
+                    <input className="input" type="date" value={opOrdFrom} onChange={(e)=>setOpOrdFrom(e.target.value)} />
+                    <input className="input" type="date" value={opOrdTo} onChange={(e)=>setOpOrdTo(e.target.value)} />
                   </div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Oxirgi qo'ng'iroq sanasi</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:6}}>
@@ -3770,7 +3825,10 @@ function Obzvon({
                   <div style={{display:'flex',justifyContent:'space-between'}}>
                     <button className="btn btn-gh btn-sm" onClick={()=>{
                       setOpFilterOperators([]);
+                      setOpFilterDistricts([]);
                       setOpBalFrom(''); setOpBalTo('');
+                      setOpQtyFrom(''); setOpQtyTo('');
+                      setOpOrdFrom(''); setOpOrdTo('');
                       setOpLastCallFrom(''); setOpLastCallTo('');
                       setOpNextFrom(''); setOpNextTo('');
                     }}>Tozalash</button>
@@ -3786,9 +3844,9 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
               <table className="tbl">
-                <thead><tr><th>ID</th><th>Mijoz</th><th>Rayon</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi zakaz</th><th>Oxirgi qo'ng'iroq</th><th>Oxirgi izoh</th><th>Keyingi sana</th><th>Operator</th></tr></thead>
+                <thead><tr><th>ID</th><th>Mijoz</th><th>Rayon</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi zakaz</th><th style={{textAlign:'right'}}>Zakaz soni</th><th>Oxirgi qo'ng'iroq</th><th>Keyingi sana</th><th>Operator</th><th>Oxirgi izoh</th></tr></thead>
                 <tbody>
-                  {operatorTableRows.length===0 ? <tr><td colSpan={9} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
+                  {operatorTableRows.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
                     visibleOperatorRows.map((r, i) => (
                       <tr
                         key={i}
@@ -3802,15 +3860,16 @@ function Obzvon({
                         <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</span></td>
                         <td style={{maxWidth:140}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.district || '—'}</span></td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.balance<0?'var(--rd)':r.balance>0?'var(--gr)':'var(--t3)'}}>{fmt(r.balance)}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.ord1)} {r.lastQty?` ·  ${r.lastQty} ta`:''}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.ord1)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--bl)'}}>{r.lastQty ? `${r.lastQty}` : '0'}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.lastCallDate)}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.nextDate)}</td>
+                        <td>{r.operator}</td>
                         <td style={{maxWidth:260}}>
                           <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                             {r.lastNote || '—'}
                           </span>
                         </td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.nextDate)}</td>
-                        <td>{r.operator}</td>
                       </tr>
                     ))
                   }
