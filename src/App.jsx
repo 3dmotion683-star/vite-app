@@ -5512,6 +5512,7 @@ export default function App() {
   const [remoteAccessLoaded, setRemoteAccessLoaded] = useState(false);
   const [obzvonAllLoaded, setObzvonAllLoaded] = useState(false);
   const skipCloudPushRef = useRef(false);
+  const remoteAccessConfigRef = useRef(null);
   const buildDefaultCreds = useCallback((baseUsers) => {
     const m = {};
     (baseUsers || []).forEach((u) => { m[u] = u; });
@@ -5536,6 +5537,7 @@ export default function App() {
       try { cfg = JSON.parse(cfg); } catch { return false; }
     }
     if (!cfg || typeof cfg !== 'object') return false;
+    remoteAccessConfigRef.current = cfg;
     const srcUsers = Array.isArray(cfg.users)
       ? cfg.users.map((u) => String(u || '').trim()).filter(Boolean)
       : [];
@@ -5612,16 +5614,30 @@ export default function App() {
   const pushRemoteAccessConfig = useCallback(async (payload) => {
     if (!accessApiUrl) return;
     try {
+      const baseRemote = (remoteAccessConfigRef.current && typeof remoteAccessConfigRef.current === 'object')
+        ? remoteAccessConfigRef.current
+        : {};
+      const mergedPayload = {
+        ...baseRemote,
+        ...(payload && typeof payload === 'object' ? payload : {}),
+      };
       const r = await fetch(accessApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'access_set',
-          accessConfig: payload,
+          accessConfig: mergedPayload,
         }),
       });
       const j = await r.json().catch(() => ({}));
-      if (j?.ok && (j?.saved || j?.accessConfig || j?.mode === 'access_set')) return;
+      if (j?.ok && (j?.saved || j?.accessConfig || j?.mode === 'access_set')) {
+        if (j?.accessConfig && typeof j.accessConfig === 'object') {
+          remoteAccessConfigRef.current = j.accessConfig;
+        } else {
+          remoteAccessConfigRef.current = mergedPayload;
+        }
+        return;
+      }
     } catch {}
   }, [accessApiUrl]);
 
@@ -5726,14 +5742,8 @@ export default function App() {
 
   const pullRemoteObzvonNewRows = useCallback(async () => {
     if (!accessApiUrl) return false;
-    try {
-      const sep = accessApiUrl.includes('?') ? '&' : '?';
-      const url = `${accessApiUrl}${sep}action=obzvon_new_get&_=${Date.now()}`;
-      const r = await fetch(url, { cache:'no-store' });
-      if (!r.ok) return false;
-      const j = await r.json().catch(() => ({}));
-      if (!j?.ok || !Array.isArray(j?.rows)) return false;
-      const incoming = j.rows
+    const applyIncomingRows = (rows = []) => {
+      const incoming = (rows || [])
         .map((x, i) => normalizeObzvonNewRow(x, i))
         .filter((x) => (x.customerId || x.customer) && hasObzvonRowPayload(x));
       setObzvonAllNewRows((prev) => {
@@ -5742,6 +5752,28 @@ export default function App() {
         return next;
       });
       return true;
+    };
+    try {
+      const sep = accessApiUrl.includes('?') ? '&' : '?';
+      const url = `${accessApiUrl}${sep}action=obzvon_new_get&_=${Date.now()}`;
+      const r = await fetch(url, { cache:'no-store' });
+      if (r.ok) {
+        const j = await r.json().catch(() => ({}));
+        if (j?.ok && Array.isArray(j?.rows)) return applyIncomingRows(j.rows);
+      }
+    } catch {}
+    // Fallback: obzvon_new_* actionlari yo'q bo'lsa access_get ichidagi obzvonNewRows dan olamiz.
+    try {
+      const sep = accessApiUrl.includes('?') ? '&' : '?';
+      const url = `${accessApiUrl}${sep}action=access_get&_=${Date.now()}`;
+      const r = await fetch(url, { cache:'no-store' });
+      if (!r.ok) return false;
+      const j = await r.json().catch(() => ({}));
+      const cfg = (j?.ok && j?.accessConfig && typeof j.accessConfig === 'object') ? j.accessConfig : null;
+      if (!cfg) return false;
+      remoteAccessConfigRef.current = cfg;
+      const rows = Array.isArray(cfg.obzvonNewRows) ? cfg.obzvonNewRows : [];
+      return applyIncomingRows(rows);
     } catch {}
     return false;
   }, [accessApiUrl, normalizeObzvonNewRow, hasObzvonRowPayload, mergeObzvonNewRows]);
@@ -5763,10 +5795,56 @@ export default function App() {
         }),
       });
       const j = await r.json().catch(() => ({}));
-      return !!j?.ok;
+      if (j?.ok) return true;
+    } catch {}
+    // Fallback: access_set ichiga obzvonNewRows ni yozib, barcha qurilmalarda bitta umumiy holatga keltiramiz.
+    try {
+      const sep = accessApiUrl.includes('?') ? '&' : '?';
+      const getUrl = `${accessApiUrl}${sep}action=access_get&_=${Date.now()}`;
+      const getResp = await fetch(getUrl, { cache:'no-store' });
+      const getJson = await getResp.json().catch(() => ({}));
+      const remoteCfg = (getJson?.ok && getJson?.accessConfig && typeof getJson.accessConfig === 'object')
+        ? getJson.accessConfig
+        : ((remoteAccessConfigRef.current && typeof remoteAccessConfigRef.current === 'object') ? remoteAccessConfigRef.current : {});
+      const remoteRows = Array.isArray(remoteCfg.obzvonNewRows) ? remoteCfg.obzvonNewRows : [];
+      const mergedRows = mergeObzvonNewRows(remoteRows, payloadRows);
+      const fallbackPayload = {
+        ...remoteCfg,
+        users: Array.isArray(remoteCfg.users) ? remoteCfg.users : users,
+        access: (remoteCfg.access && typeof remoteCfg.access === 'object') ? remoteCfg.access : access,
+        userCreds: (remoteCfg.userCreds && typeof remoteCfg.userCreds === 'object') ? remoteCfg.userCreds : userCreds,
+        obzvonNewRows: mergedRows,
+        updatedAt: new Date().toISOString(),
+        updatedBy: sessionUser || currentUser || 'unknown',
+      };
+      const setResp = await fetch(accessApiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'access_set',
+          accessConfig: fallbackPayload,
+        }),
+      });
+      const setJson = await setResp.json().catch(() => ({}));
+      if (setJson?.ok) {
+        remoteAccessConfigRef.current = (setJson?.accessConfig && typeof setJson.accessConfig === 'object')
+          ? setJson.accessConfig
+          : fallbackPayload;
+        return true;
+      }
     } catch {}
     return false;
-  }, [accessApiUrl, normalizeObzvonNewRow, hasObzvonRowPayload, sessionUser, currentUser]);
+  }, [
+    accessApiUrl,
+    normalizeObzvonNewRow,
+    hasObzvonRowPayload,
+    sessionUser,
+    currentUser,
+    mergeObzvonNewRows,
+    users,
+    access,
+    userCreds,
+  ]);
 
   const upsertObzvonAllNewRows = useCallback((rows = []) => {
     const normalizedRows = (rows || [])
