@@ -3545,7 +3545,9 @@ function Obzvon({
         String(r.note || '').toLowerCase().includes(q)
       );
     }
-    return applyUniversalFilters(base, allFilterColumns, allNewUniFilterState);
+    const filtered = applyUniversalFilters(base, allFilterColumns, allNewUniFilterState);
+    // Barcha qurilmalarda bir xil ko'rinishi uchun No ni har safar qayta ketma-ketlaymiz.
+    return filtered.map((r, idx) => ({ ...r, no: String(idx + 1) }));
   }, [appAllNewRows, deferredSearchAllNew, allFilterColumns, allNewUniFilterState]);
 
   const visibleAllRows = useMemo(
@@ -5501,10 +5503,10 @@ export default function App() {
   const [isLoggedIn,setIsLoggedIn] = useState(() => !!S.get('aq-session-user', ''));
   const [mainSheetUrl, setMainSheetUrl] = useState(() => SHEET_CONFIG.url || '');
   const [obzvonSheetUrl, setObzvonSheetUrl] = useState(() => OBZVON_ALL_SHEET_URL || '');
-  const [obzvonWebhook,setObzvonWebhook] = useState(() =>
-    S.get(ACCESS_SYNC_URL_KEY, S.get('aq-obzvon-webhook', OBZVON_WEBHOOK_DEFAULT))
-  );
-  const accessApiUrl = useMemo(() => normalizeAccessApiUrl(obzvonWebhook), [obzvonWebhook]);
+  // Muhim: barcha qurilmalar bir xil endpointga yozishi/o'qishi uchun
+  // access sync URL ni hard-fixed qilamiz (lokal eski URL lar aralashib ketmasin).
+  const [obzvonWebhook,setObzvonWebhook] = useState(() => OBZVON_WEBHOOK_DEFAULT);
+  const accessApiUrl = useMemo(() => OBZVON_WEBHOOK_DEFAULT, []);
   const [showUp,setUp]     = useState(false);
   const [notif,setNotif]   = useState(null);
   const [side,setSide]     = useState(true);
@@ -5856,8 +5858,11 @@ export default function App() {
       S.set('aq-obzvon-all-new-rows', next);
       return next;
     });
-    pushRemoteObzvonNewRows(normalizedRows);
-  }, [normalizeObzvonNewRow, hasObzvonRowPayload, mergeObzvonNewRows, pushRemoteObzvonNewRows]);
+    Promise.resolve(pushRemoteObzvonNewRows(normalizedRows))
+      .finally(() => {
+        setTimeout(() => { pullRemoteObzvonNewRows(); }, 350);
+      });
+  }, [normalizeObzvonNewRow, hasObzvonRowPayload, mergeObzvonNewRows, pushRemoteObzvonNewRows, pullRemoteObzvonNewRows]);
   useEffect(() => {
     if (!Array.isArray(obzvonAllRows) || !obzvonAllRows.length) return;
     const cleaned = obzvonAllRows
@@ -5875,9 +5880,10 @@ export default function App() {
   useEffect(() => { S.set('aq-current-user', currentUser); }, [currentUser]);
   useEffect(() => { S.set('aq-session-user', sessionUser || ''); }, [sessionUser]);
   useEffect(() => {
-    const normalized = normalizeAccessApiUrl(obzvonWebhook);
+    const normalized = OBZVON_WEBHOOK_DEFAULT;
+    if (obzvonWebhook !== normalized) setObzvonWebhook(normalized);
     S.set(ACCESS_SYNC_URL_KEY, normalized || '');
-    S.set('aq-obzvon-webhook', normalized || ''); // legacy key
+    S.set('aq-obzvon-webhook', normalized || '');
   }, [obzvonWebhook]);
   useEffect(() => { S.set('aq-main-url', mainSheetUrl || ''); }, [mainSheetUrl]);
   useEffect(() => { S.set('aq-obzvon-url', obzvonSheetUrl || ''); }, [obzvonSheetUrl]);
