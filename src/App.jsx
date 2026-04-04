@@ -649,6 +649,10 @@ const isCancelledStatus = (s) => {
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ MAHSULOT ANIQLASH в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 const normProduct = (p) => normText(p).replace(/\s+/g, ' ');
+const WATER_PRODUCT_NAMES = new Set([
+  'murodbaxsh 18.9l',
+  'бонус murodbaxsh 18.9l',
+]);
 // Tara ga ta'sir qiladigan mahsulotlar (zakaz=+, vozvrat=-)
 const isTaraAffectingProduct = (p) => {
   const pl = normProduct(p);
@@ -665,7 +669,7 @@ const isTaraAffectingProduct = (p) => {
 // Faqat suv mahsulotlari (daromad hisoblash uchun)
 const isWaterProduct = (p) => {
   const pl = normProduct(p);
-  return pl.includes('murodbaxsh 18.9l') || pl.includes('murodbash 18.9l');
+  return WATER_PRODUCT_NAMES.has(pl);
 };
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ EXCEL READER в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
@@ -3269,6 +3273,8 @@ function Obzvon({
   const [opSelectedIds, setOpSelectedIds] = useState({});
   const [duePickMode, setDuePickMode] = useState(false);
   const [dueSelectedIds, setDueSelectedIds] = useState({});
+  const [latePickMode, setLatePickMode] = useState(false);
+  const [lateSelectedIds, setLateSelectedIds] = useState({});
   const deferredSearchAll = useDeferredValue(searchAll);
   const deferredSearchAllNew = useDeferredValue(searchAllNew);
   const deferredOpSearch = useDeferredValue(opSearch);
@@ -3315,7 +3321,7 @@ function Obzvon({
     { key:'name', label:'Mijoz', type:'text' },
     { key:'district', label:'Rayon', type:'text' },
     { key:'phone', label:'Telefon', type:'text' },
-    { key:'last3Info', label:'Oxirgi 3 zakaz', type:'text' },
+    { key:'last3Info', label:'Oxirgi zakazlar', type:'text' },
     { key:'passed', label:"O'tgan kun", type:'number' },
     { key:'shouldIn', label:"Qo'ng'iroq me'yori", type:'number' },
   ]), []);
@@ -3612,6 +3618,10 @@ function Obzvon({
     () => Object.values(dueSelectedIds).filter(Boolean).length,
     [dueSelectedIds]
   );
+  const lateSelectedCount = useMemo(
+    () => Object.values(lateSelectedIds).filter(Boolean).length,
+    [lateSelectedIds]
+  );
   const suggestions = useMemo(() => {
     const q = pickQuery.toLowerCase().trim();
     if (!q) return [];
@@ -3623,7 +3633,7 @@ function Obzvon({
     ).slice(0,40);
   }, [pickQuery, customers]);
 
-  const dueCandidates = useMemo(() => {
+  const callCandidates = useMemo(() => {
     const assignment = D.assignmentById || {};
     const grouped = {};
     rawOrders.forEach((o) => {
@@ -3640,17 +3650,27 @@ function Obzvon({
       const sorted = ords
         .filter((o) => toDate(o.orderDate))
         .sort((a,b)=>(toDate(b.orderDate)-toDate(a.orderDate)));
-      if (sorted.length < 3) return;
-      const last3 = sorted.slice(0,3);
-      const newest = toDate(last3[0].orderDate);
-      const oldest = toDate(last3[2].orderDate);
+      if (sorted.length < 2) return;
+
+      const newestDate = toDate(sorted[0].orderDate);
+      const monthlyCount = sorted.filter((o) => {
+        const od = toDate(o.orderDate);
+        if (!od || !newestDate) return false;
+        return ((newestDate - od) / 864e5) <= 30;
+      }).length;
+      const useCount = (monthlyCount >= 3 && sorted.length >= 3) ? 3 : 2;
+      const used = sorted.slice(0, useCount);
+
+      const newest = toDate(used[0].orderDate);
+      const oldest = toDate(used[used.length - 1].orderDate);
       let spanDays = Math.round((newest - oldest) / 864e5);
-      if (spanDays < 2) spanDays = 7;
-      const totalQty = last3.reduce((s,o)=>s+Math.abs(o.qty||0),0);
+      if (spanDays < 1) spanDays = 1;
+
+      const totalQty = used.reduce((s,o)=>s+Math.abs(o.qty||0),0);
       const daily = totalQty / spanDays;
       if (daily <= 0) return;
-      const lastQty = Math.abs(last3[0].qty || 0);
-      const shouldIn = Math.max(1, Math.floor(lastQty / daily) - 1);
+      const lastQty = Math.abs(used[0].qty || 0);
+      const shouldIn = Math.max(1, Math.ceil(lastQty / daily) - 1);
       const c = customers.find((x)=>x.id===mid);
       if (!c) return;
       if (!isActiveCustomerName(c.name)) return;
@@ -3658,21 +3678,32 @@ function Obzvon({
         const owner = assignment[mid] || '';
         if (owner && owner !== currentUser) return;
       }
-      const passed = c.daysAgo ?? 0;
-      if (passed >= shouldIn) {
-        out.push({
-          ...c,
-          shouldIn,
-          passed,
-          last3Info: `${Math.abs(last3[0].qty)} / ${Math.abs(last3[1].qty)} / ${Math.abs(last3[2].qty)} ta`,
-        });
-      }
+      const passed = daysAgo(used[0].orderDate) ?? 0;
+      out.push({
+        ...c,
+        shouldIn,
+        passed,
+        sampleSize: useCount,
+        last3Info: `${used.map((o) => Math.abs(o.qty || 0)).join(' / ')} ta`,
+      });
     });
     return out.sort((a,b)=>(b.passed-a.passed));
   }, [rawOrders, customers, currentUser, D.assignmentById]);
+  const dueCandidates = useMemo(
+    () => callCandidates.filter((c) => c.passed < 60 && c.passed >= c.shouldIn),
+    [callCandidates]
+  );
+  const staleCandidates = useMemo(
+    () => callCandidates.filter((c) => c.passed >= 60),
+    [callCandidates]
+  );
   const filteredDueCandidates = useMemo(
     () => applyUniversalFilters(dueCandidates, dueFilterColumns, dueUniFilterState),
     [dueCandidates, dueFilterColumns, dueUniFilterState]
+  );
+  const filteredStaleCandidates = useMemo(
+    () => applyUniversalFilters(staleCandidates, dueFilterColumns, dueUniFilterState),
+    [staleCandidates, dueFilterColumns, dueUniFilterState]
   );
   const dueFilterCount = useMemo(() => countUniversalFilters(dueUniFilterState), [dueUniFilterState]);
   const latestCallByCustomer = useMemo(() => {
@@ -3801,8 +3832,17 @@ function Obzvon({
       exportAoaExcel({
         fileName: `Vaqti_kelgan_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'VaqtiKelgan',
-        headers: ['ID', 'Mijoz', 'Telefon', 'Oxirgi 3 zakaz', 'Otgan kun', "Qongiroq meyori"],
+        headers: ['ID', 'Mijoz', 'Telefon', 'Oxirgi zakazlar', 'Otgan kun', "Qongiroq meyori"],
         rows: dueCandidates.map((r) => [r.id, r.name, r.phone || '', r.last3Info || '', r.passed ?? '', r.shouldIn ?? '']),
+      });
+      return;
+    }
+    if (tab === 'late2m') {
+      exportAoaExcel({
+        fileName: `Ikki_oydan_otgan_${new Date().toISOString().slice(0,10)}.xlsx`,
+        sheetName: '2OydanOtgan',
+        headers: ['ID', 'Mijoz', 'Telefon', 'Oxirgi zakazlar', 'Otgan kun', "Qongiroq meyori"],
+        rows: staleCandidates.map((r) => [r.id, r.name, r.phone || '', r.last3Info || '', r.passed ?? '', r.shouldIn ?? '']),
       });
       return;
     }
@@ -3817,15 +3857,16 @@ function Obzvon({
   };
 
   return (
-    <div className="ani" style={{display:'flex',flexDirection:'column',gap:12}}>
-      <div className="tabs" style={{display:'inline-flex'}}>
-        <button className={`tab${tab==='main'?' on':''}`} onClick={()=>setTab('main')}>Obzvon</button>
-        <button className={`tab${tab==='all'?' on':''}`} onClick={()=>setTab('all')}>Barcha Obzvon</button>
-        <button className={`tab${tab==='all_new'?' on':''}`} onClick={()=>setTab('all_new')}>Barcha Obzvon Yangi</button>
-        <button className={`tab${tab==='due'?' on':''}`} onClick={()=>setTab('due')}>Vaqti Kelgan</button>
-        <button className={`tab${tab==='op'?' on':''}`} onClick={()=>setTab('op')}>Operator jadvali</button>
-      </div>
-      <div style={{display:'flex',justifyContent:'flex-end'}}>
+    <div className="ani" style={{display:'flex',flexDirection:'column',gap:10}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <div className="tabs" style={{display:'inline-flex'}}>
+          <button className={`tab${tab==='main'?' on':''}`} onClick={()=>setTab('main')}>Obzvon</button>
+          <button className={`tab${tab==='all'?' on':''}`} onClick={()=>setTab('all')}>Barcha Obzvon</button>
+          <button className={`tab${tab==='all_new'?' on':''}`} onClick={()=>setTab('all_new')}>Barcha Obzvon Yangi</button>
+          <button className={`tab${tab==='due'?' on':''}`} onClick={()=>setTab('due')}>Vaqti Kelgan</button>
+          <button className={`tab${tab==='op'?' on':''}`} onClick={()=>setTab('op')}>Operator jadvali</button>
+          <button className={`tab${tab==='late2m'?' on':''}`} onClick={()=>setTab('late2m')}>2 oydan o'tgan mijozlar</button>
+        </div>
         <button className="btn btn-gr btn-sm" onClick={exportCurrentTab}>⬇ Excel</button>
       </div>
 
@@ -3868,7 +3909,7 @@ function Obzvon({
                       return (
                       <tr key={r._rid || i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id || '—'}</td>
-                        <td style={{minWidth:250}}>
+                        <td style={{minWidth:420}}>
                           <div style={{position:'relative'}}>
                             <input
                               className="input"
@@ -3895,7 +3936,21 @@ function Obzvon({
                               }}
                             />
                             {pickTargetIdx===i && suggestions.length>0 && (
-                              <div className="card" style={{position:'absolute',left:0,right:0,top:'calc(100% + 4px)',zIndex:40,maxHeight:180,overflow:'auto',padding:6}}>
+                              <div
+                                className="card"
+                                style={{
+                                  position:'absolute',
+                                  left:0,
+                                  top:'calc(100% + 4px)',
+                                  zIndex:40,
+                                  width:'max-content',
+                                  minWidth:'100%',
+                                  maxWidth:'min(960px, calc(100vw - 90px))',
+                                  maxHeight:260,
+                                  overflow:'auto',
+                                  padding:6,
+                                }}
+                              >
                                 {suggestions.map((s) => (
                                   <div
                                     key={`${i}_${s.id}`}
@@ -3914,7 +3969,7 @@ function Obzvon({
                                     }}
                                   >
                                     <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{s.id}</span>
-                                    <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name}</span>
+                                    <span style={{whiteSpace:'normal',wordBreak:'break-word',lineHeight:1.25}}>{s.name}</span>
                                   </div>
                                 ))}
                               </div>
@@ -4169,7 +4224,7 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
               <table className="tbl">
-                <thead><tr><th>Mijoz</th><th>ID</th><th>Oxirgi 3 zakaz</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
+                <thead><tr><th>Mijoz</th><th>ID</th><th>Oxirgi zakazlar</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
                 <tbody>
                   {filteredDueCandidates.length===0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Vaqti kelgan mijoz yo'q</td></tr> :
                     filteredDueCandidates.map((c,i)=>(
@@ -4228,6 +4283,99 @@ function Obzvon({
                 }}
               >
                 Tanlanganlarni qo'shish ({dueSelectedCount} ta)
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {tab==='late2m' && (
+        <>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <div style={{position:'relative'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setDueUniFilterOpen((v)=>!v)}>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                </svg>
+                Filtr ({dueFilterCount})
+              </button>
+              <UniversalFilterPanel
+                open={dueUniFilterOpen}
+                title="2 oydan o'tganlar filtri"
+                columns={dueFilterColumns}
+                rows={staleCandidates}
+                state={dueUniFilterState}
+                setState={setDueUniFilterState}
+                onClose={()=>setDueUniFilterOpen(false)}
+                width={620}
+              />
+            </div>
+            <button className={`btn ${latePickMode?'btn-gr':'btn-gh'} btn-sm`} onClick={()=>setLatePickMode((v)=>!v)}>
+              + Obzvonga qo'shish
+            </button>
+          </div>
+          <div className="card" style={{overflow:'hidden'}}>
+            <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
+              <table className="tbl">
+                <thead><tr><th>Mijoz</th><th>ID</th><th>Oxirgi zakazlar</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
+                <tbody>
+                  {filteredStaleCandidates.length===0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>2 oydan o'tgan mijoz yo'q</td></tr> :
+                    filteredStaleCandidates.map((c,i)=>(
+                      <tr
+                        key={i}
+                        onClick={()=>{
+                          if (!latePickMode) return;
+                          setLateSelectedIds((p)=>({ ...p, [c.id]: !p[c.id] }));
+                        }}
+                        style={latePickMode && lateSelectedIds[c.id] ? { background:'rgba(88,166,255,.11)' } : undefined}
+                      >
+                        <td style={{maxWidth:340}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</span></td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{c.id}</td>
+                        <td>{c.last3Info}</td>
+                        <td>{c.passed} kun</td>
+                        <td>{c.shouldIn} kunda</td>
+                        <td>
+                          {!latePickMode ? (
+                            <button className="btn btn-bl btn-sm" onClick={()=>{ addRecord(c,'Buyurtma olish'); setTab('main'); }}>Obzvonga qo'shish</button>
+                          ) : (
+                            <span className="tag" style={{background:lateSelectedIds[c.id]?'var(--gr2)':'var(--s3)',color:lateSelectedIds[c.id]?'var(--gr)':'var(--t3)'}}>
+                              {lateSelectedIds[c.id] ? 'Tanlangan' : 'Tanlash'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {latePickMode && (
+            <div style={{display:'flex',justifyContent:'flex-end'}}>
+              <button
+                className="btn btn-bl btn-sm"
+                disabled={lateSelectedCount===0}
+                onClick={() => {
+                  const selected = filteredStaleCandidates.filter((c) => lateSelectedIds[c.id]);
+                  if (!selected.length) return;
+                  const rows = selected.map((c) => ({
+                    id: c.id,
+                    customer: c.name,
+                    callDate: new Date().toISOString().slice(0,10),
+                    topic: 'Buyurtma olish',
+                    note: '',
+                    nextDate: '',
+                    orderCount: '',
+                    orderDate: '',
+                    operator: currentUser,
+                  }));
+                  saveRecords([...rows, ...records]);
+                  setLateSelectedIds({});
+                  setLatePickMode(false);
+                  setTab('main');
+                }}
+              >
+                Tanlanganlarni qo'shish ({lateSelectedCount} ta)
               </button>
             </div>
           )}
