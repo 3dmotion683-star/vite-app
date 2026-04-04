@@ -438,6 +438,11 @@ const sanitizeObzvonCell = (v) => {
   const s = String(v ?? '').trim();
   return isInvalidObzvonCustomerText(s) ? '' : s;
 };
+const OBZVON_DELETED_NOTE = '__AQ_DELETED__';
+const isObzvonDeletedRow = (row) => {
+  const note = String(row?.note || '').trim();
+  return note === OBZVON_DELETED_NOTE || String(row?.deleted || '') === '1';
+};
 const pickObzvonCustomerName = (row) => {
   const fromJ = sanitizeObzvonCell(row?.[9]);
   const fromB = sanitizeObzvonCell(row?.[1]);
@@ -1319,21 +1324,28 @@ function exportSverkaExcel(customer, rows) {
     [`Idish (tara): ${customer.tara} ta`],
     [],
   ];
-  const data = [
-    ...title,
-    headers,
-    ...rows.map((r) => [
-      r.kod, r.sana, r.dokument, r.produkt,
-      r.qty != null ? r.qty : '',
-      r.narx ? Math.round(r.narx) : '',
-      r.summa || '',
-      r._type === 'payment' && r.currency !== 'USD' ? r.tolov : '',
-      r._type === 'payment' && r.currency === 'USD'  ? r.tolov : '',
-      r.balansUZS, r.balansUSD, r.currency,
-      r.agent, r.driver, r.status,
-    ]),
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(data);
+  const detailRows = rows.map((r) => [
+    r.kod, r.sana, r.dokument, r.produkt,
+    r.qty != null ? r.qty : '',
+    r.narx ? Math.round(r.narx) : '',
+    r.summa || '',
+    r._type === 'payment' && r.currency !== 'USD' ? r.tolov : '',
+    r._type === 'payment' && r.currency === 'USD'  ? r.tolov : '',
+    r.balansUZS, r.balansUSD, r.currency,
+    r.agent, r.driver, r.status,
+  ]);
+  const ws = XLSX.utils.aoa_to_sheet(title, { cellDates:true, raw:true });
+  const { typedRows, colTypes } = buildTypedAoa(headers, detailRows);
+  XLSX.utils.sheet_add_aoa(ws, [headers, ...typedRows], { origin: `A${title.length + 1}`, cellDates:true, raw:true });
+  colTypes.forEach((type, colIndex) => {
+    for (let rowIndex = title.length + 2; rowIndex <= title.length + typedRows.length + 1; rowIndex++) {
+      const addr = XLSX.utils.encode_cell({ r: rowIndex - 1, c: colIndex });
+      const cell = ws[addr];
+      if (!cell) continue;
+      if (type === 'number' && cell.t === 'n') cell.z = EXCEL_NUM_FMT;
+      if (type === 'date' && (cell.t === 'd' || cell.t === 'n')) cell.z = EXCEL_DATE_FMT;
+    }
+  });
   ws['!cols'] = [12,14,22,22,7,12,12,12,12,14,12,8,12,18,14].map((w) => ({ wch: w }));
   XLSX.utils.book_append_sheet(wb, ws, 'Sverka');
   XLSX.writeFile(wb, `Sverka_${customer.name.slice(0,40).replace(/[/\\:*?"<>|]/g,'_')}.xlsx`);
@@ -1345,27 +1357,27 @@ function exportAllReport(customers) {
     'Idish (ta)','Kuler','Jami suv (ta)','Summa UZS','Summa USD',
     'Oxirgi zakaz','Kun','Agent','Manba',
   ];
-  const ws = XLSX.utils.aoa_to_sheet([
+  const ws = buildTypedExcelSheet(
     headers,
-    ...customers.map((c) => [
+    customers.map((c) => [
       c.id, c.name, c.phone, c.district, c.balanceUZS, c.balanceUSD,
       c.tara, c.kulers, c.totalWaterQ, c.totalWaterS_uzs, c.totalWaterS_usd,
       fmtD(c.lastOrderDate), c.daysAgo != null ? c.daysAgo : '', c.lastAgent, c.source,
-    ]),
-  ]);
+    ])
+  );
   ws['!cols'] = [10,35,14,16,14,12,10,7,12,16,12,14,8,12,14].map((w) => ({ wch: w }));
   XLSX.utils.book_append_sheet(wb, ws, 'Mijozlar');
 
   const debtors = customers.filter((c) => c.balanceUZS < 0 || c.balanceUSD < 0)
     .sort((a,b) => a.balanceUZS - b.balanceUZS);
   const dh = ['ID','Mijoz','Telefon','Rayon','Qarz UZS','Qarz USD','Idish','Oxirgi zakaz','Kun','Agent'];
-  const ws2 = XLSX.utils.aoa_to_sheet([
+  const ws2 = buildTypedExcelSheet(
     dh,
-    ...debtors.map((c) => [
+    debtors.map((c) => [
       c.id, c.name, c.phone, c.district, c.balanceUZS, c.balanceUSD,
       c.tara, fmtD(c.lastOrderDate), c.daysAgo != null ? c.daysAgo : '', c.lastAgent,
-    ]),
-  ]);
+    ])
+  );
   ws2['!cols'] = [10,35,14,16,14,12,8,12,6,12].map((w) => ({ wch: w }));
   XLSX.utils.book_append_sheet(wb, ws2, 'Qarzdorlar');
   XLSX.writeFile(wb, `AquaBiz_Hisobot_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -1382,10 +1394,96 @@ const buildColsFromAoa = (headers, rows) => {
     return { wch: Math.min(48, Math.max(8, w)) };
   });
 };
+const EXCEL_NUM_FMT = '#,##0';
+const EXCEL_DATE_FMT = 'dd.mm.yyyy';
+const isDateLikeHeader = (h) => /(sana|date|oxirgi|keyingi|olingan|muddat)/i.test(String(h || '').trim());
+const isNumberLikeHeader = (h) => /(summa|balans|qarz|dona|soni|kol-vo|qty|oylar|qoldiq|to['`’]?langan|idish|jami|miqdor|suv soni)/i.test(String(h || '').trim());
+const isTextForcedHeader = (h) => /(^|\s)(id|kod|telefon|phone|operator|agent|kontragent|mijoz|rayon|status|mavzu|izoh|mahsulot|hujjat|tur)(\s|$)/i.test(String(h || '').trim());
+const parseExcelNumber = (v) => {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  const s0 = String(v ?? '').trim();
+  if (!s0 || s0 === '-' || s0 === '—') return null;
+  let s = s0
+    .replace(/\s+/g, '')
+    .replace(/[^\d,.\-]/g, '');
+  if (!s || s === '-' || s === '.' || s === ',') return null;
+  const hasDot = s.includes('.');
+  const hasComma = s.includes(',');
+  if (hasDot && hasComma) {
+    if (s.lastIndexOf('.') > s.lastIndexOf(',')) s = s.replace(/,/g, '');
+    else s = s.replace(/\./g, '').replace(',', '.');
+  } else if (hasComma && !hasDot) {
+    const parts = s.split(',');
+    if (parts.length > 2) s = parts.join('');
+    else {
+      const decLen = (parts[1] || '').length;
+      s = decLen === 3 ? parts.join('') : `${parts[0]}.${parts[1] || ''}`;
+    }
+  } else if (hasDot && !hasComma) {
+    const parts = s.split('.');
+    if (parts.length > 2) s = parts.join('');
+    else {
+      const decLen = (parts[1] || '').length;
+      if (decLen === 3 && /^\d+$/.test(parts[0] || '') && /^\d+$/.test(parts[1] || '')) s = parts.join('');
+    }
+  }
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+};
+const normalizeDateForExcel = (v) => {
+  const d = toDate(v);
+  if (!d) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+};
+const detectExcelColumnType = (header, rows, colIndex) => {
+  if (isTextForcedHeader(header)) return 'text';
+  if (isDateLikeHeader(header)) return 'date';
+  if (isNumberLikeHeader(header)) return 'number';
+  const sample = (rows || []).slice(0, 300).map((r) => (r || [])[colIndex]).filter((v) => String(v ?? '').trim() !== '');
+  if (!sample.length) return 'text';
+  let numHits = 0;
+  let dateHits = 0;
+  sample.forEach((v) => {
+    if (parseExcelNumber(v) != null) numHits++;
+    if (normalizeDateForExcel(v)) dateHits++;
+  });
+  if (dateHits / sample.length >= 0.7) return 'date';
+  if (numHits / sample.length >= 0.7) return 'number';
+  return 'text';
+};
+const buildTypedAoa = (headers = [], rows = []) => {
+  const colTypes = headers.map((h, idx) => detectExcelColumnType(h, rows, idx));
+  const typedRows = (rows || []).map((r) => headers.map((_, colIndex) => {
+    const type = colTypes[colIndex];
+    const raw = (r || [])[colIndex];
+    if (type === 'date') return normalizeDateForExcel(raw) || (raw ?? '');
+    if (type === 'number') {
+      const n = parseExcelNumber(raw);
+      return n == null ? (raw ?? '') : n;
+    }
+    return raw ?? '';
+  }));
+  return { typedRows, colTypes };
+};
+const buildTypedExcelSheet = (headers = [], rows = []) => {
+  const { typedRows, colTypes } = buildTypedAoa(headers, rows);
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...typedRows], { cellDates:true, raw:true });
+  ws['!cols'] = buildColsFromAoa(headers, typedRows);
+  headers.forEach((_, colIndex) => {
+    const type = colTypes[colIndex];
+    for (let rowIndex = 2; rowIndex <= typedRows.length + 1; rowIndex++) {
+      const addr = XLSX.utils.encode_cell({ r: rowIndex - 1, c: colIndex });
+      const cell = ws[addr];
+      if (!cell) continue;
+      if (type === 'number' && cell.t === 'n') cell.z = EXCEL_NUM_FMT;
+      if (type === 'date' && (cell.t === 'd' || cell.t === 'n')) cell.z = EXCEL_DATE_FMT;
+    }
+  });
+  return ws;
+};
 function exportAoaExcel({ fileName, sheetName = 'Hisobot', headers = [], rows = [] }) {
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
-  ws['!cols'] = buildColsFromAoa(headers, rows);
+  const ws = buildTypedExcelSheet(headers, rows);
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, safeExcelName(fileName));
 }
@@ -1514,21 +1612,21 @@ const DEFAULT_ACCESS = {
     scope: 'own',
     activeScope: 'own',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
     ui: { theme:'dark' },
   },
   Dilfuza: {
     scope: 'own',
     activeScope: 'own',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
     ui: { theme:'dark' },
   },
   Admin:   {
     scope: 'all',
     activeScope: 'all',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true },
     ui: { theme:'dark' },
   },
 };
@@ -1538,8 +1636,8 @@ function normalizeAccessConfig(user, cfg) {
   const isAdmin = user === 'Admin';
   const src = cfg || {};
   const base = isAdmin
-    ? { scope:'all', activeScope:'all', customerTabs:{ ...DEFAULT_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true, settings_staff:true, settings_app:true, settings_ui:true }, ui:{ theme:'dark' } }
-    : { scope:'own', activeScope:'own', customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false }, ui:{ theme:'dark' } };
+    ? { scope:'all', activeScope:'all', customerTabs:{ ...DEFAULT_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true }, ui:{ theme:'dark' } }
+    : { scope:'own', activeScope:'own', customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false }, ui:{ theme:'dark' } };
   const scope = src.scope || base.scope;
   const normalized = {
     scope,
@@ -1554,6 +1652,8 @@ function normalizeAccessConfig(user, cfg) {
     normalized.visible.settings_staff = true;
     normalized.visible.settings_app = true;
     normalized.visible.settings_ui = true;
+    normalized.visible.obzvon_new_edit = true;
+    normalized.visible.obzvon_new_delete = true;
   }
   return normalized;
 }
@@ -3133,11 +3233,14 @@ function Kassa({ D }) {
 function Obzvon({
   D,
   currentUser='Admin',
+  canEditAllNew=false,
+  canDeleteAllNew=false,
   records=[],
   setRecords=()=>{},
   allRows=[],
   newRows=[],
   onReloadAll=()=>{},
+  onReloadAllNew=()=>{},
   onAppendAllRows=()=>{},
   onUpsertNewRows=()=>{},
 }) {
@@ -3153,6 +3256,8 @@ function Obzvon({
   const [allUniFilterState, setAllUniFilterState] = useState({});
   const [allNewUniFilterOpen, setAllNewUniFilterOpen] = useState(false);
   const [allNewUniFilterState, setAllNewUniFilterState] = useState({});
+  const [allNewEditRid, setAllNewEditRid] = useState('');
+  const [allNewEditDraft, setAllNewEditDraft] = useState(null);
   const [dueUniFilterOpen, setDueUniFilterOpen] = useState(false);
   const [dueUniFilterState, setDueUniFilterState] = useState({});
   const [opUniFilterOpen, setOpUniFilterOpen] = useState(false);
@@ -3399,7 +3504,7 @@ function Obzvon({
         customerId: cid,
         customer: liveName || r.customer || (cid ? `ID: ${cid}` : ''),
       };
-    });
+    }).filter((r) => !isObzvonDeletedRow(r));
     rows.sort((a, b) => {
       const da = toDate(a.callDate);
       const db = toDate(b.callDate);
@@ -3451,6 +3556,53 @@ function Obzvon({
     () => allShowMode === 'all' ? allNewList : allNewList.slice(0, 500),
     [allNewList, allShowMode]
   );
+  const startAllNewEdit = (row) => {
+    setAllNewEditRid(String(row?.rid || ''));
+    setAllNewEditDraft({
+      ...row,
+      callDate: String(row?.callDate || '').slice(0,10),
+      nextDate: String(row?.nextDate || '').slice(0,10),
+      orderDate: String(row?.orderDate || '').slice(0,10),
+    });
+  };
+  const cancelAllNewEdit = () => {
+    setAllNewEditRid('');
+    setAllNewEditDraft(null);
+  };
+  const saveAllNewEdit = () => {
+    if (!allNewEditDraft || !allNewEditRid) return;
+    if (!String(allNewEditDraft.customer || allNewEditDraft.customerId || '').trim()) {
+      alert("Mijoz bo'sh bo'lishi mumkin emas");
+      return;
+    }
+    if (!String(allNewEditDraft.note || '').trim()) {
+      alert("Izoh bo'sh bo'lishi mumkin emas");
+      return;
+    }
+    const updated = {
+      ...allNewEditDraft,
+      rid: allNewEditRid,
+      _rid: allNewEditRid,
+      updatedAt: new Date().toISOString(),
+      deleted: '',
+    };
+    onUpsertNewRows([updated]);
+    cancelAllNewEdit();
+  };
+  const removeAllNewRow = (row) => {
+    if (!row) return;
+    const rid = row.rid || row._rid || createRowRid();
+    const tomb = {
+      ...row,
+      rid,
+      _rid: rid,
+      deleted: '1',
+      note: OBZVON_DELETED_NOTE,
+      updatedAt: new Date().toISOString(),
+    };
+    onUpsertNewRows([tomb]);
+    if (String(row.rid || '') === String(allNewEditRid || '')) cancelAllNewEdit();
+  };
   const mainFilterCount = useMemo(() => countUniversalFilters(mainFilterState), [mainFilterState]);
   const allFilterCount = useMemo(() => countUniversalFilters(allUniFilterState), [allUniFilterState]);
   const allNewFilterCount = useMemo(() => countUniversalFilters(allNewUniFilterState), [allNewUniFilterState]);
@@ -3603,6 +3755,9 @@ function Obzvon({
     opUniFilterState,
   ]);
   const opUniversalFilterCount = useMemo(() => countUniversalFilters(opUniFilterState), [opUniFilterState]);
+  useEffect(() => {
+    if (tab === 'all_new') onReloadAllNew && onReloadAllNew();
+  }, [tab, onReloadAllNew]);
 
   useEffect(() => {
     setOpLimit(500);
@@ -3675,10 +3830,6 @@ function Obzvon({
       {tab==='main' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <div className="sb" style={{minWidth:340,flex:1}}>
-              <span style={{color:'var(--t3)'}}>{E.find}</span>
-              <input placeholder={pickTargetIdx!=null ? "Qator uchun mijoz qidiring..." : "Yangi mijoz qo'shish uchun qidiring..."} value={pickQuery} onChange={(e)=>setPickQuery(e.target.value)} />
-            </div>
             <div style={{position:'relative'}}>
               <button className="btn btn-gh btn-sm" onClick={()=>setMainFilterOpen((v)=>!v)}>
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -3703,29 +3854,6 @@ function Obzvon({
               Kun yakunlash
             </button>
           </div>
-          {suggestions.length>0 && (
-            <div className="card" style={{padding:10,maxHeight:160,overflow:'auto'}}>
-              {suggestions.map((s) => (
-                <div key={s.id} className="nav-i" style={{padding:'6px 8px'}} onClick={()=>{
-                  if (pickTargetIdx != null) {
-                    saveRecords(records.map((x,j)=>j===pickTargetIdx?{
-                      ...x,
-                      id:s.id,
-                      customer:s.name,
-                      callDate:(x.callDate || todayIso()),
-                    }:x));
-                    setPickTargetIdx(null);
-                  } else {
-                    addRecord(s);
-                  }
-                  setPickQuery('');
-                }}>
-                  <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{s.id}</span>
-                  <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name}</span>
-                </div>
-              ))}
-            </div>
-          )}
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'58vh'}}>
               <table className="tbl">
@@ -3739,25 +3867,57 @@ function Obzvon({
                       <tr key={r._rid || i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id || '—'}</td>
                         <td style={{minWidth:250}}>
-                          <input
-                            className="input"
-                            value={r.customer || ''}
-                            placeholder="Mijoz (ustiga bosing va qidiring)"
-                            onFocus={()=>{ setPickTargetIdx(i); setPickQuery(r.customer || ''); }}
-                            onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{
-                              ...x,
-                              customer:e.target.value,
-                              id:'',
-                              callDate:(x.callDate || (String(e.target.value || '').trim() ? todayIso() : x.callDate)),
-                            }:x))}
-                            onInput={(e)=>{ setPickTargetIdx(i); setPickQuery(e.currentTarget.value || ''); }}
-                            onKeyDown={(e)=>{
-                              if (e.key === 'Escape') {
-                                setPickTargetIdx(null);
-                                setPickQuery('');
-                              }
-                            }}
-                          />
+                          <div style={{position:'relative'}}>
+                            <input
+                              className="input"
+                              value={r.customer || ''}
+                              placeholder="Mijoz (yozing va tanlang)"
+                              onFocus={()=>{ setPickTargetIdx(i); setPickQuery(r.customer || ''); }}
+                              onBlur={()=>setTimeout(()=>{ setPickTargetIdx(null); setPickQuery(''); }, 120)}
+                              onChange={(e)=>{
+                                const v = e.target.value || '';
+                                saveRecords(records.map((x,j)=>j===i?{
+                                  ...x,
+                                  customer:v,
+                                  id:'',
+                                  callDate:(x.callDate || (String(v).trim() ? todayIso() : x.callDate)),
+                                }:x));
+                                setPickTargetIdx(i);
+                                setPickQuery(v);
+                              }}
+                              onKeyDown={(e)=>{
+                                if (e.key === 'Escape') {
+                                  setPickTargetIdx(null);
+                                  setPickQuery('');
+                                }
+                              }}
+                            />
+                            {pickTargetIdx===i && suggestions.length>0 && (
+                              <div className="card" style={{position:'absolute',left:0,right:0,top:'calc(100% + 4px)',zIndex:40,maxHeight:180,overflow:'auto',padding:6}}>
+                                {suggestions.map((s) => (
+                                  <div
+                                    key={`${i}_${s.id}`}
+                                    className="nav-i"
+                                    style={{padding:'6px 8px'}}
+                                    onMouseDown={(ev)=>{
+                                      ev.preventDefault();
+                                      saveRecords(records.map((x,j)=>j===i?{
+                                        ...x,
+                                        id:s.id,
+                                        customer:s.name,
+                                        callDate:(x.callDate || todayIso()),
+                                      }:x));
+                                      setPickTargetIdx(null);
+                                      setPickQuery('');
+                                    }}
+                                  >
+                                    <span style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{s.id}</span>
+                                    <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.name}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td><input className="input" type="date" value={String(r.callDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,callDate:e.target.value}:x))} /></td>
                         <td>
@@ -3836,7 +3996,6 @@ function Obzvon({
               {E.refresh} Yangilash
             </button>
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{visibleAllRows.length} / {allList.length} ta yozuv</span>
-            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Qidiruv/filtr hamma yozuv bo'yicha</span>
             {allList.length > 500 && (
               <button className="btn btn-gh btn-sm" onClick={()=>setAllShowMode((m)=>m==='all'?'smart':'all')}>
                 {allShowMode==='all' ? "Faqat 500 ta ko'rsatish" : "Hammasini ko'rsatish"}
@@ -3899,8 +4058,10 @@ function Obzvon({
             <button className="btn btn-gh btn-sm" onClick={() => setSearchAllNew('')}>
               Qidiruvni tozalash
             </button>
+            <button className="btn btn-bl btn-sm" onClick={() => onReloadAllNew && onReloadAllNew()}>
+              {E.refresh} Yangilash
+            </button>
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{visibleAllNewRows.length} / {allNewList.length} ta yozuv</span>
-            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Ilovadan yozilgan yangi obzvonlar</span>
             {allNewList.length > 500 && (
               <button className="btn btn-gh btn-sm" onClick={()=>setAllShowMode((m)=>m==='all'?'smart':'all')}>
                 {allShowMode==='all' ? "Faqat 500 ta ko'rsatish" : "Hammasini ko'rsatish"}
@@ -3910,23 +4071,66 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden',flex:1}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 230px)'}}>
               <table className="tbl">
-                <thead><tr><th>No</th><th>ID</th><th>Kontragent</th><th>Sana</th><th>Mavzu</th><th>Izoh</th><th>Keyingi sana</th><th>Z.soni / summa</th><th>Zakaz sanasi</th><th>Operator</th></tr></thead>
+                <thead><tr><th>No</th><th>ID</th><th>Kontragent</th><th>Sana</th><th>Mavzu</th><th>Izoh</th><th>Keyingi sana</th><th>Z.soni / summa</th><th>Zakaz sanasi</th><th>Operator</th>{(canEditAllNew || canDeleteAllNew) && <th>Amal</th>}</tr></thead>
                 <tbody>
-                  {allNewList.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:32,color:'var(--t3)'}}>Yangi obzvon yozuvlari yo'q</td></tr> :
-                    visibleAllNewRows.map((r,i)=>(
+                  {allNewList.length===0 ? <tr><td colSpan={(canEditAllNew || canDeleteAllNew) ? 11 : 10} style={{textAlign:'center',padding:32,color:'var(--t3)'}}>Yangi obzvon yozuvlari yo'q</td></tr> :
+                    visibleAllNewRows.map((r,i)=>{
+                      const isEdit = String(allNewEditRid || '') === String(r.rid || '');
+                      const d = isEdit ? (allNewEditDraft || r) : r;
+                      return (
                       <tr key={r.rid || i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || i+1}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || '—'}</td>
-                        <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : '—')}</span></td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.callDate)}</td>
-                        <td>{r.topic || '—'}</td>
-                        <td style={{maxWidth:300}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '—'}</span></td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.nextDate)}</td>
-                        <td>{r.orderCount || '—'}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.orderDate)}</td>
+                        <td style={{maxWidth:360}}>
+                          {isEdit ? (
+                            <input className="input" value={d.customer || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), customer:e.target.value}))} />
+                          ) : (
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : '—')}</span>
+                          )}
+                        </td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>
+                          {isEdit ? <input className="input" type="date" value={String(d.callDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), callDate:e.target.value}))} /> : fmtD(r.callDate)}
+                        </td>
+                        <td>
+                          {isEdit ? (
+                            <select className="select" value={d.topic || 'Buyurtma olish'} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), topic:e.target.value}))}>
+                              <option>Buyurtma olish</option>
+                              <option>Qarzdorlik</option>
+                              <option>Tara togrlash</option>
+                              <option>Baza to'g'irlash</option>
+                              <option>Qarzini so'rash</option>
+                            </select>
+                          ) : (r.topic || '—')}
+                        </td>
+                        <td style={{maxWidth:300}}>
+                          {isEdit ? (
+                            <input className="input" value={d.note || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), note:e.target.value}))} />
+                          ) : (
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '—'}</span>
+                          )}
+                        </td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>
+                          {isEdit ? <input className="input" type="date" value={String(d.nextDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), nextDate:e.target.value}))} /> : fmtD(r.nextDate)}
+                        </td>
+                        <td>
+                          {isEdit ? <input className="input" value={d.orderCount || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), orderCount:e.target.value}))} /> : (r.orderCount || '—')}
+                        </td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>
+                          {isEdit ? <input className="input" type="date" value={String(d.orderDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), orderDate:e.target.value}))} /> : fmtD(r.orderDate)}
+                        </td>
                         <td>{r.operator || '—'}</td>
+                        {(canEditAllNew || canDeleteAllNew) && (
+                          <td>
+                            <div style={{display:'flex',gap:6}}>
+                              {canEditAllNew && !isEdit && <button className="btn btn-gh btn-sm" onClick={()=>startAllNewEdit(r)}>Edit</button>}
+                              {canEditAllNew && isEdit && <button className="btn btn-bl btn-sm" onClick={saveAllNewEdit}>Saqlash</button>}
+                              {canEditAllNew && isEdit && <button className="btn btn-gh btn-sm" onClick={cancelAllNewEdit}>Bekor</button>}
+                              {canDeleteAllNew && <button className="btn btn-gh btn-sm" onClick={()=>removeAllNewRow(r)}>O'chir</button>}
+                            </div>
+                          </td>
+                        )}
                       </tr>
-                    ))
+                    )})
                   }
                 </tbody>
               </table>
@@ -4811,6 +5015,10 @@ function SettingsPanel({
     { key:'settings_app', label:'Ilova sozlamalari' },
     { key:'settings_ui', label:'Interfeys nastroykasi' },
   ];
+  const obzvonNewPermSections = [
+    { key:'obzvon_new_edit', label:'Barcha Obzvon Yangi: tahrirlash' },
+    { key:'obzvon_new_delete', label:"Barcha Obzvon Yangi: o'chirish" },
+  ];
   const defaultVisible = { ...DEFAULT_VISIBLE_PAGES };
   const customerTabDefs = [
     { key:'all', label:'Hamma mijozlar' },
@@ -5094,6 +5302,32 @@ function SettingsPanel({
                             setAccess((prev) => {
                               const confU = normalizeAccessConfig(u, prev[u] || uc);
                               const currentOn = ((confU.visible || {})[s.key] ?? true);
+                              const next = {
+                                ...prev,
+                                [u]: normalizeAccessConfig(u, {
+                                  ...confU,
+                                  visible: { ...(confU.visible || {}), [s.key]: !currentOn },
+                                }),
+                              };
+                              S.set('aq-access', next);
+                              return next;
+                            });
+                          }}><span className="knob" /></button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginTop:8,marginBottom:6}}>Obzvon yangi ruxsatlari</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr',gap:6}}>
+                    {obzvonNewPermSections.map((s) => {
+                      const on = ((uc.visible || {})[s.key] ?? false);
+                      return (
+                        <div key={s.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--s3)',borderRadius:8,padding:'6px 8px'}}>
+                          <span style={{fontSize:11,color:'var(--t2)'}}>{s.label}</span>
+                          <button className={`toggle${on?' on':''}`} onClick={() => {
+                            setAccess((prev) => {
+                              const confU = normalizeAccessConfig(u, prev[u] || uc);
+                              const currentOn = ((confU.visible || {})[s.key] ?? false);
                               const next = {
                                 ...prev,
                                 [u]: normalizeAccessConfig(u, {
@@ -6008,11 +6242,14 @@ export default function App() {
                   <Obzvon
                   D={D}
                   currentUser={effectiveUser}
+                  canEditAllNew={!!(currentAccess.visible?.obzvon_new_edit ?? (effectiveUser === 'Admin'))}
+                  canDeleteAllNew={!!(currentAccess.visible?.obzvon_new_delete ?? (effectiveUser === 'Admin'))}
                   records={obzvonRecords}
                   setRecords={setObzvonRecords}
                   allRows={obzvonAllRows}
                   newRows={obzvonAllNewRows}
                   onReloadAll={loadObzvonAllRemote}
+                  onReloadAllNew={pullRemoteObzvonNewRows}
                   onAppendAllRows={appendObzvonAllRemote}
                   onUpsertNewRows={upsertObzvonAllNewRows}
                 />
