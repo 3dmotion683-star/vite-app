@@ -511,6 +511,53 @@ const toNum = (v) => {
   const n = parseFloat(String(v).replace(/[\s\xa0]/g,'').replace(',','.'));
   return isNaN(n) ? 0 : n;
 };
+const normalizeMonthKey = (v) => {
+  const m = String(v || '').match(/^(\d{4})-(\d{2})$/);
+  return m ? `${m[1]}-${m[2]}` : '';
+};
+const buildDefaultPlanRows = (baseDate = new Date()) => {
+  const start = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+  const rows = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
+    rows.push({
+      month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+      waterPlan: 0,
+      coolerPlan: 0,
+      workDays: 26,
+    });
+  }
+  return rows;
+};
+const normalizePlanRows = (rows = [], baseDate = new Date()) => {
+  const byMonth = {};
+  (rows || []).forEach((r) => {
+    const mk = normalizeMonthKey(r?.month);
+    if (!mk) return;
+    byMonth[mk] = {
+      month: mk,
+      waterPlan: Math.max(0, Math.round(Number(r?.waterPlan || 0))),
+      coolerPlan: Math.max(0, Math.round(Number(r?.coolerPlan || 0))),
+      workDays: Math.max(1, Math.round(Number(r?.workDays || 26))),
+    };
+  });
+  return buildDefaultPlanRows(baseDate).map((r) => byMonth[r.month] || r);
+};
+const toIntFromMixed = (v) => {
+  const s = String(v ?? '').trim();
+  if (!s) return 0;
+  const parts = s.match(/\d+/g);
+  if (!parts || !parts.length) return 0;
+  const joined = parts.join('');
+  if (!joined) return 0;
+  const n = Number(joined);
+  if (!Number.isFinite(n)) return 0;
+  return s.includes('-') ? -n : n;
+};
+const toIsoDate = (v) => {
+  const d = toDate(v);
+  return d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
+};
 const normId = (v) => {
   const s = String(v ?? '').trim();
   if (!s) return '';
@@ -1615,22 +1662,25 @@ const DEFAULT_ACCESS = {
   Dildora: {
     scope: 'own',
     activeScope: 'own',
+    role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
     ui: { theme:'dark' },
   },
   Dilfuza: {
     scope: 'own',
     activeScope: 'own',
+    role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
     ui: { theme:'dark' },
   },
   Admin:   {
     scope: 'all',
     activeScope: 'all',
+    role: 'admin',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, plan:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true },
     ui: { theme:'dark' },
   },
 };
@@ -1640,12 +1690,13 @@ function normalizeAccessConfig(user, cfg) {
   const isAdmin = user === 'Admin';
   const src = cfg || {};
   const base = isAdmin
-    ? { scope:'all', activeScope:'all', customerTabs:{ ...DEFAULT_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true }, ui:{ theme:'dark' } }
-    : { scope:'own', activeScope:'own', customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false }, ui:{ theme:'dark' } };
+    ? { scope:'all', activeScope:'all', role:'admin', customerTabs:{ ...DEFAULT_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true }, ui:{ theme:'dark' } }
+    : { scope:'own', activeScope:'own', role:'operator', customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false }, ui:{ theme:'dark' } };
   const scope = src.scope || base.scope;
   const normalized = {
     scope,
-    activeScope: src.activeScope || (scope === 'own' ? 'own' : base.activeScope),
+    activeScope: scope === 'own' ? 'own' : 'all',
+    role: src.role || base.role,
     visible: { ...base.visible, ...(src.visible || {}) },
     customerTabs: { ...base.customerTabs, ...(src.customerTabs || {}) },
     ui: { ...base.ui, ...((src.ui && typeof src.ui === 'object') ? src.ui : {}) },
@@ -2173,27 +2224,27 @@ function Dashboard({ D }) {
   const wDelThisMonth = wDel.filter((o) => monthKey(o.orderDate)===curMonthKey);
   const pays = (cashbox||[]).filter((c) => isPaymentFromCounterparty(c.opType));
   const debtors = debtorsByBalance.length ? debtorsByBalance : customers.filter((c) => c.balanceUZS < 0);
-  const debt = {
-    uzsCount: debtors.length,
-    uzsSum: debtors.reduce((s, c) => s + Math.abs(c.balanceUZS || 0), 0),
-  };
   const stale2m = customers
     .filter((c) => c.hasOrders && c.daysAgo != null && c.daysAgo >= 60 && isActiveCustomerName(c.name))
     .sort((a,b) => (b.daysAgo || 0) - (a.daysAgo || 0));
 
-  const monthOptions = useMemo(() => {
-    const ks = [...new Set(wDel.map((o) => monthKey(o.orderDate)).filter(Boolean))].sort();
-    return ks;
-  }, [wDel]);
+  const monthOptions = useMemo(
+    () => [...new Set(wDel.map((o) => monthKey(o.orderDate)).filter(Boolean))].sort(),
+    [wDel]
+  );
   const [agentMonth, setAgentMonth] = useState(curMonthKey);
+  const [rayonMonth, setRayonMonth] = useState(curMonthKey);
   useEffect(() => {
     if (!monthOptions.length) return;
     if (agentMonth !== 'all' && !monthOptions.includes(agentMonth)) {
-      setAgentMonth(curMonthKey && monthOptions.includes(curMonthKey) ? curMonthKey : monthOptions[monthOptions.length - 1]);
+      setAgentMonth(monthOptions.includes(curMonthKey) ? curMonthKey : monthOptions[monthOptions.length - 1]);
     }
-  }, [monthOptions, agentMonth, curMonthKey]);
+    if (rayonMonth !== 'all' && !monthOptions.includes(rayonMonth)) {
+      setRayonMonth(monthOptions.includes(curMonthKey) ? curMonthKey : monthOptions[monthOptions.length - 1]);
+    }
+  }, [monthOptions, agentMonth, rayonMonth, curMonthKey]);
 
-  const monthly = useMemo(() => {
+  const monthlyPayments = useMemo(() => {
     const m = {};
     pays.forEach((c) => {
       const k = monthKey(c.sana); if (!k) return;
@@ -2202,12 +2253,36 @@ function Dashboard({ D }) {
     });
     return Object.values(m).sort((a,b)=>a.key.localeCompare(b.key)).slice(-9);
   }, [pays]);
-
-  const agents = useMemo(() => {
+  const byMonth = useMemo(() => {
     const m = {};
+    wDel.forEach((o) => {
+      const k = monthKey(o.orderDate); if (!k) return;
+      if (!m[k]) m[k]={key:k,qty:0,sumUZS:0};
+      m[k].qty+=Math.abs(o.qty);
+      if (o.currency !== 'USD') m[k].sumUZS += o.sum;
+    });
+    return Object.values(m).sort((a,b)=>a.key.localeCompare(b.key)).slice(-12);
+  }, [wDel]);
+  const byDist = useMemo(() => {
+    const source = rayonMonth === 'all' ? wDel : wDel.filter((o) => monthKey(o.orderDate) === rayonMonth);
+    const m = {};
+    source.forEach((o) => {
+      const c = customers.find((x)=>x.id===o.mId);
+      const d = c?.district || "Noma'lum";
+      if (!m[d]) m[d] = { name:d, qty:0, sum:0, custs:new Set() };
+      m[d].qty += Math.abs(o.qty || 0);
+      m[d].sum += (o.currency==='USD' ? 0 : (o.sum || 0));
+      if (o.mId) m[d].custs.add(o.mId);
+    });
+    return Object.values(m)
+      .map((x)=>({ ...x, custs:x.custs.size }))
+      .sort((a,b)=>b.sum-a.sum);
+  }, [wDel, customers, rayonMonth]);
+  const agents = useMemo(() => {
     const source = agentMonth === 'all'
       ? wDel
       : wDel.filter((o) => monthKey(o.orderDate) === agentMonth);
+    const m = {};
     source.forEach((o) => {
       const a=o.agent||'—';
       if (!m[a]) m[a]={name:a,qty:0,sum:0};
@@ -2215,35 +2290,15 @@ function Dashboard({ D }) {
     });
     return Object.values(m).sort((a,b)=>b.sum-a.sum).slice(0,7);
   }, [wDel, agentMonth]);
-  const exportDashboard = () => {
-    const summaryRows = [
-      ['Jami mijozlar', customers.length],
-      ['Aktiv mijozlar', customers.filter((c)=>c.hasOrders).length],
-      ['Qarz UZS (sum)', debt.uzsSum],
-      ['Qarzdorlar soni', debt.uzsCount],
-      ['Jami idish', customers.reduce((s,c)=>s+c.tara,0)],
-      ['2 oy olmagan', stale2m.length],
-      ['Joriy oy suv dona', wDelThisMonth.reduce((s,o)=>s+Math.abs(o.qty),0)],
-      ['Joriy oy suv summa', wDelThisMonth.reduce((s,o)=>s+o.sum,0)],
-    ];
-    exportAoaExcel({
-      fileName: `Dashboard_${new Date().toISOString().slice(0,10)}.xlsx`,
-      sheetName: 'Dashboard',
-      headers: ['Ko`rsatkich', 'Qiymat'],
-      rows: summaryRows,
-    });
-  };
+
+  const debtSum = debtors.reduce((s, c) => s + Math.abs(c.balanceUZS || 0), 0);
+  const COLORS = ['#58a6ff','#3fb950','#f85149','#d29922','#bc8cff','#f0883e','#79c0ff','#56d364','#ffa657'];
 
   return (
     <div style={{display:'flex',flexDirection:'column',gap:14}} className="ani">
-      <div style={{display:'flex',justifyContent:'flex-end'}}>
-        <button className="btn btn-gr btn-sm" onClick={exportDashboard}>⬇ Excel</button>
-      </div>
       <div className="g5">
         <StatCard l="JAMI MIJOZLAR" v={customers.length} s={customers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
-        <StatCard l="QARZ UZS"
-          v={fmt(debt.uzsSum)+" so'm"}
-          s={debt.uzsCount+' ta qarzdor'} c="var(--rd)"/>
+        <StatCard l="QARZ UZS" v={fmt(debtSum)+" so'm"} s={debtors.length+' ta qarzdor'} c="var(--rd)"/>
         <StatCard l="JAMI IDISH" v={customers.reduce((s,c)=>s+c.tara,0)+' ta'} s="barcha mijozlarda" c="var(--pu)"/>
         <StatCard l="2 OY OLMAGAN" v={stale2m.length+' ta'} s="aktiv mijozlar ichidan" c="var(--yl)"/>
         <StatCard
@@ -2251,13 +2306,14 @@ function Dashboard({ D }) {
           v={fmt(wDelThisMonth.reduce((s,o)=>s+Math.abs(o.qty),0))+' ta'}
           s={fmt(wDelThisMonth.reduce((s,o)=>s+o.sum,0))+" so'm"} c="var(--gr)"/>
       </div>
+
       <div className="g2">
         <div className="card" style={{padding:16}}>
           <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.pay} Oylik to'lovlar (so'm)</div>
-          {monthly.length===0
+          {monthlyPayments.length===0
             ? <div style={{color:'var(--t3)',textAlign:'center',padding:24,fontSize:13}}>To'lov ma'lumoti yo'q</div>
             : <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={monthly}>
+                <AreaChart data={monthlyPayments}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#21262d"/>
                   <XAxis dataKey="key" tick={{fontSize:10,fill:'#656d76'}}/>
                   <YAxis tick={{fontSize:10,fill:'#656d76'}} tickFormatter={fmtM}/>
@@ -2289,24 +2345,49 @@ function Dashboard({ D }) {
           ))}
         </div>
       </div>
+
+      <div className="card" style={{padding:16}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.order} Oylik yetkazish (UZS)</div>
+        {byMonth.length===0 ? (
+          <div style={{color:'var(--t3)',textAlign:'center',padding:24,fontSize:13}}>Yetkazish ma'lumoti yo'q</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={byMonth}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#21262d"/>
+              <XAxis dataKey="key" tick={{fontSize:10,fill:'#656d76'}}/>
+              <YAxis yAxisId="q" tick={{fontSize:10,fill:'#656d76'}} orientation="left"/>
+              <YAxis yAxisId="s" tick={{fontSize:10,fill:'#656d76'}} orientation="right" tickFormatter={fmtM}/>
+              <Tooltip formatter={(v,n)=>n==='Summa UZS'?fmt(v)+" so'm":v+' ta'} contentStyle={{background:'#161b22',border:'1px solid #30363d',borderRadius:8}}/>
+              <Bar yAxisId="q" dataKey="qty" fill="var(--bl)" radius={[4,4,0,0]} name="Dona"/>
+              <Bar yAxisId="s" dataKey="sumUZS" fill="var(--gr)" radius={[4,4,0,0]} name="Summa UZS"/>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
       <div className="g2">
         <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.top} Top qarzdorlar</div>
-          {debtors.length===0
-            ? <div style={{color:'var(--t3)',textAlign:'center',padding:20,fontSize:13}}>Qarzdor yo'q {E.ok}</div>
-            : debtors.sort((a,b)=>a.balanceUZS-b.balanceUZS).slice(0,8).map((c,i) => (
-              <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,padding:'6px 0',borderBottom:'1px solid var(--b2)'}}>
-                <div style={{minWidth:0,flex:1}}>
-                  <div style={{fontWeight:600,fontSize:12.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
-                  <div style={{fontSize:11,color:'var(--t3)'}}>{c.district}  ·  <a href={`tel:${c.phone}`} style={{color:'var(--bl)',textDecoration:'none'}}>{c.phone}</a></div>
-                </div>
-                <div style={{textAlign:'right',flexShrink:0}}>
-                  {c.balanceUZS<0 && <div><span className="tag" style={{background:'var(--rd2)',color:'var(--rd)'}}>-{fmt(Math.abs(c.balanceUZS))} so'm</span></div>}
-                  {c.balanceUSD<0 && <div style={{marginTop:2}}><span className="tag" style={{background:'var(--yl2)',color:'var(--yl)'}}>-{fmt(Math.abs(c.balanceUSD))} $</span></div>}
+          <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',marginBottom:14}}>
+            <div style={{fontWeight:700,fontSize:13}}>{E.area} Rayonlar bo'yicha</div>
+            <select className="select" value={rayonMonth} onChange={(e)=>setRayonMonth(e.target.value)} style={{padding:'4px 8px',fontSize:12}}>
+              <option value="all">Hammasi</option>
+              {monthOptions.slice().reverse().map((m)=><option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+          {byDist.slice(0,12).map((d,i) => (
+            <div key={i} style={{marginBottom:10}}>
+              <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5,marginBottom:3}}>
+                <span style={{fontWeight:600}}>{d.name}</span>
+                <div style={{display:'flex',gap:12,color:'var(--t3)'}}>
+                  <span>{d.custs} mijoz</span>
+                  <span style={{color:'var(--gr)',fontWeight:700}}>{fmtM(d.sum)}</span>
                 </div>
               </div>
-            ))
-          }
+              <div style={{height:4,background:'var(--s3)',borderRadius:2}}>
+                <div style={{height:'100%',width:`${(d.sum/(byDist[0]?.sum||1))*100}%`,background:COLORS[i%COLORS.length],borderRadius:2,transition:'width .5s'}}/>
+              </div>
+            </div>
+          ))}
         </div>
         <div className="card" style={{padding:16}}>
           <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.late} 2+ oy suv olmaganlar</div>
@@ -4936,210 +5017,276 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
 }
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ HISOBOTLAR в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
-function Reports({ D }) {
-  const { customers, rawOrders=[] } = D;
-  const now = new Date();
-  const curMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const wDel = rawOrders.filter((o) => isWaterProduct(o.product) && isOrderDoc(o.docType) && isDeliveredStatus(o.status));
-  const monthOptions = useMemo(
-    () => [...new Set(wDel.map((o) => monthKey(o.orderDate)).filter(Boolean))].sort(),
-    [wDel]
+function Reports({
+  D,
+  currentUser='Admin',
+  currentAccess=null,
+  users=[],
+  access={},
+  planRows=[],
+  obzvonNewRows=[],
+}) {
+  const { rawOrders=[] } = D;
+  const todayIso = toIsoDate(new Date());
+  const currentMonth = normalizeMonthKey(todayIso.slice(0,7));
+  const planByMonth = useMemo(() => {
+    const m = {};
+    (planRows || []).forEach((r) => { if (r?.month) m[r.month] = r; });
+    return m;
+  }, [planRows]);
+  const selectedPlan = planByMonth[currentMonth] || { month: currentMonth, waterPlan:0, coolerPlan:0, workDays:26 };
+  const canSeeAll = (currentAccess?.scope || 'all') === 'all';
+  const visibleOperators = useMemo(() => {
+    const src = (users || []).filter((u) => {
+      const conf = normalizeAccessConfig(u, access?.[u]);
+      if (!(conf.visible?.reports ?? true)) return false;
+      if (u === 'Admin') return false;
+      if (conf.role === 'admin') return false;
+      return true;
+    });
+    return src.length ? src : [currentUser || 'Admin'];
+  }, [users, access, currentUser]);
+  const visibleRows = useMemo(() => {
+    const base = (obzvonNewRows || []).filter((r) => !isObzvonDeletedRow(r));
+    if (canSeeAll) return base;
+    return base.filter((r) => String(r.operator || '').trim() === String(currentUser || '').trim());
+  }, [obzvonNewRows, canSeeAll, currentUser]);
+  const rowsToday = useMemo(
+    () => visibleRows.filter((r) => toIsoDate(r.callDate) === todayIso),
+    [visibleRows, todayIso]
   );
-  const [repMonth, setRepMonth] = useState('all');
-  const [showFilter, setShowFilter] = useState(false);
-  const [repDistricts, setRepDistricts] = useState([]);
-  const [repAgents, setRepAgents] = useState([]);
-  useEffect(() => {
-    if (repMonth === 'all') return;
-    if (monthOptions.length && !monthOptions.includes(repMonth)) {
-      setRepMonth(monthOptions.includes(curMonthKey) ? curMonthKey : 'all');
-    }
-  }, [monthOptions, repMonth, curMonthKey]);
-  const reportOrders = useMemo(
-    () => {
-      const districtById = {};
-      customers.forEach((c) => { districtById[c.id] = c.district || "Noma'lum"; });
-      let arr = repMonth === 'all' ? wDel : wDel.filter((o) => monthKey(o.orderDate) === repMonth);
-      if (repDistricts.length) arr = arr.filter((o) => repDistricts.includes(districtById[o.mId] || "Noma'lum"));
-      if (repAgents.length) arr = arr.filter((o) => repAgents.includes(o.agent || '—'));
-      return arr;
-    },
-    [wDel, repMonth, customers, repDistricts, repAgents]
-  );
-  const filterOptions = useMemo(() => {
-    const districtById = {};
-    customers.forEach((c) => { districtById[c.id] = c.district || "Noma'lum"; });
-    return {
-      districts: [...new Set(wDel.map((o)=>districtById[o.mId] || "Noma'lum"))].sort(),
-      agents: [...new Set(wDel.map((o)=>o.agent || '—'))].sort(),
-    };
-  }, [wDel, customers]);
-  const toggleIn = (setter, val) => setter((prev)=>prev.includes(val)?prev.filter((x)=>x!==val):[...prev,val]);
-  const activeFilterCount = useMemo(() => {
-    let c = 0;
-    if (repMonth !== 'all') c++;
-    if (repDistricts.length) c++;
-    if (repAgents.length) c++;
-    return c;
-  }, [repMonth, repDistricts, repAgents]);
 
-  const byDist = useMemo(() => {
-    const m = {};
-    reportOrders.forEach((o) => {
-      const cust = customers.find((c)=>c.id===o.mId);
-      const d = cust?.district||"Noma'lum";
-      if (!m[d]) m[d]={name:d,qty:0,sum:0,custs:new Set()};
-      m[d].qty+=Math.abs(o.qty); m[d].sum+=o.sum; m[d].custs.add(o.mId);
+  const monthWaterOrders = useMemo(() => {
+    return (rawOrders || []).filter((o) =>
+      isWaterProduct(o.product) &&
+      isOrderDoc(o.docType) &&
+      isDeliveredStatus(o.status) &&
+      monthKey(o.orderDate) === currentMonth
+    );
+  }, [rawOrders, currentMonth]);
+  const monthWaterQty = monthWaterOrders.reduce((s,o)=>s + Math.abs(o.qty || 0), 0);
+  const monthWaterSum = monthWaterOrders.reduce((s,o)=>s + (o.currency === 'USD' ? 0 : (o.sum || 0)), 0);
+
+  const planPerDay = Math.ceil((Number(selectedPlan.waterPlan || 0)) / Math.max(1, Number(selectedPlan.workDays || 26)));
+  const perOperatorPlan = Math.ceil(planPerDay / Math.max(1, canSeeAll ? visibleOperators.length : 1));
+  const currentPlanTarget = canSeeAll ? planPerDay : perOperatorPlan;
+  const buyurtmaRowsToday = rowsToday.filter((r) => String(r.topic || '').toLowerCase().includes('buyurtma'));
+  const debtRowsToday = rowsToday.filter((r) => String(r.topic || '').toLowerCase().includes('qarz'));
+  const callsToday = rowsToday.length;
+  const fromCallsTodayQty = buyurtmaRowsToday.reduce((s, r) => s + Math.max(0, toIntFromMixed(r.orderCount || 0)), 0);
+  const fromOrdersTodayQty = (rawOrders || []).filter((o) =>
+    isWaterProduct(o.product) &&
+    isOrderDoc(o.docType) &&
+    !isCancelledStatus(o.status) &&
+    toIsoDate(o.orderDate) === todayIso
+  ).reduce((s,o)=>s + Math.abs(o.qty || 0), 0);
+  const planLeft = Math.max(0, currentPlanTarget - fromCallsTodayQty - fromOrdersTodayQty);
+  const debtWorkedCount = new Set(
+    debtRowsToday.map((r) => String(r.customerId || r.id || r.customer || '').trim()).filter(Boolean)
+  ).size;
+  const debtWorkedSum = debtRowsToday.reduce((s,r)=>s + Math.abs(toIntFromMixed(r.orderCount || 0)), 0);
+
+  const dailyByOperator = useMemo(() => {
+    const ops = new Map();
+    rowsToday.forEach((r) => {
+      const op = String(r.operator || '—').trim() || '—';
+      if (!ops.has(op)) ops.set(op, []);
+      ops.get(op).push(r);
     });
-    return Object.values(m).map((d)=>({...d,custs:d.custs.size})).sort((a,b)=>b.sum-a.sum);
-  }, [reportOrders,customers]);
+    return Array.from(ops.entries()).map(([op, rows]) => {
+      const buyRows = rows.filter((x) => String(x.topic || '').toLowerCase().includes('buyurtma'));
+      const qarzRows = rows.filter((x) => String(x.topic || '').toLowerCase().includes('qarz'));
+      const qty = buyRows.reduce((s,x)=>s + Math.max(0, toIntFromMixed(x.orderCount || 0)), 0);
+      const debtSum = qarzRows.reduce((s,x)=>s + Math.abs(toIntFromMixed(x.orderCount || 0)), 0);
+      const byOrderDate = {};
+      buyRows.forEach((x) => {
+        const k = toIsoDate(x.orderDate) || '—';
+        byOrderDate[k] = (byOrderDate[k] || 0) + Math.max(0, toIntFromMixed(x.orderCount || 0));
+      });
+      const dateBreak = Object.entries(byOrderDate)
+        .sort((a,b)=>a[0].localeCompare(b[0]))
+        .map(([k,v]) => `${k}: ${v} ta`)
+        .join(' | ');
+      return {
+        operator: op,
+        calls: rows.length,
+        buyurtmaCount: buyRows.length,
+        buyurtmaQty: qty,
+        debtCount: qarzRows.length,
+        debtSum,
+        dateBreak,
+      };
+    }).sort((a,b)=>b.calls-a.calls);
+  }, [rowsToday]);
+  const dailyRows = useMemo(() => {
+    if (canSeeAll) return dailyByOperator;
+    return dailyByOperator.filter((x)=>x.operator===currentUser);
+  }, [canSeeAll, dailyByOperator, currentUser]);
 
-  const byMonth = useMemo(() => {
-    const m = {};
-    wDel.forEach((o) => {
-      const k = monthKey(o.orderDate); if (!k) return;
-      if (!m[k]) m[k]={key:k,qty:0,sumUZS:0,sumUSD:0};
-      m[k].qty+=Math.abs(o.qty);
-      if (o.currency==='USD') m[k].sumUSD+=o.sum;
-      else m[k].sumUZS+=o.sum;
-    });
-    return Object.values(m).sort((a,b)=>a.key.localeCompare(b.key)).slice(-12);
-  }, [wDel]);
-
-  const byAgent = useMemo(() => {
-    const m = {};
-    reportOrders.forEach((o) => {
-      const a=o.agent||'—';
-      if (!m[a]) m[a]={name:a,qty:0,sum:0,custs:new Set()};
-      m[a].qty+=Math.abs(o.qty); m[a].sum+=o.sum; m[a].custs.add(o.mId);
-    });
-    return Object.values(m).map((d)=>({...d,custs:d.custs.size})).sort((a,b)=>b.sum-a.sum);
-  }, [reportOrders]);
-
-  const COLORS = ['#58a6ff','#3fb950','#f85149','#d29922','#bc8cff','#f0883e','#79c0ff','#56d364','#ffa657'];
   const exportReports = () => {
     exportAoaExcel({
-      fileName: `Hisobotlar_${repMonth==='all'?'all':repMonth}_${new Date().toISOString().slice(0,10)}.xlsx`,
-      sheetName: 'Hisobotlar',
-      headers: ['Mijoz ID', 'Rayon', 'Agent', 'Sana', 'Mahsulot', 'Dona', 'Valyuta', 'Summa'],
-      rows: reportOrders.map((o) => {
-        const c = customers.find((x)=>x.id===o.mId);
-        return [
-          o.mId || '',
-          c?.district || "Noma'lum",
-          o.agent || '—',
-          fmtD(o.orderDate),
-          o.product || '',
-          Math.abs(o.qty || 0),
-          o.currency || 'UZS',
-          o.sum || 0,
-        ];
-      }),
+      fileName: `Hisobot_${todayIso}.xlsx`,
+      sheetName: 'Hisobot',
+      headers: ['Operator', 'Bugun obzvon', "Buyurtma soni", "Suv soni", "Qarz mijoz", "Qarz summa", "Zakaz sanalari kesimi"],
+      rows: dailyRows.map((r) => [r.operator, r.calls, r.buyurtmaCount, r.buyurtmaQty, r.debtCount, r.debtSum, r.dateBreak]),
     });
   };
 
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:14}}>
-      <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap',position:'relative'}}>
-        <div className="tabs" style={{display:'inline-flex'}}>
-          <button className={`tab${repMonth==='all'?' on':''}`} onClick={()=>setRepMonth('all')}>Hammasi</button>
-          {monthOptions.slice().reverse().slice(0,8).map((m)=>(
-            <button key={m} className={`tab${repMonth===m?' on':''}`} onClick={()=>setRepMonth(m)}>{m}</button>
-          ))}
-        </div>
-        <div style={{display:'flex',gap:8}}>
-          <div style={{position:'relative'}}>
-            <button className="btn btn-gh btn-sm" onClick={()=>setShowFilter((v)=>!v)}>
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-              </svg>
-              Filtr{activeFilterCount>0?` (${activeFilterCount})`:''}
-            </button>
-            {showFilter && (
-              <div className="card" style={{position:'absolute',top:34,right:0,zIndex:20,width:360,padding:10,overflow:'hidden'}}>
-                <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Oy</div>
-                <select className="select" style={{width:'100%',marginBottom:8}} value={repMonth} onChange={(e)=>setRepMonth(e.target.value)}>
-                  <option value="all">Hammasi</option>
-                  {monthOptions.slice().reverse().map((m)=><option key={m} value={m}>{m}</option>)}
-                </select>
-                <div className="g2" style={{gap:8}}>
-                  <div>
-                    <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Rayon</div>
-                    <div style={{maxHeight:130,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                      {filterOptions.districts.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={repDistricts.includes(x)} onChange={()=>toggleIn(setRepDistricts,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Agent</div>
-                    <div style={{maxHeight:130,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                      {filterOptions.agents.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={repAgents.includes(x)} onChange={()=>toggleIn(setRepAgents,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
-                    </div>
-                  </div>
-                </div>
-                <div style={{display:'flex',justifyContent:'space-between',marginTop:8}}>
-                  <button className="btn btn-gh btn-sm" onClick={()=>{ setRepMonth('all'); setRepDistricts([]); setRepAgents([]); }}>Tozalash</button>
-                  <button className="btn btn-bl btn-sm" onClick={()=>setShowFilter(false)}>Qo'llash</button>
-                </div>
-              </div>
-            )}
-          </div>
-          <button className="btn btn-gr btn-sm" onClick={exportReports}>⬇ Excel</button>
-        </div>
+      <div style={{display:'flex',justifyContent:'flex-end'}}>
+        <button className="btn btn-gr btn-sm" onClick={exportReports}>⬇ Excel</button>
       </div>
       <div className="g4">
-        <StatCard l="YETKAZILGAN JAMI" v={fmt(reportOrders.reduce((s,o)=>s+Math.abs(o.qty),0))+' ta'} c="var(--bl)"/>
-        <StatCard l="JAMI SUMMA (UZS)" v={fmt(reportOrders.filter((o)=>o.currency!=='USD').reduce((s,o)=>s+o.sum,0))+" so'm"} c="var(--gr)"/>
-        <StatCard l="AKTIV RAYONLAR"   v={byDist.length+' ta'} c="var(--yl)"/>
-        <StatCard l="AKTIV AGENTLAR"   v={byAgent.length+' ta'} c="var(--pu)"/>
+        <StatCard
+          l={`SUV (${currentMonth})`}
+          v={`${fmt(monthWaterQty)} ta`}
+          s={`${fmt(monthWaterSum)} so'm`}
+          c="var(--bl)"
+        />
+        <StatCard
+          l="BUGUNGI PLAN QOLDIQ"
+          v={`${fmt(planLeft)} ta`}
+          s={`Reja: ${fmt(currentPlanTarget)} · bajarilgan: ${fmt(fromCallsTodayQty + fromOrdersTodayQty)}`}
+          c="var(--gr)"
+        />
+        <StatCard
+          l="QARZDORLIK ISHLOVI"
+          v={`${debtWorkedCount} ta`}
+          s={`${fmt(debtWorkedSum)} so'm`}
+          c="var(--or)"
+        />
+        <StatCard
+          l="BUGUNGI OBZVON"
+          v={`${callsToday} ta`}
+          s={canSeeAll ? 'Hamma operator' : `${currentUser}`}
+          c="var(--yl)"
+        />
       </div>
-      {byMonth.length>0 && (
-        <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.order} Oylik yetkazish (UZS)</div>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={byMonth}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#21262d"/>
-              <XAxis dataKey="key" tick={{fontSize:10,fill:'#656d76'}}/>
-              <YAxis yAxisId="q" tick={{fontSize:10,fill:'#656d76'}} orientation="left"/>
-              <YAxis yAxisId="s" tick={{fontSize:10,fill:'#656d76'}} orientation="right" tickFormatter={fmtM}/>
-              <Tooltip formatter={(v,n)=>n==='Summa UZS'?fmt(v)+" so'm":v+' ta'} contentStyle={{background:'#161b22',border:'1px solid #30363d',borderRadius:8}}/>
-              <Bar yAxisId="q" dataKey="qty"    fill="var(--bl)" radius={[4,4,0,0]} name="Dona"/>
-              <Bar yAxisId="s" dataKey="sumUZS" fill="var(--gr)" radius={[4,4,0,0]} name="Summa UZS"/>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-      <div className="g2">
-        <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:14}}>{E.area} Rayonlar bo'yicha</div>
-          {byDist.slice(0,12).map((d,i) => (
-            <div key={i} style={{marginBottom:10}}>
-              <div style={{display:'flex',justifyContent:'space-between',fontSize:12.5,marginBottom:3}}>
-                <span style={{fontWeight:600}}>{d.name}</span>
-                <div style={{display:'flex',gap:12,color:'var(--t3)'}}>
-                  <span>{d.custs} mijoz</span>
-                  <span style={{color:'var(--gr)',fontWeight:700}}>{fmtM(d.sum)}</span>
-                </div>
-              </div>
-              <div style={{height:4,background:'var(--s3)',borderRadius:2}}>
-                <div style={{height:'100%',width:`${(d.sum/(byDist[0]?.sum||1))*100}%`,background:COLORS[i%COLORS.length],borderRadius:2,transition:'width .5s'}}/>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="card" style={{padding:16}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.top} Agentlar natijalari</div>
+      <div className="card" style={{padding:16}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Kunlik natija</div>
+        <div style={{overflow:'auto',maxHeight:'58vh'}}>
           <table className="tbl">
-            <thead><tr><th>#</th><th>Agent</th><th>Mijoz</th><th>Dona</th><th>Summa</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Operator</th>
+                <th style={{textAlign:'right'}}>Obzvon</th>
+                <th style={{textAlign:'right'}}>Buyurtma</th>
+                <th style={{textAlign:'right'}}>Suv soni</th>
+                <th style={{textAlign:'right'}}>Qarz mijoz</th>
+                <th style={{textAlign:'right'}}>Qarz summa</th>
+                <th>Qaysi sanaga zakaz</th>
+                <th style={{textAlign:'right'}}>Kunlik plan</th>
+              </tr>
+            </thead>
             <tbody>
-              {byAgent.map((a,i) => (
+              {dailyRows.length===0 ? (
+                <tr><td colSpan={8} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Bugungi natija yo'q</td></tr>
+              ) : dailyRows.map((r, i) => (
                 <tr key={i}>
-                  <td style={{fontWeight:800,color:i===0?'var(--yl)':i===1?'var(--t2)':i===2?'var(--or)':'var(--t3)'}}>{i+1}</td>
-                  <td style={{fontWeight:600}}>{a.name}</td>
-                  <td style={{color:'var(--t3)'}}>{a.custs}</td>
-                  <td style={{fontFamily:'var(--mono)'}}>{a.qty}</td>
-                  <td style={{fontFamily:'var(--mono)',color:'var(--gr)',fontWeight:700}}>{fmtM(a.sum)}</td>
+                  <td>{r.operator}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.calls)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.buyurtmaCount)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.buyurtmaQty)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.debtCount)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--rd)'}}>{fmt(r.debtSum)}</td>
+                  <td style={{fontSize:11,color:'var(--t2)'}}>{r.dateBreak || '—'}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(canSeeAll ? perOperatorPlan : currentPlanTarget)}</td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlanPage({ users=[], access={}, currentUser='Admin', planRows=[], setPlanRows=()=>{} }) {
+  const [rows, setRows] = useState(() => normalizePlanRows(planRows));
+  useEffect(() => { setRows(normalizePlanRows(planRows)); }, [planRows]);
+
+  const operators = useMemo(() => {
+    const list = (users || []).filter((u) => u !== 'Admin');
+    return list.length ? list : ['Operator'];
+  }, [users]);
+  const opCount = Math.max(1, operators.length);
+  const canEdit = currentUser === 'Admin';
+
+  const updateCell = (month, key, value) => {
+    const n = Math.max(0, Math.round(Number(value || 0)));
+    setRows((prev) => prev.map((r) => r.month === month ? { ...r, [key]: key === 'workDays' ? Math.max(1, n) : n } : r));
+  };
+  const savePlan = () => {
+    const next = normalizePlanRows(rows);
+    setRows(next);
+    setPlanRows(next);
+    S.set('aq-plan-rows', next);
+  };
+  const exportPlan = () => {
+    exportAoaExcel({
+      fileName: `Plan_${new Date().toISOString().slice(0,10)}.xlsx`,
+      sheetName: 'Plan',
+      headers: ['Oy', 'Suv plan', 'Kuler plan', 'Ish kuni', 'Kunlik suv', 'Kunlik kuler', 'Operatorga suv', 'Operatorga kuler'],
+      rows: rows.map((r) => {
+        const wd = Math.max(1, Number(r.workDays || 1));
+        const waterDay = Math.ceil(Number(r.waterPlan || 0) / wd);
+        const coolerDay = Math.ceil(Number(r.coolerPlan || 0) / wd);
+        return [r.month, r.waterPlan, r.coolerPlan, r.workDays, waterDay, coolerDay, Math.ceil(waterDay / opCount), Math.ceil(coolerDay / opCount)];
+      }),
+    });
+  };
+
+  return (
+    <div className="ani" style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+        <div className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Operatorlar: {operators.join(', ')}</div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-gr btn-sm" onClick={exportPlan}>⬇ Excel</button>
+          <button className="btn btn-bl btn-sm" onClick={savePlan} disabled={!canEdit}>Saqlash</button>
+        </div>
+      </div>
+      <div className="card" style={{overflow:'hidden'}}>
+        <div style={{overflow:'auto',maxHeight:'68vh'}}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Oy</th>
+                <th style={{textAlign:'right'}}>Suv plan</th>
+                <th style={{textAlign:'right'}}>Kuler plan</th>
+                <th style={{textAlign:'right'}}>Ish kuni</th>
+                <th style={{textAlign:'right'}}>Kunlik suv</th>
+                <th style={{textAlign:'right'}}>Kunlik kuler</th>
+                <th style={{textAlign:'right'}}>1 operatorga suv</th>
+                <th style={{textAlign:'right'}}>1 operatorga kuler</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const wd = Math.max(1, Number(r.workDays || 1));
+                const waterDay = Math.ceil(Number(r.waterPlan || 0) / wd);
+                const coolerDay = Math.ceil(Number(r.coolerPlan || 0) / wd);
+                const perOpWater = Math.ceil(waterDay / opCount);
+                const perOpCooler = Math.ceil(coolerDay / opCount);
+                return (
+                  <tr key={r.month || i}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.month}</td>
+                    <td style={{textAlign:'right'}}>
+                      <input className="input" type="number" value={r.waterPlan} disabled={!canEdit} onChange={(e)=>updateCell(r.month,'waterPlan',e.target.value)} />
+                    </td>
+                    <td style={{textAlign:'right'}}>
+                      <input className="input" type="number" value={r.coolerPlan} disabled={!canEdit} onChange={(e)=>updateCell(r.month,'coolerPlan',e.target.value)} />
+                    </td>
+                    <td style={{textAlign:'right'}}>
+                      <input className="input" type="number" value={r.workDays} disabled={!canEdit} onChange={(e)=>updateCell(r.month,'workDays',e.target.value)} />
+                    </td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(waterDay)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(coolerDay)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(perOpWater)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(perOpCooler)}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -5159,7 +5306,7 @@ function SettingsPanel({
   const [editPassword, setEditPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const conf = normalizeAccessConfig(sel, access[sel]);
-  const pages = ['dash','cust','orders','kassa','obzvon','doljniki','reports','refresh','settings'];
+  const pages = ['dash','cust','orders','kassa','obzvon','doljniki','reports','plan','refresh','settings'];
   const settingsSections = [
     { key:'settings_staff', label:"Hodimlar ruhsatlari" },
     { key:'settings_app', label:'Ilova sozlamalari' },
@@ -5380,22 +5527,23 @@ function SettingsPanel({
                     }}><span className="knob" /></button>
                   </div>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,gap:8}}>
-                    <span style={{fontSize:12,color:'var(--t3)'}}>Aktiv mijozlar</span>
+                    <span style={{fontSize:12,color:'var(--t3)'}}>Lavozim</span>
                     <select
                       className="select"
-                      value={uc.activeScope || 'all'}
-                      onChange={(e) => {
-                        const v = e.target.value === 'own' ? 'own' : 'all';
-                        setAccess((prev) => {
+                      value={uc.role || (u==='Admin' ? 'admin' : 'operator')}
+                      onChange={(e)=>{
+                        const role = e.target.value;
+                        setAccess((prev)=>{
                           const confU = normalizeAccessConfig(u, prev[u] || uc);
-                          const next = { ...prev, [u]: normalizeAccessConfig(u, { ...confU, activeScope: v }) };
+                          const next = { ...prev, [u]: normalizeAccessConfig(u, { ...confU, role }) };
                           S.set('aq-access', next);
                           return next;
                         });
                       }}
                     >
-                      <option value="all">Hammasi</option>
-                      <option value="own">Faqat o'zimniki</option>
+                      <option value="operator">Operator</option>
+                      <option value="supervisor">Supervisor</option>
+                      <option value="admin">Admin</option>
                     </select>
                   </div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:6}}>Mijozlar bo'limlari</div>
@@ -5631,6 +5779,7 @@ const NAV = [
   { id:'obzvon',  label:'Obzvon',     icon:E.phone, badge:'o' },
   { id:'doljniki',label:'Doljniki',   icon:E.doc, badge:'dz' },
   { id:'reports', label:'Hisobotlar', icon:E.report },
+  { id:'plan',    label:'Plan',       icon:'🗓️' },
 ];
 
 export default function App() {
@@ -5639,6 +5788,7 @@ export default function App() {
   const [obzvonRecords,setObzvonRecords] = useState(() => S.get('aq-obzvon-records', []));
   const [obzvonAllRows,setObzvonAllRows] = useState(() => S.get('aq-obzvon-all-rows', []));
   const [obzvonAllNewRows,setObzvonAllNewRows] = useState(() => S.get('aq-obzvon-all-new-rows', []));
+  const [planRows, setPlanRows] = useState(() => normalizePlanRows(S.get('aq-plan-rows', [])));
   const [users,setUsers] = useState(() => S.get('aq-users', DEFAULT_USERS));
   const [access,setAccess] = useState(() => S.get('aq-access', DEFAULT_ACCESS));
   const [userCreds,setUserCreds] = useState(() => {
@@ -6053,6 +6203,7 @@ export default function App() {
   useEffect(() => { S.set('aq-obzvon-records', obzvonRecords || []); }, [obzvonRecords]);
   useEffect(() => { S.set('aq-obzvon-all-rows', obzvonAllRows || []); }, [obzvonAllRows]);
   useEffect(() => { S.set('aq-obzvon-all-new-rows', obzvonAllNewRows || []); }, [obzvonAllNewRows]);
+  useEffect(() => { S.set('aq-plan-rows', normalizePlanRows(planRows || [])); }, [planRows]);
   useEffect(() => { S.set('aq-user-creds', userCreds || {}); }, [userCreds]);
   useEffect(() => {
     if (!Array.isArray(obzvonRecords) || !obzvonRecords.length) return;
@@ -6487,7 +6638,26 @@ export default function App() {
                 />
               )}
                 {page==='doljniki'&& canViewPage('doljniki') && <Doljniki rows={doljniki} otherRows={otherDoljniki} D={D} kulerRows={D.kulerInstallments || []} onAddToObzvon={addObzvonRows} currentUser={effectiveUser} />}
-                {page==='reports' && canViewPage('reports') && <Reports   D={D}/>}
+                {page==='reports' && canViewPage('reports') && (
+                  <Reports
+                    D={D}
+                    currentUser={effectiveUser}
+                    currentAccess={currentAccess}
+                    users={users}
+                    access={access}
+                    planRows={planRows}
+                    obzvonNewRows={obzvonAllNewRows}
+                  />
+                )}
+                {page==='plan' && canViewPage('plan') && (
+                  <PlanPage
+                    users={users}
+                    access={access}
+                    currentUser={effectiveUser}
+                    planRows={planRows}
+                    setPlanRows={setPlanRows}
+                  />
+                )}
                 {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} />}
               </>
             )}
