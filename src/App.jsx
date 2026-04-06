@@ -325,6 +325,73 @@ function UniversalFilterPanel({
     });
     return out;
   }, [columns, rows]);
+  const panelRef = useRef(null);
+  const [placement, setPlacement] = useState(() => ({
+    side: 'right', // right => panel opens to right side of button (left:0)
+    panelWidth: width,
+    maxHeight: '56vh',
+  }));
+  const recalcPlacement = useCallback(() => {
+    if (!open) return;
+    const panelEl = panelRef.current;
+    const anchorEl = panelEl?.parentElement;
+    if (!anchorEl) return;
+    const anchorRect = anchorEl.getBoundingClientRect();
+    const vw = window.innerWidth || document.documentElement.clientWidth || 1280;
+    const vh = window.innerHeight || document.documentElement.clientHeight || 800;
+    const margin = 8;
+    let boundary = {
+      left: margin,
+      right: vw - margin,
+      top: margin,
+      bottom: vh - margin,
+    };
+    const boundaryEl = anchorEl.closest('[data-filter-boundary="1"]');
+    if (boundaryEl) {
+      const b = boundaryEl.getBoundingClientRect();
+      boundary = {
+        left: Math.max(margin, b.left + 4),
+        right: Math.min(vw - margin, b.right - 4),
+        top: Math.max(margin, b.top + 4),
+        bottom: Math.min(vh - margin, b.bottom - 4),
+      };
+    }
+    const desiredWidth = Number(width) || 560;
+    const maxAllowedWidth = Math.max(220, Math.floor(boundary.right - boundary.left));
+    let panelWidth = Math.min(desiredWidth, maxAllowedWidth);
+    const spaceRight = Math.floor(boundary.right - anchorRect.left);
+    const spaceLeft = Math.floor(anchorRect.right - boundary.left);
+    let side = 'right';
+    if (panelWidth <= spaceRight) {
+      side = 'right';
+    } else if (panelWidth <= spaceLeft) {
+      side = 'left';
+    } else if (spaceLeft > spaceRight) {
+      side = 'left';
+      panelWidth = Math.max(220, Math.min(spaceLeft, maxAllowedWidth));
+    } else {
+      side = 'right';
+      panelWidth = Math.max(220, Math.min(spaceRight, maxAllowedWidth));
+    }
+    const maxHeightPx = Math.max(260, Math.floor(boundary.bottom - anchorRect.top - 60));
+    setPlacement({
+      side,
+      panelWidth,
+      maxHeight: `${maxHeightPx}px`,
+    });
+  }, [open, width]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const run = () => recalcPlacement();
+    const raf = requestAnimationFrame(run);
+    window.addEventListener('resize', run);
+    window.addEventListener('scroll', run, true);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', run);
+      window.removeEventListener('scroll', run, true);
+    };
+  }, [open, recalcPlacement]);
 
   if (!open) return null;
   const safeState = ensureUniversalFilterState(columns, state);
@@ -349,7 +416,22 @@ function UniversalFilterPanel({
   };
 
   return (
-    <div className="card" style={{position:'absolute',top:40,right:0,zIndex:40,width,padding:12,boxShadow:'0 24px 60px rgba(0,0,0,.6)',backdropFilter:'blur(10px)',overflow:'hidden'}}>
+    <div
+      ref={panelRef}
+      className="card"
+      style={{
+        position:'absolute',
+        top:40,
+        ...(placement.side === 'left' ? { right:0, left:'auto' } : { left:0, right:'auto' }),
+        zIndex:80,
+        width:placement.panelWidth,
+        maxWidth:'calc(100vw - 16px)',
+        padding:12,
+        boxShadow:'0 24px 60px rgba(0,0,0,.6)',
+        backdropFilter:'blur(10px)',
+        overflow:'hidden',
+      }}
+    >
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
         <div style={{fontWeight:700,fontSize:13}}>{title}</div>
         <div style={{display:'flex',gap:6}}>
@@ -357,7 +439,7 @@ function UniversalFilterPanel({
           <button className="btn btn-gh btn-sm" onClick={()=>setAll('clear')}>Hammasini tozalash</button>
         </div>
       </div>
-      <div style={{maxHeight:'56vh',overflow:'auto',paddingRight:2}}>
+      <div style={{maxHeight:placement.maxHeight,overflow:'auto',paddingRight:2}}>
         {columns.map((col) => {
           const st = safeState[col.key] || makeUniversalColState();
           const opts = optionsByKey[col.key] || [];
@@ -2606,7 +2688,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
         />
 
         {showAdv && (
-            <div className="card" style={{position:'absolute',top:40,right:0,zIndex:30,width:520,padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)',overflow:'hidden'}}>
+            <div className="card" style={{position:'absolute',top:40,left:0,right:'auto',zIndex:50,width:'min(520px, calc(100vw - 24px))',padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)',overflow:'hidden'}}>
             <div className="g2" style={{marginBottom:8}}>
               <div>
                 <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Rayon</div>
@@ -2944,7 +3026,7 @@ function Orders({ D }) {
             width={620}
           />
           {showFilter && (
-            <div className="card" style={{position:'absolute',top:34,right:0,zIndex:25,width:380,padding:10,overflow:'hidden'}}>
+            <div className="card" style={{position:'absolute',top:34,left:0,right:'auto',zIndex:50,width:'min(380px, calc(100vw - 24px))',padding:10,overflow:'hidden'}}>
               <div className="g2" style={{gap:10}}>
                 <div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Agent</div>
@@ -3218,7 +3300,7 @@ function Kassa({ D }) {
             width={620}
           />
           {showFilter && (
-            <div className="card" style={{position:'absolute',top:34,right:0,zIndex:20,width:380,padding:10,overflow:'hidden'}}>
+            <div className="card" style={{position:'absolute',top:34,left:0,right:'auto',zIndex:50,width:'min(380px, calc(100vw - 24px))',padding:10,overflow:'hidden'}}>
               <div className="g2" style={{gap:10}}>
                 <div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Operator</div>
@@ -6586,7 +6668,7 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{flex:1,overflow:'auto',padding:16}}>
+          <div data-filter-boundary="1" style={{flex:1,overflow:'auto',padding:16}}>
             {!data && page!=='doljniki' ? (
               <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <div style={{textAlign:'center',maxWidth:440}}>
