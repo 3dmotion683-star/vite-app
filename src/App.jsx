@@ -5969,6 +5969,8 @@ export default function App() {
   const [obzvonAllLoaded, setObzvonAllLoaded] = useState(false);
   const skipCloudPushRef = useRef(false);
   const remoteAccessConfigRef = useRef(null);
+  const obzvonAllNewRowsRef = useRef(obzvonAllNewRows || []);
+  const pendingObzvonNewRowsRef = useRef([]);
   const buildDefaultCreds = useCallback((baseUsers) => {
     const m = {};
     (baseUsers || []).forEach((u) => { m[u] = u; });
@@ -6254,16 +6256,23 @@ export default function App() {
       if (j?.ok) return true;
     } catch {}
     // Fallback: access_set ichiga obzvonNewRows ni yozib, barcha qurilmalarda bitta umumiy holatga keltiramiz.
+    // MUHIM: avval remote holatni aniq o'qib olmasdan yozmaymiz (aks holda boshqa operator yozuvlari bosilib ketishi mumkin).
     try {
       const sep = accessApiUrl.includes('?') ? '&' : '?';
       const getUrl = `${accessApiUrl}${sep}action=access_get&_=${Date.now()}`;
       const getResp = await fetch(getUrl, { cache:'no-store' });
+      if (!getResp.ok) return false;
       const getJson = await getResp.json().catch(() => ({}));
       const remoteCfg = (getJson?.ok && getJson?.accessConfig && typeof getJson.accessConfig === 'object')
         ? getJson.accessConfig
-        : ((remoteAccessConfigRef.current && typeof remoteAccessConfigRef.current === 'object') ? remoteAccessConfigRef.current : {});
+        : null;
+      if (!remoteCfg) return false;
       const remoteRows = Array.isArray(remoteCfg.obzvonNewRows) ? remoteCfg.obzvonNewRows : [];
-      const mergedRows = mergeObzvonNewRows(remoteRows, payloadRows);
+      const localKnownRows = Array.isArray(obzvonAllNewRowsRef.current) ? obzvonAllNewRowsRef.current : [];
+      const mergedRows = mergeObzvonNewRows(
+        mergeObzvonNewRows(remoteRows, localKnownRows),
+        payloadRows
+      );
       const fallbackPayload = {
         ...remoteCfg,
         users: Array.isArray(remoteCfg.users) ? remoteCfg.users : users,
@@ -6302,6 +6311,17 @@ export default function App() {
     userCreds,
   ]);
 
+  const flushPendingObzvonNewRows = useCallback(async () => {
+    const queue = Array.isArray(pendingObzvonNewRowsRef.current) ? pendingObzvonNewRowsRef.current : [];
+    if (!queue.length) return true;
+    const ok = await pushRemoteObzvonNewRows(queue);
+    if (ok) {
+      pendingObzvonNewRowsRef.current = [];
+      setTimeout(() => { pullRemoteObzvonNewRows(); }, 350);
+    }
+    return ok;
+  }, [pushRemoteObzvonNewRows, pullRemoteObzvonNewRows]);
+
   const upsertObzvonAllNewRows = useCallback((rows = []) => {
     const normalizedRows = (rows || [])
       .map((row, i) => normalizeObzvonNewRow(row, i))
@@ -6312,11 +6332,12 @@ export default function App() {
       S.set('aq-obzvon-all-new-rows', next);
       return next;
     });
-    Promise.resolve(pushRemoteObzvonNewRows(normalizedRows))
-      .finally(() => {
-        setTimeout(() => { pullRemoteObzvonNewRows(); }, 350);
-      });
-  }, [normalizeObzvonNewRow, hasObzvonRowPayload, mergeObzvonNewRows, pushRemoteObzvonNewRows, pullRemoteObzvonNewRows]);
+    pendingObzvonNewRowsRef.current = mergeObzvonNewRows(
+      pendingObzvonNewRowsRef.current || [],
+      normalizedRows
+    );
+    Promise.resolve(flushPendingObzvonNewRows());
+  }, [normalizeObzvonNewRow, hasObzvonRowPayload, mergeObzvonNewRows, flushPendingObzvonNewRows]);
   useEffect(() => {
     if (!Array.isArray(obzvonAllRows) || !obzvonAllRows.length) return;
     const cleaned = obzvonAllRows
@@ -6359,6 +6380,9 @@ export default function App() {
   useEffect(() => { S.set('aq-obzvon-records', obzvonRecords || []); }, [obzvonRecords]);
   useEffect(() => { S.set('aq-obzvon-all-rows', obzvonAllRows || []); }, [obzvonAllRows]);
   useEffect(() => { S.set('aq-obzvon-all-new-rows', obzvonAllNewRows || []); }, [obzvonAllNewRows]);
+  useEffect(() => {
+    obzvonAllNewRowsRef.current = obzvonAllNewRows || [];
+  }, [obzvonAllNewRows]);
   useEffect(() => { S.set('aq-plan-rows', normalizePlanRows(planRows || [])); }, [planRows]);
   useEffect(() => { S.set('aq-user-creds', userCreds || {}); }, [userCreds]);
   useEffect(() => {
@@ -6420,6 +6444,13 @@ export default function App() {
     }, 15000);
     return () => clearInterval(t);
   }, [isLoggedIn, accessApiUrl, pullRemoteObzvonNewRows]);
+  useEffect(() => {
+    if (!isLoggedIn || !accessApiUrl) return;
+    const t = setInterval(() => {
+      flushPendingObzvonNewRows();
+    }, 7000);
+    return () => clearInterval(t);
+  }, [isLoggedIn, accessApiUrl, flushPendingObzvonNewRows]);
 
   useEffect(() => {
     if (users.length === 0) return;
