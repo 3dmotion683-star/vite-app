@@ -1604,7 +1604,7 @@ const buildColsFromAoa = (headers, rows) => {
 const EXCEL_NUM_FMT = '#,##0';
 const EXCEL_DATE_FMT = 'dd.mm.yyyy';
 const isDateLikeHeader = (h) => /(sana|date|oxirgi|keyingi|olingan|muddat)/i.test(String(h || '').trim());
-const isNumberLikeHeader = (h) => /(summa|balans|qarz|dona|soni|kol-vo|qty|oylar|qoldiq|to['`’]?langan|idish|jami|miqdor|suv soni)/i.test(String(h || '').trim());
+const isNumberLikeHeader = (h) => /(summa|balans|qarz|dona|soni|kol-vo|qty|oylar|qoldiq|to['`’]?langan|idish|jami|miqdor|suv soni|(^|\s)(no|№)(\s|$))/i.test(String(h || '').trim());
 const isTextForcedHeader = (h) => /(^|\s)(id|kod|telefon|phone|operator|agent|kontragent|mijoz|rayon|status|mavzu|izoh|mahsulot|hujjat|tur)(\s|$)/i.test(String(h || '').trim());
 const parseExcelNumber = (v) => {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
@@ -1637,7 +1637,20 @@ const parseExcelNumber = (v) => {
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
 };
+const isLikelyDateInputForExcel = (v) => {
+  if (v instanceof Date) return true;
+  if (typeof v === 'number') {
+    return Number.isFinite(v) && v >= 40000 && v <= 60000;
+  }
+  const s = String(v ?? '').trim();
+  if (!s) return false;
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return true;
+  if (/^\d{2}[./-]\d{2}[./-]\d{4}/.test(s)) return true;
+  if (/^\d{4}[./-]\d{2}[./-]\d{2}/.test(s)) return true;
+  return false;
+};
 const normalizeDateForExcel = (v) => {
+  if (!isLikelyDateInputForExcel(v)) return null;
   const d = toDate(v);
   if (!d) return null;
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -4159,7 +4172,7 @@ function Obzvon({
                                 saveRecords(records.map((x,j)=>j===i?{
                                   ...x,
                                   customer:v,
-                                  id:'',
+                                  id:x.id || '',
                                   callDate:(x.callDate || (String(v).trim() ? todayIso() : x.callDate)),
                                 }:x));
                                 setPickTargetIdx(i);
@@ -6142,7 +6155,16 @@ export default function App() {
       }
       const prevTs = obzvonRowUpdatedTs(prev);
       const nextTs = obzvonRowUpdatedTs(r);
-      if (nextTs >= prevTs) m.set(key, { ...prev, ...r });
+      if (nextTs >= prevTs) {
+        const merged = { ...prev, ...r };
+        const prevId = String(prev?.customerId || '').trim();
+        const nextId = String(r?.customerId || '').trim();
+        if (!nextId && prevId) merged.customerId = prevId;
+        if (!String(merged?.customer || '').trim() && String(prev?.customer || '').trim()) {
+          merged.customer = prev.customer;
+        }
+        m.set(key, merged);
+      }
     });
     return Array.from(m.values()).sort((a, b) => obzvonRowUpdatedTs(b) - obzvonRowUpdatedTs(a));
   }, [normalizeObzvonNewRow, obzvonRowUpdatedTs]);
