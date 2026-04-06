@@ -392,6 +392,56 @@ function UniversalFilterPanel({
       window.removeEventListener('scroll', run, true);
     };
   }, [open, recalcPlacement]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [open, onClose]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const panelEl = panelRef.current;
+    const anchorEl = panelEl?.parentElement;
+    const boundaryEl = anchorEl?.closest('[data-filter-boundary="1"]');
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevBodyOverscroll = document.body.style.overscrollBehavior;
+    const prevBoundaryOverflow = boundaryEl ? boundaryEl.style.overflow : '';
+    const prevBoundaryOverscroll = boundaryEl ? boundaryEl.style.overscrollBehavior : '';
+
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    if (boundaryEl) {
+      boundaryEl.style.overflow = 'hidden';
+      boundaryEl.style.overscrollBehavior = 'none';
+    }
+
+    return () => {
+      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflow = prevBodyOverflow;
+      document.body.style.overscrollBehavior = prevBodyOverscroll;
+      if (boundaryEl) {
+        boundaryEl.style.overflow = prevBoundaryOverflow;
+        boundaryEl.style.overscrollBehavior = prevBoundaryOverscroll;
+      }
+    };
+  }, [open]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleDown = (e) => {
+      const panelEl = panelRef.current;
+      if (panelEl && !panelEl.contains(e.target)) onClose();
+    };
+    document.addEventListener('mousedown', handleDown, true);
+    document.addEventListener('touchstart', handleDown, true);
+    return () => {
+      document.removeEventListener('mousedown', handleDown, true);
+      document.removeEventListener('touchstart', handleDown, true);
+    };
+  }, [open, onClose]);
 
   if (!open) return null;
   const safeState = ensureUniversalFilterState(columns, state);
@@ -416,87 +466,111 @@ function UniversalFilterPanel({
   };
 
   return (
-    <div
-      ref={panelRef}
-      className="card"
-      style={{
-        position:'absolute',
-        top:40,
-        ...(placement.side === 'left' ? { right:0, left:'auto' } : { left:0, right:'auto' }),
-        zIndex:80,
-        width:placement.panelWidth,
-        maxWidth:'calc(100vw - 16px)',
-        padding:12,
-        boxShadow:'0 24px 60px rgba(0,0,0,.6)',
-        backdropFilter:'blur(10px)',
-        overflow:'hidden',
-      }}
-    >
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-        <div style={{fontWeight:700,fontSize:13}}>{title}</div>
-        <div style={{display:'flex',gap:6}}>
-          <button className="btn btn-gh btn-sm" onClick={()=>setAll('select')}>Hammasini belgilash</button>
-          <button className="btn btn-gh btn-sm" onClick={()=>setAll('clear')}>Hammasini tozalash</button>
+    <>
+      <div
+        style={{position:'fixed',inset:0,zIndex:79,background:'transparent',touchAction:'none'}}
+        onClick={onClose}
+        onMouseDown={onClose}
+        onTouchStart={onClose}
+        onWheel={(e)=>e.preventDefault()}
+      />
+      <div
+        ref={panelRef}
+        className="card"
+        style={{
+          position:'absolute',
+          top:40,
+          ...(placement.side === 'left' ? { right:0, left:'auto' } : { left:0, right:'auto' }),
+          zIndex:80,
+          width:placement.panelWidth,
+          maxWidth:'calc(100vw - 16px)',
+          padding:12,
+          boxShadow:'0 24px 60px rgba(0,0,0,.6)',
+          backdropFilter:'blur(10px)',
+          overflow:'hidden',
+        }}
+        onMouseDown={(e)=>e.stopPropagation()}
+        onClick={(e)=>e.stopPropagation()}
+        onTouchStart={(e)=>e.stopPropagation()}
+        onWheelCapture={(e)=>e.stopPropagation()}
+      >
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+          <div style={{fontWeight:700,fontSize:13}}>{title}</div>
+          <div style={{display:'flex',gap:6}}>
+            <button className="btn btn-gh btn-sm" onClick={()=>setAll('select')}>Hammasini belgilash</button>
+            <button className="btn btn-gh btn-sm" onClick={()=>setAll('clear')}>Hammasini tozalash</button>
+          </div>
+        </div>
+        <div
+          style={{
+            maxHeight:placement.maxHeight,
+            overflow:'auto',
+            paddingRight:2,
+            overscrollBehavior:'contain',
+            overscrollBehaviorY:'contain',
+            WebkitOverflowScrolling:'touch',
+          }}
+          onWheel={(e)=>e.stopPropagation()}
+          onTouchMove={(e)=>e.stopPropagation()}
+        >
+          {columns.map((col) => {
+            const st = safeState[col.key] || makeUniversalColState();
+            const opts = optionsByKey[col.key] || [];
+            const shownOpts = opts.filter((o) => o.toLowerCase().includes(String(st.optionQuery || '').toLowerCase()));
+            return (
+              <div key={col.key} className="card" style={{padding:8,marginBottom:8,background:'var(--s3)',border:'1px solid var(--b1)'}}>
+                <div style={{fontSize:10.5,color:'var(--t3)',fontWeight:700,marginBottom:6}}>{col.label}</div>
+                <div style={{display:'grid',gridTemplateColumns:'120px 1fr auto',gap:6,marginBottom:6}}>
+                  <select className="select" value={st.mode || 'show'} onChange={(e)=>upd(col.key, { mode:e.target.value })}>
+                    {UNIVERSAL_FILTER_MODES.map((m)=><option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                  <input
+                    className="input"
+                    type={col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : 'text'}
+                    value={st.value || ''}
+                    placeholder={col.type === 'number' ? 'son kiriting' : col.type === 'date' ? 'sanani tanlang' : 'qiymat yozing'}
+                    onChange={(e)=>upd(col.key, { value:e.target.value })}
+                  />
+                  <button className="btn btn-gh btn-sm" onClick={()=>upd(col.key, { optionsOpen: !st.optionsOpen })}>{st.optionsOpen ? 'Yop' : "Ro'yxat"}</button>
+                </div>
+                {st.optionsOpen && (
+                  <div className="card" style={{padding:8,border:'1px solid var(--b1)'}}>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr auto auto',gap:6,marginBottom:6}}>
+                      <input className="input" placeholder="Qidirish..." value={st.optionQuery || ''} onChange={(e)=>upd(col.key, { optionQuery: e.target.value })} />
+                      <button className="btn btn-gh btn-sm" onClick={()=>upd(col.key, { selected:[...opts] })}>Hammasi</button>
+                      <button className="btn btn-gh btn-sm" onClick={()=>upd(col.key, { selected:[] })}>Tozalash</button>
+                    </div>
+                    <div style={{maxHeight:120,overflow:'auto',overscrollBehavior:'contain'}}>
+                      {shownOpts.map((opt) => {
+                        const checked = (st.selected || []).includes(opt);
+                        return (
+                          <label key={opt} style={FILTER_CHECK_LABEL_STYLE}>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e)=>upd(col.key, {
+                                selected: e.target.checked
+                                  ? [...(st.selected || []), opt]
+                                  : (st.selected || []).filter((x)=>x!==opt),
+                              })}
+                            />
+                            <span style={{...FILTER_CHECK_TEXT_STYLE,color:checked?'var(--bl)':'var(--t2)'}}>{opt}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{display:'flex',justifyContent:'flex-end',gap:6}}>
+          <button className="btn btn-gh btn-sm" onClick={onClose}>Yopish</button>
+          <button className="btn btn-bl btn-sm" onClick={onClose}>Qo'llash</button>
         </div>
       </div>
-      <div style={{maxHeight:placement.maxHeight,overflow:'auto',paddingRight:2}}>
-        {columns.map((col) => {
-          const st = safeState[col.key] || makeUniversalColState();
-          const opts = optionsByKey[col.key] || [];
-          const shownOpts = opts.filter((o) => o.toLowerCase().includes(String(st.optionQuery || '').toLowerCase()));
-          return (
-            <div key={col.key} className="card" style={{padding:8,marginBottom:8,background:'var(--s3)',border:'1px solid var(--b1)'}}>
-              <div style={{fontSize:10.5,color:'var(--t3)',fontWeight:700,marginBottom:6}}>{col.label}</div>
-              <div style={{display:'grid',gridTemplateColumns:'120px 1fr auto',gap:6,marginBottom:6}}>
-                <select className="select" value={st.mode || 'show'} onChange={(e)=>upd(col.key, { mode:e.target.value })}>
-                  {UNIVERSAL_FILTER_MODES.map((m)=><option key={m.value} value={m.value}>{m.label}</option>)}
-                </select>
-                <input
-                  className="input"
-                  type={col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : 'text'}
-                  value={st.value || ''}
-                  placeholder={col.type === 'number' ? 'son kiriting' : col.type === 'date' ? 'sanani tanlang' : 'qiymat yozing'}
-                  onChange={(e)=>upd(col.key, { value:e.target.value })}
-                />
-                <button className="btn btn-gh btn-sm" onClick={()=>upd(col.key, { optionsOpen: !st.optionsOpen })}>{st.optionsOpen ? 'Yop' : "Ro'yxat"}</button>
-              </div>
-              {st.optionsOpen && (
-                <div className="card" style={{padding:8,border:'1px solid var(--b1)'}}>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr auto auto',gap:6,marginBottom:6}}>
-                    <input className="input" placeholder="Qidirish..." value={st.optionQuery || ''} onChange={(e)=>upd(col.key, { optionQuery: e.target.value })} />
-                    <button className="btn btn-gh btn-sm" onClick={()=>upd(col.key, { selected:[...opts] })}>Hammasi</button>
-                    <button className="btn btn-gh btn-sm" onClick={()=>upd(col.key, { selected:[] })}>Tozalash</button>
-                  </div>
-                  <div style={{maxHeight:120,overflow:'auto'}}>
-                    {shownOpts.map((opt) => {
-                      const checked = (st.selected || []).includes(opt);
-                      return (
-                        <label key={opt} style={FILTER_CHECK_LABEL_STYLE}>
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={(e)=>upd(col.key, {
-                              selected: e.target.checked
-                                ? [...(st.selected || []), opt]
-                                : (st.selected || []).filter((x)=>x!==opt),
-                            })}
-                          />
-                          <span style={{...FILTER_CHECK_TEXT_STYLE,color:checked?'var(--bl)':'var(--t2)'}}>{opt}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div style={{display:'flex',justifyContent:'flex-end',gap:6}}>
-        <button className="btn btn-gh btn-sm" onClick={onClose}>Yopish</button>
-        <button className="btn btn-bl btn-sm" onClick={onClose}>Qo'llash</button>
-      </div>
-    </div>
+    </>
   );
 }
 const createRowRid = () => `r_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
