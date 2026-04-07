@@ -1439,7 +1439,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
     _dateStr: o.orderDate,
   }));
   const myCash = (cashByMId[cid] || [])
-    .filter((p) => isPaymentFromCounterparty(p.opType))
+    .filter((p) => isPaymentFromCounterparty(p.opType) || isPaymentToCounterparty(p.opType))
     .map((p) => ({
       ...p,
       _type: 'payment',
@@ -1487,17 +1487,18 @@ function buildSverka(customer, ordersByMId, cashByMId) {
         _type: 'order',
       };
     } else {
-      if (row.currency === 'USD') runBalUSD += row.amount;
-      else runBalUZS += row.amount;
+      const signedAmount = isPaymentToCounterparty(row.opType) ? -Math.abs(row.amount || 0) : Math.abs(row.amount || 0);
+      if (row.currency === 'USD') runBalUSD += signedAmount;
+      else runBalUZS += signedAmount;
       return {
         kod: row.opNum,
         sana: fmtD(row._dateStr),
-        dokument: "РћРїР»Р°С‚Р° РѕС‚ РєРѕРЅС‚СЂР°РіРµРЅС‚Р°",
+        dokument: row.opType || "РћРїР»Р°С‚Р° РѕС‚ РєРѕРЅС‚СЂР°РіРµРЅС‚Р°",
         produkt: '',
         qty: null,
         narx: null,
         summa: 0,
-        tolov: row.amount,
+        tolov: signedAmount,
         balansUZS: runBalUZS,
         balansUSD: runBalUSD,
         currency: row.currency || 'UZS',
@@ -2100,7 +2101,7 @@ function CustomerDetail({ c, D, onClose }) {
     (o) => isWaterProduct(o.product) && isReturnDoc(o.docType)
   );
   const myPays = (cashByMId?.[c.id] || []).filter(
-    (p) => isPaymentFromCounterparty(p.opType)
+    (p) => isPaymentFromCounterparty(p.opType) || isPaymentToCounterparty(p.opType)
   );
 
   const balColor = (v) => v < 0 ? 'var(--rd)' : v > 0 ? 'var(--gr)' : 'var(--t3)';
@@ -2218,8 +2219,8 @@ function CustomerDetail({ c, D, onClose }) {
                           <td style={{textAlign:'center'}}>
                             <span className={row.currency==='USD'?'cur-usd':'cur-uzs'}>{row.currency||'UZS'}</span>
                           </td>
-                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:row.tolov?'var(--gr)':'var(--t4)'}}>
-                            {row.tolov?'+'+fmt(row.tolov):'—'}
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:row.tolov>0?'var(--gr)':row.tolov<0?'var(--rd)':'var(--t4)'}}>
+                            {row.tolov ? `${row.tolov > 0 ? '+' : '-'}${fmt(Math.abs(row.tolov))}` : '—'}
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:row.balansUZS<0?'var(--rd)':row.balansUZS>0?'var(--gr)':'var(--t3)'}}>
                             {row.balansUZS<0?'-':row.balansUZS>0?'+':''}{fmt(Math.abs(row.balansUZS))}
@@ -2350,17 +2351,21 @@ function CustomerDetail({ c, D, onClose }) {
                 <tbody>
                   {myPays.length===0
                     ? <tr><td colSpan={7} style={{textAlign:'center',padding:32,color:'var(--t3)'}}>To'lovlar yo'q</td></tr>
-                    : myPays.map((p,i) => (
+                    : myPays.map((p,i) => {
+                      const signed = isPaymentToCounterparty(p.opType) ? -Math.abs(p.amount || 0) : Math.abs(p.amount || 0);
+                      return (
                       <tr key={i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:10.5,color:'var(--t3)'}}>{p.opNum}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(p.sana)}</td>
-                        <td style={{fontFamily:'var(--mono)',fontWeight:800,color:'var(--gr)'}}>+{fmt(p.amount)}</td>
+                        <td style={{fontFamily:'var(--mono)',fontWeight:800,color:signed>=0?'var(--gr)':'var(--rd)'}}>
+                          {signed>=0?'+':'-'}{fmt(Math.abs(signed))}
+                        </td>
                         <td><span className={p.currency==='USD'?'cur-usd':'cur-uzs'}>{p.currency||'UZS'}</span></td>
                         <td style={{fontSize:11,color:'var(--t3)'}}>{p.kassa||'—'}</td>
                         <td style={{fontSize:11}}>{p.operator||'—'}</td>
                         <td style={{fontSize:11,color:'var(--t3)'}}>{p.note||'—'}</td>
                       </tr>
-                    ))
+                    )})
                   }
                 </tbody>
               </table>
