@@ -5733,7 +5733,8 @@ function Reports({
         {showReport && <button className="btn btn-gr btn-sm" onClick={exportReports}>Hisobot Excel</button>}
         {showNazorat && <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>}
       </div>
-      {showReport && <div className="g4">
+      {showReport && (
+      <div className="g4">
         <StatCard
           l={`SUV (${currentMonth}) Р’В· ${companyLabelByKey(company)}`}
           v={`${fmt(monthWaterQty)} ta`}
@@ -5758,9 +5759,11 @@ function Reports({
           s={canSeeAll ? 'Hamma operator' : `${currentUser}`}
           c="var(--yl)"
         />
-      </div>}
+      </div>
+      )}
 
-      {showReport && <div className="card" style={{padding:16}}>
+      {showReport && (
+      <div className="card" style={{padding:16}}>
         <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Kunlik natija</div>
         <div style={{overflow:'auto',maxHeight:'58vh'}}>
           <table className="tbl">
@@ -5822,9 +5825,11 @@ function Reports({
             </tbody>
           </table>
         </div>
-      </div>}
+      </div>
+      )}
 
-      {showNazorat && <div className="card" style={{padding:16}}>
+      {showNazorat && (
+      <div className="card" style={{padding:16}}>
         <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Nazorat</div>
         <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
           Dostavchik-sklad biriktirish: Nastroyka > Biriktirish bo'limida.
@@ -5903,7 +5908,8 @@ function Reports({
             </tbody>
           </table>
         </div>
-      </div>}
+      </div>
+      )}
     </div>
   );
 }
