@@ -123,7 +123,7 @@ function recalcInstallment(row, monthsRaw) {
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ CONFIG в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 const SHEET_CONFIG = {
   url: 'https://docs.google.com/spreadsheets/d/1RND6D5JIWh6vnk8i_FO1mx1if4hx182VNaPzGQtKuQM/edit?gid=1272423090#gid=1272423090',
-  gids: { merchants: '', balans: '', orders: '', cashbox: '', integration: '', mijozlar: '' },
+  gids: { merchants: '', balans: '', orders: '', cashbox: '', integration: '', mijozlar: '', warehouseTransfer: '' },
 };
 const OBZVON_ALL_LOCAL_XLSX = '/obzvon-vse.xlsx';
 const OBZVON_ALL_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=0#gid=0';
@@ -1132,6 +1132,7 @@ async function loadFromGoogleSheets(sheetId, gids, onProgress, mode='gid') {
       { key:'public.view_current_merchant_event_balance', label:'Balans', sheet:'public.view_current_merchant_event_balance', required:false },
       { key:'public.view_item_basket', label:'Zakazlar', sheet:'public.view_item_basket', required:false },
       { key:'public.view_cashbox_documents', label:'Kassa', sheet:'public.view_cashbox_documents', required:false },
+      { key:'public.view_warehouse_transfer', label:'Permesheniya', sheet:'public.view_warehouse_transfer', required:false },
       { key:'intigratsiya', label:'Integratsiya', sheet:'intigratsiya', required:false },
       { key:'mijozlar', label:'Mijoz biriktiruv', sheet:'mijozlar', required:false },
     ];
@@ -1158,6 +1159,7 @@ async function loadFromGoogleSheets(sheetId, gids, onProgress, mode='gid') {
     { key: 'Balans',                           gid: gids.balans,      label: 'Balans' },
     { key: 'public.view_item_basket',          gid: gids.orders,      label: 'Zakazlar' },
     { key: 'public.view_cashbox_documents',    gid: gids.cashbox,     label: 'Kassa' },
+    { key: 'public.view_warehouse_transfer',   gid: gids.warehouseTransfer, label: 'Permesheniya' },
     { key: 'intigratsiya',                     gid: gids.integration, label: 'Integratsiya' },
     { key: 'mijozlar',                         gid: gids.mijozlar,    label: 'Mijoz biriktiruv' },
   ];
@@ -1315,6 +1317,36 @@ function processAll(mainData) {
 
       if (!opNum || opNum === 'РќРѕРјРµСЂ РѕРїРµСЂР°С†РёРё') return;
       rawCash.push({ opStatus, opNum, sana, amount, currency, opType, operator, contName, kassa, mId, note });
+    });
+  }
+
+  /* ── 5.1. PERMESHENIYA ──
+     R(r[17])=OperationID  S(r[18])=SoSklada  T(r[19])=NaSklad
+     U(r[20])=Sana         V(r[21])=Mahsulot  W(r[22])=Soni
+     X(r[23])=Kod          Y(r[24])=UniqueID */
+  const transferSheet = mainData.sheets['public.view_warehouse_transfer'];
+  const warehouseTransfers = [];
+  if (transferSheet) {
+    transferSheet.slice(1).forEach((r) => {
+      const movementId = String(r[17] || '').trim();
+      const fromWarehouse = String(r[18] || '').trim();
+      const toWarehouse = String(r[19] || '').trim();
+      const moveDate = String(r[20] || '').trim();
+      const product = String(r[21] || '').trim();
+      const qty = Math.abs(toNum(r[22]));
+      const changeCode = String(r[23] || '').trim();
+      const uniqueId = String(r[24] || '').trim();
+      if (!movementId && !fromWarehouse && !toWarehouse && !moveDate && !product && !qty && !uniqueId) return;
+      warehouseTransfers.push({
+        movementId,
+        fromWarehouse,
+        toWarehouse,
+        moveDate,
+        product,
+        qty,
+        changeCode,
+        uniqueId,
+      });
     });
   }
 
@@ -1545,7 +1577,7 @@ function processAll(mainData) {
 
   return {
     customers, orders: rawOrders, cashbox: rawCash, contacts,
-    rawOrders, rawCash, ordersByMId, cashByMId, kulerInstallments, assignmentById, debtorsByBalance, otherDebtorsByBalance,
+    rawOrders, rawCash, ordersByMId, cashByMId, warehouseTransfers, kulerInstallments, assignmentById, debtorsByBalance, otherDebtorsByBalance,
   };
 }
 
@@ -2042,7 +2074,7 @@ function UploadModal({
   const [loading, setLoad] = useState(false);
   const [progress, setProg] = useState('');
   const [gids, setGids] = useState(() => S.get('aq-gs-gids', {
-    merchants:'', balans:'', orders:'', cashbox:'', integration:'', mijozlar:'',
+    merchants:'', balans:'', orders:'', cashbox:'', integration:'', mijozlar:'', warehouseTransfer:'',
   }));
   const fixedMainUrl = SHEET_CONFIG.url || '';
   const fixedObzvonUrl = OBZVON_ALL_SHEET_URL || '';
@@ -2135,7 +2167,7 @@ function UploadModal({
                     ? <div style={{fontWeight:700,color:'var(--gr)',fontSize:13}}>{files.main.name}</div>
                     : <div>
                         <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>Asosiy Excel faylni tanlang</div>
-                        <div style={{fontSize:11.5,color:'var(--t3)'}}>public.view_merchants, Balans, Zakazlar, Kassa varaqlari</div>
+                        <div style={{fontSize:11.5,color:'var(--t3)'}}>public.view_merchants, Balans, Zakazlar, Kassa, public.view_warehouse_transfer varaqlari</div>
                       </div>
                   }
                 </div>
@@ -2188,7 +2220,7 @@ function UploadModal({
               <div style={{background:'var(--s3)',border:'1px solid var(--b1)',borderRadius:8,padding:'10px 12px',marginBottom:12,fontSize:12,color:'var(--t2)'}}>
                 Kerakli listlar:
                 <div style={{marginTop:6,fontFamily:'var(--mono)',fontSize:11}}>
-                  public.view_merchants, public.view_current_merchant_event_balance, public.view_item_basket, public.view_cashbox_documents, intigratsiya, mijozlar
+                  public.view_merchants, public.view_current_merchant_event_balance, public.view_item_basket, public.view_cashbox_documents, public.view_warehouse_transfer, intigratsiya, mijozlar
                 </div>
               </div>
               <div style={{marginBottom:14}}>
@@ -4847,8 +4879,14 @@ function Obzvon({
                         <td style={{maxWidth:140}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.district || '—'}</span></td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.balance<0?'var(--rd)':r.balance>0?'var(--gr)':'var(--t3)'}}>{fmt(r.balance)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
-                          <div>{fmtD(r.ord1)}</div>
-                          <div style={{color:'var(--t3)',fontSize:10.5}}>{fmtD(r.ord2)}</div>
+                          <div style={{display:'flex',justifyContent:'space-between',gap:10}}>
+                            <span style={{color:'var(--t3)',fontSize:10}}>Oxirgi</span>
+                            <span>{fmtD(r.ord1)}</span>
+                          </div>
+                          <div style={{display:'flex',justifyContent:'space-between',gap:10,marginTop:2}}>
+                            <span style={{color:'var(--t3)',fontSize:10}}>Oldingi</span>
+                            <span>{fmtD(r.ord2)}</span>
+                          </div>
                         </td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--bl)'}}>{r.lastQty ? `${r.lastQty}` : '0'}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.lastCallDate)}</td>
@@ -5360,6 +5398,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
 }
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ HISOBOTLAR в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ NAZORAT в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 function Reports({
   D,
   company='murodbaxsh',
@@ -5369,11 +5408,25 @@ function Reports({
   access={},
   planRows=[],
   planOffDays=[],
-  obzvonNewRows=[],
 }) {
-  const { rawOrders=[] } = D;
+  const { rawOrders=[], warehouseTransfers=[] } = D;
   const todayIso = toIsoDate(new Date());
   const currentMonth = normalizeMonthKey(todayIso.slice(0,7));
+  const canSeeAll = (currentAccess?.scope || 'all') === 'all';
+  const normalizeWarehouseKey = (v) => normText(v).replace(/\s+/g, ' ').trim();
+  const isMainWarehouseName = (v) => {
+    const s = normalizeWarehouseKey(v).replace(/\s+/g, '');
+    if (!s) return false;
+    return (
+      s.includes('основнойсклад') ||
+      s.includes('основной') ||
+      s.includes('osnovnoysklad') ||
+      s.includes('osnovnoy') ||
+      s.includes('asosnoysklad') ||
+      s.includes('asosiysklad')
+    );
+  };
+
   const planByMonth = useMemo(() => {
     const m = {};
     (planRows || []).forEach((r) => { if (r?.month) m[r.month] = r; });
@@ -5382,38 +5435,6 @@ function Reports({
   const selectedPlan = planByMonth[currentMonth] || { month: currentMonth, waterPlan:0, coolerPlan:0, workDays:26 };
   const offDays = useMemo(() => normalizeOffDays(planOffDays || []), [planOffDays]);
   const offDaysSet = useMemo(() => new Set(offDays), [offDays]);
-  const canSeeAll = (currentAccess?.scope || 'all') === 'all';
-  const visibleOperators = useMemo(() => {
-    const src = (users || []).filter((u) => {
-      const conf = normalizeAccessConfig(u, access?.[u]);
-      if (!(conf.visible?.reports ?? true)) return false;
-      if (u === 'Admin') return false;
-      if (conf.role === 'admin') return false;
-      return true;
-    });
-    return src.length ? src : [currentUser || 'Admin'];
-  }, [users, access, currentUser]);
-  const visibleRows = useMemo(() => {
-    const base = (obzvonNewRows || []).filter((r) => !isObzvonDeletedRow(r));
-    if (canSeeAll) return base;
-    return base.filter((r) => String(r.operator || '').trim() === String(currentUser || '').trim());
-  }, [obzvonNewRows, canSeeAll, currentUser]);
-  const rowsToday = useMemo(
-    () => visibleRows.filter((r) => toIsoDate(r.callDate) === todayIso),
-    [visibleRows, todayIso]
-  );
-
-  const monthWaterOrders = useMemo(() => {
-    return (rawOrders || []).filter((o) =>
-      isWaterProduct(o.product) &&
-      isOrderDoc(o.docType) &&
-      isDeliveredStatus(o.status) &&
-      monthKey(o.orderDate) === currentMonth
-    );
-  }, [rawOrders, currentMonth]);
-  const monthWaterQty = monthWaterOrders.reduce((s,o)=>s + Math.abs(o.qty || 0), 0);
-  const monthWaterSum = monthWaterOrders.reduce((s,o)=>s + (o.currency === 'USD' ? 0 : (o.sum || 0)), 0);
-
   const todayDate = useMemo(() => {
     const d = toDate(todayIso);
     if (!d) return new Date();
@@ -5425,19 +5446,6 @@ function Reports({
     if (!y || !m) return new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
     return new Date(y, m, 0);
   }, [currentMonth, todayDate]);
-  const soldUntilTodayQty = useMemo(() => {
-    return (rawOrders || []).filter((o) => {
-      if (!isWaterProduct(o.product)) return false;
-      if (!isOrderDoc(o.docType)) return false;
-      if (isCancelledStatus(o.status)) return false;
-      if (monthKey(o.orderDate) !== currentMonth) return false;
-      const od = toDate(o.orderDate);
-      if (!od) return false;
-      od.setHours(0, 0, 0, 0);
-      return od <= todayDate;
-    }).reduce((s, o) => s + Math.abs(o.qty || 0), 0);
-  }, [rawOrders, currentMonth, todayDate]);
-  const remainingMonthPlanQty = Math.max(0, Number(selectedPlan.waterPlan || 0) - soldUntilTodayQty);
   const tomorrowDate = useMemo(() => {
     const d = new Date(todayDate);
     d.setDate(d.getDate() + 1);
@@ -5451,75 +5459,212 @@ function Reports({
     () => nextWorkDate ? countWorkDays(nextWorkDate, monthEndDate, offDaysSet) : 0,
     [nextWorkDate, monthEndDate, offDaysSet]
   );
-  const nextWorkDayPlan = remainingWorkDays > 0 ? Math.ceil(remainingMonthPlanQty / remainingWorkDays) : 0;
-  const nextWorkDayPlanPerOperator = Math.ceil(nextWorkDayPlan / Math.max(1, canSeeAll ? visibleOperators.length : 1));
-  const currentPlanTarget = canSeeAll ? nextWorkDayPlan : nextWorkDayPlanPerOperator;
-  const debtRowsToday = rowsToday.filter((r) => String(r.topic || '').toLowerCase().includes('qarz'));
-  const callsToday = rowsToday.length;
-  const planLeft = nextWorkDayPlan;
-  const debtWorkedCount = new Set(
-    debtRowsToday.map((r) => String(r.customerId || r.id || r.customer || '').trim()).filter(Boolean)
-  ).size;
-  const debtWorkedSum = debtRowsToday.reduce((s,r)=>s + Math.abs(toIntFromMixed(r.orderCount || 0)), 0);
 
-  const dailyByOperator = useMemo(() => {
-    const ops = new Map();
-    rowsToday.forEach((r) => {
-      const op = String(r.operator || '—').trim() || '—';
-      if (!ops.has(op)) ops.set(op, []);
-      ops.get(op).push(r);
+  const monthWaterOrders = useMemo(() => {
+    return (rawOrders || []).filter((o) =>
+      isWaterProduct(o.product) &&
+      isOrderDoc(o.docType) &&
+      !isCancelledStatus(o.status) &&
+      monthKey(o.orderDate) === currentMonth
+    );
+  }, [rawOrders, currentMonth]);
+  const monthWaterQty = monthWaterOrders.reduce((s,o)=>s + Math.abs(o.qty || 0), 0);
+  const monthWaterSum = monthWaterOrders.reduce((s,o)=>s + (o.currency === 'USD' ? 0 : (o.sum || 0)), 0);
+  const soldUntilTodayQty = useMemo(() => {
+    return (rawOrders || []).filter((o) => {
+      if (!isWaterProduct(o.product)) return false;
+      if (!isOrderDoc(o.docType)) return false;
+      if (isCancelledStatus(o.status)) return false;
+      if (monthKey(o.orderDate) !== currentMonth) return false;
+      const od = toDate(o.orderDate);
+      if (!od) return false;
+      od.setHours(0, 0, 0, 0);
+      return od <= todayDate;
+    }).reduce((s, o) => s + Math.abs(o.qty || 0), 0);
+  }, [rawOrders, currentMonth, todayDate]);
+  const remainingMonthPlanQty = Math.max(0, Number(selectedPlan.waterPlan || 0) - soldUntilTodayQty);
+  const nextWorkDayPlan = remainingWorkDays > 0 ? Math.ceil(remainingMonthPlanQty / remainingWorkDays) : 0;
+
+  const mapStorageKey = useMemo(
+    () => `aq-driver-warehouse-map-${normalizeCompanyKey(company)}`,
+    [company]
+  );
+  const [driverWarehouseMap, setDriverWarehouseMap] = useState(() => S.get(mapStorageKey, {}));
+  useEffect(() => {
+    setDriverWarehouseMap(S.get(mapStorageKey, {}));
+  }, [mapStorageKey]);
+  useEffect(() => {
+    S.set(mapStorageKey, driverWarehouseMap || {});
+  }, [mapStorageKey, driverWarehouseMap]);
+
+  const controlOrderRows = useMemo(() => {
+    let rows = (rawOrders || []).filter((o) => {
+      if (!isWaterProduct(o.product)) return false;
+      if (!isOrderDoc(o.docType)) return false;
+      if (isCancelledStatus(o.status)) return false;
+      const dateKey = toIsoDate(o.orderDate);
+      if (!dateKey) return false;
+      const driver = String(o.delivPerson || o.agent || '').trim();
+      if (!driver) return false;
+      return true;
+    }).map((o) => ({
+      date: toIsoDate(o.orderDate),
+      driver: String(o.delivPerson || o.agent || '').trim(),
+      qty: Math.abs(toNum(o.qty)),
+    }));
+    if (!canSeeAll) rows = rows.filter((r) => r.driver === currentUser);
+    return rows;
+  }, [rawOrders, canSeeAll, currentUser]);
+
+  const transferRows = useMemo(() => {
+    return (warehouseTransfers || []).filter((r) => {
+      if (!isWaterProduct(r.product)) return false;
+      if (!isMainWarehouseName(r.toWarehouse)) return false;
+      const d = toIsoDate(r.moveDate);
+      if (!d) return false;
+      const from = String(r.fromWarehouse || '').trim();
+      if (!from) return false;
+      return true;
+    }).map((r) => ({
+      date: toIsoDate(r.moveDate),
+      fromWarehouse: String(r.fromWarehouse || '').trim(),
+      qty: Math.abs(toNum(r.qty)),
+    }));
+  }, [warehouseTransfers]);
+
+  const warehouseOptions = useMemo(() => {
+    const uniq = Array.from(new Set((transferRows || []).map((r) => r.fromWarehouse).filter(Boolean)));
+    return uniq.sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [transferRows]);
+
+  const { orderQtyByDriverDate, orderDatesByDriver, driverOptions } = useMemo(() => {
+    const qtyMap = new Map();
+    const datesByDriver = new Map();
+    const drivers = new Set();
+    controlOrderRows.forEach((r) => {
+      const key = `${r.driver}__${r.date}`;
+      qtyMap.set(key, (qtyMap.get(key) || 0) + Math.abs(toNum(r.qty)));
+      drivers.add(r.driver);
+      if (!datesByDriver.has(r.driver)) datesByDriver.set(r.driver, new Set());
+      datesByDriver.get(r.driver).add(r.date);
     });
-    return Array.from(ops.entries()).map(([op, rows]) => {
-      const buyRows = rows.filter((x) => String(x.topic || '').toLowerCase().includes('buyurtma'));
-      const qarzRows = rows.filter((x) => String(x.topic || '').toLowerCase().includes('qarz'));
-      const qty = buyRows.reduce((s,x)=>s + Math.max(0, toIntFromMixed(x.orderCount || 0)), 0);
-      const debtSum = qarzRows.reduce((s,x)=>s + Math.abs(toIntFromMixed(x.orderCount || 0)), 0);
-      const byOrderDate = {};
-      buyRows.forEach((x) => {
-        const k = toIsoDate(x.orderDate) || '—';
-        byOrderDate[k] = (byOrderDate[k] || 0) + Math.max(0, toIntFromMixed(x.orderCount || 0));
+    return {
+      orderQtyByDriverDate: qtyMap,
+      orderDatesByDriver: datesByDriver,
+      driverOptions: Array.from(drivers).sort((a, b) => a.localeCompare(b, 'ru')),
+    };
+  }, [controlOrderRows]);
+
+  const { transferQtyByWarehouseDate, transferDatesByWarehouse } = useMemo(() => {
+    const qtyMap = new Map();
+    const datesByWarehouse = new Map();
+    transferRows.forEach((r) => {
+      const warehouseKey = normalizeWarehouseKey(r.fromWarehouse);
+      if (!warehouseKey) return;
+      const key = `${warehouseKey}__${r.date}`;
+      qtyMap.set(key, (qtyMap.get(key) || 0) + Math.abs(toNum(r.qty)));
+      if (!datesByWarehouse.has(warehouseKey)) datesByWarehouse.set(warehouseKey, new Set());
+      datesByWarehouse.get(warehouseKey).add(r.date);
+    });
+    return { transferQtyByWarehouseDate: qtyMap, transferDatesByWarehouse: datesByWarehouse };
+  }, [transferRows]);
+
+  const allDrivers = useMemo(() => {
+    const set = new Set(driverOptions);
+    Object.keys(driverWarehouseMap || {}).forEach((d) => {
+      const name = String(d || '').trim();
+      if (name) set.add(name);
+    });
+    let rows = Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
+    if (!canSeeAll) rows = rows.filter((x) => x === currentUser);
+    return rows;
+  }, [driverOptions, driverWarehouseMap, canSeeAll, currentUser]);
+
+  const comparisonRows = useMemo(() => {
+    const out = [];
+    allDrivers.forEach((driver) => {
+      const warehouse = String(driverWarehouseMap?.[driver] || '').trim();
+      const warehouseKey = normalizeWarehouseKey(warehouse);
+      const orderDates = orderDatesByDriver.get(driver) || new Set();
+      const transferDates = warehouseKey ? (transferDatesByWarehouse.get(warehouseKey) || new Set()) : new Set();
+      const allDates = Array.from(new Set([...orderDates, ...transferDates])).sort((a, b) => a.localeCompare(b));
+      allDates.forEach((date) => {
+        const orderQty = Number(orderQtyByDriverDate.get(`${driver}__${date}`) || 0);
+        const transferQty = warehouseKey ? Number(transferQtyByWarehouseDate.get(`${warehouseKey}__${date}`) || 0) : 0;
+        out.push({
+          date,
+          driver,
+          warehouse: warehouse || '—',
+          orderQty,
+          transferQty,
+          diff: orderQty - transferQty,
+          mappingMissing: !warehouse,
+        });
       });
-      const dateEntries = Object.entries(byOrderDate)
-        .sort((a,b)=>a[0].localeCompare(b[0]))
-        .map(([k,v]) => ({ date: k, qty: v }));
-      const dateBreak = dateEntries.map((x) => `${x.date}: ${x.qty} ta`).join(' | ');
-      return {
-        operator: op,
-        calls: rows.length,
-        buyurtmaCount: buyRows.length,
-        buyurtmaQty: qty,
-        debtCount: qarzRows.length,
-        debtSum,
-        dateEntries,
-        dateBreak,
-      };
-    }).sort((a,b)=>b.calls-a.calls);
-  }, [rowsToday]);
-  const dailyRows = useMemo(() => {
-    if (canSeeAll) return dailyByOperator;
-    return dailyByOperator.filter((x)=>x.operator===currentUser);
-  }, [canSeeAll, dailyByOperator, currentUser]);
-  const dailyTotals = useMemo(() => ({
-    calls: dailyRows.reduce((s, r) => s + (r.calls || 0), 0),
-    buyurtmaCount: dailyRows.reduce((s, r) => s + (r.buyurtmaCount || 0), 0),
-    buyurtmaQty: dailyRows.reduce((s, r) => s + (r.buyurtmaQty || 0), 0),
-    debtCount: dailyRows.reduce((s, r) => s + (r.debtCount || 0), 0),
-    debtSum: dailyRows.reduce((s, r) => s + (r.debtSum || 0), 0),
-  }), [dailyRows]);
+    });
+    return out;
+  }, [
+    allDrivers,
+    driverWarehouseMap,
+    normalizeWarehouseKey,
+    orderDatesByDriver,
+    transferDatesByWarehouse,
+    orderQtyByDriverDate,
+    transferQtyByWarehouseDate,
+  ]);
+
+  const dailyControlRows = useMemo(
+    () => comparisonRows
+      .filter((r) => r.mappingMissing || r.orderQty > 0 || r.transferQty > 0)
+      .sort((a, b) => (a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date))),
+    [comparisonRows]
+  );
+  const mismatchRows = useMemo(
+    () => dailyControlRows.filter((r) => r.mappingMissing || r.diff !== 0),
+    [dailyControlRows]
+  );
+  const dateTotals = useMemo(() => {
+    const m = new Map();
+    dailyControlRows.forEach((r) => {
+      const prev = m.get(r.date) || { date: r.date, orderQty: 0, transferQty: 0 };
+      prev.orderQty += Number(r.orderQty || 0);
+      prev.transferQty += Number(r.transferQty || 0);
+      m.set(r.date, prev);
+    });
+    return Array.from(m.values())
+      .map((r) => ({ ...r, diff: r.orderQty - r.transferQty }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }, [dailyControlRows]);
+  const unmatchedDrivers = useMemo(
+    () => allDrivers.filter((d) => !String(driverWarehouseMap?.[d] || '').trim()),
+    [allDrivers, driverWarehouseMap]
+  );
+  const controlTotals = useMemo(() => ({
+    orderQty: dailyControlRows.reduce((s, r) => s + Number(r.orderQty || 0), 0),
+    transferQty: dailyControlRows.reduce((s, r) => s + Number(r.transferQty || 0), 0),
+  }), [dailyControlRows]);
 
   const exportReports = () => {
     exportAoaExcel({
-      fileName: `Hisobot_${todayIso}.xlsx`,
-      sheetName: 'Hisobot',
-      headers: ['Operator', 'Bugun obzvon', "Buyurtma soni", "Suv soni", "Qarz mijoz", "Qarz summa", "Zakaz sanalari kesimi"],
-      rows: dailyRows.map((r) => [r.operator, r.calls, r.buyurtmaCount, r.buyurtmaQty, r.debtCount, r.debtSum, r.dateBreak]),
+      fileName: `Nazorat_${todayIso}.xlsx`,
+      sheetName: 'Nazorat',
+      headers: ['Sana', 'Dostavchik', 'Sklad', 'Zakaz suv soni', 'Permesheniya (obshiyga)', 'Farq', 'Holat'],
+      rows: dailyControlRows.map((r) => [
+        r.date,
+        r.driver,
+        r.warehouse,
+        r.orderQty,
+        r.transferQty,
+        r.diff,
+        r.mappingMissing ? 'Sklad biriktirilmagan' : (r.diff === 0 ? 'OK' : 'Hatoli'),
+      ]),
     });
   };
 
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:14}}>
       <div style={{display:'flex',justifyContent:'flex-end'}}>
-        <button className="btn btn-gr btn-sm" onClick={exportReports}>? Excel</button>
+        <button className="btn btn-gr btn-sm" onClick={exportReports}>Excel</button>
       </div>
       <div className="g4">
         <StatCard
@@ -5530,82 +5675,168 @@ function Reports({
         />
         <StatCard
           l="BUGUNGI PLAN QOLDIQ"
-          v={`${fmt(planLeft)} ta`}
+          v={`${fmt(nextWorkDayPlan)} ta`}
           s={`Keyingi ish kuni (${nextWorkDate ? toIsoDate(nextWorkDate) : '-'}) rejasi: ${fmt(nextWorkDayPlan)} · oy qoldiq: ${fmt(remainingMonthPlanQty)} · ish kun: ${fmt(remainingWorkDays)}`}
           c="var(--gr)"
         />
         <StatCard
-          l="QARZDORLIK ISHLOVI"
-          v={`${debtWorkedCount} ta`}
-          s={`${fmt(debtWorkedSum)} so'm`}
-          c="var(--or)"
+          l="HATOLI SATRLAR"
+          v={`${fmt(mismatchRows.length)} ta`}
+          s={mismatchRows.length ? "Zakaz va permesheniya teng emas" : 'Hamma satr mos'}
+          c={mismatchRows.length ? 'var(--rd)' : 'var(--gr)'}
         />
         <StatCard
-          l="BUGUNGI OBZVON"
-          v={`${callsToday} ta`}
-          s={canSeeAll ? 'Hamma operator' : `${currentUser}`}
-          c="var(--yl)"
+          l="BIRIKTIRILMAGAN DOSTAVCHIK"
+          v={`${fmt(unmatchedDrivers.length)} ta`}
+          s={unmatchedDrivers.length ? unmatchedDrivers.join(', ') : 'Hammasi biriktirilgan'}
+          c={unmatchedDrivers.length ? 'var(--yl)' : 'var(--bl)'}
         />
       </div>
-      <div className="card" style={{padding:16}}>
-        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Kunlik natija</div>
-        <div style={{overflow:'auto',maxHeight:'58vh'}}>
+
+      <div className="card" style={{padding:14}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>Dostavchik → sklad biriktirish</div>
+        <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
+          Har bir dostavchikka mos skladni tanlang. Shu skladdan "Основной склад"ga chiqqan suvlar zakaz bilan solishtiriladi.
+        </div>
+        <div style={{overflow:'auto',maxHeight:'34vh'}}>
           <table className="tbl">
             <thead>
               <tr>
-                <th>Operator</th>
-                <th style={{textAlign:'right'}}>Obzvon</th>
-                <th style={{textAlign:'right'}}>Buyurtma</th>
-                <th style={{textAlign:'right'}}>Suv soni</th>
-                <th style={{textAlign:'right'}}>Qarz mijoz</th>
-                <th style={{textAlign:'right'}}>Qarz summa</th>
-                <th>Qaysi sanaga zakaz</th>
-                <th style={{textAlign:'right'}}>Kunlik plan</th>
+                <th style={{minWidth:220}}>Dostavchik</th>
+                <th style={{minWidth:280}}>Sklad</th>
               </tr>
             </thead>
             <tbody>
-              {dailyRows.length===0 ? (
-                <tr><td colSpan={8} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Bugungi natija yo'q</td></tr>
+              {allDrivers.length === 0 ? (
+                <tr><td colSpan={2} style={{textAlign:'center',padding:20,color:'var(--t3)'}}>Dostavchik topilmadi</td></tr>
+              ) : allDrivers.map((driver) => (
+                <tr key={driver}>
+                  <td style={{fontWeight:600}}>{driver}</td>
+                  <td>
+                    <select
+                      className="select"
+                      style={{minWidth:260}}
+                      value={String(driverWarehouseMap?.[driver] || '')}
+                      onChange={(e) => {
+                        const nextVal = String(e.target.value || '').trim();
+                        setDriverWarehouseMap((prev) => ({
+                          ...(prev || {}),
+                          [driver]: nextVal,
+                        }));
+                      }}
+                    >
+                      <option value="">Sklad tanlanmagan</option>
+                      {warehouseOptions.map((w) => <option key={w} value={w}>{w}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card" style={{padding:16}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>1) Hatoli</div>
+        <div style={{overflow:'auto',maxHeight:'40vh'}}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Sana</th>
+                <th>Dostavchik</th>
+                <th>Sklad</th>
+                <th style={{textAlign:'right'}}>Zakaz suv soni</th>
+                <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
+                <th style={{textAlign:'right'}}>Raznitsa</th>
+                <th>Holat</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mismatchRows.length === 0 ? (
+                <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--gr)'}}>Hatolik topilmadi</td></tr>
+              ) : mismatchRows.map((r, i) => (
+                <tr key={`m_${i}_${r.driver}_${r.date}`} style={{background:'rgba(248,81,73,.07)'}}>
+                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '—'}</td>
+                  <td>{r.driver}</td>
+                  <td>{r.warehouse}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.orderQty)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.transferQty)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--rd)'}}>{fmt(r.diff)}</td>
+                  <td style={{fontSize:11,color:'var(--rd)'}}>
+                    {r.mappingMissing ? 'Sklad biriktirilmagan' : 'Mos emas'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="card" style={{padding:16}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>2) Kunlik suv sonlari</div>
+        <div style={{overflow:'auto',maxHeight:'44vh',marginBottom:10}}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Sana</th>
+                <th>Dostavchik</th>
+                <th>Sklad</th>
+                <th style={{textAlign:'right'}}>Zakaz suv soni</th>
+                <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
+                <th style={{textAlign:'right'}}>Farq</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dailyControlRows.length === 0 ? (
+                <tr><td colSpan={6} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Nazorat uchun ma'lumot topilmadi</td></tr>
               ) : (
                 <>
-                  {dailyRows.map((r, i) => (
-                    <Fragment key={`rep_${i}_${r.operator}`}>
-                      <tr>
-                        <td style={{fontWeight:700}}>{r.operator}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.calls)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.buyurtmaCount)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.buyurtmaQty)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.debtCount)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--rd)'}}>{fmt(r.debtSum)}</td>
-                        <td style={{fontSize:11,color:'var(--t2)'}}>—</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
-                      </tr>
-                      {(r.dateEntries || []).map((d, j) => (
-                        <tr key={`rep_${i}_${j}_${d.date}`} style={{background:'rgba(88,166,255,.05)'}}>
-                          <td style={{color:'var(--t3)',fontSize:11}}>? sana</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
-                          <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(d.qty)}</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{d.date}</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
-                        </tr>
-                      ))}
-                    </Fragment>
+                  {dailyControlRows.map((r, i) => (
+                    <tr key={`d_${i}_${r.driver}_${r.date}`}>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '—'}</td>
+                      <td>{r.driver}</td>
+                      <td>{r.warehouse}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
+                    </tr>
                   ))}
                   <tr style={{background:'var(--s2)'}}>
-                    <td style={{fontWeight:800}}>ITOG</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.calls)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.buyurtmaCount)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{fmt(dailyTotals.buyurtmaQty)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.debtCount)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--rd)'}}>{fmt(dailyTotals.debtSum)}</td>
-                    <td style={{fontWeight:700,color:'var(--t3)'}}>—</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
+                    <td colSpan={3} style={{fontWeight:800}}>ITOG</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--gr)'}}>{fmt(controlTotals.orderQty)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--bl)'}}>{fmt(controlTotals.transferQty)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:controlTotals.orderQty-controlTotals.transferQty===0?'var(--gr)':'var(--rd)'}}>
+                      {fmt(controlTotals.orderQty - controlTotals.transferQty)}
+                    </td>
                   </tr>
                 </>
               )}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{fontWeight:700,fontSize:12.5,marginBottom:8}}>Sana bo'yicha jami</div>
+        <div style={{overflow:'auto',maxHeight:'30vh'}}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Sana</th>
+                <th style={{textAlign:'right'}}>Zakaz jami</th>
+                <th style={{textAlign:'right'}}>Permesheniya jami</th>
+                <th style={{textAlign:'right'}}>Farq</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dateTotals.length === 0 ? (
+                <tr><td colSpan={4} style={{textAlign:'center',padding:20,color:'var(--t3)'}}>Sana kesimi topilmadi</td></tr>
+              ) : dateTotals.map((r) => (
+                <tr key={`t_${r.date}`}>
+                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -6285,7 +6516,7 @@ const NAV = [
   { id:'kassa',   label:'Kassa',      icon:E.pay },
   { id:'obzvon',  label:'Obzvon',     icon:E.phone, badge:'o' },
   { id:'doljniki',label:'Doljniki',   icon:E.doc, badge:'dz' },
-  { id:'reports', label:'Hisobotlar', icon:E.report },
+  { id:'reports', label:'Nazorat', icon:E.report },
   { id:'plan',    label:'Plan',       icon:'???' },
 ];
 
@@ -6954,7 +7185,7 @@ export default function App() {
     loadFromConfig();
   }, [loadFromConfig]);
 
-  const rawD = data || { customers:[], orders:[], cashbox:[], contacts:[], rawOrders:[], rawCash:[], ordersByMId:{}, cashByMId:{}, kulerInstallments:[], assignmentById:{}, debtorsByBalance:[], otherDebtorsByBalance:[] };
+  const rawD = data || { customers:[], orders:[], cashbox:[], contacts:[], rawOrders:[], rawCash:[], ordersByMId:{}, cashByMId:{}, warehouseTransfers:[], kulerInstallments:[], assignmentById:{}, debtorsByBalance:[], otherDebtorsByBalance:[] };
   // Effective profile: Admin can switch users, others are locked to their own login.
   const effectiveUser = sessionUser === 'Admin'
     ? currentUser
@@ -7262,7 +7493,6 @@ export default function App() {
                     access={access}
                     planRows={planRows}
                     planOffDays={planOffDays}
-                    obzvonNewRows={companyObzvonAllNewRows}
                   />
                 )}
                 {page==='plan' && canViewPage('plan') && (
@@ -7303,6 +7533,7 @@ export default function App() {
     </>
   );
 }
+
 
 
 
