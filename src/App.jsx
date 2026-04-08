@@ -620,7 +620,7 @@ const isNameInactiveByPrefix = (name) => {
 };
 const isAhmadteaTag = (v) => {
   const s = normText(v).replace(/[\s._-]+/g, '');
-  return s === 'ahmadtea';
+  return s.includes('ahmadtea');
 };
 const isAhmadteaCustomer = (c) => {
   if (!c) return false;
@@ -629,6 +629,75 @@ const isAhmadteaCustomer = (c) => {
 };
 const isMurodbaxshCustomer = (c) => {
   return !isAhmadteaCustomer(c);
+};
+const COMPANY_OPTIONS = [
+  { key: 'murodbaxsh', label: 'Murodbaxsh' },
+  { key: 'ahmadtea', label: 'Ahmadtea' },
+];
+const normalizeCompanyKey = (v) => (String(v || '').trim().toLowerCase() === 'ahmadtea' ? 'ahmadtea' : 'murodbaxsh');
+const normalizeStoredCompanyKey = (v) => {
+  const s = String(v || '').trim();
+  return s ? normalizeCompanyKey(s) : '';
+};
+const companyLabelByKey = (v) => (normalizeCompanyKey(v) === 'ahmadtea' ? 'Ahmadtea' : 'Murodbaxsh');
+const normalizeIdKey = (v) => String(v ?? '').trim();
+const filterDataByCustomerIds = (baseData, idSetInput) => {
+  const source = baseData || {};
+  const ids = new Set(
+    Array.from(idSetInput || [])
+      .map((v) => normalizeIdKey(v))
+      .filter(Boolean)
+  );
+  const hasId = (v) => ids.has(normalizeIdKey(v));
+  const customers = (source.customers || []).filter((c) => hasId(c?.id));
+  const contacts = (source.contacts || []).filter((c) => hasId(c?.id));
+  const rawOrders = (source.rawOrders || source.orders || []).filter((o) => hasId(o?.mId));
+  const rawCash = (source.rawCash || source.cashbox || []).filter((c) => hasId(c?.mId));
+  const ordersByMId = {};
+  rawOrders.forEach((o) => {
+    const key = normalizeIdKey(o?.mId);
+    if (!key) return;
+    if (!ordersByMId[key]) ordersByMId[key] = [];
+    ordersByMId[key].push(o);
+  });
+  const cashByMId = {};
+  rawCash.forEach((c) => {
+    const key = normalizeIdKey(c?.mId);
+    if (!key) return;
+    if (!cashByMId[key]) cashByMId[key] = [];
+    cashByMId[key].push(c);
+  });
+  const assignmentById = {};
+  Object.entries(source.assignmentById || {}).forEach(([id, op]) => {
+    if (hasId(id)) assignmentById[id] = op;
+  });
+
+  return {
+    ...source,
+    customers,
+    contacts,
+    orders: rawOrders,
+    cashbox: rawCash,
+    rawOrders,
+    rawCash,
+    ordersByMId,
+    cashByMId,
+    assignmentById,
+    kulerInstallments: (source.kulerInstallments || []).filter((k) => hasId(k?.customerId)),
+    debtorsByBalance: (source.debtorsByBalance || []).filter((c) => hasId(c?.id)),
+    otherDebtorsByBalance: (source.otherDebtorsByBalance || []).filter((c) => hasId(c?.id)),
+  };
+};
+const filterDataByCompany = (baseData, company = 'murodbaxsh') => {
+  const source = baseData || {};
+  const useAhmadtea = company === 'ahmadtea';
+  const idSet = new Set(
+    (source.customers || [])
+      .filter((c) => (useAhmadtea ? isAhmadteaCustomer(c) : isMurodbaxshCustomer(c)))
+      .map((c) => normalizeIdKey(c?.id))
+      .filter(Boolean)
+  );
+  return filterDataByCustomerIds(source, idSet);
 };
 const isActiveCustomerName = (name) => {
   const n = String(name || '').trim();
@@ -1836,6 +1905,7 @@ const DEFAULT_ACCESS = {
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
     visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
     ui: { theme:'dark' },
+    company: { canSwitch:false, default:'murodbaxsh' },
   },
   Dilfuza: {
     scope: 'own',
@@ -1844,6 +1914,7 @@ const DEFAULT_ACCESS = {
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
     visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
     ui: { theme:'dark' },
+    company: { canSwitch:false, default:'murodbaxsh' },
   },
   Admin:   {
     scope: 'all',
@@ -1852,6 +1923,7 @@ const DEFAULT_ACCESS = {
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
     visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, plan:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true },
     ui: { theme:'dark' },
+    company: { canSwitch:true, default:'murodbaxsh' },
   },
 };
 const DEFAULT_VISIBLE_PAGES = { ...DEFAULT_ACCESS.Admin.visible };
@@ -1860,9 +1932,26 @@ function normalizeAccessConfig(user, cfg) {
   const isAdmin = user === 'Admin';
   const src = cfg || {};
   const base = isAdmin
-    ? { scope:'all', activeScope:'all', role:'admin', customerTabs:{ ...DEFAULT_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true }, ui:{ theme:'dark' } }
-    : { scope:'own', activeScope:'own', role:'operator', customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS }, visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false }, ui:{ theme:'dark' } };
+    ? {
+        scope:'all',
+        activeScope:'all',
+        role:'admin',
+        customerTabs:{ ...DEFAULT_CUSTOMER_TABS },
+        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true },
+        ui:{ theme:'dark' },
+        company:{ canSwitch:true, default:'murodbaxsh' },
+      }
+    : {
+        scope:'own',
+        activeScope:'own',
+        role:'operator',
+        customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS },
+        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
+        ui:{ theme:'dark' },
+        company:{ canSwitch:false, default:'murodbaxsh' },
+      };
   const scope = src.scope || base.scope;
+  const srcCompany = (src.company && typeof src.company === 'object') ? src.company : {};
   const normalized = {
     scope,
     activeScope: scope === 'own' ? 'own' : 'all',
@@ -1870,6 +1959,10 @@ function normalizeAccessConfig(user, cfg) {
     visible: { ...base.visible, ...(src.visible || {}) },
     customerTabs: { ...base.customerTabs, ...(src.customerTabs || {}) },
     ui: { ...base.ui, ...((src.ui && typeof src.ui === 'object') ? src.ui : {}) },
+    company: {
+      canSwitch: Boolean(srcCompany.canSwitch ?? base.company.canSwitch),
+      default: normalizeCompanyKey(srcCompany.default || base.company.default),
+    },
   };
   // Admin always keeps Settings access to avoid accidental lockout.
   if (isAdmin) {
@@ -2584,7 +2677,7 @@ function Dashboard({ D }) {
 }
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ MIJOZLAR в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
-function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById={} }) {
+function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById={}, company='murodbaxsh' }) {
   const { customers } = D;
   const [segment, setSegment] = useState('all');
   const [search,setS]   = useState('');
@@ -2611,18 +2704,19 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     ...DEFAULT_CUSTOMER_TABS,
     ...((currentAccess && currentAccess.customerTabs) || {}),
   };
+  const allowCompanyTabs = company === 'all';
   const activeScope = (currentAccess && currentAccess.activeScope) || ((currentAccess && currentAccess.scope) === 'own' ? 'own' : 'all');
   const availableTabs = useMemo(() => {
     const items = [];
     if (tabVisible.all) items.push({ id:'all', label:`${E.all} Hamma mijozlar` });
-    if (tabVisible.ahmadtea) items.push({ id:'aa_ahmadtea', label:'Ahmadtea' });
-    if (tabVisible.murodbaxsh) items.push({ id:'aa_other', label:'Murodbaxsh' });
+    if (allowCompanyTabs && tabVisible.ahmadtea) items.push({ id:'aa_ahmadtea', label:'Ahmadtea' });
+    if (allowCompanyTabs && tabVisible.murodbaxsh) items.push({ id:'aa_other', label:'Murodbaxsh' });
     if (tabVisible.activeAll) items.push({ id:'active_all', label:'Aktiv (hammasi)' });
     if (tabVisible.activeOwn) items.push({ id:'active_own', label:"Aktiv (o'zimniki)" });
     if (tabVisible.inactive) items.push({ id:'inactive', label:'Nofaol mijozlar' });
     if (tabVisible.other) items.push({ id:'other_customers', label:'Boshqa mijozlar' });
     return items.length ? items : [{ id:'all', label:`${E.all} Hamma mijozlar` }];
-  }, [tabVisible]);
+  }, [tabVisible, allowCompanyTabs]);
   useEffect(() => {
     if (!availableTabs.some((t) => t.id === segment)) setSegment(availableTabs[0].id);
   }, [availableTabs, segment]);
@@ -2946,7 +3040,6 @@ function SoDetailModal({ soGroup, onClose }) {
 function Orders({ D }) {
   const { rawOrders=[], customers=[] } = D;
   const [search,setS]  = useState('');
-  const [companyTab, setCompanyTab] = useState('murodbaxsh');
   const [fType,setT]   = useState('zakaz');
   const [showFilter, setShowFilter] = useState(false);
   const [uFilterOpen, setUFilterOpen] = useState(false);
@@ -2961,11 +3054,6 @@ function Orders({ D }) {
   const [fSumFrom, setSumFrom] = useState('');
   const [fSumTo, setSumTo] = useState('');
   const [selectedSO,setSelectedSO] = useState(null);
-  const customerById = useMemo(() => {
-    const m = {};
-    (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c; });
-    return m;
-  }, [customers]);
   const districtById = useMemo(() => {
     const m = {};
     (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c.district || ''; });
@@ -2998,13 +3086,7 @@ function Orders({ D }) {
   const allZakaz   = soGroups.filter((g)=>isOrderDoc(g.docType));
   const allVozvrat = soGroups.filter((g)=>isReturnDoc(g.docType));
   const baseByType = fType==='zakaz'?allZakaz:fType==='vozvrat'?allVozvrat:soGroups;
-  const base = useMemo(() => {
-    return baseByType.filter((g) => {
-      const c = customerById[String(g.mId || '').trim()];
-      if (companyTab === 'ahmadtea') return isAhmadteaCustomer(c);
-      return isMurodbaxshCustomer(c);
-    });
-  }, [baseByType, companyTab, customerById]);
+  const base = baseByType;
   const options = useMemo(() => ({
     agents: [...new Set(soGroups.map((g)=>g.agent).filter(Boolean))].sort(),
     statuses: [...new Set(soGroups.map((g)=>g.status).filter(Boolean))].sort(),
@@ -3103,10 +3185,6 @@ function Orders({ D }) {
 
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
-      <div className="tabs" style={{display:'inline-flex'}}>
-        <button className={`tab${companyTab==='murodbaxsh'?' on':''}`} onClick={()=>setCompanyTab('murodbaxsh')}>Murodbaxsh</button>
-        <button className={`tab${companyTab==='ahmadtea'?' on':''}`} onClick={()=>setCompanyTab('ahmadtea')}>Ahmadtea</button>
-      </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
         <div className="sb" style={{flex:1}}>
           <span style={{color:'var(--t3)'}}>Qidiruv</span>
@@ -3508,6 +3586,7 @@ function Kassa({ D }) {
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ OBZVON в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 function Obzvon({
   D,
+  company='murodbaxsh',
   currentUser='Admin',
   canEditAllNew=false,
   canDeleteAllNew=false,
@@ -3635,9 +3714,9 @@ function Obzvon({
       ...r,
       _rid: r?._rid || createRowRid(),
       orderCount: getDebtValueText(r),
+      company: normalizeCompanyKey(r?.company || company),
     }));
     setRecords(prepared);
-    S.set('aq-obzvon-records', prepared);
     const freshRows = prepared
       .filter((r) => (r.id || r.customer) && hasObzvonPayload(r))
       .map((r, i) => ({
@@ -3652,6 +3731,7 @@ function Obzvon({
         operator: r.operator || currentUser,
         customerId: r.id || '',
         orderDate: r.orderDate || '',
+        company: normalizeCompanyKey(r.company || company),
       }));
     if (freshRows.length) onUpsertNewRows(freshRows);
   };
@@ -3666,6 +3746,7 @@ function Obzvon({
       orderCount: '',
       orderDate: '',
       operator: currentUser,
+      company: normalizeCompanyKey(company),
     }));
     saveRecords([...(records||[]), ...rows]);
   };
@@ -3680,6 +3761,7 @@ function Obzvon({
       orderCount: '',
       orderDate: '',
       operator: currentUser,
+      company: normalizeCompanyKey(company),
     };
     const next = [row, ...records];
     saveRecords(next);
@@ -3700,6 +3782,7 @@ function Obzvon({
       operator: r.operator || currentUser,
       customerId: r.id || '',
       orderDate: r.orderDate || '',
+      company: normalizeCompanyKey(r.company || company),
     }));
     onUpsertNewRows(normalized);
     const left = (records || []).filter((r) => {
@@ -3722,6 +3805,7 @@ function Obzvon({
         operator: r.operator || '',
         customerId: r.customerId || r.id || '',
         orderDate: r.orderDate || '',
+        company: normalizeCompanyKey(r.company || company),
       }))
       .filter((r) => !isAccessSyncRow(r))
       .map((r) => {
@@ -3739,7 +3823,7 @@ function Obzvon({
       return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
     });
     return rows;
-  }, [allRows, customerNameById]);
+  }, [allRows, customerNameById, company]);
 
   const appAllNewRows = useMemo(() => {
     const fromNew = (newRows || []).map((r, i) => ({
@@ -3754,6 +3838,7 @@ function Obzvon({
       operator: r.operator || '',
       customerId: r.customerId || r.id || '',
       orderDate: r.orderDate || '',
+      company: normalizeCompanyKey(r.company || company),
     }));
     const fromCurrent = (records || [])
       .filter((r) => (r.id || r.customer) && hasObzvonPayload(r))
@@ -3769,6 +3854,7 @@ function Obzvon({
         operator: r.operator || '',
         customerId: r.id || '',
         orderDate: r.orderDate || '',
+        company: normalizeCompanyKey(r.company || company),
       }));
     const m = new Map();
     [...fromNew, ...fromCurrent].forEach((r) => {
@@ -3781,6 +3867,7 @@ function Obzvon({
         ...r,
         customerId: cid,
         customer: liveName || r.customer || (cid ? `ID: ${cid}` : ''),
+        company: normalizeCompanyKey(r.company || company),
       };
     }).filter((r) => !isObzvonDeletedRow(r));
     rows.sort((a, b) => {
@@ -3789,7 +3876,7 @@ function Obzvon({
       return (db ? db.getTime() : 0) - (da ? da.getTime() : 0);
     });
     return rows;
-  }, [newRows, records, customerNameById, hasObzvonPayload]);
+  }, [newRows, records, customerNameById, hasObzvonPayload, company]);
 
   const mainRows = useMemo(() => {
     const base = (records || []).map((r) => ({
@@ -3865,6 +3952,7 @@ function Obzvon({
       _rid: allNewEditRid,
       updatedAt: new Date().toISOString(),
       deleted: '',
+      company: normalizeCompanyKey(allNewEditDraft.company || company),
     };
     onUpsertNewRows([updated]);
     cancelAllNewEdit();
@@ -3879,6 +3967,7 @@ function Obzvon({
       deleted: '1',
       note: OBZVON_DELETED_NOTE,
       updatedAt: new Date().toISOString(),
+      company: normalizeCompanyKey(row.company || company),
     };
     onUpsertNewRows([tomb]);
     if (String(row.rid || '') === String(allNewEditRid || '')) cancelAllNewEdit();
@@ -5737,6 +5826,56 @@ function SettingsPanel({
                       <option value="admin">Admin</option>
                     </select>
                   </div>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                    <span style={{fontSize:12,color:'var(--t3)'}}>Kompaniya almashtirish tugmasi</span>
+                    <button className={`toggle${(uc.company?.canSwitch ?? false)?' on':''}`} onClick={() => {
+                      setAccess((prev) => {
+                        const confU = normalizeAccessConfig(u, prev[u] || uc);
+                        const next = {
+                          ...prev,
+                          [u]: normalizeAccessConfig(u, {
+                            ...confU,
+                            company: {
+                              ...(confU.company || {}),
+                              canSwitch: !(confU.company?.canSwitch ?? false),
+                              default: normalizeCompanyKey(confU.company?.default || 'murodbaxsh'),
+                            },
+                          }),
+                        };
+                        S.set('aq-access', next);
+                        return next;
+                      });
+                    }}><span className="knob" /></button>
+                  </div>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,gap:8}}>
+                    <span style={{fontSize:12,color:'var(--t3)'}}>
+                      {(uc.company?.canSwitch ?? false) ? "Boshlang'ich kompaniya" : "Biriktirilgan kompaniya"}
+                    </span>
+                    <select
+                      className="select"
+                      value={normalizeCompanyKey(uc.company?.default || 'murodbaxsh')}
+                      onChange={(e)=>{
+                        const nextCompany = normalizeCompanyKey(e.target.value);
+                        setAccess((prev)=>{
+                          const confU = normalizeAccessConfig(u, prev[u] || uc);
+                          const next = {
+                            ...prev,
+                            [u]: normalizeAccessConfig(u, {
+                              ...confU,
+                              company: {
+                                ...(confU.company || {}),
+                                default: nextCompany,
+                              },
+                            }),
+                          };
+                          S.set('aq-access', next);
+                          return next;
+                        });
+                      }}
+                    >
+                      {COMPANY_OPTIONS.map((x)=><option key={x.key} value={x.key}>{x.label}</option>)}
+                    </select>
+                  </div>
                   <div style={{fontSize:11,color:'var(--t3)',marginBottom:6}}>Mijozlar bo'limlari</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
                     {customerTabDefs.map((t) => {
@@ -5999,6 +6138,9 @@ export default function App() {
   const [showUp,setUp]     = useState(false);
   const [notif,setNotif]   = useState(null);
   const [side,setSide]     = useState(true);
+  const [companyFilter, setCompanyFilter] = useState(() =>
+    normalizeCompanyKey(S.get('aq-company-filter', 'murodbaxsh'))
+  );
   const [autoLoad,setAutoLoad] = useState({ loading:false, progress:'', error:'' });
   const [remoteAccessLoaded, setRemoteAccessLoaded] = useState(false);
   const [obzvonAllLoaded, setObzvonAllLoaded] = useState(false);
@@ -6059,6 +6201,10 @@ export default function App() {
             visible: { ...(localConf.visible || {}), ...((remoteRaw.visible && typeof remoteRaw.visible === 'object') ? remoteRaw.visible : {}) },
             customerTabs: { ...(localConf.customerTabs || {}), ...((remoteRaw.customerTabs && typeof remoteRaw.customerTabs === 'object') ? remoteRaw.customerTabs : {}) },
             ui: { ...(localConf.ui || {}), ...((remoteRaw.ui && typeof remoteRaw.ui === 'object') ? remoteRaw.ui : {}) },
+            company: {
+              ...(localConf.company || {}),
+              ...((remoteRaw.company && typeof remoteRaw.company === 'object') ? remoteRaw.company : {}),
+            },
           }
         : localConf;
       nextAccess[u] = normalizeAccessConfig(u, mergedConf);
@@ -6145,6 +6291,7 @@ export default function App() {
     operator: sanitizeObzvonCell(r?.operator),
     customerId: sanitizeObzvonCell(r?.customerId || r?.id),
     orderDate: sanitizeObzvonCell(r?.orderDate),
+    company: normalizeStoredCompanyKey(sanitizeObzvonCell(r?.company)),
   }), []);
   const normalizeObzvonNewRow = useCallback((r, i = 0) => ({
     rid: sanitizeObzvonCell(r?.rid || r?._rid) || `nr_${Date.now()}_${i}`,
@@ -6159,6 +6306,7 @@ export default function App() {
     customerId: sanitizeObzvonCell(r?.customerId || r?.id),
     orderDate: sanitizeObzvonCell(r?.orderDate),
     updatedAt: sanitizeObzvonCell(r?.updatedAt) || new Date().toISOString(),
+    company: normalizeStoredCompanyKey(sanitizeObzvonCell(r?.company)),
   }), []);
   const obzvonRowUpdatedTs = useCallback((row) => {
     const d = toDate(row?.updatedAt || row?.callDate || '');
@@ -6398,6 +6546,7 @@ export default function App() {
   };
   useEffect(() => { S.set('aq-current-user', currentUser); }, [currentUser]);
   useEffect(() => { S.set('aq-session-user', sessionUser || ''); }, [sessionUser]);
+  useEffect(() => { S.set('aq-company-filter', companyFilter); }, [companyFilter]);
   useEffect(() => {
     const normalized = OBZVON_WEBHOOK_DEFAULT;
     if (obzvonWebhook !== normalized) setObzvonWebhook(normalized);
@@ -6617,9 +6766,10 @@ export default function App() {
         customerId: r.id || '',
         orderDate: r.orderDate || '',
         updatedAt: new Date().toISOString(),
+        company: normalizeCompanyKey(companyFilter),
       }))
     );
-  }, [upsertObzvonAllNewRows, currentUser]);
+  }, [upsertObzvonAllNewRows, currentUser, companyFilter]);
 
   useEffect(() => {
     loadFromConfig();
@@ -6634,30 +6784,62 @@ export default function App() {
     effectiveUser,
     access[effectiveUser] || DEFAULT_ACCESS[effectiveUser] || DEFAULT_ACCESS.Admin
   );
+  const companyAccess = currentAccess.company || {};
+  const canSwitchCompany = !!companyAccess.canSwitch;
+  const lockedCompany = normalizeCompanyKey(companyAccess.default || 'murodbaxsh');
+  const activeCompany = canSwitchCompany ? normalizeCompanyKey(companyFilter) : lockedCompany;
   const scopeOwn = currentAccess.scope === 'own';
-  const ownIds = new Set(Object.entries(rawD.assignmentById || {}).filter(([,op]) => op === effectiveUser).map(([id]) => id));
-  const D = useMemo(() => {
+  const ownIds = useMemo(
+    () => new Set(Object.entries(rawD.assignmentById || {}).filter(([, op]) => op === effectiveUser).map(([id]) => id)),
+    [rawD.assignmentById, effectiveUser]
+  );
+  const scopedD = useMemo(() => {
     if (!scopeOwn) return rawD;
-    const customers = (rawD.customers || []).filter((c) => ownIds.has(c.id));
-    const idSet = new Set(customers.map((c)=>c.id));
-    const rawOrders = (rawD.rawOrders || []).filter((o) => idSet.has(o.mId));
-    const rawCash = (rawD.rawCash || []).filter((c) => idSet.has(c.mId));
-    const ordersByMId = {};
-    rawOrders.forEach((o)=>{ if(!ordersByMId[o.mId]) ordersByMId[o.mId]=[]; ordersByMId[o.mId].push(o); });
-    const cashByMId = {};
-    rawCash.forEach((c)=>{ if(!cashByMId[c.mId]) cashByMId[c.mId]=[]; cashByMId[c.mId].push(c); });
-    return {
-      ...rawD,
-      customers,
-      rawOrders,
-      rawCash,
-      ordersByMId,
-      cashByMId,
-      kulerInstallments: (rawD.kulerInstallments || []).filter((k)=>idSet.has(k.customerId)),
-      debtorsByBalance: (rawD.debtorsByBalance || []).filter((c)=>idSet.has(c.id)),
-      otherDebtorsByBalance: (rawD.otherDebtorsByBalance || []).filter((c)=>idSet.has(c.id)),
-    };
+    return filterDataByCustomerIds(rawD, ownIds);
   }, [rawD, scopeOwn, ownIds]);
+  useEffect(() => {
+    if (canSwitchCompany) return;
+    if (normalizeCompanyKey(companyFilter) !== lockedCompany) {
+      setCompanyFilter(lockedCompany);
+    }
+  }, [canSwitchCompany, companyFilter, lockedCompany]);
+  const D = useMemo(() => filterDataByCompany(scopedD, activeCompany), [scopedD, activeCompany]);
+  const companyCustomerIds = useMemo(
+    () => new Set((D.customers || []).map((c) => normalizeIdKey(c?.id)).filter(Boolean)),
+    [D.customers]
+  );
+  const rowBelongsToCompany = useCallback((r, idSet, companyKey) => {
+    const cid = normalizeIdKey(r?.id || r?.customerId);
+    if (cid) return idSet.has(cid);
+    const rowCompany = normalizeStoredCompanyKey(r?.company);
+    if (!rowCompany) return false;
+    return rowCompany === normalizeCompanyKey(companyKey);
+  }, []);
+  const companyObzvonAllRows = useMemo(
+    () => (obzvonAllRows || []).filter((r) => rowBelongsToCompany(r, companyCustomerIds, activeCompany)),
+    [obzvonAllRows, rowBelongsToCompany, companyCustomerIds, activeCompany]
+  );
+  const companyObzvonAllNewRows = useMemo(
+    () => (obzvonAllNewRows || []).filter((r) => rowBelongsToCompany(r, companyCustomerIds, activeCompany)),
+    [obzvonAllNewRows, rowBelongsToCompany, companyCustomerIds, activeCompany]
+  );
+  const companyObzvonRecords = useMemo(
+    () => (obzvonRecords || []).filter((r) => rowBelongsToCompany(r, companyCustomerIds, activeCompany)),
+    [obzvonRecords, rowBelongsToCompany, companyCustomerIds, activeCompany]
+  );
+  const setCompanyScopedObzvonRecords = useCallback((valueOrUpdater) => {
+    setObzvonRecords((prev) => {
+      const source = Array.isArray(prev) ? prev : [];
+      const visible = source.filter((r) => rowBelongsToCompany(r, companyCustomerIds, activeCompany));
+      const hidden = source.filter((r) => !rowBelongsToCompany(r, companyCustomerIds, activeCompany));
+      const nextVisibleRaw = typeof valueOrUpdater === 'function' ? valueOrUpdater(visible) : valueOrUpdater;
+      const nextVisible = (Array.isArray(nextVisibleRaw) ? nextVisibleRaw : []).map((r) => ({
+        ...(r || {}),
+        company: normalizeCompanyKey((r || {}).company || activeCompany),
+      }));
+      return [...nextVisible, ...hidden];
+    });
+  }, [companyCustomerIds, activeCompany, rowBelongsToCompany]);
   const debtorsByBalance = (D.debtorsByBalance && D.debtorsByBalance.length)
     ? D.debtorsByBalance
     : (D.customers || []).filter((c) => c.balanceUZS < 0);
@@ -6801,6 +6983,19 @@ export default function App() {
               )}
             </div>
             <div style={{display:'flex',gap:6}}>
+              {canSwitchCompany ? (
+                <select
+                  className="select"
+                  value={activeCompany}
+                  onChange={(e) => setCompanyFilter(normalizeCompanyKey(e.target.value))}
+                >
+                  {COMPANY_OPTIONS.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
+                </select>
+              ) : (
+                <span className="tag" style={{background:'var(--s3)',color:'var(--t2)'}}>
+                  {companyLabelByKey(activeCompany)}
+                </span>
+              )}
               {sessionUser === 'Admin' ? (
                 <select className="select" value={currentUser} onChange={(e)=>switchUser(e.target.value)}>
                   {users.map((u)=><option key={u}>{u}</option>)}
@@ -6849,19 +7044,20 @@ export default function App() {
             ) : (
               <>
                 {page==='dash'    && canViewPage('dash') && <Dashboard D={D}/>}
-                {page==='cust'    && canViewPage('cust') && <Customers D={rawD} currentUser={effectiveUser} currentAccess={currentAccess} assignmentById={rawD.assignmentById || {}}/>}
+                {page==='cust'    && canViewPage('cust') && <Customers D={D} currentUser={effectiveUser} currentAccess={currentAccess} assignmentById={D.assignmentById || {}} company={activeCompany}/>}
                 {page==='orders'  && canViewPage('orders') && <Orders    D={D}/>}
                 {page==='kassa'   && canViewPage('kassa') && <Kassa     D={D}/>}
                 {page==='obzvon'  && canViewPage('obzvon') && (
                   <Obzvon
                   D={D}
+                  company={activeCompany}
                   currentUser={effectiveUser}
                   canEditAllNew={!!(currentAccess.visible?.obzvon_new_edit ?? (effectiveUser === 'Admin'))}
                   canDeleteAllNew={!!(currentAccess.visible?.obzvon_new_delete ?? (effectiveUser === 'Admin'))}
-                  records={obzvonRecords}
-                  setRecords={setObzvonRecords}
-                  allRows={obzvonAllRows}
-                  newRows={obzvonAllNewRows}
+                  records={companyObzvonRecords}
+                  setRecords={setCompanyScopedObzvonRecords}
+                  allRows={companyObzvonAllRows}
+                  newRows={companyObzvonAllNewRows}
                   onReloadAll={loadObzvonAllRemote}
                   onReloadAllNew={pullRemoteObzvonNewRows}
                   onAppendAllRows={appendObzvonAllRemote}
@@ -6877,7 +7073,7 @@ export default function App() {
                     users={users}
                     access={access}
                     planRows={planRows}
-                    obzvonNewRows={obzvonAllNewRows}
+                    obzvonNewRows={companyObzvonAllNewRows}
                   />
                 )}
                 {page==='plan' && canViewPage('plan') && (
