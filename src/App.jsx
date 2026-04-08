@@ -576,7 +576,7 @@ function UniversalFilterPanel({
           <button className="btn btn-gh btn-sm" onClick={onClose}>Yopish</button>
           <button className="btn btn-bl btn-sm" onClick={onClose}>Qo'llash</button>
         </div>
-      </div>
+      </div>}
     </>
   );
 }
@@ -2663,7 +2663,7 @@ function Dashboard({ D }) {
           l={`SUV (${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()})`}
           v={fmt(wDelThisMonth.reduce((s,o)=>s+Math.abs(o.qty),0))+' ta'}
           s={fmt(wDelThisMonth.reduce((s,o)=>s+o.sum,0))+" so'm"} c="var(--gr)"/>
-      </div>
+      </div>}
 
       <div className="g2">
         <div className="card" style={{padding:16}}>
@@ -2702,7 +2702,7 @@ function Dashboard({ D }) {
             </div>
           ))}
         </div>
-      </div>
+      </div>}
 
       <div className="card" style={{padding:16}}>
         <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>{E.order} Oylik yetkazish (UZS)</div>
@@ -5758,7 +5758,7 @@ function Reports({
           s={canSeeAll ? 'Hamma operator' : `${currentUser}`}
           c="var(--yl)"
         />
-      </div>
+      </div>}
 
       {showReport && <div className="card" style={{padding:16}}>
         <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Kunlik natija</div>
@@ -5822,7 +5822,7 @@ function Reports({
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
 
       {showNazorat && <div className="card" style={{padding:16}}>
         <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Nazorat</div>
@@ -5903,7 +5903,7 @@ function Reports({
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }
