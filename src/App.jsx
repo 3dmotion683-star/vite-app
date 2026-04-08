@@ -5397,8 +5397,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
   );
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ HISOBOTLAR в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ NAZORAT в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ HISOBOTLAR / NAZORAT в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 function Reports({
   D,
   company='murodbaxsh',
@@ -5408,24 +5407,12 @@ function Reports({
   access={},
   planRows=[],
   planOffDays=[],
+  obzvonNewRows=[],
 }) {
   const { rawOrders=[], warehouseTransfers=[] } = D;
   const todayIso = toIsoDate(new Date());
   const currentMonth = normalizeMonthKey(todayIso.slice(0,7));
   const canSeeAll = (currentAccess?.scope || 'all') === 'all';
-  const normalizeWarehouseKey = (v) => normText(v).replace(/\s+/g, ' ').trim();
-  const isMainWarehouseName = (v) => {
-    const s = normalizeWarehouseKey(v).replace(/\s+/g, '');
-    if (!s) return false;
-    return (
-      s.includes('основнойсклад') ||
-      s.includes('основной') ||
-      s.includes('osnovnoysklad') ||
-      s.includes('osnovnoy') ||
-      s.includes('asosnoysklad') ||
-      s.includes('asosiysklad')
-    );
-  };
 
   const planByMonth = useMemo(() => {
     const m = {};
@@ -5435,6 +5422,40 @@ function Reports({
   const selectedPlan = planByMonth[currentMonth] || { month: currentMonth, waterPlan:0, coolerPlan:0, workDays:26 };
   const offDays = useMemo(() => normalizeOffDays(planOffDays || []), [planOffDays]);
   const offDaysSet = useMemo(() => new Set(offDays), [offDays]);
+
+  const visibleOperators = useMemo(() => {
+    const src = (users || []).filter((u) => {
+      const conf = normalizeAccessConfig(u, access?.[u]);
+      if (!(conf.visible?.reports ?? true)) return false;
+      if (u === 'Admin') return false;
+      if (conf.role === 'admin') return false;
+      return true;
+    });
+    return src.length ? src : [currentUser || 'Admin'];
+  }, [users, access, currentUser]);
+
+  const visibleRows = useMemo(() => {
+    const base = (obzvonNewRows || []).filter((r) => !isObzvonDeletedRow(r));
+    if (canSeeAll) return base;
+    return base.filter((r) => String(r.operator || '').trim() === String(currentUser || '').trim());
+  }, [obzvonNewRows, canSeeAll, currentUser]);
+
+  const rowsToday = useMemo(
+    () => visibleRows.filter((r) => toIsoDate(r.callDate) === todayIso),
+    [visibleRows, todayIso]
+  );
+
+  const monthWaterOrders = useMemo(() => {
+    return (rawOrders || []).filter((o) =>
+      isWaterProduct(o.product) &&
+      isOrderDoc(o.docType) &&
+      isDeliveredStatus(o.status) &&
+      monthKey(o.orderDate) === currentMonth
+    );
+  }, [rawOrders, currentMonth]);
+  const monthWaterQty = monthWaterOrders.reduce((s,o)=>s + Math.abs(o.qty || 0), 0);
+  const monthWaterSum = monthWaterOrders.reduce((s,o)=>s + (o.currency === 'USD' ? 0 : (o.sum || 0)), 0);
+
   const todayDate = useMemo(() => {
     const d = toDate(todayIso);
     if (!d) return new Date();
@@ -5446,30 +5467,6 @@ function Reports({
     if (!y || !m) return new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0);
     return new Date(y, m, 0);
   }, [currentMonth, todayDate]);
-  const tomorrowDate = useMemo(() => {
-    const d = new Date(todayDate);
-    d.setDate(d.getDate() + 1);
-    return d;
-  }, [todayDate]);
-  const nextWorkDate = useMemo(
-    () => findNextWorkDate(tomorrowDate, monthEndDate, offDaysSet),
-    [tomorrowDate, monthEndDate, offDaysSet]
-  );
-  const remainingWorkDays = useMemo(
-    () => nextWorkDate ? countWorkDays(nextWorkDate, monthEndDate, offDaysSet) : 0,
-    [nextWorkDate, monthEndDate, offDaysSet]
-  );
-
-  const monthWaterOrders = useMemo(() => {
-    return (rawOrders || []).filter((o) =>
-      isWaterProduct(o.product) &&
-      isOrderDoc(o.docType) &&
-      !isCancelledStatus(o.status) &&
-      monthKey(o.orderDate) === currentMonth
-    );
-  }, [rawOrders, currentMonth]);
-  const monthWaterQty = monthWaterOrders.reduce((s,o)=>s + Math.abs(o.qty || 0), 0);
-  const monthWaterSum = monthWaterOrders.reduce((s,o)=>s + (o.currency === 'USD' ? 0 : (o.sum || 0)), 0);
   const soldUntilTodayQty = useMemo(() => {
     return (rawOrders || []).filter((o) => {
       if (!isWaterProduct(o.product)) return false;
@@ -5483,8 +5480,87 @@ function Reports({
     }).reduce((s, o) => s + Math.abs(o.qty || 0), 0);
   }, [rawOrders, currentMonth, todayDate]);
   const remainingMonthPlanQty = Math.max(0, Number(selectedPlan.waterPlan || 0) - soldUntilTodayQty);
+  const tomorrowDate = useMemo(() => {
+    const d = new Date(todayDate);
+    d.setDate(d.getDate() + 1);
+    return d;
+  }, [todayDate]);
+  const nextWorkDate = useMemo(
+    () => findNextWorkDate(tomorrowDate, monthEndDate, offDaysSet),
+    [tomorrowDate, monthEndDate, offDaysSet]
+  );
+  const remainingWorkDays = useMemo(
+    () => nextWorkDate ? countWorkDays(nextWorkDate, monthEndDate, offDaysSet) : 0,
+    [nextWorkDate, monthEndDate, offDaysSet]
+  );
   const nextWorkDayPlan = remainingWorkDays > 0 ? Math.ceil(remainingMonthPlanQty / remainingWorkDays) : 0;
+  const nextWorkDayPlanPerOperator = Math.ceil(nextWorkDayPlan / Math.max(1, canSeeAll ? visibleOperators.length : 1));
+  const currentPlanTarget = canSeeAll ? nextWorkDayPlan : nextWorkDayPlanPerOperator;
 
+  const debtRowsToday = rowsToday.filter((r) => String(r.topic || '').toLowerCase().includes('qarz'));
+  const callsToday = rowsToday.length;
+  const debtWorkedCount = new Set(
+    debtRowsToday.map((r) => String(r.customerId || r.id || r.customer || '').trim()).filter(Boolean)
+  ).size;
+  const debtWorkedSum = debtRowsToday.reduce((s,r)=>s + Math.abs(toIntFromMixed(r.orderCount || 0)), 0);
+
+  const dailyByOperator = useMemo(() => {
+    const ops = new Map();
+    rowsToday.forEach((r) => {
+      const op = String(r.operator || '—').trim() || '—';
+      if (!ops.has(op)) ops.set(op, []);
+      ops.get(op).push(r);
+    });
+    return Array.from(ops.entries()).map(([op, rows]) => {
+      const buyRows = rows.filter((x) => String(x.topic || '').toLowerCase().includes('buyurtma'));
+      const qarzRows = rows.filter((x) => String(x.topic || '').toLowerCase().includes('qarz'));
+      const qty = buyRows.reduce((s,x)=>s + Math.max(0, toIntFromMixed(x.orderCount || 0)), 0);
+      const debtSum = qarzRows.reduce((s,x)=>s + Math.abs(toIntFromMixed(x.orderCount || 0)), 0);
+      const byOrderDate = {};
+      buyRows.forEach((x) => {
+        const k = toIsoDate(x.orderDate) || '—';
+        byOrderDate[k] = (byOrderDate[k] || 0) + Math.max(0, toIntFromMixed(x.orderCount || 0));
+      });
+      const dateEntries = Object.entries(byOrderDate)
+        .sort((a,b)=>a[0].localeCompare(b[0]))
+        .map(([k,v]) => ({ date: k, qty: v }));
+      return {
+        operator: op,
+        calls: rows.length,
+        buyurtmaCount: buyRows.length,
+        buyurtmaQty: qty,
+        debtCount: qarzRows.length,
+        debtSum,
+        dateEntries,
+      };
+    }).sort((a,b)=>b.calls-a.calls);
+  }, [rowsToday]);
+
+  const dailyRows = useMemo(() => {
+    if (canSeeAll) return dailyByOperator;
+    return dailyByOperator.filter((x)=>x.operator===currentUser);
+  }, [canSeeAll, dailyByOperator, currentUser]);
+  const dailyTotals = useMemo(() => ({
+    calls: dailyRows.reduce((s, r) => s + (r.calls || 0), 0),
+    buyurtmaCount: dailyRows.reduce((s, r) => s + (r.buyurtmaCount || 0), 0),
+    buyurtmaQty: dailyRows.reduce((s, r) => s + (r.buyurtmaQty || 0), 0),
+    debtCount: dailyRows.reduce((s, r) => s + (r.debtCount || 0), 0),
+    debtSum: dailyRows.reduce((s, r) => s + (r.debtSum || 0), 0),
+  }), [dailyRows]);
+
+  const normalizeWarehouseKey = (v) => normText(v).replace(/\s+/g, ' ').trim();
+  const isMainWarehouseName = (v) => {
+    const s = normalizeWarehouseKey(v).replace(/\s+/g, '');
+    if (!s) return false;
+    return (
+      s.includes('основнойсклад') ||
+      s.includes('основной') ||
+      s.includes('osnovnoysklad') ||
+      s.includes('osnovnoy') ||
+      s.includes('asosnoysklad') ||
+      s.includes('asosiysklad')
+    );
+  };
   const mapStorageKey = useMemo(
     () => `aq-driver-warehouse-map-${normalizeCompanyKey(company)}`,
     [company]
@@ -5493,9 +5569,6 @@ function Reports({
   useEffect(() => {
     setDriverWarehouseMap(S.get(mapStorageKey, {}));
   }, [mapStorageKey]);
-  useEffect(() => {
-    S.set(mapStorageKey, driverWarehouseMap || {});
-  }, [mapStorageKey, driverWarehouseMap]);
 
   const controlOrderRows = useMemo(() => {
     let rows = (rawOrders || []).filter((o) => {
@@ -5532,27 +5605,16 @@ function Reports({
     }));
   }, [warehouseTransfers]);
 
-  const warehouseOptions = useMemo(() => {
-    const uniq = Array.from(new Set((transferRows || []).map((r) => r.fromWarehouse).filter(Boolean)));
-    return uniq.sort((a, b) => a.localeCompare(b, 'ru'));
-  }, [transferRows]);
-
-  const { orderQtyByDriverDate, orderDatesByDriver, driverOptions } = useMemo(() => {
+  const { orderQtyByDriverDate, orderDatesByDriver } = useMemo(() => {
     const qtyMap = new Map();
     const datesByDriver = new Map();
-    const drivers = new Set();
     controlOrderRows.forEach((r) => {
       const key = `${r.driver}__${r.date}`;
       qtyMap.set(key, (qtyMap.get(key) || 0) + Math.abs(toNum(r.qty)));
-      drivers.add(r.driver);
       if (!datesByDriver.has(r.driver)) datesByDriver.set(r.driver, new Set());
       datesByDriver.get(r.driver).add(r.date);
     });
-    return {
-      orderQtyByDriverDate: qtyMap,
-      orderDatesByDriver: datesByDriver,
-      driverOptions: Array.from(drivers).sort((a, b) => a.localeCompare(b, 'ru')),
-    };
+    return { orderQtyByDriverDate: qtyMap, orderDatesByDriver: datesByDriver };
   }, [controlOrderRows]);
 
   const { transferQtyByWarehouseDate, transferDatesByWarehouse } = useMemo(() => {
@@ -5570,17 +5632,16 @@ function Reports({
   }, [transferRows]);
 
   const allDrivers = useMemo(() => {
-    const set = new Set(driverOptions);
-    Object.keys(driverWarehouseMap || {}).forEach((d) => {
-      const name = String(d || '').trim();
-      if (name) set.add(name);
-    });
-    let rows = Array.from(set).sort((a, b) => a.localeCompare(b, 'ru'));
+    const set = new Set([
+      ...Array.from(orderDatesByDriver.keys()),
+      ...Object.keys(driverWarehouseMap || {}),
+    ]);
+    let rows = Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b, 'ru'));
     if (!canSeeAll) rows = rows.filter((x) => x === currentUser);
     return rows;
-  }, [driverOptions, driverWarehouseMap, canSeeAll, currentUser]);
+  }, [orderDatesByDriver, driverWarehouseMap, canSeeAll, currentUser]);
 
-  const comparisonRows = useMemo(() => {
+  const dailyControlRows = useMemo(() => {
     const out = [];
     allDrivers.forEach((driver) => {
       const warehouse = String(driverWarehouseMap?.[driver] || '').trim();
@@ -5591,6 +5652,8 @@ function Reports({
       allDates.forEach((date) => {
         const orderQty = Number(orderQtyByDriverDate.get(`${driver}__${date}`) || 0);
         const transferQty = warehouseKey ? Number(transferQtyByWarehouseDate.get(`${warehouseKey}__${date}`) || 0) : 0;
+        if (!warehouse && !orderQty && !transferQty) return;
+        if (warehouse && !orderQty && !transferQty) return;
         out.push({
           date,
           driver,
@@ -5602,42 +5665,12 @@ function Reports({
         });
       });
     });
-    return out;
-  }, [
-    allDrivers,
-    driverWarehouseMap,
-    normalizeWarehouseKey,
-    orderDatesByDriver,
-    transferDatesByWarehouse,
-    orderQtyByDriverDate,
-    transferQtyByWarehouseDate,
-  ]);
+    return out.sort((a, b) => (a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date)));
+  }, [allDrivers, driverWarehouseMap, orderDatesByDriver, transferDatesByWarehouse, orderQtyByDriverDate, transferQtyByWarehouseDate]);
 
-  const dailyControlRows = useMemo(
-    () => comparisonRows
-      .filter((r) => r.mappingMissing || r.orderQty > 0 || r.transferQty > 0)
-      .sort((a, b) => (a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date))),
-    [comparisonRows]
-  );
   const mismatchRows = useMemo(
     () => dailyControlRows.filter((r) => r.mappingMissing || r.diff !== 0),
     [dailyControlRows]
-  );
-  const dateTotals = useMemo(() => {
-    const m = new Map();
-    dailyControlRows.forEach((r) => {
-      const prev = m.get(r.date) || { date: r.date, orderQty: 0, transferQty: 0 };
-      prev.orderQty += Number(r.orderQty || 0);
-      prev.transferQty += Number(r.transferQty || 0);
-      m.set(r.date, prev);
-    });
-    return Array.from(m.values())
-      .map((r) => ({ ...r, diff: r.orderQty - r.transferQty }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [dailyControlRows]);
-  const unmatchedDrivers = useMemo(
-    () => allDrivers.filter((d) => !String(driverWarehouseMap?.[d] || '').trim()),
-    [allDrivers, driverWarehouseMap]
   );
   const controlTotals = useMemo(() => ({
     orderQty: dailyControlRows.reduce((s, r) => s + Number(r.orderQty || 0), 0),
@@ -5645,6 +5678,15 @@ function Reports({
   }), [dailyControlRows]);
 
   const exportReports = () => {
+    exportAoaExcel({
+      fileName: `Hisobot_${todayIso}.xlsx`,
+      sheetName: 'Hisobot',
+      headers: ['Operator', 'Bugun obzvon', 'Buyurtma soni', 'Suv soni', 'Qarz mijoz', 'Qarz summa'],
+      rows: dailyRows.map((r) => [r.operator, r.calls, r.buyurtmaCount, r.buyurtmaQty, r.debtCount, r.debtSum]),
+    });
+  };
+
+  const exportNazorat = () => {
     exportAoaExcel({
       fileName: `Nazorat_${todayIso}.xlsx`,
       sheetName: 'Nazorat',
@@ -5663,8 +5705,9 @@ function Reports({
 
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:14}}>
-      <div style={{display:'flex',justifyContent:'flex-end'}}>
-        <button className="btn btn-gr btn-sm" onClick={exportReports}>Excel</button>
+      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
+        <button className="btn btn-gr btn-sm" onClick={exportReports}>Hisobot Excel</button>
+        <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>
       </div>
       <div className="g4">
         <StatCard
@@ -5680,65 +5723,91 @@ function Reports({
           c="var(--gr)"
         />
         <StatCard
-          l="HATOLI SATRLAR"
-          v={`${fmt(mismatchRows.length)} ta`}
-          s={mismatchRows.length ? "Zakaz va permesheniya teng emas" : 'Hamma satr mos'}
-          c={mismatchRows.length ? 'var(--rd)' : 'var(--gr)'}
+          l="QARZDORLIK ISHLOVI"
+          v={`${debtWorkedCount} ta`}
+          s={`${fmt(debtWorkedSum)} so'm`}
+          c="var(--or)"
         />
         <StatCard
-          l="BIRIKTIRILMAGAN DOSTAVCHIK"
-          v={`${fmt(unmatchedDrivers.length)} ta`}
-          s={unmatchedDrivers.length ? unmatchedDrivers.join(', ') : 'Hammasi biriktirilgan'}
-          c={unmatchedDrivers.length ? 'var(--yl)' : 'var(--bl)'}
+          l="BUGUNGI OBZVON"
+          v={`${callsToday} ta`}
+          s={canSeeAll ? 'Hamma operator' : `${currentUser}`}
+          c="var(--yl)"
         />
       </div>
 
-      <div className="card" style={{padding:14}}>
-        <div style={{fontWeight:700,fontSize:13,marginBottom:8}}>Dostavchik → sklad biriktirish</div>
-        <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
-          Har bir dostavchikka mos skladni tanlang. Shu skladdan "Основной склад"ga chiqqan suvlar zakaz bilan solishtiriladi.
-        </div>
-        <div style={{overflow:'auto',maxHeight:'34vh'}}>
+      <div className="card" style={{padding:16}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Kunlik natija</div>
+        <div style={{overflow:'auto',maxHeight:'58vh'}}>
           <table className="tbl">
             <thead>
               <tr>
-                <th style={{minWidth:220}}>Dostavchik</th>
-                <th style={{minWidth:280}}>Sklad</th>
+                <th>Operator</th>
+                <th style={{textAlign:'right'}}>Obzvon</th>
+                <th style={{textAlign:'right'}}>Buyurtma</th>
+                <th style={{textAlign:'right'}}>Suv soni</th>
+                <th style={{textAlign:'right'}}>Qarz mijoz</th>
+                <th style={{textAlign:'right'}}>Qarz summa</th>
+                <th>Qaysi sanaga zakaz</th>
+                <th style={{textAlign:'right'}}>Kunlik plan</th>
               </tr>
             </thead>
             <tbody>
-              {allDrivers.length === 0 ? (
-                <tr><td colSpan={2} style={{textAlign:'center',padding:20,color:'var(--t3)'}}>Dostavchik topilmadi</td></tr>
-              ) : allDrivers.map((driver) => (
-                <tr key={driver}>
-                  <td style={{fontWeight:600}}>{driver}</td>
-                  <td>
-                    <select
-                      className="select"
-                      style={{minWidth:260}}
-                      value={String(driverWarehouseMap?.[driver] || '')}
-                      onChange={(e) => {
-                        const nextVal = String(e.target.value || '').trim();
-                        setDriverWarehouseMap((prev) => ({
-                          ...(prev || {}),
-                          [driver]: nextVal,
-                        }));
-                      }}
-                    >
-                      <option value="">Sklad tanlanmagan</option>
-                      {warehouseOptions.map((w) => <option key={w} value={w}>{w}</option>)}
-                    </select>
-                  </td>
-                </tr>
-              ))}
+              {dailyRows.length===0 ? (
+                <tr><td colSpan={8} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Bugungi natija yo'q</td></tr>
+              ) : (
+                <>
+                  {dailyRows.map((r, i) => (
+                    <Fragment key={`rep_${i}_${r.operator}`}>
+                      <tr>
+                        <td style={{fontWeight:700}}>{r.operator}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.calls)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.buyurtmaCount)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.buyurtmaQty)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.debtCount)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--rd)'}}>{fmt(r.debtSum)}</td>
+                        <td style={{fontSize:11,color:'var(--t2)'}}>—</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
+                      </tr>
+                      {(r.dateEntries || []).map((d, j) => (
+                        <tr key={`rep_${i}_${j}_${d.date}`} style={{background:'rgba(88,166,255,.05)'}}>
+                          <td style={{color:'var(--t3)',fontSize:11}}>sana</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(d.qty)}</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{d.date}</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
+                        </tr>
+                      ))}
+                    </Fragment>
+                  ))}
+                  <tr style={{background:'var(--s2)'}}>
+                    <td style={{fontWeight:800}}>ITOG</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.calls)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.buyurtmaCount)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{fmt(dailyTotals.buyurtmaQty)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.debtCount)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--rd)'}}>{fmt(dailyTotals.debtSum)}</td>
+                    <td style={{fontWeight:700,color:'var(--t3)'}}>—</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
+                  </tr>
+                </>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
       <div className="card" style={{padding:16}}>
-        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>1) Hatoli</div>
-        <div style={{overflow:'auto',maxHeight:'40vh'}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Nazorat</div>
+        <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
+          Dostavchik-sklad biriktirish: Nastroyka → Biriktirish bo'limida.
+        </div>
+
+        <div style={{fontWeight:700,fontSize:12.5,marginBottom:8}}>1) Hatoli</div>
+        <div style={{overflow:'auto',maxHeight:'34vh',marginBottom:12}}>
           <table className="tbl">
             <thead>
               <tr>
@@ -5762,19 +5831,15 @@ function Reports({
                   <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.orderQty)}</td>
                   <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.transferQty)}</td>
                   <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--rd)'}}>{fmt(r.diff)}</td>
-                  <td style={{fontSize:11,color:'var(--rd)'}}>
-                    {r.mappingMissing ? 'Sklad biriktirilmagan' : 'Mos emas'}
-                  </td>
+                  <td style={{fontSize:11,color:'var(--rd)'}}>{r.mappingMissing ? 'Sklad biriktirilmagan' : 'Mos emas'}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      </div>
 
-      <div className="card" style={{padding:16}}>
-        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>2) Kunlik suv sonlari</div>
-        <div style={{overflow:'auto',maxHeight:'44vh',marginBottom:10}}>
+        <div style={{fontWeight:700,fontSize:12.5,marginBottom:8}}>2) Kunlik suv sonlari</div>
+        <div style={{overflow:'auto',maxHeight:'38vh'}}>
           <table className="tbl">
             <thead>
               <tr>
@@ -5811,32 +5876,6 @@ function Reports({
                   </tr>
                 </>
               )}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{fontWeight:700,fontSize:12.5,marginBottom:8}}>Sana bo'yicha jami</div>
-        <div style={{overflow:'auto',maxHeight:'30vh'}}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Sana</th>
-                <th style={{textAlign:'right'}}>Zakaz jami</th>
-                <th style={{textAlign:'right'}}>Permesheniya jami</th>
-                <th style={{textAlign:'right'}}>Farq</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dateTotals.length === 0 ? (
-                <tr><td colSpan={4} style={{textAlign:'center',padding:20,color:'var(--t3)'}}>Sana kesimi topilmadi</td></tr>
-              ) : dateTotals.map((r) => (
-                <tr key={`t_${r.date}`}>
-                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date}</td>
-                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
-                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
-                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
-                </tr>
-              ))}
             </tbody>
           </table>
         </div>
@@ -5986,6 +6025,7 @@ function PlanPage({
 function SettingsPanel({
   users, setUsers, access, setAccess, currentUser, setCurrentUser,
   webhookUrl, setWebhookUrl, userCreds, setUserCreds, onSwitchUser, isAdminSession=false, viewerAccess=null,
+  D=null, company='murodbaxsh',
 }) {
   const [tab, setTab] = useState('staff');
   const [sel, setSel] = useState(currentUser || users[0] || 'Admin');
@@ -6016,8 +6056,51 @@ function SettingsPanel({
   ];
   const viewerConf = normalizeAccessConfig(currentUser, viewerAccess || access[currentUser]);
   const uiConf = normalizeAccessConfig(currentUser, access[currentUser]);
+  const bindingStorageKey = useMemo(
+    () => `aq-driver-warehouse-map-${normalizeCompanyKey(company)}`,
+    [company]
+  );
+  const [driverWarehouseMap, setDriverWarehouseMap] = useState(() => S.get(bindingStorageKey, {}));
+  useEffect(() => {
+    setDriverWarehouseMap(S.get(bindingStorageKey, {}));
+  }, [bindingStorageKey]);
+  useEffect(() => {
+    S.set(bindingStorageKey, driverWarehouseMap || {});
+  }, [bindingStorageKey, driverWarehouseMap]);
+  const normalizeWarehouseKey = (v) => normText(v).replace(/\s+/g, ' ').trim();
+  const isMainWarehouseName = (v) => {
+    const s = normalizeWarehouseKey(v).replace(/\s+/g, '');
+    if (!s) return false;
+    return (
+      s.includes('основнойсклад') ||
+      s.includes('основной') ||
+      s.includes('osnovnoysklad') ||
+      s.includes('osnovnoy') ||
+      s.includes('asosnoysklad') ||
+      s.includes('asosiysklad')
+    );
+  };
+  const bindingDrivers = useMemo(() => {
+    const src = (D?.rawOrders || []).filter((o) =>
+      isWaterProduct(o.product) &&
+      isOrderDoc(o.docType) &&
+      !isCancelledStatus(o.status)
+    ).map((o) => String(o.delivPerson || o.agent || '').trim()).filter(Boolean);
+    const uniq = Array.from(new Set(src)).sort((a, b) => a.localeCompare(b, 'ru'));
+    if (isAdminSession) return uniq;
+    return uniq.filter((d) => d === currentUser);
+  }, [D, isAdminSession, currentUser]);
+  const bindingWarehouses = useMemo(() => {
+    const src = (D?.warehouseTransfers || []).filter((r) =>
+      isWaterProduct(r.product) &&
+      isMainWarehouseName(r.toWarehouse)
+    ).map((r) => String(r.fromWarehouse || '').trim()).filter(Boolean);
+    return Array.from(new Set(src)).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [D]);
+  const canEditBinding = !!isAdminSession;
   const allowedSettingsTabs = useMemo(() => {
     const out = [];
+    out.push('binding');
     if ((viewerConf.visible?.settings_staff ?? true)) out.push('staff');
     if ((viewerConf.visible?.settings_app ?? true)) out.push('app');
     if ((viewerConf.visible?.settings_ui ?? true)) out.push('ui');
@@ -6113,6 +6196,7 @@ function SettingsPanel({
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12}}>
       <div className="tabs" style={{display:'inline-flex'}}>
+        <button className={`tab${tab==='binding'?' on':''}`} onClick={()=>setTab('binding')}>Biriktirish</button>
         {(viewerConf.visible?.settings_staff ?? true) && (
           <button className={`tab${tab==='staff'?' on':''}`} onClick={()=>setTab('staff')}>{E.users} Hodimlar ruhsatlari</button>
         )}
@@ -6125,6 +6209,54 @@ function SettingsPanel({
       </div>
       {!allowedSettingsTabs.length && (
         <div className="card" style={{padding:14,color:'var(--t3)'}}>Siz uchun nastroyka bo'limlari yopilgan.</div>
+      )}
+
+      {tab==='binding' && (
+        <div className="card" style={{padding:14}}>
+          <div style={{fontWeight:700,marginBottom:8}}>Dostavchik va sklad biriktirish</div>
+          <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
+            Kompaniya: <strong style={{color:'var(--t1)'}}>{companyLabelByKey(company)}</strong>. Bu sozlama Nazorat bo'limi solishtiruvida ishlatiladi.
+          </div>
+          <div style={{overflow:'auto',maxHeight:'56vh'}}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Dostavchik</th>
+                  <th>Sklad</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bindingDrivers.length === 0 ? (
+                  <tr><td colSpan={2} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Dostavchik topilmadi</td></tr>
+                ) : bindingDrivers.map((driver) => (
+                  <tr key={driver}>
+                    <td style={{fontWeight:600}}>{driver}</td>
+                    <td>
+                      <select
+                        className="select"
+                        style={{minWidth:280}}
+                        value={String(driverWarehouseMap?.[driver] || '')}
+                        disabled={!canEditBinding}
+                        onChange={(e) => {
+                          const val = String(e.target.value || '').trim();
+                          setDriverWarehouseMap((prev) => ({ ...(prev || {}), [driver]: val }));
+                        }}
+                      >
+                        <option value="">Sklad tanlanmagan</option>
+                        {bindingWarehouses.map((w) => <option key={w} value={w}>{w}</option>)}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!canEditBinding && (
+            <div style={{fontSize:11,color:'var(--yl)',marginTop:10}}>
+              Biriktirishni o'zgartirish faqat Admin sessiyada ochiq.
+            </div>
+          )}
+        </div>
       )}
 
       {tab==='staff' && (viewerConf.visible?.settings_staff ?? true) && (
@@ -6516,7 +6648,7 @@ const NAV = [
   { id:'kassa',   label:'Kassa',      icon:E.pay },
   { id:'obzvon',  label:'Obzvon',     icon:E.phone, badge:'o' },
   { id:'doljniki',label:'Doljniki',   icon:E.doc, badge:'dz' },
-  { id:'reports', label:'Nazorat', icon:E.report },
+  { id:'reports', label:'Hisobotlar', icon:E.report },
   { id:'plan',    label:'Plan',       icon:'???' },
 ];
 
@@ -7493,6 +7625,7 @@ export default function App() {
                     access={access}
                     planRows={planRows}
                     planOffDays={planOffDays}
+                    obzvonNewRows={companyObzvonAllNewRows}
                   />
                 )}
                 {page==='plan' && canViewPage('plan') && (
@@ -7507,7 +7640,7 @@ export default function App() {
                     setPlanOffDays={setPlanOffDays}
                   />
                 )}
-                {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} />}
+                {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} D={D} company={activeCompany} />}
               </>
             )}
           </div>
@@ -7533,6 +7666,7 @@ export default function App() {
     </>
   );
 }
+
 
 
 
