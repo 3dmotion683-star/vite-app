@@ -1,11 +1,11 @@
-﻿import { Fragment, useState, useMemo, useCallback, useEffect, useDeferredValue, useRef } from 'react';
+import { Fragment, useState, useMemo, useCallback, useEffect, useDeferredValue, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import {
   BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ EXCLUDED MERCHANT KEYWORDS в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ EXCLUDED MERCHANT KEYWORDS Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 const EXCLUDED_KEYWORDS = [
   'Dividend','UOS','Rasxod','Rasxodnik','Postavshik',
   'Personal','Dolg','VIP','KULER','Ofis',
@@ -38,7 +38,7 @@ const isExcludedZCategory = (v) => {
 };
 const normCurrency = (v) => {
   const s = String(v || '').trim().toUpperCase();
-  if (['USD', '$', 'Р”РћР›Р›РђР '].includes(s)) return 'USD';
+  if (['USD', '$', 'Р В РІР‚СњР В РЎвЂєР В РІР‚С”Р В РІР‚С”Р В РЎвЂ™Р В Р’В '].includes(s)) return 'USD';
   return 'UZS';
 };
 const isCommonDistrictLabel = (v) => {
@@ -46,12 +46,12 @@ const isCommonDistrictLabel = (v) => {
   if (!s) return false;
   // Normal Cyrillic + ehtimoliy buzilgan kodirovka ko'rinishlari
   return (
-    s.includes('общая территория') ||
-    s.includes('общая') ||
+    s.includes('Р С•Р В±РЎвЂ°Р В°РЎРЏ РЎвЂљР ВµРЎР‚РЎР‚Р С‘РЎвЂљР С•РЎР‚Р С‘РЎРЏ') ||
+    s.includes('Р С•Р В±РЎвЂ°Р В°РЎРЏ') ||
     s.includes('territoriya') ||
     s.includes('territoria') ||
-    s.includes('рћр±с‰р°сџ') ||
-    s.includes('рћр±с‰') ||
+    s.includes('РЎР‚РЎвЂєРЎР‚Р’В±РЎРѓРІР‚В°РЎР‚Р’В°РЎРѓРЎСџ') ||
+    s.includes('РЎР‚РЎвЂєРЎР‚Р’В±РЎРѓРІР‚В°') ||
     s.includes('obshaya')
   );
 };
@@ -120,19 +120,25 @@ function recalcInstallment(row, monthsRaw) {
   return { ...row, months, monthly, remaining, paidMonths, monthsLeft, dueCount, overdueAmount };
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ CONFIG в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ CONFIG Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 const SHEET_CONFIG = {
   url: 'https://docs.google.com/spreadsheets/d/1RND6D5JIWh6vnk8i_FO1mx1if4hx182VNaPzGQtKuQM/edit?gid=1272423090#gid=1272423090',
   gids: { merchants: '', balans: '', orders: '', cashbox: '', integration: '', mijozlar: '', warehouseTransfer: '' },
 };
 const OBZVON_ALL_LOCAL_XLSX = '/obzvon-vse.xlsx';
 const OBZVON_ALL_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=0#gid=0';
+const OBZVON_NEW_EXPORT_SHEET_ID = '1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8';
+const OBZVON_NEW_EXPORT_SHEET_NAME = 'Barcha_obzvon_yangi';
+const OBZVON_NEW_EXPORT_HOUR = 3;
+const OBZVON_NEW_EXPORTED_MAP_KEY = 'aq-obzvon-new-exported-map';
+const OBZVON_NEW_LAST_AUTO_DATE_KEY = 'aq-obzvon-new-last-auto-date';
+const OBZVON_NEW_HEADERS_WRITTEN_KEY = 'aq-obzvon-new-sheet-headers-written';
 const ACCESS_SYNC_URL_KEY = 'aq-access-api-url';
 const ACCESS_UPDATED_AT_KEY = 'aq-access-updated-at';
 // Access konfiguratsiya sinxroni uchun Cloudflare Worker API URL:
 const OBZVON_WEBHOOK_DEFAULT = 'https://solitary-brook-4889aquabiz-api.3dmotion683.workers.dev';
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ HELPERS в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ HELPERS Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 const fmt  = (n) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
 const fmtM = (n) =>
   n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' :
@@ -159,6 +165,7 @@ const E = {
   phone: '\u{1F4DE}',
   doc: '\u{1F4C4}',
   report: '\u{1F4CA}',
+  plan: '\u{1F4C5}',
   water: '\u{1F4A7}',
   uzs: '\u{1F4B4}',
   usd: '\u{1F4B5}',
@@ -608,14 +615,14 @@ const isNameExcludedForActiveStats = (name) => {
   const n = String(name || '').trim().toUpperCase();
   if (!n) return true;
   if (isNameInactiveByPrefix(n)) return true;
-  if (/^[KК]\b/.test(n)) return true;
+  if (/^[KР С™]\b/.test(n)) return true;
   return false;
 };
 const isNameInactiveByPrefix = (name) => {
   const n = String(name || '').trim().toUpperCase().replace(/\s+/g, ' ');
   if (!n) return false;
-  if (n.startsWith('Я') || n.startsWith('РЇ') || n.startsWith('YA')) return true;
-  if ((n.includes('TUGATILDI') || n.includes('ESKI')) && (n.includes('Я') || n.includes('РЇ') || n.includes('YA'))) return true;
+  if (n.startsWith('Р Р‡') || n.startsWith('Р В Р вЂЎ') || n.startsWith('YA')) return true;
+  if ((n.includes('TUGATILDI') || n.includes('ESKI')) && (n.includes('Р Р‡') || n.includes('Р В Р вЂЎ') || n.includes('YA'))) return true;
   return false;
 };
 const isAhmadteaTag = (v) => {
@@ -721,7 +728,7 @@ function toDate(v) {
   const d = new Date(s);
   return isNaN(d) ? null : d;
 }
-const fmtD = (v) => { const d = toDate(v); return d ? d.toLocaleDateString('ru-RU') : '—'; };
+const fmtD = (v) => { const d = toDate(v); return d ? d.toLocaleDateString('ru-RU') : 'РІР‚вЂќ'; };
 const daysAgo = (v) => {
   const d = toDate(v); if (!d) return null;
   const n = new Date(); n.setHours(0,0,0,0); d.setHours(0,0,0,0);
@@ -856,36 +863,36 @@ const cleanDistrictDisplay = (v) => {
   const parts = raw.split(';').map((x) => String(x || '').trim()).filter(Boolean);
   const filtered = parts.filter((p) => {
     const n = p.toLowerCase();
-    return !n.includes('общая территория') && n !== 'общая';
+    return !n.includes('Р С•Р В±РЎвЂ°Р В°РЎРЏ РЎвЂљР ВµРЎР‚РЎР‚Р С‘РЎвЂљР С•РЎР‚Р С‘РЎРЏ') && n !== 'Р С•Р В±РЎвЂ°Р В°РЎРЏ';
   });
   return filtered[0] || '';
 };
 const isOrderDoc = (v) => {
   const t = normText(v);
-  return ['заказ', 'р·р°рєр°р·', 'zakaz'].includes(t);
+  return ['Р В·Р В°Р С”Р В°Р В·', 'РЎР‚Р’В·РЎР‚Р’В°РЎР‚РЎвЂќРЎР‚Р’В°РЎР‚Р’В·', 'zakaz'].includes(t);
 };
 const isReturnDoc = (v) => {
   const t = normText(v);
-  return ['возврат', 'ріѕр·рі°с‚', 'vozvrat'].includes(t);
+  return ['Р Р†Р С•Р В·Р Р†РЎР‚Р В°РЎвЂљ', 'РЎР‚РЎвЂ“РЎвЂўРЎР‚Р’В·РЎР‚РЎвЂ“Р’В°РЎРѓРІР‚С™', 'vozvrat'].includes(t);
 };
 const isPaymentFromCounterparty = (v) => {
   const t = normText(v);
   return (
-    t === 'оплата от контрагента' ||
-    t === 'рѕрїр»р°с‚р° рѕс‚ рєрѕрѕс‚сђр°рірµрѕс‚р°' ||
+    t === 'Р С•Р С—Р В»Р В°РЎвЂљР В° Р С•РЎвЂљ Р С”Р С•Р Р…РЎвЂљРЎР‚Р В°Р С–Р ВµР Р…РЎвЂљР В°' ||
+    t === 'РЎР‚РЎвЂўРЎР‚РЎвЂ”РЎР‚Р’В»РЎР‚Р’В°РЎРѓРІР‚С™РЎР‚Р’В° РЎР‚РЎвЂўРЎРѓРІР‚С™ РЎР‚РЎвЂќРЎР‚РЎвЂўРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂ™РЎР‚Р’В°РЎР‚РЎвЂ“РЎР‚Р’ВµРЎР‚РЎвЂўРЎРѓРІР‚С™РЎР‚Р’В°' ||
     t === 'oplata ot kontragenta' ||
-    t.includes('контрагента') ||
-    t.includes('рєрѕрѕс‚сђр°рірµрѕс‚р°')
+    t.includes('Р С”Р С•Р Р…РЎвЂљРЎР‚Р В°Р С–Р ВµР Р…РЎвЂљР В°') ||
+    t.includes('РЎР‚РЎвЂќРЎР‚РЎвЂўРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂ™РЎР‚Р’В°РЎР‚РЎвЂ“РЎР‚Р’ВµРЎР‚РЎвЂўРЎРѓРІР‚С™РЎР‚Р’В°')
   );
 };
 const isPaymentToCounterparty = (v) => {
   const t = normText(v);
   return (
-    t === 'оплата контрагенту' ||
-    t === 'рѕрїр»р°с‚р° рєрѕрѕс‚сђр°рірµрѕс‚сѓ' ||
+    t === 'Р С•Р С—Р В»Р В°РЎвЂљР В° Р С”Р С•Р Р…РЎвЂљРЎР‚Р В°Р С–Р ВµР Р…РЎвЂљРЎС“' ||
+    t === 'РЎР‚РЎвЂўРЎР‚РЎвЂ”РЎР‚Р’В»РЎР‚Р’В°РЎРѓРІР‚С™РЎР‚Р’В° РЎР‚РЎвЂќРЎР‚РЎвЂўРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂ™РЎР‚Р’В°РЎР‚РЎвЂ“РЎР‚Р’ВµРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂњ' ||
     t === 'oplata kontragentu' ||
-    t.includes('контрагенту') ||
-    t.includes('рєрѕрѕс‚сђр°рірµрѕс‚сѓ')
+    t.includes('Р С”Р С•Р Р…РЎвЂљРЎР‚Р В°Р С–Р ВµР Р…РЎвЂљРЎС“') ||
+    t.includes('РЎР‚РЎвЂќРЎР‚РЎвЂўРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂ™РЎР‚Р’В°РЎР‚РЎвЂ“РЎР‚Р’ВµРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂњ')
   );
 };
 function parseObzvonAllRows(rows = []) {
@@ -893,7 +900,7 @@ function parseObzvonAllRows(rows = []) {
   const headerIdx = rows.findIndex((r) => {
     const c0 = String((r || [])[0] || '').trim().toLowerCase();
     const c1 = String((r || [])[1] || '').trim().toLowerCase();
-    return c0 === '№' || c0 === 'в„–' || c0 === 'no' || c1.includes('контрагент') || c1.includes('рєрѕрѕс‚сђр°рірµрѕс‚') || c1.includes('kontragent');
+    return c0 === 'РІвЂћвЂ“' || c0 === 'Р Р†РІР‚С›РІР‚вЂњ' || c0 === 'no' || c1.includes('Р С”Р С•Р Р…РЎвЂљРЎР‚Р В°Р С–Р ВµР Р…РЎвЂљ') || c1.includes('РЎР‚РЎвЂќРЎР‚РЎвЂўРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂ™РЎР‚Р’В°РЎР‚РЎвЂ“РЎР‚Р’ВµРЎР‚РЎвЂўРЎРѓРІР‚С™') || c1.includes('kontragent');
   });
   const start = headerIdx >= 0 ? headerIdx + 1 : 0;
   return rows.slice(start)
@@ -953,28 +960,28 @@ function extractAccessConfigFromRows(rows = []) {
   return decoded;
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ STATUS HELPERS в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
-// Р”РћРЎРўРђР’Р›Р•Рќ va РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР” — ikkisi ham yetkazilgan hisoblanadi
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ STATUS HELPERS Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+// Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ va Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ РІР‚вЂќ ikkisi ham yetkazilgan hisoblanadi
 const isDeliveredStatus = (s) => {
   const st = normText(s);
   return (
-    st === 'доставлен' ||
-    st === 'получен на склад' ||
-    st === 'р”рћрўрђр’р›р•рќ' ||
+    st === 'Р Т‘Р С•РЎРѓРЎвЂљР В°Р Р†Р В»Р ВµР Р…' ||
+    st === 'Р С—Р С•Р В»РЎС“РЎвЂЎР ВµР Р… Р Р…Р В° РЎРѓР С”Р В»Р В°Р Т‘' ||
+    st === 'РЎР‚РІР‚СњРЎР‚РЎвЂєРЎР‚РЎС›РЎР‚РЎвЂ™РЎР‚РІР‚в„ўРЎР‚РІР‚С”РЎР‚РІР‚СћРЎР‚РЎСљ' ||
     st === 'poluchen na sklad'
   );
 };
 // Bekor qilingan
 const isCancelledStatus = (s) => {
   const st = normText(s);
-  return st === 'отменено' || st === 'рћс‚рњр•рќр•рќрћ';
+  return st === 'Р С•РЎвЂљР СР ВµР Р…Р ВµР Р…Р С•' || st === 'РЎР‚РЎвЂєРЎРѓРІР‚С™РЎР‚РЎС™РЎР‚РІР‚СћРЎР‚РЎСљРЎР‚РІР‚СћРЎР‚РЎСљРЎР‚РЎвЂє';
 };
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ MAHSULOT ANIQLASH в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ MAHSULOT ANIQLASH Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 const normProduct = (p) => normText(p).replace(/\s+/g, ' ');
 const WATER_PRODUCT_NAMES = new Set([
   'murodbaxsh 18.9l',
-  'бонус murodbaxsh 18.9l',
+  'Р В±Р С•Р Р…РЎС“РЎРѓ murodbaxsh 18.9l',
 ]);
 // Tara ga ta'sir qiladigan mahsulotlar (zakaz=+, vozvrat=-)
 const isTaraAffectingProduct = (p) => {
@@ -983,9 +990,9 @@ const isTaraAffectingProduct = (p) => {
   if (!pl.includes('18.9l')) return false;
   return (
     pl.includes('tara') ||
-    pl.includes('тара') ||
-    pl.includes('рўр°сђр°') ||
-    pl.includes('пустой') ||
+    pl.includes('РЎвЂљР В°РЎР‚Р В°') ||
+    pl.includes('РЎР‚РЎС›РЎР‚Р’В°РЎРѓРЎвЂ™РЎР‚Р’В°') ||
+    pl.includes('Р С—РЎС“РЎРѓРЎвЂљР С•Р в„–') ||
     pl.includes('empty')
   );
 };
@@ -995,7 +1002,7 @@ const isWaterProduct = (p) => {
   return WATER_PRODUCT_NAMES.has(pl);
 };
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ EXCEL READER в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ EXCEL READER Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function readExcelFile(file) {
   return new Promise((res, rej) => {
     const reader = new FileReader();
@@ -1014,7 +1021,7 @@ function readExcelFile(file) {
   });
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ GOOGLE SHEETS в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ GOOGLE SHEETS Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function buildGsUrl(sheetId, gid) {
   return `https://docs.google.com/spreadsheets/d/${sheetId}/pub?gid=${gid}&single=true&output=csv`;
 }
@@ -1181,11 +1188,11 @@ function extractGid(url) {
   return m ? m[1] : '';
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ DATA PROCESSING в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ DATA PROCESSING Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function processAll(mainData) {
   if (!mainData) return { customers:[], orders:[], cashbox:[], contacts:[] };
 
-  /* в”Ђв”Ђ 1. MERCHANTS в”Ђв”Ђ
+  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 1. MERCHANTS Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ
      A(r[0])=ID  C(r[2])=Nom  D(r[3])=Tel  E(r[4])=Kontakt
      O(r[14])=Manzil  V(r[21])=Rayon  Y(r[24])=EskiID  Z(r[25])=Manba */
   const merchantSheet = mainData.sheets['public.view_merchants'];
@@ -1210,14 +1217,14 @@ function processAll(mainData) {
         source,
         aaTag: aaValue,
         merchantNote: merchNote,
-        eskiId:   String(r[24] || '').trim(), // Y ustun — eski ID (integratsiya uchun)
+        eskiId:   String(r[24] || '').trim(), // Y ustun РІР‚вЂќ eski ID (integratsiya uchun)
       });
     });
   }
   const contactById = {};
   contacts.forEach((c) => { contactById[c.id] = c; });
 
-  /* в”Ђв”Ђ 2. BALANS в”Ђв”Ђ
+  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 2. BALANS Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ
      8-qatordan boshlanadi (slice(7))
      G(r[6])=MijozID  D(r[3])=BalansUZS  C(r[2])=BalansUSD */
   const balMapUZS = {};
@@ -1244,10 +1251,10 @@ function processAll(mainData) {
     });
   }
 
-  /* в”Ђв”Ђ 3. INTIGRATSIYA в”Ђв”Ђ
+  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 3. INTIGRATSIYA Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ
      2-qatordan boshlanadi (slice(1))
      A(r[0])=EskiID  H(r[7])=TaraOstatka
-     Logika: merchants.eskiId === intigratsiya.eskiId в†’ boshlang'ich tara */
+     Logika: merchants.eskiId === intigratsiya.eskiId Р Р†РІР‚В РІР‚в„ў boshlang'ich tara */
   const integTaraByEskiId = {};
   const integSheet = mainData.sheets['intigratsiya'];
   if (integSheet) {
@@ -1259,7 +1266,7 @@ function processAll(mainData) {
     });
   }
 
-  /* в”Ђв”Ђ 4. ZAKAZLAR в”Ђв”Ђ
+  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 4. ZAKAZLAR Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ
      A(r[0])=ZakazNom  D(r[3])=Mahsulot  H(r[7])=Miqdor  I(r[8])=Summa
      J(r[9])=Kat  K(r[10])=KontragentNom  L(r[11])=Valyuta
      M(r[12])=HujjatTuri  N(r[13])=Status  R(r[17])=UniqueID
@@ -1295,7 +1302,7 @@ function processAll(mainData) {
     });
   }
 
-  /* в”Ђв”Ђ 5. KASSA в”Ђв”Ђ
+  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 5. KASSA Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ
      A(r[0])=OpStatus  B(r[1])=OpNom  E(r[4])=Summa  N(r[13])=Izoh
      R(r[17])=OpTuri  S(r[18])=Operator  T(r[19])=KontragentNom
      U(r[20])=Kassa   V(r[21])=Sana   X(r[23])=MijozID */
@@ -1315,12 +1322,12 @@ function processAll(mainData) {
       const mId      = normId(r[23]);
       const note     = String(r[13] || '').trim();
 
-      if (!opNum || opNum === 'РќРѕРјРµСЂ РѕРїРµСЂР°С†РёРё') return;
+      if (!opNum || opNum === 'Р В РЎСљР В РЎвЂўР В РЎВР В Р’ВµР РЋР вЂљ Р В РЎвЂўР В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚В Р В РЎвЂР В РЎвЂ') return;
       rawCash.push({ opStatus, opNum, sana, amount, currency, opType, operator, contName, kassa, mId, note });
     });
   }
 
-  /* ── 5.1. PERMESHENIYA ──
+  /* -- 5.1. PERMESHENIYA --
      R(r[17])=OperationID  S(r[18])=SoSklada  T(r[19])=NaSklad
      U(r[20])=Sana         V(r[21])=Mahsulot  W(r[22])=Soni
      X(r[23])=Kod          Y(r[24])=UniqueID */
@@ -1350,7 +1357,7 @@ function processAll(mainData) {
     });
   }
 
-  /* в”Ђв”Ђ 6. GURUHLASH в”Ђв”Ђ */
+  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 6. GURUHLASH Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ */
   const ordersByMId = {};
   rawOrders.forEach((o) => {
     const mid = o.mId || o.contName;
@@ -1378,7 +1385,7 @@ function processAll(mainData) {
     });
   }
 
-  /* в”Ђв”Ђ 7. MIJOZLAR YARATISH в”Ђв”Ђ */
+  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 7. MIJOZLAR YARATISH Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ */
   const customers = contacts.map((c) => {
     const myOrders = ordersByMId[c.id] || [];
     const myCash   = cashByMId[c.id]   || [];
@@ -1391,7 +1398,7 @@ function processAll(mainData) {
     const deliveredTaraRows = myOrders.filter(
       (o) => isTaraAffectingProduct(o.product) && isDeliveredStatus(o.status)
     );
-    // Boshlang'ich tara: merchants.eskiId в†’ intigratsiya.A в†’ intigratsiya.H
+    // Boshlang'ich tara: merchants.eskiId Р Р†РІР‚В РІР‚в„ў intigratsiya.A Р Р†РІР‚В РІР‚в„ў intigratsiya.H
     const integTara  = c.eskiId ? (integTaraByEskiId[c.eskiId] || 0) : 0;
     const taraDelta = deliveredTaraRows.reduce((s, o) => {
       const q = Math.abs(toNum(o.qty));
@@ -1411,7 +1418,7 @@ function processAll(mainData) {
 
     const kulerOrds = myOrders.filter(
       (o) => (o.product || '').toLowerCase().includes('kuler') ||
-              (o.product || '').toLowerCase().includes('РєСѓР»РµСЂ')
+              (o.product || '').toLowerCase().includes('Р В РЎвЂќР РЋРЎвЂњР В Р’В»Р В Р’ВµР РЋР вЂљ')
     );
     const kulers = kulerOrds.filter((o) => isOrderDoc(o.docType)).length;
 
@@ -1436,7 +1443,7 @@ function processAll(mainData) {
     return {
       id: c.id,
       name: c.name,
-      phone: c.phone || '—',
+      phone: c.phone || 'РІР‚вЂќ',
       district: c.district,
       source: c.source,
       aaTag: c.aaTag || '',
@@ -1477,7 +1484,7 @@ function processAll(mainData) {
   );
   const isKulerProduct = (p) => {
     const pl = (p || '').toLowerCase();
-    return pl.includes('kuler') || pl.includes('РєСѓР»РµСЂ');
+    return pl.includes('kuler') || pl.includes('Р В РЎвЂќР РЋРЎвЂњР В Р’В»Р В Р’ВµР РЋР вЂљ');
   };
 
   const deliveredKulerOrders = rawOrders.filter((o) =>
@@ -1557,8 +1564,8 @@ function processAll(mainData) {
       source: customer?.source || 'KULER',
       note: customer?.merchantNote || '',
       purchaseDate: firstOrder?.orderDate || '',
-      orderNo: firstOrder?.soNum || '—',
-      operator: firstOrder?.agent || '—',
+      orderNo: firstOrder?.soNum || 'РІР‚вЂќ',
+      operator: firstOrder?.agent || 'РІР‚вЂќ',
       product: firstOrder?.product || 'Kuler',
       payments: [...k.payments].sort((a,b) => (toDate(a.sana)||0) - (toDate(b.sana)||0)),
       months,
@@ -1581,7 +1588,7 @@ function processAll(mainData) {
   };
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ SVERKA в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ SVERKA Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function buildSverka(customer, ordersByMId, cashByMId) {
   const cid = customer.id;
   const myOrders = (ordersByMId[cid] || []).map((o) => ({
@@ -1607,7 +1614,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
       const isVoz  = isReturnDoc(row.docType);
       const isTara = isTaraAffectingProduct(row.product);
       const isWater = isWaterProduct(row.product);
-      // РћРўРњР•РќР•РќРћ bo'lmagan va Р”РћРЎРўРђР’Р›Р•Рќ/РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР” bo'lgan в†’ balansga ta'sir qiladi
+      // Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє bo'lmagan va Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ/Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ bo'lgan Р Р†РІР‚В РІР‚в„ў balansga ta'sir qiladi
       const countsForBalance = isDeliveredStatus(row.status);
       const orderSum  = row.sum || 0;
       const isCancelled = isCancelledStatus(row.status);
@@ -1619,7 +1626,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
       return {
         kod: row.soNum,
         sana: fmtD(row._dateStr),
-        dokument: row.docType || 'Р—Р°РєР°Р·',
+        dokument: row.docType || 'Р В РІР‚вЂќР В Р’В°Р В РЎвЂќР В Р’В°Р В Р’В·',
         produkt: row.product,
         qty: row.qty,
         narx: row.price,
@@ -1630,7 +1637,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
         currency: row.currency || 'UZS',
         agent: row.agent,
         note: '',
-        driver: row.delivPerson, // X ustun — dostavchik ismi
+        driver: row.delivPerson, // X ustun РІР‚вЂќ dostavchik ismi
         status: row.status,
         _isVoz: isVoz,
         _isTara: isTara,
@@ -1645,7 +1652,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
       return {
         kod: row.opNum,
         sana: fmtD(row._dateStr),
-        dokument: row.opType || "РћРїР»Р°С‚Р° РѕС‚ РєРѕРЅС‚СЂР°РіРµРЅС‚Р°",
+        dokument: row.opType || "Р В РЎвЂєР В РЎвЂ”Р В Р’В»Р В Р’В°Р РЋРІР‚С™Р В Р’В° Р В РЎвЂўР РЋРІР‚С™ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°",
         produkt: '',
         qty: null,
         narx: null,
@@ -1668,7 +1675,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
   });
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ EXCEL EXPORT в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ EXCEL EXPORT Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function exportSverkaExcel(customer, rows) {
   const wb = XLSX.utils.book_new();
   const headers = [
@@ -1757,12 +1764,12 @@ const buildColsFromAoa = (headers, rows) => {
 const EXCEL_NUM_FMT = '#,##0';
 const EXCEL_DATE_FMT = 'dd.mm.yyyy';
 const isDateLikeHeader = (h) => /(sana|date|oxirgi|keyingi|olingan|muddat)/i.test(String(h || '').trim());
-const isNumberLikeHeader = (h) => /(summa|balans|qarz|dona|soni|kol-vo|qty|oylar|qoldiq|to['`’]?langan|idish|jami|miqdor|suv soni|(^|\s)(no|№)(\s|$))/i.test(String(h || '').trim());
+const isNumberLikeHeader = (h) => /(summa|balans|qarz|dona|soni|kol-vo|qty|oylar|qoldiq|to['`РІР‚в„ў]?langan|idish|jami|miqdor|suv soni|(^|\s)(no|РІвЂћвЂ“)(\s|$))/i.test(String(h || '').trim());
 const isTextForcedHeader = (h) => /(^|\s)(id|kod|telefon|phone|operator|agent|kontragent|mijoz|rayon|status|mavzu|izoh|mahsulot|hujjat|tur)(\s|$)/i.test(String(h || '').trim());
 const parseExcelNumber = (v) => {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
   const s0 = String(v ?? '').trim();
-  if (!s0 || s0 === '-' || s0 === '—') return null;
+  if (!s0 || s0 === '-' || s0 === 'РІР‚вЂќ') return null;
   let s = s0
     .replace(/\s+/g, '')
     .replace(/[^\d,.\-]/g, '');
@@ -1861,7 +1868,7 @@ function exportAoaExcel({ fileName, sheetName = 'Hisobot', headers = [], rows = 
   XLSX.writeFile(wb, safeExcelName(fileName));
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ CSS в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ CSS Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
 :root{
@@ -1964,7 +1971,7 @@ const LIGHT_THEME_VARS = {
   '--pu2': '#efe6ff',
 };
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ LOCAL STORAGE в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ LOCAL STORAGE Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 const S = {
   get: (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):d; } catch { return d; } },
   set: (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} },
@@ -1986,7 +1993,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -1995,7 +2002,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -2004,7 +2011,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'all',
     role: 'admin',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, reports:true, plan:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true },
     ui: { theme:'dark' },
     company: { canSwitch:true, default:'murodbaxsh' },
   },
@@ -2020,7 +2027,7 @@ function normalizeAccessConfig(user, cfg) {
         activeScope:'all',
         role:'admin',
         customerTabs:{ ...DEFAULT_CUSTOMER_TABS },
-        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true },
+        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true },
         ui:{ theme:'dark' },
         company:{ canSwitch:true, default:'murodbaxsh' },
       }
@@ -2029,7 +2036,7 @@ function normalizeAccessConfig(user, cfg) {
         activeScope:'own',
         role:'operator',
         customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS },
-        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false },
+        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false },
         ui:{ theme:'dark' },
         company:{ canSwitch:false, default:'murodbaxsh' },
       };
@@ -2055,11 +2062,12 @@ function normalizeAccessConfig(user, cfg) {
     normalized.visible.settings_ui = true;
     normalized.visible.obzvon_new_edit = true;
     normalized.visible.obzvon_new_delete = true;
+    normalized.visible.obzvon_new_publish = true;
   }
   return normalized;
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ UPLOAD MODAL в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ UPLOAD MODAL Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function UploadModal({
   onLoad,
   hasData,
@@ -2174,7 +2182,7 @@ function UploadModal({
               </div>
               <div style={{marginBottom:14}}>
                 <div style={{fontSize:11.5,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:8}}>
-                  Integratsiya fayli (ixtiyoriy — eski baza ostatkasi)
+                  Integratsiya fayli (ixtiyoriy РІР‚вЂќ eski baza ostatkasi)
                 </div>
                 <div className={`drop-z${files.integration?' done':''}`}
                   onClick={()=>!loading&&pickFile('integration')} style={{padding:'16px',textAlign:'center'}}>
@@ -2183,7 +2191,7 @@ function UploadModal({
                     ? <div style={{fontWeight:700,color:'var(--gr)',fontSize:13}}>{files.integration.name}</div>
                     : <div>
                         <div style={{fontWeight:700,fontSize:13,marginBottom:3}}>Integratsiya faylini tanlang</div>
-                        <div style={{fontSize:11,color:'var(--t3)'}}>A=eski ID  ·  H=tara ostatkasi  ·  Varaq nomi: "intigratsiya"</div>
+                        <div style={{fontSize:11,color:'var(--t3)'}}>A=eski ID  Р’В·  H=tara ostatkasi  Р’В·  Varaq nomi: "intigratsiya"</div>
                       </div>
                   }
                 </div>
@@ -2231,7 +2239,7 @@ function UploadModal({
                   placeholder="https://docs.google.com/spreadsheets/d/..."
                   value={fixedObzvonUrl} readOnly/>
                 <div style={{fontSize:11,color:'var(--t3)',marginTop:5}}>
-                  "Обзвон ВСЕ" listi shu faylda bo'lishi kerak
+                  "Р С›Р В±Р В·Р Р†Р С•Р Р… Р вЂ™Р РЋР вЂў" listi shu faylda bo'lishi kerak
                 </div>
               </div>
               <div style={{background:'var(--yl2)',border:'1px solid var(--yl)',borderRadius:8,padding:'9px 14px',marginBottom:14,fontSize:12,color:'var(--yl)'}}>
@@ -2257,7 +2265,7 @@ function UploadModal({
   );
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ CUSTOMER DETAIL в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ CUSTOMER DETAIL Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function CustomerDetail({ c, D, onClose }) {
   const { ordersByMId, cashByMId } = D;
   const [activeTab, setTab] = useState('sverka');
@@ -2298,7 +2306,7 @@ function CustomerDetail({ c, D, onClose }) {
               {c.name}
             </div>
             <div style={{fontSize:11,color:'var(--t3)',fontFamily:'var(--mono)',marginTop:2}}>
-              ID: {c.id}  ·  {c.district}  ·  {c.phone}
+              ID: {c.id}  Р’В·  {c.district}  Р’В·  {c.phone}
             </div>
           </div>
           <div style={{display:'flex',gap:8,flexShrink:0,marginLeft:12}}>
@@ -2380,23 +2388,23 @@ function CustomerDetail({ c, D, onClose }) {
                           </td>
                           <td style={{maxWidth:175,color:'var(--t1)',fontWeight:row._type==='payment'?400:500}}>
                             <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:173}}>
-                              {row.produkt||'—'}
+                              {row.produkt||'РІР‚вЂќ'}
                             </span>
                           </td>
                           <td style={{textAlign:'center',fontWeight:700,color:row.qty!=null?(row._isVoz?'var(--or)':row.qty>0?'var(--t1)':'var(--t3)'):'var(--t3)'}}>
-                            {row.qty!=null?(row._isVoz?'-':'')+Math.abs(row.qty):'—'}
+                            {row.qty!=null?(row._isVoz?'-':'')+Math.abs(row.qty):'РІР‚вЂќ'}
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>
-                            {row.narx?fmt(Math.round(row.narx)):'—'}
+                            {row.narx?fmt(Math.round(row.narx)):'РІР‚вЂќ'}
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:row.summa?'var(--rd)':'var(--t4)'}}>
-                            {row.summa?'-'+fmt(row.summa):'—'}
+                            {row.summa?'-'+fmt(row.summa):'РІР‚вЂќ'}
                           </td>
                           <td style={{textAlign:'center'}}>
                             <span className={row.currency==='USD'?'cur-usd':'cur-uzs'}>{row.currency||'UZS'}</span>
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:row.tolov>0?'var(--gr)':row.tolov<0?'var(--rd)':'var(--t4)'}}>
-                            {row.tolov ? `${row.tolov > 0 ? '+' : '-'}${fmt(Math.abs(row.tolov))}` : '—'}
+                            {row.tolov ? `${row.tolov > 0 ? '+' : '-'}${fmt(Math.abs(row.tolov))}` : 'РІР‚вЂќ'}
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:row.balansUZS<0?'var(--rd)':row.balansUZS>0?'var(--gr)':'var(--t3)'}}>
                             {row.balansUZS<0?'-':row.balansUZS>0?'+':''}{fmt(Math.abs(row.balansUZS))}
@@ -2404,15 +2412,15 @@ function CustomerDetail({ c, D, onClose }) {
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:row.balansUSD<0?'var(--rd)':row.balansUSD>0?'var(--gr)':'var(--t3)',fontSize:11}}>
                             {row.balansUSD<0?'-':row.balansUSD>0?'+':''}{fmt(Math.abs(row.balansUSD))}$
                           </td>
-                          <td style={{fontSize:11,color:'var(--t3)'}}>{row.agent||'—'}</td>
-                          <td style={{fontSize:11,color:'var(--t2)'}}>{row.driver||'—'}</td>
+                          <td style={{fontSize:11,color:'var(--t3)'}}>{row.agent||'РІР‚вЂќ'}</td>
+                          <td style={{fontSize:11,color:'var(--t2)'}}>{row.driver||'РІР‚вЂќ'}</td>
                           <td>
                             <span className="tag" style={{
-                              background: row.status==='Р”РћРЎРўРђР’Р›Р•Рќ'?'var(--gr2)':row.status==='РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР”'?'var(--gr2)':row.status==='РћРўРњР•РќР•РќРћ'?'var(--rd2)':'var(--s3)',
-                              color:      row.status==='Р”РћРЎРўРђР’Р›Р•Рќ'?'var(--gr)':row.status==='РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР”'?'var(--gr)':row.status==='РћРўРњР•РќР•РќРћ'?'var(--t4)':'var(--t3)',
+                              background: row.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'?'var(--gr2)':row.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr2)':row.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--rd2)':'var(--s3)',
+                              color:      row.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'?'var(--gr)':row.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr)':row.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--t4)':'var(--t3)',
                               fontSize:9.5,
                             }}>
-                              {row.status||'—'}
+                              {row.status||'РІР‚вЂќ'}
                             </span>
                           </td>
                         </tr>
@@ -2423,12 +2431,12 @@ function CustomerDetail({ c, D, onClose }) {
               </div>
               {sverkaRows.length>0 && (
                 <div style={{marginTop:10,fontSize:12,color:'var(--t3)',textAlign:'right'}}>
-                  Jami {sverkaRows.length} ta yozuv  · {' '}
-                  {sverkaRows.filter((r)=>r._type==='order'&&!r._isCancelled).length} ta zakaz  · {' '}
+                  Jami {sverkaRows.length} ta yozuv  Р’В· {' '}
+                  {sverkaRows.filter((r)=>r._type==='order'&&!r._isCancelled).length} ta zakaz  Р’В· {' '}
                   {sverkaRows.filter((r)=>r._type==='payment').length} ta to'lov
                   {sverkaRows.some((r)=>r._isCancelled) && (
                     <span style={{color:'var(--rd)',marginLeft:8}}>
-                       ·  {sverkaRows.filter((r)=>r._isCancelled).length} ta otmena
+                       Р’В·  {sverkaRows.filter((r)=>r._isCancelled).length} ta otmena
                     </span>
                   )}
                 </div>
@@ -2441,7 +2449,7 @@ function CustomerDetail({ c, D, onClose }) {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>Zakaz в„–</th><th>Sana</th><th>Mahsulot</th>
+                    <th>Zakaz Р Р†РІР‚С›РІР‚вЂњ</th><th>Sana</th><th>Mahsulot</th>
                     <th>Kol-vo</th><th>Narx</th><th>Summa</th>
                     <th>Valyuta</th><th>Agent</th><th>Dostavchik</th><th>Status</th>
                   </tr>
@@ -2457,15 +2465,15 @@ function CustomerDetail({ c, D, onClose }) {
                           <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178}}>{o.product}</span>
                         </td>
                         <td style={{textAlign:'center',fontWeight:700}}>{Math.abs(o.qty)}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'—'}</td>
-                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{o.sum?fmt(o.sum):'—'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'РІР‚вЂќ'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{o.sum?fmt(o.sum):'РІР‚вЂќ'}</td>
                         <td><span className={o.currency==='USD'?'cur-usd':'cur-uzs'}>{o.currency||'UZS'}</span></td>
-                        <td style={{fontSize:11}}>{o.agent||'—'}</td>
-                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'—'}</td>
+                        <td style={{fontSize:11}}>{o.agent||'РІР‚вЂќ'}</td>
+                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'РІР‚вЂќ'}</td>
                         <td>
                           <span className="tag" style={{
-                            background:o.status==='Р”РћРЎРўРђР’Р›Р•Рќ'||o.status==='РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР”'?'var(--gr2)':o.status==='РћРўРњР•РќР•РќРћ'?'var(--rd2)':'var(--s3)',
-                            color:o.status==='Р”РћРЎРўРђР’Р›Р•Рќ'||o.status==='РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР”'?'var(--gr)':o.status==='РћРўРњР•РќР•РќРћ'?'var(--t4)':'var(--t3)',
+                            background:o.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'||o.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr2)':o.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--rd2)':'var(--s3)',
+                            color:o.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'||o.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr)':o.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--t4)':'var(--t3)',
                             fontSize:10,
                           }}>{o.status}</span>
                         </td>
@@ -2482,7 +2490,7 @@ function CustomerDetail({ c, D, onClose }) {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>Vozvrat в„–</th><th>Sana</th><th>Mahsulot</th>
+                    <th>Vozvrat Р Р†РІР‚С›РІР‚вЂњ</th><th>Sana</th><th>Mahsulot</th>
                     <th>Kol-vo</th><th>Narx</th><th>Summa</th>
                     <th>Valyuta</th><th>Agent</th><th>Dostavchik</th><th>Status</th>
                   </tr>
@@ -2498,15 +2506,15 @@ function CustomerDetail({ c, D, onClose }) {
                           <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178}}>{o.product}</span>
                         </td>
                         <td style={{textAlign:'center',fontWeight:700,color:'var(--or)'}}>-{Math.abs(o.qty)}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'—'}</td>
-                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--or)'}}>{o.sum?fmt(Math.abs(o.sum)):'—'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'РІР‚вЂќ'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--or)'}}>{o.sum?fmt(Math.abs(o.sum)):'РІР‚вЂќ'}</td>
                         <td><span className={o.currency==='USD'?'cur-usd':'cur-uzs'}>{o.currency||'UZS'}</span></td>
-                        <td style={{fontSize:11}}>{o.agent||'—'}</td>
-                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'—'}</td>
+                        <td style={{fontSize:11}}>{o.agent||'РІР‚вЂќ'}</td>
+                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'РІР‚вЂќ'}</td>
                         <td>
                           <span className="tag" style={{
-                            background:o.status==='Р”РћРЎРўРђР’Р›Р•Рќ'||o.status==='РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР”'?'var(--gr2)':o.status==='РћРўРњР•РќР•РќРћ'?'var(--rd2)':'var(--s3)',
-                            color:o.status==='Р”РћРЎРўРђР’Р›Р•Рќ'||o.status==='РџРћР›РЈР§Р•Рќ РќРђ РЎРљР›РђР”'?'var(--gr)':o.status==='РћРўРњР•РќР•РќРћ'?'var(--t4)':'var(--t3)',
+                            background:o.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'||o.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr2)':o.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--rd2)':'var(--s3)',
+                            color:o.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'||o.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr)':o.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--t4)':'var(--t3)',
                             fontSize:10,
                           }}>{o.status}</span>
                         </td>
@@ -2522,7 +2530,7 @@ function CustomerDetail({ c, D, onClose }) {
             <div style={{overflow:'auto',maxHeight:'60vh',borderRadius:9,border:'1px solid var(--b2)'}}>
               <table className="tbl">
                 <thead>
-                  <tr><th>Op в„–</th><th>Sana</th><th>Summa</th><th>Valyuta</th><th>Kassa</th><th>Operator</th><th>Izoh</th></tr>
+                  <tr><th>Op Р Р†РІР‚С›РІР‚вЂњ</th><th>Sana</th><th>Summa</th><th>Valyuta</th><th>Kassa</th><th>Operator</th><th>Izoh</th></tr>
                 </thead>
                 <tbody>
                   {myPays.length===0
@@ -2537,9 +2545,9 @@ function CustomerDetail({ c, D, onClose }) {
                           {signed>=0?'+':'-'}{fmt(Math.abs(signed))}
                         </td>
                         <td><span className={p.currency==='USD'?'cur-usd':'cur-uzs'}>{p.currency||'UZS'}</span></td>
-                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.kassa||'—'}</td>
-                        <td style={{fontSize:11}}>{p.operator||'—'}</td>
-                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.note||'—'}</td>
+                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.kassa||'РІР‚вЂќ'}</td>
+                        <td style={{fontSize:11}}>{p.operator||'РІР‚вЂќ'}</td>
+                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.note||'РІР‚вЂќ'}</td>
                       </tr>
                     )})
                   }
@@ -2553,7 +2561,7 @@ function CustomerDetail({ c, D, onClose }) {
   );
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ STAT CARD в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ STAT CARD Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function StatCard({ l, v, s, c }) {
   return (
     <div className="stat" style={{padding:'13px 15px'}}>
@@ -2565,7 +2573,7 @@ function StatCard({ l, v, s, c }) {
   );
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ DASHBOARD в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ DASHBOARD Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function Dashboard({ D }) {
   const { customers, cashbox, rawOrders, debtorsByBalance=[] } = D;
   const now = new Date();
@@ -2634,7 +2642,7 @@ function Dashboard({ D }) {
       : wDel.filter((o) => monthKey(o.orderDate) === agentMonth);
     const m = {};
     source.forEach((o) => {
-      const a=o.agent||'—';
+      const a=o.agent||'РІР‚вЂќ';
       if (!m[a]) m[a]={name:a,qty:0,sum:0};
       m[a].qty+=Math.abs(o.qty); m[a].sum+=o.sum;
     });
@@ -2759,7 +2767,7 @@ function Dashboard({ D }) {
   );
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ MIJOZLAR в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ MIJOZLAR Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById={}, company='murodbaxsh' }) {
   const { customers } = D;
   const [segment, setSegment] = useState('all');
@@ -2916,7 +2924,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   const tog = (col) => setSort((s) => s.col===col?{col,dir:s.dir==='asc'?'desc':'asc'}:{col,dir:'asc'});
   const SI = ({c:col}) => sort.col===col
     ? <span style={{marginLeft:3}}>{sort.dir==='asc'?'^':'v'}</span>
-    : <span style={{marginLeft:3,opacity:.2}}>¦</span>;
+    : <span style={{marginLeft:3,opacity:.2}}>Р’В¦</span>;
   const balColor = (v) => v<0?'var(--rd)':v>0?'var(--gr)':'var(--t3)';
   const debt = getDebtStats(segmentCustomers);
 
@@ -3039,15 +3047,15 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
                       {c.address && <div style={{fontSize:10.5,color:'var(--t3)',maxWidth:205,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.address}</div>}
                     </td>
                     <td><a href={`tel:${c.phone}`} onClick={(e)=>e.stopPropagation()} style={{color:'var(--bl)',textDecoration:'none',fontFamily:'var(--mono)',fontSize:11.5}}>{c.phone}</a></td>
-                    <td style={{fontSize:12}}>{c.district||'—'}</td>
+                    <td style={{fontSize:12}}>{c.district||'РІР‚вЂќ'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:balColor(c.balanceUZS)}}>{c.balanceUZS<0?'-':c.balanceUZS>0?'+':''}{fmt(Math.abs(c.balanceUZS))}</td>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:balColor(c.balanceUSD)}}>{c.balanceUSD!==0?<>{c.balanceUSD<0?'-':c.balanceUSD>0?'+':''}{fmt(Math.abs(c.balanceUSD))}$</>:'—'}</td>
-                    <td style={{textAlign:'center',fontWeight:700,color:c.tara<0?'var(--rd)':'var(--bl)'}}>{c.tara!==0?(c.tara<0?'-':'')+Math.abs(c.tara):'—'}</td>
-                    <td style={{textAlign:'center'}}>{c.kulers>0?<span className="tag" style={{background:'var(--yl2)',color:'var(--yl)'}}>{c.kulers}</span>:'—'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:balColor(c.balanceUSD)}}>{c.balanceUSD!==0?<>{c.balanceUSD<0?'-':c.balanceUSD>0?'+':''}{fmt(Math.abs(c.balanceUSD))}$</>:'РІР‚вЂќ'}</td>
+                    <td style={{textAlign:'center',fontWeight:700,color:c.tara<0?'var(--rd)':'var(--bl)'}}>{c.tara!==0?(c.tara<0?'-':'')+Math.abs(c.tara):'РІР‚вЂќ'}</td>
+                    <td style={{textAlign:'center'}}>{c.kulers>0?<span className="tag" style={{background:'var(--yl2)',color:'var(--yl)'}}>{c.kulers}</span>:'РІР‚вЂќ'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.lastOrderDate)}</td>
-                    <td>{c.daysAgo!=null&&c.daysAgo>=0 ? <span className="tag" style={{background:c.daysAgo>30?'var(--rd2)':c.daysAgo>14?'var(--yl2)':c.daysAgo>7?'var(--or2)':'var(--s3)',color:c.daysAgo>30?'var(--rd)':c.daysAgo>14?'var(--yl)':c.daysAgo>7?'var(--or)':'var(--t3)'}}>{c.daysAgo}k</span> : '—'}</td>
-                    <td style={{textAlign:'center'}}>{c.lastQty||'—'}</td>
-                    <td style={{fontSize:12}}>{c.lastAgent||'—'}</td>
+                    <td>{c.daysAgo!=null&&c.daysAgo>=0 ? <span className="tag" style={{background:c.daysAgo>30?'var(--rd2)':c.daysAgo>14?'var(--yl2)':c.daysAgo>7?'var(--or2)':'var(--s3)',color:c.daysAgo>30?'var(--rd)':c.daysAgo>14?'var(--yl)':c.daysAgo>7?'var(--or)':'var(--t3)'}}>{c.daysAgo}k</span> : 'РІР‚вЂќ'}</td>
+                    <td style={{textAlign:'center'}}>{c.lastQty||'РІР‚вЂќ'}</td>
+                    <td style={{fontSize:12}}>{c.lastAgent||'РІР‚вЂќ'}</td>
                   </tr>
                 ))
               }
@@ -3060,7 +3068,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   );
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ SO DETAIL MODAL в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ SO DETAIL MODAL Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function SoDetailModal({ soGroup, onClose }) {
   return (
     <div className="modal-ov fade" onClick={(e)=>e.target===e.currentTarget&&onClose()}>
@@ -3072,8 +3080,8 @@ function SoDetailModal({ soGroup, onClose }) {
               <span style={{fontSize:13,color:'var(--t2)',fontWeight:500}}>{soGroup.contName}</span>
             </div>
             <div style={{fontSize:11,color:'var(--t3)',marginTop:4,fontFamily:'var(--mono)'}}>
-              {fmtD(soGroup.orderDate)}  ·  {soGroup.agent||'—'}  ·  {soGroup.items.length} ta mahsulot
-              {soGroup.delivPerson && <span>  ·  {E.driver} {soGroup.delivPerson}</span>}
+              {fmtD(soGroup.orderDate)}  Р’В·  {soGroup.agent||'РІР‚вЂќ'}  Р’В·  {soGroup.items.length} ta mahsulot
+              {soGroup.delivPerson && <span>  Р’В·  {E.driver} {soGroup.delivPerson}</span>}
             </div>
           </div>
           <button className="btn btn-gh btn-sm" onClick={onClose}>X</button>
@@ -3095,8 +3103,8 @@ function SoDetailModal({ soGroup, onClose }) {
                   <tr key={i}>
                     <td style={{fontWeight:500,color:'var(--t1)'}}>{item.product}</td>
                     <td style={{textAlign:'center',fontWeight:700,color:item.qty<0?'var(--or)':'var(--t1)'}}>{item.qty}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{item.price?fmt(Math.round(item.price)):'—'}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{item.sum?fmt(item.sum):'—'}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{item.price?fmt(Math.round(item.price)):'РІР‚вЂќ'}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{item.sum?fmt(item.sum):'РІР‚вЂќ'}</td>
                     <td style={{textAlign:'center'}}><span className={item.currency==='USD'?'cur-usd':'cur-uzs'}>{item.currency||'UZS'}</span></td>
                   </tr>
                 ))}
@@ -3105,9 +3113,9 @@ function SoDetailModal({ soGroup, onClose }) {
           </div>
           <div style={{marginTop:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <span className="tag" style={{
-              background:isDeliveredStatus(soGroup.status)?'var(--gr2)':soGroup.status==='РћРўРњР•РќР•РќРћ'?'var(--rd2)':'var(--s3)',
-              color:isDeliveredStatus(soGroup.status)?'var(--gr)':soGroup.status==='РћРўРњР•РќР•РќРћ'?'var(--t4)':'var(--t3)',
-            }}>{soGroup.status||'—'}</span>
+              background:isDeliveredStatus(soGroup.status)?'var(--gr2)':soGroup.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--rd2)':'var(--s3)',
+              color:isDeliveredStatus(soGroup.status)?'var(--gr)':soGroup.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--t4)':'var(--t3)',
+            }}>{soGroup.status||'РІР‚вЂќ'}</span>
             <div style={{display:'flex',gap:12,fontWeight:700,fontSize:13}}>
               {soGroup.totalSumUZS>0 && <span style={{color:'var(--gr)'}}>{fmt(soGroup.totalSumUZS)} so'm</span>}
               {soGroup.totalSumUSD>0 && <span style={{color:'var(--yl)'}}>{fmt(soGroup.totalSumUSD)} $</span>}
@@ -3119,7 +3127,7 @@ function SoDetailModal({ soGroup, onClose }) {
   );
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ ZAKAZLAR в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ ZAKAZLAR Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function Orders({ D }) {
   const { rawOrders=[], customers=[] } = D;
   const [search,setS]  = useState('');
@@ -3350,7 +3358,7 @@ function Orders({ D }) {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Zakaz №</th><th>Kontragent</th><th>Rayon</th><th>Sana</th>
+                <th>Zakaz РІвЂћвЂ“</th><th>Kontragent</th><th>Rayon</th><th>Sana</th>
                 <th>Dostavchik</th><th style={{textAlign:'center'}}>Dona</th>
                 <th style={{textAlign:'right'}}>Summa UZS</th>
                 <th style={{textAlign:'right'}}>Summa USD</th>
@@ -3367,15 +3375,15 @@ function Orders({ D }) {
                     <td style={{maxWidth:180,fontWeight:600}}>
                       <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178,fontSize:12}}>{g.contName}</span>
                     </td>
-                    <td style={{fontSize:11,color:'var(--t3)'}}>{g.district || '—'}</td>
+                    <td style={{fontSize:11,color:'var(--t3)'}}>{g.district || 'РІР‚вЂќ'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(g.orderDate)}</td>
-                    <td style={{fontSize:11,color:'var(--t2)'}}>{g.delivPerson||'—'}</td>
+                    <td style={{fontSize:11,color:'var(--t2)'}}>{g.delivPerson||'РІР‚вЂќ'}</td>
                     <td style={{textAlign:'center',fontWeight:700,color:'var(--t1)'}}>{g.totalQty}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:g.totalSumUZS?'var(--gr)':'var(--t4)'}}>
-                      {g.totalSumUZS?fmt(g.totalSumUZS):'—'}
+                      {g.totalSumUZS?fmt(g.totalSumUZS):'РІР‚вЂќ'}
                     </td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:g.totalSumUSD?'var(--yl)':'var(--t4)'}}>
-                      {g.totalSumUSD?fmt(g.totalSumUSD)+' $':'—'}
+                      {g.totalSumUSD?fmt(g.totalSumUSD)+' $':'РІР‚вЂќ'}
                     </td>
                     <td style={{textAlign:'center'}}>
                       <span className="tag" style={{background:'var(--s3)',color:'var(--t3)',cursor:'pointer'}}>{g.items.length} ta</span>
@@ -3385,11 +3393,11 @@ function Orders({ D }) {
                         {g.docType}
                       </span>
                     </td>
-                    <td style={{fontSize:12}}>{g.agent||'—'}</td>
+                    <td style={{fontSize:12}}>{g.agent||'РІР‚вЂќ'}</td>
                     <td>
                       <span className="tag" style={{
-                        background:isDeliveredStatus(g.status)?'var(--gr2)':g.status==='ОТМЕНЕНО'?'var(--rd2)':'var(--s3)',
-                        color:isDeliveredStatus(g.status)?'var(--gr)':g.status==='ОТМЕНЕНО'?'var(--t4)':'var(--t3)',
+                        background:isDeliveredStatus(g.status)?'var(--gr2)':g.status==='Р С›Р СћР СљР вЂўР СњР вЂўР СњР С›'?'var(--rd2)':'var(--s3)',
+                        color:isDeliveredStatus(g.status)?'var(--gr)':g.status==='Р С›Р СћР СљР вЂўР СњР вЂўР СњР С›'?'var(--t4)':'var(--t3)',
                         fontSize:10,
                       }}>{g.status}</span>
                     </td>
@@ -3544,13 +3552,13 @@ function Kassa({ D }) {
       <div className="g4">
         <StatCard l={`KIRIM (${curMonthKey})`}  v={fmt(totalIn)+" so'm"}  s={paysMonth.length+' ta operatsiya'}   c="var(--gr)"/>
         <StatCard l={`CHIQIM (${curMonthKey})`} v={fmt(totalOut)+" so'm"} s={spendsMonth.length+' ta operatsiya'} c="var(--rd)"/>
-        <StatCard l="SALDO (OYLIK)" v={fmt(totalIn-totalOut)+" so'm"} s="joriy oy: kirim в€’ chiqim" c={totalIn-totalOut>=0?'var(--gr)':'var(--rd)'}/>
+        <StatCard l="SALDO (OYLIK)" v={fmt(totalIn-totalOut)+" so'm"} s="joriy oy: kirim Р Р†РІвЂљВ¬РІР‚в„ў chiqim" c={totalIn-totalOut>=0?'var(--gr)':'var(--rd)'}/>
         <StatCard l="OYLIK OPR."   v={cashMonth.length+' ta'}  s="joriy oy yozuvlari" c="var(--bl)"/>
       </div>
       <div style={{display:'flex',gap:8,alignItems:'center'}}>
         <div className="sb" style={{flex:1}}>
           <span style={{color:'var(--t3)'}}>{E.find}</span>
-          <input placeholder="Mijoz, operatsiya в„–..." value={search} onChange={(e)=>setS(e.target.value)}/>
+          <input placeholder="Mijoz, operatsiya Р Р†РІР‚С›РІР‚вЂњ..." value={search} onChange={(e)=>setS(e.target.value)}/>
         </div>
         <div style={{position:'relative'}}>
           <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
@@ -3624,7 +3632,7 @@ function Kassa({ D }) {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Sana</th><th>Op в„–</th><th>Tur</th>
+                <th>Sana</th><th>Op Р Р†РІР‚С›РІР‚вЂњ</th><th>Tur</th>
                 <th>Kassa</th><th>Kontragent</th><th>Rayon</th><th>Summa</th><th>Operator</th>
               </tr>
             </thead>
@@ -3644,16 +3652,16 @@ function Kassa({ D }) {
                         </span>
                       </td>
                       <td style={{fontSize:11.5,color:'var(--t3)',maxWidth:110}}>
-                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:108}}>{c.kassa||'—'}</span>
+                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:108}}>{c.kassa||'РІР‚вЂќ'}</span>
                       </td>
                       <td style={{maxWidth:220}}>
-                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:218,fontSize:12}}>{c.contName||'—'}</span>
+                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:218,fontSize:12}}>{c.contName||'РІР‚вЂќ'}</span>
                       </td>
-                      <td style={{fontSize:11.5,color:'var(--t3)'}}>{districtById[String(c.mId || '').trim()] || '—'}</td>
+                      <td style={{fontSize:11.5,color:'var(--t3)'}}>{districtById[String(c.mId || '').trim()] || 'РІР‚вЂќ'}</td>
                       <td style={{fontFamily:'var(--mono)',fontWeight:700,color:isIn?'var(--gr)':isPaymentToCounterparty(c.opType)?'var(--rd)':'var(--t2)'}}>
                         {isIn?'+':isPaymentToCounterparty(c.opType)?'-':''}{fmt(c.amount)}
                       </td>
-                      <td style={{fontSize:11.5,color:'var(--t3)'}}>{c.operator||'—'}</td>
+                      <td style={{fontSize:11.5,color:'var(--t3)'}}>{c.operator||'РІР‚вЂќ'}</td>
                     </tr>
                   );
                 })
@@ -3666,13 +3674,14 @@ function Kassa({ D }) {
   );
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ OBZVON в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ OBZVON Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function Obzvon({
   D,
   company='murodbaxsh',
   currentUser='Admin',
   canEditAllNew=false,
   canDeleteAllNew=false,
+  canPublishAllNew=false,
   records=[],
   setRecords=()=>{},
   allRows=[],
@@ -3681,6 +3690,7 @@ function Obzvon({
   onReloadAllNew=()=>{},
   onAppendAllRows=()=>{},
   onUpsertNewRows=()=>{},
+  onPublishAllNew=()=>{},
 }) {
   const { customers, rawOrders=[] } = D;
   const [tab, setTab] = useState('main');
@@ -4210,7 +4220,7 @@ function Obzvon({
         lastCallDate: lastCall?.callDate || '',
         lastNote: lastCall?.note || '',
         nextDate: lastCall?.nextDate || '',
-        operator: D.assignmentById?.[c.id] || '—',
+        operator: D.assignmentById?.[c.id] || 'РІР‚вЂќ',
       };
     });
     if (currentUser !== 'Admin') rows = rows.filter((r) => r.operator === currentUser);
@@ -4356,7 +4366,7 @@ function Obzvon({
                       if (i < 0) return null;
                       return (
                       <tr key={r._rid || i}>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id || '—'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id || 'РІР‚вЂќ'}</td>
                         <td style={{minWidth:420}}>
                           <div style={{position:'relative'}}>
                             <input
@@ -4516,15 +4526,15 @@ function Obzvon({
                     visibleAllRows.map((r,i)=>(
                       <tr key={i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || i+1}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || '—'}</td>
-                        <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : '—')}</span></td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || 'РІР‚вЂќ'}</td>
+                        <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : 'РІР‚вЂќ')}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.callDate)}</td>
-                        <td>{r.topic || '—'}</td>
-                        <td style={{maxWidth:300}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '—'}</span></td>
+                        <td>{r.topic || 'РІР‚вЂќ'}</td>
+                        <td style={{maxWidth:300}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || 'РІР‚вЂќ'}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.nextDate)}</td>
-                        <td>{r.orderCount || '—'}</td>
+                        <td>{r.orderCount || 'РІР‚вЂќ'}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.orderDate)}</td>
-                        <td>{r.operator || '—'}</td>
+                        <td>{r.operator || 'РІР‚вЂќ'}</td>
                       </tr>
                     ))
                   }
@@ -4566,6 +4576,17 @@ function Obzvon({
             <button className="btn btn-bl btn-sm" onClick={() => onReloadAllNew && onReloadAllNew()}>
               {E.refresh} Yangilash
             </button>
+            {canPublishAllNew && (
+              <button
+                className="btn btn-gr btn-sm"
+                onClick={async () => {
+                  const ok = await Promise.resolve(onPublishAllNew({ manual:true }));
+                  if (!ok) alert("Google Sheetga joylash muvaffaqiyatsiz bo'ldi");
+                }}
+              >
+                Google Sheetga joylash
+              </button>
+            )}
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{visibleAllNewRows.length} / {allNewList.length} ta yozuv</span>
             {allNewList.length > 500 && (
               <button className="btn btn-gh btn-sm" onClick={()=>setAllShowMode((m)=>m==='all'?'smart':'all')}>
@@ -4585,12 +4606,12 @@ function Obzvon({
                       return (
                       <tr key={r.rid || i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || i+1}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || '—'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || 'РІР‚вЂќ'}</td>
                         <td style={{maxWidth:360}}>
                           {isEdit ? (
                             <input className="input" value={d.customer || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), customer:e.target.value}))} />
                           ) : (
-                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : '—')}</span>
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : 'РІР‚вЂќ')}</span>
                           )}
                         </td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
@@ -4605,25 +4626,25 @@ function Obzvon({
                               <option>Baza to'g'irlash</option>
                               <option>Qarzini so'rash</option>
                             </select>
-                          ) : (r.topic || '—')}
+                          ) : (r.topic || 'РІР‚вЂќ')}
                         </td>
                         <td style={{maxWidth:300}}>
                           {isEdit ? (
                             <input className="input" value={d.note || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), note:e.target.value}))} />
                           ) : (
-                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '—'}</span>
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || 'РІР‚вЂќ'}</span>
                           )}
                         </td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
                           {isEdit ? <input className="input" type="date" value={String(d.nextDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), nextDate:e.target.value}))} /> : fmtD(r.nextDate)}
                         </td>
                         <td>
-                          {isEdit ? <input className="input" value={d.orderCount || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), orderCount:e.target.value}))} /> : (r.orderCount || '—')}
+                          {isEdit ? <input className="input" value={d.orderCount || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), orderCount:e.target.value}))} /> : (r.orderCount || 'РІР‚вЂќ')}
                         </td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
                           {isEdit ? <input className="input" type="date" value={String(d.orderDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), orderDate:e.target.value}))} /> : fmtD(r.orderDate)}
                         </td>
-                        <td>{r.operator || '—'}</td>
+                        <td>{r.operator || 'РІР‚вЂќ'}</td>
                         {(canEditAllNew || canDeleteAllNew) && (
                           <td>
                             <div style={{display:'flex',gap:6}}>
@@ -4876,7 +4897,7 @@ function Obzvon({
                       >
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
                         <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</span></td>
-                        <td style={{maxWidth:140}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.district || '—'}</span></td>
+                        <td style={{maxWidth:140}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.district || 'РІР‚вЂќ'}</span></td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.balance<0?'var(--rd)':r.balance>0?'var(--gr)':'var(--t3)'}}>{fmt(r.balance)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
                           <div style={{display:'flex',justifyContent:'space-between',gap:10}}>
@@ -4894,7 +4915,7 @@ function Obzvon({
                         <td>{r.operator}</td>
                         <td style={{maxWidth:260}}>
                           <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                            {r.lastNote || '—'}
+                            {r.lastNote || 'РІР‚вЂќ'}
                           </span>
                         </td>
                       </tr>
@@ -4946,7 +4967,7 @@ function Obzvon({
   );
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ DOLJNIKI в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ DOLJNIKI Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function DoljnikModal({ row, D, onClose }) {
   const customer = (D.customers || []).find((c) => c.id === row.id);
   const rows = customer ? buildSverka(customer, D.ordersByMId || {}, D.cashByMId || {}) : [];
@@ -4956,7 +4977,7 @@ function DoljnikModal({ row, D, onClose }) {
         <div className="mhdr">
           <div>
             <div style={{fontWeight:800,fontSize:14}}>{row.name}</div>
-            <div style={{fontSize:11,color:'var(--t3)'}}>ID: {row.id}  ·  Qarz zakaz: {row.orderNo || '—'}</div>
+            <div style={{fontSize:11,color:'var(--t3)'}}>ID: {row.id}  Р’В·  Qarz zakaz: {row.orderNo || 'РІР‚вЂќ'}</div>
           </div>
           <button className="btn btn-gh btn-sm" onClick={onClose}>X</button>
         </div>
@@ -4971,9 +4992,9 @@ function DoljnikModal({ row, D, onClose }) {
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.kod}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.sana}</td>
                       <td>{r.dokument}</td>
-                      <td style={{maxWidth:280,overflow:'hidden',textOverflow:'ellipsis'}}>{r.produkt || '—'}</td>
-                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.summa?'var(--rd)':'var(--t4)'}}>{r.summa?'-'+fmt(r.summa):'—'}</td>
-                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.tolov?'var(--gr)':'var(--t4)'}}>{r.tolov?'+'+fmt(r.tolov):'—'}</td>
+                      <td style={{maxWidth:280,overflow:'hidden',textOverflow:'ellipsis'}}>{r.produkt || 'РІР‚вЂќ'}</td>
+                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.summa?'var(--rd)':'var(--t4)'}}>{r.summa?'-'+fmt(r.summa):'РІР‚вЂќ'}</td>
+                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.tolov?'var(--gr)':'var(--t4)'}}>{r.tolov?'+'+fmt(r.tolov):'РІР‚вЂќ'}</td>
                       <td style={{fontFamily:'var(--mono)',textAlign:'right',fontWeight:700,color:r.balansUZS<0?'var(--rd)':r.balansUZS>0?'var(--gr)':'var(--t3)'}}>{r.balansUZS<0?'-':r.balansUZS>0?'+':''}{fmt(Math.abs(r.balansUZS))}</td>
                     </tr>
                   ))
@@ -5009,7 +5030,7 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
           <div>
             <div style={{fontWeight:800,fontSize:14}}>{row.customerName}</div>
             <div style={{fontSize:11,color:'var(--t3)'}}>
-              ID: {row.customerId}  ·  Zakaz: {row.orderNo}  ·  Olingan: {fmtD(row.purchaseDate)}
+              ID: {row.customerId}  Р’В·  Zakaz: {row.orderNo}  Р’В·  Olingan: {fmtD(row.purchaseDate)}
             </div>
           </div>
           <div style={{display:'flex',gap:8}}>
@@ -5035,16 +5056,16 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
           {tab==='payments' && (
             <div className="card" style={{overflow:'auto',maxHeight:'52vh'}}>
               <table className="tbl">
-                <thead><tr><th>Sana</th><th>Op в„–</th><th>Operator</th><th>Kassa</th><th>To'lov</th></tr></thead>
+                <thead><tr><th>Sana</th><th>Op Р Р†РІР‚С›РІР‚вЂњ</th><th>Operator</th><th>Kassa</th><th>To'lov</th></tr></thead>
                 <tbody>
                   {kulerPayments.length===0 ? (
                     <tr><td colSpan={5} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>To'lovlar topilmadi</td></tr>
                   ) : kulerPayments.map((p, i) => (
                     <tr key={i}>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(p.sana)}</td>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{p.opNum||'—'}</td>
-                      <td>{p.operator||'—'}</td>
-                      <td>{p.kassa||'—'}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{p.opNum||'РІР‚вЂќ'}</td>
+                      <td>{p.operator||'РІР‚вЂќ'}</td>
+                      <td>{p.kassa||'РІР‚вЂќ'}</td>
                       <td style={{fontFamily:'var(--mono)',color:'var(--gr)',fontWeight:700}}>+{fmt(p.amount)} so'm</td>
                     </tr>
                   ))}
@@ -5305,16 +5326,16 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
                       <td style={{maxWidth:280}}>
                         <div style={{fontWeight:700,fontSize:12.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
-                        <div style={{fontSize:10.5,color:'var(--t3)'}}>Qarz zakaz: {r.orderNo || '—'} {r.lastOrderProduct ? ` ·  ${r.lastOrderProduct}` : ''}</div>
+                        <div style={{fontSize:10.5,color:'var(--t3)'}}>Qarz zakaz: {r.orderNo || 'РІР‚вЂќ'} {r.lastOrderProduct ? ` Р’В·  ${r.lastOrderProduct}` : ''}</div>
                       </td>
                       <td style={{fontSize:11.5,color:'var(--t2)'}}>{r.category}</td>
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--rd)'}}>-{fmt(Math.abs(r.debtUZS))}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.lastOrderDate)}</td>
                       <td style={{textAlign:'center'}}>
-                        {r.days != null ? <span className="tag" style={{background:r.days>30?'var(--rd2)':r.days>15?'var(--yl2)':'var(--s3)',color:r.days>30?'var(--rd)':r.days>15?'var(--yl)':'var(--t3)'}}>{r.days}k</span> : '—'}
+                        {r.days != null ? <span className="tag" style={{background:r.days>30?'var(--rd2)':r.days>15?'var(--yl2)':'var(--s3)',color:r.days>30?'var(--rd)':r.days>15?'var(--yl)':'var(--t3)'}}>{r.days}k</span> : 'РІР‚вЂќ'}
                       </td>
                       <td style={{maxWidth:260}}>
-                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11,color:'var(--t3)'}}>{r.note || '—'}</span>
+                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11,color:'var(--t3)'}}>{r.note || 'РІР‚вЂќ'}</span>
                       </td>
                     </tr>
                   ))}
@@ -5397,7 +5418,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
   );
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ HISOBOTLAR / NAZORAT в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ HISOBOTLAR / NAZORAT Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 function Reports({
   D,
   company='murodbaxsh',
@@ -5408,11 +5429,14 @@ function Reports({
   planRows=[],
   planOffDays=[],
   obzvonNewRows=[],
+  mode='reports',
 }) {
   const { rawOrders=[], warehouseTransfers=[] } = D;
   const todayIso = toIsoDate(new Date());
   const currentMonth = normalizeMonthKey(todayIso.slice(0,7));
   const canSeeAll = (currentAccess?.scope || 'all') === 'all';
+  const showReport = mode !== 'nazorat';
+  const showNazorat = mode !== 'reports';
 
   const planByMonth = useMemo(() => {
     const m = {};
@@ -5507,7 +5531,7 @@ function Reports({
   const dailyByOperator = useMemo(() => {
     const ops = new Map();
     rowsToday.forEach((r) => {
-      const op = String(r.operator || '—').trim() || '—';
+      const op = String(r.operator || 'РІР‚вЂќ').trim() || 'РІР‚вЂќ';
       if (!ops.has(op)) ops.set(op, []);
       ops.get(op).push(r);
     });
@@ -5518,7 +5542,7 @@ function Reports({
       const debtSum = qarzRows.reduce((s,x)=>s + Math.abs(toIntFromMixed(x.orderCount || 0)), 0);
       const byOrderDate = {};
       buyRows.forEach((x) => {
-        const k = toIsoDate(x.orderDate) || '—';
+        const k = toIsoDate(x.orderDate) || 'РІР‚вЂќ';
         byOrderDate[k] = (byOrderDate[k] || 0) + Math.max(0, toIntFromMixed(x.orderCount || 0));
       });
       const dateEntries = Object.entries(byOrderDate)
@@ -5553,8 +5577,8 @@ function Reports({
     const s = normalizeWarehouseKey(v).replace(/\s+/g, '');
     if (!s) return false;
     return (
-      s.includes('основнойсклад') ||
-      s.includes('основной') ||
+      s.includes('Р С•РЎРѓР Р…Р С•Р Р†Р Р…Р С•Р в„–РЎРѓР С”Р В»Р В°Р Т‘') ||
+      s.includes('Р С•РЎРѓР Р…Р С•Р Р†Р Р…Р С•Р в„–') ||
       s.includes('osnovnoysklad') ||
       s.includes('osnovnoy') ||
       s.includes('asosnoysklad') ||
@@ -5657,7 +5681,7 @@ function Reports({
         out.push({
           date,
           driver,
-          warehouse: warehouse || '—',
+          warehouse: warehouse || 'РІР‚вЂќ',
           orderQty,
           transferQty,
           diff: orderQty - transferQty,
@@ -5706,12 +5730,12 @@ function Reports({
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:14}}>
       <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
-        <button className="btn btn-gr btn-sm" onClick={exportReports}>Hisobot Excel</button>
-        <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>
+        {showReport && <button className="btn btn-gr btn-sm" onClick={exportReports}>Hisobot Excel</button>}
+        {showNazorat && <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>}
       </div>
-      <div className="g4">
+      {showReport && <div className="g4">
         <StatCard
-          l={`SUV (${currentMonth}) · ${companyLabelByKey(company)}`}
+          l={`SUV (${currentMonth}) Р’В· ${companyLabelByKey(company)}`}
           v={`${fmt(monthWaterQty)} ta`}
           s={`${fmt(monthWaterSum)} so'm`}
           c="var(--bl)"
@@ -5719,7 +5743,7 @@ function Reports({
         <StatCard
           l="BUGUNGI PLAN QOLDIQ"
           v={`${fmt(nextWorkDayPlan)} ta`}
-          s={`Keyingi ish kuni (${nextWorkDate ? toIsoDate(nextWorkDate) : '-'}) rejasi: ${fmt(nextWorkDayPlan)} · oy qoldiq: ${fmt(remainingMonthPlanQty)} · ish kun: ${fmt(remainingWorkDays)}`}
+          s={`Keyingi ish kuni (${nextWorkDate ? toIsoDate(nextWorkDate) : '-'}) rejasi: ${fmt(nextWorkDayPlan)} Р’В· oy qoldiq: ${fmt(remainingMonthPlanQty)} Р’В· ish kun: ${fmt(remainingWorkDays)}`}
           c="var(--gr)"
         />
         <StatCard
@@ -5736,7 +5760,7 @@ function Reports({
         />
       </div>
 
-      <div className="card" style={{padding:16}}>
+      {showReport && <div className="card" style={{padding:16}}>
         <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Kunlik natija</div>
         <div style={{overflow:'auto',maxHeight:'58vh'}}>
           <table className="tbl">
@@ -5766,19 +5790,19 @@ function Reports({
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.buyurtmaQty)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.debtCount)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--rd)'}}>{fmt(r.debtSum)}</td>
-                        <td style={{fontSize:11,color:'var(--t2)'}}>—</td>
+                        <td style={{fontSize:11,color:'var(--t2)'}}>РІР‚вЂќ</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
                       </tr>
                       {(r.dateEntries || []).map((d, j) => (
                         <tr key={`rep_${i}_${j}_${d.date}`} style={{background:'rgba(88,166,255,.05)'}}>
                           <td style={{color:'var(--t3)',fontSize:11}}>sana</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>РІР‚вЂќ</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>РІР‚вЂќ</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(d.qty)}</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>РІР‚вЂќ</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>РІР‚вЂќ</td>
                           <td style={{fontFamily:'var(--mono)',fontSize:11}}>{d.date}</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>—</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>РІР‚вЂќ</td>
                         </tr>
                       ))}
                     </Fragment>
@@ -5790,7 +5814,7 @@ function Reports({
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{fmt(dailyTotals.buyurtmaQty)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.debtCount)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--rd)'}}>{fmt(dailyTotals.debtSum)}</td>
-                    <td style={{fontWeight:700,color:'var(--t3)'}}>—</td>
+                    <td style={{fontWeight:700,color:'var(--t3)'}}>РІР‚вЂќ</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
                   </tr>
                 </>
@@ -5800,10 +5824,10 @@ function Reports({
         </div>
       </div>
 
-      <div className="card" style={{padding:16}}>
+      {showNazorat && <div className="card" style={{padding:16}}>
         <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Nazorat</div>
         <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
-          Dostavchik-sklad biriktirish: Nastroyka → Biriktirish bo'limida.
+          Dostavchik-sklad biriktirish: Nastroyka > Biriktirish bo'limida.
         </div>
 
         <div style={{fontWeight:700,fontSize:12.5,marginBottom:8}}>1) Hatoli</div>
@@ -5825,7 +5849,7 @@ function Reports({
                 <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--gr)'}}>Hatolik topilmadi</td></tr>
               ) : mismatchRows.map((r, i) => (
                 <tr key={`m_${i}_${r.driver}_${r.date}`} style={{background:'rgba(248,81,73,.07)'}}>
-                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '—'}</td>
+                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || 'РІР‚вЂќ'}</td>
                   <td>{r.driver}</td>
                   <td>{r.warehouse}</td>
                   <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.orderQty)}</td>
@@ -5858,7 +5882,7 @@ function Reports({
                 <>
                   {dailyControlRows.map((r, i) => (
                     <tr key={`d_${i}_${r.driver}_${r.date}`}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '—'}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || 'РІР‚вЂќ'}</td>
                       <td>{r.driver}</td>
                       <td>{r.warehouse}</td>
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
@@ -5938,7 +5962,7 @@ function PlanPage({
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap'}}>
         <div className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>
-          Operatorlar: {operators.join(', ')} · Kompaniya: {companyLabelByKey(company)}
+          Operatorlar: {operators.join(', ')} Р’В· Kompaniya: {companyLabelByKey(company)}
         </div>
         <div style={{display:'flex',gap:8}}>
           <button className="btn btn-gr btn-sm" onClick={exportPlan}>Excel</button>
@@ -6034,7 +6058,7 @@ function SettingsPanel({
   const [editPassword, setEditPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const conf = normalizeAccessConfig(sel, access[sel]);
-  const pages = ['dash','cust','orders','kassa','obzvon','doljniki','reports','plan','refresh','settings'];
+  const pages = ['dash','cust','orders','kassa','obzvon','doljniki','nazorat','reports','plan','refresh','settings'];
   const settingsSections = [
     { key:'settings_staff', label:"Hodimlar ruhsatlari" },
     { key:'settings_app', label:'Ilova sozlamalari' },
@@ -6043,6 +6067,7 @@ function SettingsPanel({
   const obzvonNewPermSections = [
     { key:'obzvon_new_edit', label:'Barcha Obzvon Yangi: tahrirlash' },
     { key:'obzvon_new_delete', label:"Barcha Obzvon Yangi: o'chirish" },
+    { key:'obzvon_new_publish', label:"Barcha Obzvon Yangi: Google Sheetga joylash" },
   ];
   const defaultVisible = { ...DEFAULT_VISIBLE_PAGES };
   const customerTabDefs = [
@@ -6072,8 +6097,8 @@ function SettingsPanel({
     const s = normalizeWarehouseKey(v).replace(/\s+/g, '');
     if (!s) return false;
     return (
-      s.includes('основнойсклад') ||
-      s.includes('основной') ||
+      s.includes('Р С•РЎРѓР Р…Р С•Р Р†Р Р…Р С•Р в„–РЎРѓР С”Р В»Р В°Р Т‘') ||
+      s.includes('Р С•РЎРѓР Р…Р С•Р Р†Р Р…Р С•Р в„–') ||
       s.includes('osnovnoysklad') ||
       s.includes('osnovnoy') ||
       s.includes('asosnoysklad') ||
@@ -6113,7 +6138,7 @@ function SettingsPanel({
 
   const addUser = () => {
     if (!isAdminSession) {
-      alert('Yangi login qo‘shish faqat Admin uchun ochiq');
+      alert('Yangi login qoРІР‚Вshish faqat Admin uchun ochiq');
       return;
     }
     const name = prompt("Yangi login nomi:");
@@ -6576,7 +6601,7 @@ function SettingsPanel({
             </button>
           </div>
           <div style={{marginTop:12,fontSize:12,color:'var(--t3)'}}>
-            Tanlangan foydalanuvchi: <strong style={{color:'var(--t1)'}}>{currentUser}</strong> · Joriy tema: <strong style={{color:'var(--bl)'}}>{(uiConf.ui?.theme || 'dark') === 'light' ? 'Oq' : 'Qora'}</strong>
+            Tanlangan foydalanuvchi: <strong style={{color:'var(--t1)'}}>{currentUser}</strong> Р’В· Joriy tema: <strong style={{color:'var(--bl)'}}>{(uiConf.ui?.theme || 'dark') === 'light' ? 'Oq' : 'Qora'}</strong>
           </div>
         </div>
       )}
@@ -6640,7 +6665,7 @@ function LoginScreen({ users=[], onLogin, onResetCreds }) {
     </div>
   );
 }
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ ROOT APP в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ ROOT APP Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
 const NAV = [
   { id:'dash',    label:'Dashboard',  icon:E.home },
   { id:'cust',    label:'Mijozlar',   icon:E.users, badge:'d' },
@@ -6648,8 +6673,9 @@ const NAV = [
   { id:'kassa',   label:'Kassa',      icon:E.pay },
   { id:'obzvon',  label:'Obzvon',     icon:E.phone, badge:'o' },
   { id:'doljniki',label:'Doljniki',   icon:E.doc, badge:'dz' },
+  { id:'nazorat', label:'Nazorat',    icon:E.report },
   { id:'reports', label:'Hisobotlar', icon:E.report },
-  { id:'plan',    label:'Plan',       icon:'???' },
+  { id:'plan',    label:'Plan',       icon:E.plan },
 ];
 
 export default function App() {
@@ -6689,6 +6715,7 @@ export default function App() {
   const remoteAccessConfigRef = useRef(null);
   const obzvonAllNewRowsRef = useRef(obzvonAllNewRows || []);
   const pendingObzvonNewRowsRef = useRef([]);
+  const obzvonExportBusyRef = useRef(false);
   const buildDefaultCreds = useCallback((baseUsers) => {
     const m = {};
     (baseUsers || []).forEach((u) => { m[u] = u; });
@@ -7085,6 +7112,96 @@ export default function App() {
     setNotif({ msg, type });
     setTimeout(() => setNotif(null), 5000);
   };
+  const publishObzvonNewRowsToGoogleSheet = useCallback(async ({ manual=false } = {}) => {
+    if (!accessApiUrl) {
+      if (manual) notify("API URL topilmadi", 'err');
+      return false;
+    }
+    if (obzvonExportBusyRef.current) return false;
+    obzvonExportBusyRef.current = true;
+    try {
+      const exportedMap = S.get(OBZVON_NEW_EXPORTED_MAP_KEY, {}) || {};
+      const rows = (obzvonAllNewRowsRef.current || [])
+        .map((x, i) => normalizeObzvonNewRow(x, i))
+        .filter((x) => (x.customerId || x.customer) && hasObzvonRowPayload(x))
+        .filter((x) => !isObzvonDeletedRow(x));
+      const unsent = rows.filter((r) => {
+        const rid = String(r.rid || r._rid || '').trim();
+        if (!rid) return false;
+        const ts = String(r.updatedAt || '').trim() || '0';
+        return String(exportedMap[rid] || '') !== ts;
+      });
+      if (!unsent.length) {
+        if (manual) notify("Yangi yuboriladigan ma'lumot yo'q", 'ok');
+        return true;
+      }
+
+      const payloadRows = unsent.map((r, i) => ({
+        no: String(r.no || i + 1),
+        customerId: String(r.customerId || r.id || '').trim(),
+        customer: String(r.customer || '').trim(),
+        callDate: String(r.callDate || '').trim(),
+        topic: String(r.topic || '').trim(),
+        note: String(r.note || '').trim(),
+        nextDate: String(r.nextDate || '').trim(),
+        orderCount: String(r.orderCount || '').trim(),
+        orderDate: String(r.orderDate || '').trim(),
+        operator: String(r.operator || '').trim(),
+        company: String(r.company || '').trim(),
+        rid: String(r.rid || r._rid || '').trim(),
+        updatedAt: String(r.updatedAt || '').trim(),
+      }));
+
+      const withHeaders = !S.get(OBZVON_NEW_HEADERS_WRITTEN_KEY, false);
+      const postBody = {
+        action: 'obzvon_new_sheet_append',
+        sheetId: OBZVON_NEW_EXPORT_SHEET_ID,
+        sheetName: OBZVON_NEW_EXPORT_SHEET_NAME,
+        withHeaders,
+        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator', 'Kompaniya', 'RID', 'UpdatedAt'],
+        rows: payloadRows,
+        by: sessionUser || currentUser || 'unknown',
+      };
+      let ok = false;
+      try {
+        const resp = await fetch(accessApiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(postBody),
+        });
+        const js = await resp.json().catch(() => ({}));
+        ok = !!js?.ok;
+      } catch {}
+      if (!ok) {
+        try {
+          const resp = await fetch(accessApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...postBody, action: 'obzvon_new_export' }),
+          });
+          const js = await resp.json().catch(() => ({}));
+          ok = !!js?.ok;
+        } catch {}
+      }
+      if (!ok) {
+        if (manual) notify("Google Sheetga joylashda xato bo'ldi", 'err');
+        return false;
+      }
+
+      const nextMap = { ...(exportedMap || {}) };
+      unsent.forEach((r) => {
+        const rid = String(r.rid || r._rid || '').trim();
+        if (!rid) return;
+        nextMap[rid] = String(r.updatedAt || '').trim() || new Date().toISOString();
+      });
+      S.set(OBZVON_NEW_EXPORTED_MAP_KEY, nextMap);
+      if (withHeaders) S.set(OBZVON_NEW_HEADERS_WRITTEN_KEY, true);
+      if (manual) notify(`${unsent.length} ta yozuv Google Sheetga joylandi`, 'ok');
+      return true;
+    } finally {
+      obzvonExportBusyRef.current = false;
+    }
+  }, [accessApiUrl, normalizeObzvonNewRow, hasObzvonRowPayload, sessionUser, currentUser]);
   useEffect(() => { S.set('aq-current-user', currentUser); }, [currentUser]);
   useEffect(() => { S.set('aq-session-user', sessionUser || ''); }, [sessionUser]);
   useEffect(() => { S.set('aq-company-filter', companyFilter); }, [companyFilter]);
@@ -7186,6 +7303,22 @@ export default function App() {
     }, 7000);
     return () => clearInterval(t);
   }, [isLoggedIn, accessApiUrl, flushPendingObzvonNewRows]);
+  useEffect(() => {
+    if (!isLoggedIn || !accessApiUrl) return;
+    const runAuto = async () => {
+      const now = new Date();
+      const dateKey = toIsoDate(now);
+      const hh = now.getHours();
+      if (!dateKey || hh < OBZVON_NEW_EXPORT_HOUR) return;
+      const lastDone = String(S.get(OBZVON_NEW_LAST_AUTO_DATE_KEY, '') || '');
+      if (lastDone === dateKey) return;
+      const ok = await publishObzvonNewRowsToGoogleSheet({ manual:false });
+      if (ok) S.set(OBZVON_NEW_LAST_AUTO_DATE_KEY, dateKey);
+    };
+    runAuto();
+    const t = setInterval(runAuto, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [isLoggedIn, accessApiUrl, publishObzvonNewRowsToGoogleSheet]);
 
   useEffect(() => {
     if (users.length === 0) return;
@@ -7267,7 +7400,7 @@ export default function App() {
   const handleLoad = (result) => {
     setData(result);
     setUp(false);
-    notify(`OK: ${result.customers.length} mijoz · ${result.rawOrders.length} zakaz · ${result.cashbox.length} kassa`);
+    notify(`OK: ${result.customers.length} mijoz Р’В· ${result.rawOrders.length} zakaz Р’В· ${result.cashbox.length} kassa`);
   };
 
   const loadFromConfig = useCallback(async () => {
@@ -7283,7 +7416,7 @@ export default function App() {
       const d = processAll(raw);
       setData(d);
       setAutoLoad({ loading:false, progress:'', error:'' });
-      notify(`OK: ${d.customers.length} mijoz · ${d.rawOrders.length} zakaz`);
+      notify(`OK: ${d.customers.length} mijoz Р’В· ${d.rawOrders.length} zakaz`);
     } catch (e) {
       setAutoLoad({ loading:false, progress:'', error:e.message });
       notify('Xato: '+e.message, 'err');
@@ -7394,17 +7527,17 @@ export default function App() {
         const debtOrderDate = debtOrder?.orderDate || c.lastOrderDate || '';
         return {
           lastOrderProduct: debtOrder?.product || '',
-          id: c.id || '—',
-          category: c.source || '—',
-          name: c.name || '—',
+          id: c.id || 'РІР‚вЂќ',
+          category: c.source || 'РІР‚вЂќ',
+          name: c.name || 'РІР‚вЂќ',
           debtUZS: c.balanceUZS,
           lastOrderDate: debtOrderDate,
           days: debtOrderDate ? daysAgo(debtOrderDate) : c.daysAgo,
-          orderNo: c.lastDocNum || '—',
+          orderNo: c.lastDocNum || 'РІР‚вЂќ',
           qty: c.lastQty || 0,
           lastSum: c.lastSum || 0,
-          agent: c.lastAgent || '—',
-          note: c.merchantNote || '—',
+          agent: c.lastAgent || 'РІР‚вЂќ',
+          note: c.merchantNote || 'РІР‚вЂќ',
         };
       })
       .sort((a, b) => a.debtUZS - b.debtUZS);
@@ -7417,17 +7550,17 @@ export default function App() {
         const debtOrderDate = debtOrder?.orderDate || c.lastOrderDate || '';
         return {
           lastOrderProduct: debtOrder?.product || '',
-          id: c.id || '—',
-          category: c.source || '—',
-          name: c.name || '—',
+          id: c.id || 'РІР‚вЂќ',
+          category: c.source || 'РІР‚вЂќ',
+          name: c.name || 'РІР‚вЂќ',
           debtUZS: c.balanceUZS,
           lastOrderDate: debtOrderDate,
           days: debtOrderDate ? daysAgo(debtOrderDate) : c.daysAgo,
-          orderNo: c.lastDocNum || '—',
+          orderNo: c.lastDocNum || 'РІР‚вЂќ',
           qty: c.lastQty || 0,
           lastSum: c.lastSum || 0,
-          agent: c.lastAgent || '—',
-          note: c.merchantNote || '—',
+          agent: c.lastAgent || 'РІР‚вЂќ',
+          note: c.merchantNote || 'РІР‚вЂќ',
         };
       })
       .sort((a, b) => a.debtUZS - b.debtUZS);
@@ -7437,7 +7570,7 @@ export default function App() {
   const doljnikiCnt = doljniki.length;
   const companyBlockedPages = useMemo(() => (
     activeCompany === 'ahmadtea'
-      ? { obzvon: true, reports: true }
+      ? { obzvon: true, reports: true, nazorat: true }
       : {}
   ), [activeCompany]);
   const canViewPage = useCallback((id) => {
@@ -7604,6 +7737,7 @@ export default function App() {
                   currentUser={effectiveUser}
                   canEditAllNew={!!(currentAccess.visible?.obzvon_new_edit ?? (effectiveUser === 'Admin'))}
                   canDeleteAllNew={!!(currentAccess.visible?.obzvon_new_delete ?? (effectiveUser === 'Admin'))}
+                  canPublishAllNew={!!(currentAccess.visible?.obzvon_new_publish ?? (effectiveUser === 'Admin'))}
                   records={companyObzvonRecords}
                   setRecords={setCompanyScopedObzvonRecords}
                   allRows={companyObzvonAllRows}
@@ -7612,6 +7746,7 @@ export default function App() {
                   onReloadAllNew={pullRemoteObzvonNewRows}
                   onAppendAllRows={appendObzvonAllRemote}
                   onUpsertNewRows={upsertObzvonAllNewRows}
+                  onPublishAllNew={publishObzvonNewRowsToGoogleSheet}
                 />
               )}
                 {page==='doljniki'&& canViewPage('doljniki') && <Doljniki rows={doljniki} otherRows={otherDoljniki} D={D} kulerRows={D.kulerInstallments || []} onAddToObzvon={addObzvonRows} currentUser={effectiveUser} company={activeCompany} />}
@@ -7626,6 +7761,21 @@ export default function App() {
                     planRows={planRows}
                     planOffDays={planOffDays}
                     obzvonNewRows={companyObzvonAllNewRows}
+                    mode="reports"
+                  />
+                )}
+                {page==='nazorat' && canViewPage('nazorat') && (
+                  <Reports
+                    D={D}
+                    company={activeCompany}
+                    currentUser={effectiveUser}
+                    currentAccess={currentAccess}
+                    users={users}
+                    access={access}
+                    planRows={planRows}
+                    planOffDays={planOffDays}
+                    obzvonNewRows={companyObzvonAllNewRows}
+                    mode="nazorat"
                   />
                 )}
                 {page==='plan' && canViewPage('plan') && (
