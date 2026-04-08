@@ -5832,7 +5832,7 @@ function Reports({
       <div className="card" style={{padding:16}}>
         <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Nazorat</div>
         <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
-          Dostavchik-sklad biriktirish: Nastroyka > Biriktirish bo'limida.
+          Dostavchik-sklad biriktirish: Nastroyka {'>'} Biriktirish bo'limida.
         </div>
 
         <div style={{fontWeight:700,fontSize:12.5,marginBottom:8}}>1) Hatoli</div>
