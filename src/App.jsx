@@ -2203,7 +2203,7 @@ function UploadModal({
                 </div>
               </div>
               <div style={{background:'var(--yl2)',border:'1px solid var(--yl)',borderRadius:8,padding:'9px 14px',marginBottom:14,fontSize:12,color:'var(--yl)'}}>
-                Eslatma: Fayl <strong>Fayl > Veb-da nashr qilish</strong> qilingan bo'lishi kerak
+                Eslatma: Fayl <strong>Fayl &gt; Veb-da nashr qilish</strong> qilingan bo'lishi kerak
               </div>
               {loading && (
                 <div style={{background:'var(--bl3)',border:'1px solid var(--bl2)',borderRadius:8,padding:'9px 14px',marginBottom:12,display:'flex',alignItems:'center',gap:10,color:'var(--bl)'}}>
