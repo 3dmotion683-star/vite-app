@@ -2946,6 +2946,7 @@ function SoDetailModal({ soGroup, onClose }) {
 function Orders({ D }) {
   const { rawOrders=[], customers=[] } = D;
   const [search,setS]  = useState('');
+  const [companyTab, setCompanyTab] = useState('murodbaxsh');
   const [fType,setT]   = useState('zakaz');
   const [showFilter, setShowFilter] = useState(false);
   const [uFilterOpen, setUFilterOpen] = useState(false);
@@ -2960,6 +2961,11 @@ function Orders({ D }) {
   const [fSumFrom, setSumFrom] = useState('');
   const [fSumTo, setSumTo] = useState('');
   const [selectedSO,setSelectedSO] = useState(null);
+  const customerById = useMemo(() => {
+    const m = {};
+    (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c; });
+    return m;
+  }, [customers]);
   const districtById = useMemo(() => {
     const m = {};
     (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c.district || ''; });
@@ -2991,7 +2997,14 @@ function Orders({ D }) {
 
   const allZakaz   = soGroups.filter((g)=>isOrderDoc(g.docType));
   const allVozvrat = soGroups.filter((g)=>isReturnDoc(g.docType));
-  const base = fType==='zakaz'?allZakaz:fType==='vozvrat'?allVozvrat:soGroups;
+  const baseByType = fType==='zakaz'?allZakaz:fType==='vozvrat'?allVozvrat:soGroups;
+  const base = useMemo(() => {
+    return baseByType.filter((g) => {
+      const c = customerById[String(g.mId || '').trim()];
+      if (companyTab === 'ahmadtea') return isAhmadteaCustomer(c);
+      return isMurodbaxshCustomer(c);
+    });
+  }, [baseByType, companyTab, customerById]);
   const options = useMemo(() => ({
     agents: [...new Set(soGroups.map((g)=>g.agent).filter(Boolean))].sort(),
     statuses: [...new Set(soGroups.map((g)=>g.status).filter(Boolean))].sort(),
@@ -3090,6 +3103,10 @@ function Orders({ D }) {
 
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
+      <div className="tabs" style={{display:'inline-flex'}}>
+        <button className={`tab${companyTab==='murodbaxsh'?' on':''}`} onClick={()=>setCompanyTab('murodbaxsh')}>Murodbaxsh</button>
+        <button className={`tab${companyTab==='ahmadtea'?' on':''}`} onClick={()=>setCompanyTab('ahmadtea')}>Ahmadtea</button>
+      </div>
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
         <div className="sb" style={{flex:1}}>
           <span style={{color:'var(--t3)'}}>Qidiruv</span>
