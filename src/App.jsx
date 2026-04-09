@@ -6844,7 +6844,7 @@ function SettingsPanel({
       )}
 
       {tab==='staff' && (viewerConf.visible?.settings_staff ?? true) && (
-        <>
+        <div style={{display:'grid',gap:12}}>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Foydalanuvchilar: {users.length}</span>
             {isAdminSession ? (
@@ -7079,7 +7079,8 @@ function SettingsPanel({
                 </div>
               </div>
             </div>
-          </>
+          )}
+          </div>
           )}
       {tab==='app' && (viewerConf.visible?.settings_app ?? true) && (
         <div className="card" style={{padding:14}}>
