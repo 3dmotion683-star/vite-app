@@ -136,6 +136,8 @@ const OBZVON_NEW_EXPORT_HOUR = 3;
 const OBZVON_NEW_EXPORTED_MAP_KEY = 'aq-obzvon-new-exported-map';
 const OBZVON_NEW_LAST_AUTO_DATE_KEY = 'aq-obzvon-new-last-auto-date';
 const OBZVON_NEW_HEADERS_WRITTEN_KEY = 'aq-obzvon-new-sheet-headers-written';
+const OBZVON_NEW_STABLE_ID_MAP_KEY = 'aq-obzvon-new-stable-id-map';
+const OBZVON_NEW_STABLE_ID_LAST_KEY = 'aq-obzvon-new-stable-id-last';
 const ACCESS_SYNC_URL_KEY = 'aq-access-api-url';
 const ACCESS_UPDATED_AT_KEY = 'aq-access-updated-at';
 // Access konfiguratsiya sinxroni uchun Cloudflare Worker API URL:
@@ -586,6 +588,32 @@ function UniversalFilterPanel({
   );
 }
 const createRowRid = () => `r_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`;
+const hash32 = (input) => {
+  const s = String(input || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) {
+    h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h).toString(36);
+};
+const buildFallbackObzvonRid = (row, i = 0) => {
+  const src = row || {};
+  const seed = [
+    src.customerId || src.id || '',
+    src.customer || '',
+    src.callDate || '',
+    src.topic || '',
+    src.note || '',
+    src.nextDate || '',
+    src.orderCount || '',
+    src.orderDate || '',
+    src.operator || '',
+    src.company || '',
+    src.updatedAt || '',
+  ].map((x) => String(x || '').trim()).join('|');
+  if (!seed) return `nr_${i}`;
+  return `nr_${hash32(seed)}`;
+};
 const isInvalidObzvonCustomerText = (v) => {
   const s = String(v ?? '').trim();
   if (!s) return true;
@@ -4026,7 +4054,7 @@ function Obzvon({
 
   const appAllNewRows = useMemo(() => {
     const fromNew = (newRows || []).map((r, i) => ({
-      rid: r.rid || r._rid || `nr_${i}`,
+      rid: String(r.rid || r._rid || '').trim() || buildFallbackObzvonRid(r, i),
       no: String(r.no || i + 1),
       customer: r.customer || '',
       callDate: r.callDate || '',
@@ -4042,7 +4070,7 @@ function Obzvon({
     const fromCurrent = (records || [])
       .filter((r) => (r.id || r.customer) && hasObzvonPayload(r))
       .map((r, i) => ({
-        rid: r._rid || `cr_${i}`,
+        rid: String(r._rid || '').trim() || buildFallbackObzvonRid(r, i),
         no: String(r.no || i + 1),
         customer: r.customer || '',
         callDate: r.callDate || '',
@@ -4684,15 +4712,28 @@ function Obzvon({
               {E.refresh} Yangilash
             </button>
             {canPublishAllNew && (
-              <button
-                className="btn btn-gr btn-sm"
-                onClick={async () => {
-                  const ok = await Promise.resolve(onPublishAllNew({ manual:true }));
-                  if (!ok) alert("Google Sheetga joylash muvaffaqiyatsiz bo'ldi");
-                }}
-              >
-                Google Sheetga joylash
-              </button>
+              <>
+                <button
+                  className="btn btn-gr btn-sm"
+                  onClick={async () => {
+                    const ok = await Promise.resolve(onPublishAllNew({ manual:true, mode:'append', rows: appAllNewRows }));
+                    if (!ok) alert("Google Sheetga yangi ma'lumotlarni joylash muvaffaqiyatsiz bo'ldi");
+                  }}
+                >
+                  Sheetga faqat yangi
+                </button>
+                <button
+                  className="btn btn-gh btn-sm"
+                  onClick={async () => {
+                    const yes = confirm("Google Sheetdagi 'Barcha_obzvon_yangi' listini to'liq almashtiraymi?");
+                    if (!yes) return;
+                    const ok = await Promise.resolve(onPublishAllNew({ manual:true, mode:'replace', rows: appAllNewRows }));
+                    if (!ok) alert("Google Sheetni to'liq almashtirish muvaffaqiyatsiz bo'ldi");
+                  }}
+                >
+                  Sheetni to'liq almashtirish
+                </button>
+              </>
             )}
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{visibleAllNewRows.length} / {allNewList.length} ta yozuv</span>
             {allNewList.length > 500 && (
@@ -7047,7 +7088,7 @@ export default function App() {
     company: normalizeStoredCompanyKey(sanitizeObzvonCell(r?.company)),
   }), []);
   const normalizeObzvonNewRow = useCallback((r, i = 0) => ({
-    rid: sanitizeObzvonCell(r?.rid || r?._rid) || `nr_${Date.now()}_${i}`,
+    rid: sanitizeObzvonCell(r?.rid || r?._rid) || buildFallbackObzvonRid(r, i),
     no: sanitizeObzvonCell(r?.no) || String(i + 1),
     customer: sanitizeObzvonCell(r?.customer),
     callDate: sanitizeObzvonCell(r?.callDate),
@@ -7292,32 +7333,148 @@ export default function App() {
       setObzvonAllRows(cleaned);
     }
   }, [obzvonAllRows, normalizeObzvonAllRow]);
+  useEffect(() => {
+    if (!Array.isArray(obzvonAllNewRows) || !obzvonAllNewRows.length) return;
+    let changed = false;
+    const next = obzvonAllNewRows.map((r, i) => {
+      const rid = String(r?.rid || r?._rid || '').trim();
+      if (rid) return r;
+      changed = true;
+      const newRid = buildFallbackObzvonRid(r, i) || createRowRid();
+      return {
+        ...r,
+        rid: newRid,
+        _rid: newRid,
+        updatedAt: String(r?.updatedAt || '').trim() || new Date().toISOString(),
+      };
+    });
+    if (!changed) return;
+    setObzvonAllNewRows(next);
+    S.set('aq-obzvon-all-new-rows', next);
+  }, [obzvonAllNewRows]);
 
   const notify = (msg, type='ok') => {
     setNotif({ msg, type });
     setTimeout(() => setNotif(null), 5000);
   };
-  const publishObzvonNewRowsToGoogleSheet = useCallback(async ({ manual=false } = {}) => {
+  const publishObzvonNewRowsToGoogleSheet = useCallback(async ({ manual=false, mode='append', rows: externalRows=null } = {}) => {
     if (obzvonExportBusyRef.current) return false;
     obzvonExportBusyRef.current = true;
     try {
       const exportedMap = S.get(OBZVON_NEW_EXPORTED_MAP_KEY, {}) || {};
-      const rows = (obzvonAllNewRowsRef.current || [])
+      const stableIdMap = S.get(OBZVON_NEW_STABLE_ID_MAP_KEY, {}) || {};
+      let stableIdLast = Number(S.get(OBZVON_NEW_STABLE_ID_LAST_KEY, 0)) || 0;
+      const ensureStableId = (rid) => {
+        const key = String(rid || '').trim();
+        if (!key) return 0;
+        const ex = Number(stableIdMap[key] || 0);
+        if (ex > 0) return ex;
+        stableIdLast += 1;
+        stableIdMap[key] = stableIdLast;
+        return stableIdLast;
+      };
+      const rows = (Array.isArray(externalRows) ? externalRows : (obzvonAllNewRowsRef.current || []))
         .map((x, i) => normalizeObzvonNewRow(x, i))
-        .filter((x) => (x.customerId || x.customer) && hasObzvonRowPayload(x))
+        .filter((x) => (x.customerId || x.customer || x.note || x.orderCount))
         .filter((x) => !isObzvonDeletedRow(x));
-      const unsent = rows.filter((r) => {
+      const byRid = new Map();
+      rows.forEach((r, i) => {
         const rid = String(r.rid || r._rid || '').trim();
-        if (!rid) return false;
-        const ts = String(r.updatedAt || '').trim() || '0';
-        return String(exportedMap[rid] || '') !== ts;
+        if (!rid) return;
+        const prev = byRid.get(rid);
+        if (!prev) {
+          byRid.set(rid, r);
+          return;
+        }
+        const prevTs = toDate(prev.updatedAt || prev.callDate)?.getTime() || 0;
+        const nextTs = toDate(r.updatedAt || r.callDate)?.getTime() || 0;
+        if (nextTs >= prevTs) byRid.set(rid, r);
       });
-      if (!unsent.length) {
-        if (manual) notify("Yangi yuboriladigan ma'lumot yo'q", 'ok');
+      const dedupedRows = Array.from(byRid.values());
+      if (!dedupedRows.length) {
+        if (manual) notify("Google Sheetga yuboriladigan ma'lumot yo'q", 'ok');
         return true;
       }
 
-      const payloadRows = unsent.map((r, i) => ({
+      const rowsWithStableId = dedupedRows.map((r) => {
+        const rid = String(r.rid || r._rid || '').trim();
+        return {
+          ...r,
+          stableId: ensureStableId(rid),
+        };
+      });
+      const urlsToTry = Array.from(new Set([OBZVON_EXPORT_APPS_SCRIPT_URL, accessApiUrl].filter(Boolean)));
+      if (!urlsToTry.length) {
+        if (manual) notify("Eksport URL topilmadi", 'err');
+        return false;
+      }
+      const parseResponse = (text) => {
+        const t = String(text || '').trim();
+        if (!t) return {};
+        try { return JSON.parse(t); } catch (_) { return { raw: t }; }
+      };
+      const fetchSheetLastInfo = async () => {
+        for (const url of urlsToTry) {
+          try {
+            const isAppsScript = /script\.google\.com/i.test(String(url || ''));
+            const reqInit = isAppsScript
+              ? {
+                  method: 'POST',
+                  mode: 'cors',
+                  cache: 'no-store',
+                  headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+                  body: JSON.stringify({
+                    action: 'obzvon_new_sheet_last_id',
+                    sheetId: OBZVON_NEW_EXPORT_SHEET_ID,
+                    sheetName: OBZVON_NEW_EXPORT_SHEET_NAME,
+                  }),
+                }
+              : {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    action: 'obzvon_new_sheet_last_id',
+                    sheetId: OBZVON_NEW_EXPORT_SHEET_ID,
+                    sheetName: OBZVON_NEW_EXPORT_SHEET_NAME,
+                  }),
+                };
+            const resp = await fetch(url, reqInit);
+            if (!resp.ok) continue;
+            const rawText = await resp.text().catch(() => '');
+            const js = parseResponse(rawText);
+            if (js?.ok) {
+              return {
+                lastRid: String(js?.lastRid || '').trim(),
+                lastStableId: Number(js?.lastStableId || 0) || 0,
+              };
+            }
+          } catch {}
+        }
+        return { lastRid: '', lastStableId: 0 };
+      };
+      let rowsToSend = rowsWithStableId;
+      if (mode !== 'replace') {
+        const lastInfo = await fetchSheetLastInfo();
+        const lastRid = String(lastInfo.lastRid || '').trim();
+        if (lastRid) {
+          const idx = rowsWithStableId.findIndex((r) => String(r.rid || r._rid || '').trim() === lastRid);
+          if (idx > 0) rowsToSend = rowsWithStableId.slice(0, idx);
+          else if (idx === 0) rowsToSend = [];
+        } else {
+          rowsToSend = rowsWithStableId.filter((r) => {
+            const rid = String(r.rid || r._rid || '').trim();
+            const ts = String(r.updatedAt || '').trim() || '0';
+            return String(exportedMap[rid] || '') !== ts;
+          });
+        }
+      }
+      if (!rowsToSend.length) {
+        if (manual) notify("Yangi yuboriladigan ma'lumot yo'q", 'ok');
+        S.set(OBZVON_NEW_STABLE_ID_MAP_KEY, stableIdMap);
+        S.set(OBZVON_NEW_STABLE_ID_LAST_KEY, stableIdLast);
+        return true;
+      }
+      const payloadRows = rowsToSend.map((r, i) => ({
         no: String(r.no || i + 1),
         customerId: String(r.customerId || r.id || '').trim(),
         customer: String(r.customer || '').trim(),
@@ -7329,11 +7486,12 @@ export default function App() {
         orderDate: String(r.orderDate || '').trim(),
         operator: String(r.operator || '').trim(),
         company: String(r.company || '').trim(),
+        stableId: String(r.stableId || ensureStableId(r.rid || r._rid)),
         rid: String(r.rid || r._rid || '').trim(),
         updatedAt: String(r.updatedAt || '').trim(),
       }));
 
-      const withHeaders = !S.get(OBZVON_NEW_HEADERS_WRITTEN_KEY, false);
+      const withHeaders = mode === 'replace' ? true : !S.get(OBZVON_NEW_HEADERS_WRITTEN_KEY, false);
       const postBody = {
         sheetId: OBZVON_NEW_EXPORT_SHEET_ID,
         sheetName: OBZVON_NEW_EXPORT_SHEET_NAME,
@@ -7341,23 +7499,15 @@ export default function App() {
         gid: OBZVON_NEW_EXPORT_SHEET_GID,
         sheetUrl: OBZVON_NEW_EXPORT_SHEET_URL,
         withHeaders,
-        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator', 'Kompaniya', 'RID', 'UpdatedAt'],
+        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator', 'Kompaniya', 'SyncID', 'RID', 'UpdatedAt'],
         rows: payloadRows,
         by: sessionUser || currentUser || 'unknown',
       };
       let ok = false;
-      const urlsToTry = Array.from(new Set([accessApiUrl, OBZVON_EXPORT_APPS_SCRIPT_URL].filter(Boolean)));
-      if (!urlsToTry.length) {
-        if (manual) notify("Eksport URL topilmadi", 'err');
-        return false;
-      }
-      const actionsToTry = ['obzvon_new_sheet_append', 'obzvon_new_export'];
+      const actionsToTry = mode === 'replace'
+        ? ['obzvon_new_sheet_replace']
+        : ['obzvon_new_sheet_append', 'obzvon_new_export'];
       let lastErr = '';
-      const parseResponse = (text) => {
-        const t = String(text || '').trim();
-        if (!t) return {};
-        try { return JSON.parse(t); } catch (_) { return { raw: t }; }
-      };
       for (const url of urlsToTry) {
         if (ok) break;
         const isAppsScript = /script\.google\.com/i.test(String(url || ''));
@@ -7409,19 +7559,24 @@ export default function App() {
       }
 
       const nextMap = { ...(exportedMap || {}) };
-      unsent.forEach((r) => {
+      rowsToSend.forEach((r) => {
         const rid = String(r.rid || r._rid || '').trim();
         if (!rid) return;
         nextMap[rid] = String(r.updatedAt || '').trim() || new Date().toISOString();
       });
       S.set(OBZVON_NEW_EXPORTED_MAP_KEY, nextMap);
+      S.set(OBZVON_NEW_STABLE_ID_MAP_KEY, stableIdMap);
+      S.set(OBZVON_NEW_STABLE_ID_LAST_KEY, stableIdLast);
       if (withHeaders) S.set(OBZVON_NEW_HEADERS_WRITTEN_KEY, true);
-      if (manual) notify(`${unsent.length} ta yozuv Google Sheetga joylandi`, 'ok');
+      if (manual) {
+        if (mode === 'replace') notify(`Google Sheet to'liq yangilandi (${rowsToSend.length} ta)`, 'ok');
+        else notify(`${rowsToSend.length} ta yangi yozuv Google Sheetga joylandi`, 'ok');
+      }
       return true;
     } finally {
       obzvonExportBusyRef.current = false;
     }
-  }, [accessApiUrl, normalizeObzvonNewRow, hasObzvonRowPayload, sessionUser, currentUser]);
+  }, [accessApiUrl, normalizeObzvonNewRow, sessionUser, currentUser]);
   useEffect(() => { S.set('aq-current-user', currentUser); }, [currentUser]);
   useEffect(() => { S.set('aq-session-user', sessionUser || ''); }, [sessionUser]);
   useEffect(() => { S.set('aq-company-filter', companyFilter); }, [companyFilter]);

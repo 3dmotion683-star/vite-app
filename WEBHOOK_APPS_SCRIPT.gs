@@ -26,6 +26,8 @@ function doPost(e) {
     const action = safe(data && data.action);
     if (action === 'access_set') return setAccessConfig_(data && data.accessConfig);
     if (action === 'obzvon_new_upsert') return upsertObzvonNewRows_(data && data.rows, data && data.by);
+    if (action === 'obzvon_new_sheet_last_id') return getObzvonNewSheetLastId_(data);
+    if (action === 'obzvon_new_sheet_replace') return replaceObzvonNewRowsSheet_(data);
     if (action === 'obzvon_new_sheet_append' || action === 'obzvon_new_export') {
       return appendObzvonNewRowsToSheet_(data);
     }
@@ -101,15 +103,11 @@ function upsertObzvonNewRows_(rows, by) {
   });
 }
 
-function appendObzvonNewRowsToSheet_(data) {
+function getObzvonSheetConfig_(data) {
   const sheetId = safe(data && data.sheetId);
   const sheetName = safe(data && data.sheetName) || 'Barcha_obzvon_yangi';
-  const withHeaders = Boolean(data && data.withHeaders);
-  const rows = Array.isArray(data && data.rows) ? data.rows : [];
-  if (!sheetId) return json_({ ok: false, error: 'sheetId berilmagan' });
-
-  const fallbackHeaders = ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator', 'Kompaniya', 'RID', 'UpdatedAt'];
-  const fallbackKeys = ['no', 'customerId', 'customer', 'callDate', 'topic', 'note', 'nextDate', 'orderCount', 'orderDate', 'operator', 'company', 'rid', 'updatedAt'];
+  const fallbackHeaders = ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator', 'Kompaniya', 'SyncID', 'RID', 'UpdatedAt'];
+  const fallbackKeys = ['no', 'customerId', 'customer', 'callDate', 'topic', 'note', 'nextDate', 'orderCount', 'orderDate', 'operator', 'company', 'stableId', 'rid', 'updatedAt'];
   const labelToKey = {
     'No': 'no',
     'ID': 'customerId',
@@ -122,48 +120,140 @@ function appendObzvonNewRowsToSheet_(data) {
     'Zakaz sanasi': 'orderDate',
     'Operator': 'operator',
     'Kompaniya': 'company',
+    'SyncID': 'stableId',
     'RID': 'rid',
     'UpdatedAt': 'updatedAt',
   };
-
   let headers = Array.isArray(data && data.headers)
     ? data.headers.map((h) => safe(h)).filter(Boolean)
     : [];
   if (!headers.length) headers = fallbackHeaders;
   const keys = headers.map((h) => labelToKey[h] || h);
+  const ridIndex = Math.max(0, headers.findIndex((h) => safe(h).toUpperCase() === 'RID'));
+  const stableIdIndex = headers.findIndex((h) => safe(h).toUpperCase() === 'SYNCID');
+  return { sheetId, sheetName, headers, keys, ridIndex, stableIdIndex, fallbackKeys };
+}
 
-  const ss = SpreadsheetApp.openById(sheetId);
-  let sh = ss.getSheetByName(sheetName);
-  if (!sh) sh = ss.insertSheet(sheetName);
+function prepareObzvonSheetRows_(rows, conf) {
+  const headers = conf.headers;
+  const keys = conf.keys;
+  const fallbackKeys = conf.fallbackKeys;
+  return (Array.isArray(rows) ? rows : []).map((r, i) => {
+    let arr;
+    if (Array.isArray(r)) {
+      arr = [];
+      for (let j = 0; j < headers.length; j++) arr.push(safe(r[j]));
+    } else {
+      const obj = (r && typeof r === 'object') ? r : {};
+      const useKeys = keys.length === headers.length ? keys : fallbackKeys;
+      arr = useKeys.map((k) => safe(obj[k]));
+    }
+    if (!arr.some((v) => safe(v))) return null;
+    if (!safe(arr[conf.ridIndex])) {
+      // RID bo'sh bo'lsa vaqtinchalik stabil identifikator yaratamiz
+      arr[conf.ridIndex] = 'rid_' + Utilities.base64EncodeWebSafe(String(new Date().getTime()) + '_' + i).replace(/=+$/g, '');
+    }
+    return arr;
+  }).filter(Boolean);
+}
+
+function getObzvonNewSheetLastId_(data) {
+  const conf = getObzvonSheetConfig_(data);
+  if (!conf.sheetId) return json_({ ok: false, error: 'sheetId berilmagan' });
+  const ss = SpreadsheetApp.openById(conf.sheetId);
+  let sh = ss.getSheetByName(conf.sheetName);
+  if (!sh) return json_({ ok: true, sheetName: conf.sheetName, lastRid: '', lastStableId: 0, rows: 0 });
+  const lastRow = sh.getLastRow();
+  if (lastRow <= 1) return json_({ ok: true, sheetName: conf.sheetName, lastRid: '', lastStableId: 0, rows: 0 });
+
+  const ridVals = sh.getRange(2, conf.ridIndex + 1, lastRow - 1, 1).getValues();
+  let lastRid = '';
+  for (let i = ridVals.length - 1; i >= 0; i--) {
+    const v = safe(ridVals[i][0]);
+    if (v) { lastRid = v; break; }
+  }
+
+  let lastStableId = 0;
+  if (conf.stableIdIndex >= 0) {
+    const stableVals = sh.getRange(2, conf.stableIdIndex + 1, lastRow - 1, 1).getValues();
+    for (let i = stableVals.length - 1; i >= 0; i--) {
+      const n = Number(safe(stableVals[i][0]));
+      if (n > 0) { lastStableId = n; break; }
+    }
+  }
+  return json_({ ok: true, sheetName: conf.sheetName, lastRid: lastRid, lastStableId: lastStableId, rows: lastRow - 1 });
+}
+
+function replaceObzvonNewRowsSheet_(data) {
+  const conf = getObzvonSheetConfig_(data);
+  if (!conf.sheetId) return json_({ ok: false, error: 'sheetId berilmagan' });
+  const rows = prepareObzvonSheetRows_(data && data.rows, conf);
+  const ss = SpreadsheetApp.openById(conf.sheetId);
+  let sh = ss.getSheetByName(conf.sheetName);
+  if (!sh) sh = ss.insertSheet(conf.sheetName);
+  sh.clearContents();
+  sh.getRange(1, 1, 1, conf.headers.length).setValues([conf.headers]);
+  if (rows.length) {
+    // Bir xil RID kelib qolsa, birinchisini qoldiramiz
+    const uniq = [];
+    const seen = {};
+    for (let i = 0; i < rows.length; i++) {
+      const rid = safe(rows[i][conf.ridIndex]);
+      if (rid && seen[rid]) continue;
+      if (rid) seen[rid] = true;
+      uniq.push(rows[i]);
+    }
+    if (uniq.length) {
+      sh.getRange(2, 1, uniq.length, conf.headers.length).setValues(uniq);
+      return json_({ ok: true, saved: true, replaced: true, inserted: uniq.length, sheetName: conf.sheetName });
+    }
+  }
+  return json_({ ok: true, saved: true, replaced: true, inserted: 0, sheetName: conf.sheetName });
+}
+
+function appendObzvonNewRowsToSheet_(data) {
+  const conf = getObzvonSheetConfig_(data);
+  if (!conf.sheetId) return json_({ ok: false, error: 'sheetId berilmagan' });
+  const withHeaders = Boolean(data && data.withHeaders);
+  const rows = prepareObzvonSheetRows_(data && data.rows, conf);
+
+  const ss = SpreadsheetApp.openById(conf.sheetId);
+  let sh = ss.getSheetByName(conf.sheetName);
+  if (!sh) sh = ss.insertSheet(conf.sheetName);
 
   const lastRow = sh.getLastRow();
   if (withHeaders && lastRow === 0) {
-    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sh.getRange(1, 1, 1, conf.headers.length).setValues([conf.headers]);
   }
 
-  const prepared = rows.map((r) => {
-    if (Array.isArray(r)) {
-      const arr = [];
-      for (let i = 0; i < headers.length; i++) arr.push(safe(r[i]));
-      return arr;
-    }
-    const obj = (r && typeof r === 'object') ? r : {};
-    if (keys.length !== headers.length) {
-      return fallbackKeys.map((k) => safe(obj[k]));
-    }
-    return keys.map((k) => safe(obj[k]));
-  }).filter((arr) => arr.some((v) => safe(v)));
+  const existingRidSet = {};
+  const rowsInSheet = sh.getLastRow();
+  if (rowsInSheet > 1) {
+    const ridVals = sh.getRange(2, conf.ridIndex + 1, rowsInSheet - 1, 1).getValues();
+    ridVals.forEach((v) => {
+      const rid = safe(v[0]);
+      if (rid) existingRidSet[rid] = true;
+    });
+  }
+
+  const prepared = [];
+  rows.forEach((arr) => {
+    const rid = safe(arr[conf.ridIndex]);
+    if (rid && existingRidSet[rid]) return;
+    if (rid) existingRidSet[rid] = true;
+    prepared.push(arr);
+  });
 
   if (prepared.length) {
     const start = sh.getLastRow() + 1;
-    sh.getRange(start, 1, prepared.length, headers.length).setValues(prepared);
+    sh.getRange(start, 1, prepared.length, conf.headers.length).setValues(prepared);
   }
 
   return json_({
     ok: true,
     saved: true,
     inserted: prepared.length,
-    sheetName: sheetName,
+    sheetName: conf.sheetName,
   });
 }
 
