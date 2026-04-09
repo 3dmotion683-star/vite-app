@@ -991,6 +991,16 @@ const isLikelyDocType = (v) => {
   if (!s) return false;
   return isOrderDoc(s) || isReturnDoc(s);
 };
+const isLikelyWarehouseName = (v) => {
+  const t = normalizeMatchText(v);
+  if (!t) return false;
+  return (
+    t.includes('склад') ||
+    t.includes('sklad') ||
+    t.includes('warehouse') ||
+    t.includes('ombor')
+  );
+};
 const isLikelyStatus = (v) => {
   const st = normalizeMatchText(v);
   if (!st) return false;
@@ -1413,6 +1423,7 @@ function processAll(mainData) {
       const agent = pickFirstBy([r[21], r[20], r[18]], (v) => String(v || '').trim().length > 0);
       const delivPerson = pickFirstBy([r[23], r[24], r[22]], (v) => String(v || '').trim().length > 0); // X
       const orderDate = pickFirstBy([r[22], r[24], r[23], r[21], r[20]], (v) => !!toDate(v)); // W
+      const warehouse = pickFirstBy([r[19], r[20], r[18], r[16], r[25]], (v) => isLikelyWarehouseName(v));
       const mId = normId(pickFirstBy([r[29], r[30], r[28], r[27]], (v) => String(v || '').trim().length > 0));
 
       if (!isLikelyStatus(status) && orderDate) {
@@ -1430,7 +1441,7 @@ function processAll(mainData) {
         docType, status, uniqueId, agent,
         delivPerson, // dostavchik ismi
         orderDate,   // zakaz/vozvrat sanasi
-        mId, price,
+        mId, price, warehouse,
       });
     });
   }
@@ -2385,9 +2396,6 @@ function UploadModal({
                   {loading?'O Yuklanmoqda...':`${E.ok} Yuklash`}
                 </button>
               </div>
-            </>
-          )}
-
           {tab==='sheets' && (
             <>
               <div style={{marginBottom:14}}>
@@ -2434,8 +2442,6 @@ function UploadModal({
                   {loading?'O Ulanmoqda...':`${E.sheets} Ulash`}
                 </button>
               </div>
-            </>
-          )}
         </div>
       </div>
     </div>
@@ -4663,9 +4669,6 @@ function Obzvon({
           <div style={{display:'flex',justifyContent:'flex-end'}}>
             <button className="btn btn-bl btn-sm" onClick={()=>appendRows(1000)}>+ 1000 ta qator qo'shish</button>
           </div>
-        </>
-      )}
-
       {tab==='all' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -4729,9 +4732,6 @@ function Obzvon({
               </table>
             </div>
           </div>
-        </>
-      )}
-
       {tab==='all_new' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -4785,8 +4785,6 @@ function Obzvon({
                 >
                   Sheetni to'liq almashtirish
                 </button>
-              </>
-            )}
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{visibleAllNewRows.length} / {allNewList.length} ta yozuv</span>
             {allNewList.length > 500 && (
               <button className="btn btn-gh btn-sm" onClick={()=>setAllShowMode((m)=>m==='all'?'smart':'all')}>
@@ -4862,9 +4860,6 @@ function Obzvon({
               </table>
             </div>
           </div>
-        </>
-      )}
-
       {tab==='due' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -4955,9 +4950,6 @@ function Obzvon({
               </button>
             </div>
           )}
-        </>
-      )}
-
       {tab==='late2m' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -5048,9 +5040,6 @@ function Obzvon({
               </button>
             </div>
           )}
-        </>
-      )}
-
       {tab==='op' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -5153,8 +5142,6 @@ function Obzvon({
               </button>
             </div>
           )}
-        </>
-      )}
     </div>
   );
 }
@@ -5466,98 +5453,98 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
       {tab!=='kuler' ? (
         <>
           <div className="g4">
-            <StatCard l={tab==='other_qarz' ? "BOSHQA QARZDORLAR" : "QARZDORLAR"} v={list.length+' ta'} s="UZS bo'yicha" c="var(--rd)"/>
-            <StatCard l="JAMI QARZ" v={fmt(debtSum)+" so'm"} s="faqat UZS" c="var(--or)"/>
-            <StatCard l="15+ KUN QARZDOR" v={d15.length+' ta'} s={fmt(d15Sum)+" so'm"} c="var(--yl)"/>
-            <StatCard l="KULER QARZDORLIK" v={fmt(kulerDebtTotal)+" so'm"} s={`${kulerDebtorCount} ta mijoz qarzdor`} c="var(--bl)"/>
-          </div>
+                <StatCard l={tab==='other_qarz' ? "BOSHQA QARZDORLAR" : "QARZDORLAR"} v={list.length+' ta'} s="UZS bo'yicha" c="var(--rd)"/>
+                <StatCard l="JAMI QARZ" v={fmt(debtSum)+" so'm"} s="faqat UZS" c="var(--or)"/>
+                <StatCard l="15+ KUN QARZDOR" v={d15.length+' ta'} s={fmt(d15Sum)+" so'm"} c="var(--yl)"/>
+                <StatCard l="KULER QARZDORLIK" v={fmt(kulerDebtTotal)+" so'm"} s={`${kulerDebtorCount} ta mijoz qarzdor`} c="var(--bl)"/>
+              </div>
 
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-            <div className="sb" style={{flex:2,minWidth:220}}>
-              <span style={{color:'var(--t3)'}}>{E.find}</span>
-              <input placeholder="Ism, ID, zakaz bo'yicha..." value={search} onChange={(e)=>setSearch(e.target.value)} />
-            </div>
-            <div style={{position:'relative'}}>
-              <button className="btn btn-gh btn-sm" onClick={()=>setDebtFilterOpen((v)=>!v)}>
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-                </svg>
-                Filtr ({debtFilterCount})
-              </button>
-              <UniversalFilterPanel
-                open={debtFilterOpen}
-                title={tab==='other_qarz' ? "Boshqa qarzdorli filtri" : "Doljniki filtri"}
-                columns={debtFilterColumns}
-                rows={activeDebtRows}
-                state={debtFilterState}
-                setState={setDebtFilterState}
-                onClose={()=>setDebtFilterOpen(false)}
-                width={620}
-              />
-            </div>
-            <button className="btn btn-gr btn-sm" onClick={exportDoljniki}>? Excel</button>
-            <button className={`btn ${pickMode ? 'btn-gr' : 'btn-gh'} btn-sm`} onClick={()=>setPickMode((v)=>!v)}>
-              + Obzvonga qo'shish
-            </button>
-          </div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+                <div className="sb" style={{flex:2,minWidth:220}}>
+                  <span style={{color:'var(--t3)'}}>{E.find}</span>
+                  <input placeholder="Ism, ID, zakaz bo'yicha..." value={search} onChange={(e)=>setSearch(e.target.value)} />
+                </div>
+                <div style={{position:'relative'}}>
+                  <button className="btn btn-gh btn-sm" onClick={()=>setDebtFilterOpen((v)=>!v)}>
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                    </svg>
+                    Filtr ({debtFilterCount})
+                  </button>
+                  <UniversalFilterPanel
+                    open={debtFilterOpen}
+                    title={tab==='other_qarz' ? "Boshqa qarzdorli filtri" : "Doljniki filtri"}
+                    columns={debtFilterColumns}
+                    rows={activeDebtRows}
+                    state={debtFilterState}
+                    setState={setDebtFilterState}
+                    onClose={()=>setDebtFilterOpen(false)}
+                    width={620}
+                  />
+                </div>
+                <button className="btn btn-gr btn-sm" onClick={exportDoljniki}>? Excel</button>
+                <button className={`btn ${pickMode ? 'btn-gr' : 'btn-gh'} btn-sm`} onClick={()=>setPickMode((v)=>!v)}>
+                  + Obzvonga qo'shish
+                </button>
+              </div>
 
-          <div className="card" style={{overflow:'hidden',flex:1}}>
-            <div style={{overflow:'auto',maxHeight:'100%'}}>
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Kontragent</th>
-                    <th>Kategoriya</th>
-                    <th style={{textAlign:'right'}}>Qarz (UZS)</th>
-                    <th>Sana</th>
-                    <th style={{textAlign:'center'}}>Kun</th>
-                    <th>Izoh (T)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.length===0 ? (
-                    <tr><td colSpan={7} style={{textAlign:'center',padding:36,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr>
-                  ) : list.map((r, i) => (
-                    <tr
-                      key={i}
-                      onClick={()=>{
-                        if (pickMode) {
-                          setSelectedIds((p)=>({ ...p, [r.id]: !p[r.id] }));
-                          return;
-                        }
-                        setSelected(r);
-                      }}
-                      style={pickMode && selectedIds[r.id] ? { background:'rgba(88,166,255,.11)' } : undefined}
-                    >
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
-                      <td style={{maxWidth:280}}>
-                        <div style={{fontWeight:700,fontSize:12.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
-                        <div style={{fontSize:10.5,color:'var(--t3)'}}>Qarz zakaz: {r.orderNo || '-'} {r.lastOrderProduct ? `  |   ${r.lastOrderProduct}` : ''}</div>
-                      </td>
-                      <td style={{fontSize:11.5,color:'var(--t2)'}}>{r.category}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--rd)'}}>-{fmt(Math.abs(r.debtUZS))}</td>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.lastOrderDate)}</td>
-                      <td style={{textAlign:'center'}}>
-                        {r.days != null ? <span className="tag" style={{background:r.days>30?'var(--rd2)':r.days>15?'var(--yl2)':'var(--s3)',color:r.days>30?'var(--rd)':r.days>15?'var(--yl)':'var(--t3)'}}>{r.days}k</span> : '-'}
-                      </td>
-                      <td style={{maxWidth:260}}>
-                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11,color:'var(--t3)'}}>{r.note || '-'}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          {pickMode && (
-            <div style={{display:'flex',justifyContent:'flex-end'}}>
-              <button className="btn btn-bl" disabled={selectedCount===0} onClick={addSelectedToObzvon}>
-                Tanlanganlarni qo'shish ({selectedCount} ta)
-              </button>
-            </div>
-          )}
-          {selected && <DoljnikModal row={selected} D={D} onClose={()=>setSelected(null)} />}
+              <div className="card" style={{overflow:'hidden',flex:1}}>
+                <div style={{overflow:'auto',maxHeight:'100%'}}>
+                  <table className="tbl">
+                    <thead>
+                      <tr>
+                        <th>ID</th>
+                        <th>Kontragent</th>
+                        <th>Kategoriya</th>
+                        <th style={{textAlign:'right'}}>Qarz (UZS)</th>
+                        <th>Sana</th>
+                        <th style={{textAlign:'center'}}>Kun</th>
+                        <th>Izoh (T)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.length===0 ? (
+                        <tr><td colSpan={7} style={{textAlign:'center',padding:36,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr>
+                      ) : list.map((r, i) => (
+                        <tr
+                          key={i}
+                          onClick={()=>{
+                            if (pickMode) {
+                              setSelectedIds((p)=>({ ...p, [r.id]: !p[r.id] }));
+                              return;
+                            }
+                            setSelected(r);
+                          }}
+                          style={pickMode && selectedIds[r.id] ? { background:'rgba(88,166,255,.11)' } : undefined}
+                        >
+                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
+                          <td style={{maxWidth:280}}>
+                            <div style={{fontWeight:700,fontSize:12.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
+                            <div style={{fontSize:10.5,color:'var(--t3)'}}>Qarz zakaz: {r.orderNo || '-'} {r.lastOrderProduct ? `  |   ${r.lastOrderProduct}` : ''}</div>
+                          </td>
+                          <td style={{fontSize:11.5,color:'var(--t2)'}}>{r.category}</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--rd)'}}>-{fmt(Math.abs(r.debtUZS))}</td>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.lastOrderDate)}</td>
+                          <td style={{textAlign:'center'}}>
+                            {r.days != null ? <span className="tag" style={{background:r.days>30?'var(--rd2)':r.days>15?'var(--yl2)':'var(--s3)',color:r.days>30?'var(--rd)':r.days>15?'var(--yl)':'var(--t3)'}}>{r.days}k</span> : '-'}
+                          </td>
+                          <td style={{maxWidth:260}}>
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11,color:'var(--t3)'}}>{r.note || '-'}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {pickMode && (
+                <div style={{display:'flex',justifyContent:'flex-end'}}>
+                  <button className="btn btn-bl" disabled={selectedCount===0} onClick={addSelectedToObzvon}>
+                    Tanlanganlarni qo'shish ({selectedCount} ta)
+                  </button>
+                </div>
+              )}
+              {selected && <DoljnikModal row={selected} D={D} onClose={()=>setSelected(null)} />}
         </>
       ) : (
         <>
@@ -5788,12 +5775,17 @@ function Reports({
   useEffect(() => {
     setDriverWarehouseMap(S.get(mapStorageKey, {}));
   }, [mapStorageKey]);
+  const [nazoratSection, setNazoratSection] = useState('orders');
+  const [nazoratView, setNazoratView] = useState('errors');
+  const [nazoratFilterOpen, setNazoratFilterOpen] = useState(false);
+  const [nazoratFilterState, setNazoratFilterState] = useState({});
 
   const controlOrderRows = useMemo(() => {
     let rows = (rawOrders || []).filter((o) => {
       if (!isWaterProduct(o.product)) return false;
       if (!isOrderDoc(o.docType)) return false;
       if (isCancelledStatus(o.status)) return false;
+      if (!isMainWarehouseLabel(o.warehouse)) return false;
       const dateKey = toIsoDate(o.orderDate);
       if (!dateKey) return false;
       const driver = String(o.delivPerson || o.agent || '').trim();
@@ -5887,14 +5879,99 @@ function Reports({
     return out.sort((a, b) => (a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date)));
   }, [allDrivers, driverWarehouseMap, orderDatesByDriver, transferDatesByWarehouse, orderQtyByDriverDate, transferQtyByWarehouseDate]);
 
-  const mismatchRows = useMemo(
-    () => dailyControlRows.filter((r) => r.mappingMissing || r.diff !== 0),
+  const orderControlRows = useMemo(
+    () => dailyControlRows.map((r) => ({
+      ...r,
+      status: r.mappingMissing ? 'Sklad biriktirilmagan' : (r.diff === 0 ? 'OK' : 'Mos emas'),
+    })),
     [dailyControlRows]
   );
-  const controlTotals = useMemo(() => ({
-    orderQty: dailyControlRows.reduce((s, r) => s + Number(r.orderQty || 0), 0),
-    transferQty: dailyControlRows.reduce((s, r) => s + Number(r.transferQty || 0), 0),
-  }), [dailyControlRows]);
+  const orderMismatchRows = useMemo(
+    () => orderControlRows.filter((r) => r.mappingMissing || r.diff !== 0),
+    [orderControlRows]
+  );
+  const returnControlRows = useMemo(() => {
+    const scopedRows = (rawOrders || []).filter((o) => {
+      if (!isWaterProduct(o.product)) return false;
+      if (isCancelledStatus(o.status)) return false;
+      const date = toIsoDate(o.orderDate);
+      if (!date) return false;
+      const customerId = String(o.mId || '').trim();
+      if (!customerId) return false;
+      if (!canSeeAll) {
+        const person = String(o.delivPerson || o.agent || '').trim();
+        if (person !== String(currentUser || '').trim()) return false;
+      }
+      return true;
+    });
+    const orderSet = new Set(
+      scopedRows
+        .filter((o) => isOrderDoc(o.docType))
+        .map((o) => `${String(o.mId || '').trim()}__${toIsoDate(o.orderDate)}`)
+    );
+    return scopedRows
+      .filter((o) => isReturnDoc(o.docType))
+      .map((o) => {
+        const customerId = String(o.mId || '').trim();
+        const date = toIsoDate(o.orderDate);
+        const hasOrder = orderSet.has(`${customerId}__${date}`);
+        return {
+          date,
+          customerId,
+          customer: String(o.contName || '').trim() || `ID ${customerId}`,
+          returnNo: String(o.soNum || '').trim(),
+          qty: Math.abs(toNum(o.qty)),
+          driver: String(o.delivPerson || o.agent || '').trim() || '-',
+          hasOrder,
+          status: hasOrder ? 'Zakazi bor' : "Zakazi yo'q",
+        };
+      })
+      .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
+  }, [rawOrders, canSeeAll, currentUser]);
+  const returnMismatchRows = useMemo(
+    () => returnControlRows.filter((r) => !r.hasOrder),
+    [returnControlRows]
+  );
+  const nazoratOrderColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'warehouse', label:'Sklad', type:'text' },
+    { key:'orderQty', label:'Zakaz suv soni', type:'number' },
+    { key:'transferQty', label:'Permesheniya (obshiyga)', type:'number' },
+    { key:'diff', label:'Farq', type:'number' },
+    { key:'status', label:'Holat', type:'text' },
+  ]), []);
+  const nazoratReturnColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'returnNo', label:'Vozvrat zakaz', type:'text' },
+    { key:'qty', label:'Vozvrat suv soni', type:'number' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'status', label:'Status', type:'text' },
+  ]), []);
+  const activeNazoratColumns = nazoratSection === 'orders' ? nazoratOrderColumns : nazoratReturnColumns;
+  const activeNazoratBaseRows = useMemo(() => {
+    if (nazoratSection === 'orders') {
+      return nazoratView === 'errors' ? orderMismatchRows : orderControlRows;
+    }
+    return nazoratView === 'errors' ? returnMismatchRows : returnControlRows;
+  }, [nazoratSection, nazoratView, orderMismatchRows, orderControlRows, returnMismatchRows, returnControlRows]);
+  useEffect(() => {
+    setNazoratFilterState((prev) => ensureUniversalFilterState(activeNazoratColumns, prev));
+  }, [activeNazoratColumns]);
+  const nazoratFilteredRows = useMemo(
+    () => applyUniversalFilters(activeNazoratBaseRows, activeNazoratColumns, nazoratFilterState),
+    [activeNazoratBaseRows, activeNazoratColumns, nazoratFilterState]
+  );
+  const nazoratFilterCount = useMemo(
+    () => countUniversalFilters(nazoratFilterState),
+    [nazoratFilterState]
+  );
+  const orderDisplayTotals = useMemo(() => ({
+    orderQty: nazoratFilteredRows.reduce((s, r) => s + Number(r.orderQty || 0), 0),
+    transferQty: nazoratFilteredRows.reduce((s, r) => s + Number(r.transferQty || 0), 0),
+  }), [nazoratFilteredRows]);
 
   const exportReports = () => {
     exportAoaExcel({
@@ -5907,19 +5984,37 @@ function Reports({
   };
 
   const exportNazorat = () => {
+    if (nazoratSection === 'orders') {
+      exportAoaExcel({
+        fileName: `Zakaz_nazorati_${todayIso}.xlsx`,
+        sheetName: 'Zakaz_nazorati',
+        headers: ['Sana', 'Dostavchik', 'Sklad', 'Zakaz suv soni', 'Permesheniya (obshiyga)', 'Farq', 'Holat'],
+        columnTypes: ['date', 'text', 'text', 'number', 'number', 'number', 'text'],
+        rows: nazoratFilteredRows.map((r) => [
+          r.date,
+          r.driver,
+          r.warehouse,
+          r.orderQty,
+          r.transferQty,
+          r.diff,
+          r.status,
+        ]),
+      });
+      return;
+    }
     exportAoaExcel({
-      fileName: `Nazorat_${todayIso}.xlsx`,
-      sheetName: 'Nazorat',
-      headers: ['Sana', 'Dostavchik', 'Sklad', 'Zakaz suv soni', 'Permesheniya (obshiyga)', 'Farq', 'Holat'],
-      columnTypes: ['date', 'text', 'text', 'number', 'number', 'number', 'text'],
-      rows: dailyControlRows.map((r) => [
+      fileName: `Vozvrat_nazorati_${todayIso}.xlsx`,
+      sheetName: 'Vozvrat_nazorati',
+      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Vozvrat zakaz', 'Vozvrat suv soni', 'Dostavchik', 'Status'],
+      columnTypes: ['date', 'text', 'text', 'text', 'number', 'text', 'text'],
+      rows: nazoratFilteredRows.map((r) => [
         r.date,
+        r.customerId,
+        r.customer,
+        r.returnNo,
+        r.qty,
         r.driver,
-        r.warehouse,
-        r.orderQty,
-        r.transferQty,
-        r.diff,
-        r.mappingMissing ? 'Sklad biriktirilmagan' : (r.diff === 0 ? 'OK' : 'Hatoli'),
+        r.status,
       ]),
     });
   };
@@ -6017,8 +6112,6 @@ function Reports({
                     <td style={{fontWeight:700,color:'var(--t3)'}}>-</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
                   </tr>
-                </>
-              )}
             </tbody>
           </table>
         </div>
@@ -6027,83 +6120,123 @@ function Reports({
 
       {showNazorat && (
       <div className="card" style={{padding:16}}>
-        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Nazorat</div>
-        <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
-          Dostavchik-sklad biriktirish: Nastroyka {'>'} Biriktirish bo'limida.
+        <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:10}}>
+          <div className="tabs" style={{display:'inline-flex'}}>
+            <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
+            <button className={`tab${nazoratSection==='returns'?' on':''}`} onClick={()=>setNazoratSection('returns')}>Vozvrat nazorati</button>
+          </div>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <div style={{position:'relative'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setNazoratFilterOpen((v)=>!v)}>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                </svg>
+                Filtr ({nazoratFilterCount})
+              </button>
+              <UniversalFilterPanel
+                open={nazoratFilterOpen}
+                title={nazoratSection === 'orders' ? 'Zakaz nazorati filtri' : 'Vozvrat nazorati filtri'}
+                columns={activeNazoratColumns}
+                rows={activeNazoratBaseRows}
+                state={nazoratFilterState}
+                setState={setNazoratFilterState}
+                onClose={()=>setNazoratFilterOpen(false)}
+                width={620}
+              />
+            </div>
+            <div className="tabs" style={{display:'inline-flex'}}>
+              <button className={`tab${nazoratView==='errors'?' on':''}`} onClick={()=>setNazoratView('errors')}>Hatolilar</button>
+              <button className={`tab${nazoratView==='all'?' on':''}`} onClick={()=>setNazoratView('all')}>Barchasi</button>
+            </div>
+          </div>
         </div>
 
-        <div style={{fontWeight:700,fontSize:12.5,marginBottom:8}}>1) Hatoli</div>
-        <div style={{overflow:'auto',maxHeight:'34vh',marginBottom:12}}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Sana</th>
-                <th>Dostavchik</th>
-                <th>Sklad</th>
-                <th style={{textAlign:'right'}}>Zakaz suv soni</th>
-                <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
-                <th style={{textAlign:'right'}}>Raznitsa</th>
-                <th>Holat</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mismatchRows.length === 0 ? (
-                <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--gr)'}}>Hatolik topilmadi</td></tr>
-              ) : mismatchRows.map((r, i) => (
-                <tr key={`m_${i}_${r.driver}_${r.date}`} style={{background:'rgba(248,81,73,.07)'}}>
-                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
-                  <td>{r.driver}</td>
-                  <td>{r.warehouse}</td>
-                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.orderQty)}</td>
-                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.transferQty)}</td>
-                  <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--rd)'}}>{fmt(r.diff)}</td>
-                  <td style={{fontSize:11,color:'var(--rd)'}}>{r.mappingMissing ? 'Sklad biriktirilmagan' : 'Mos emas'}</td>
+        {nazoratSection === 'orders' && (
+          <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
+            Faqat "Основной склад"dan urilgan zakazlar hisobga olinadi. Dostavchik-sklad biriktirish: Nastroyka {'>'} Biriktirish bo'limida.
+          </div>
+        )}
+        {nazoratSection === 'returns' && (
+          <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
+            Vozvrat tekshiruvi: shu sana va shu mijoz bo'yicha zakaz bo'lsa "Zakazi bor", bo'lmasa "Zakazi yo'q".
+          </div>
+        )}
+
+        <div style={{overflow:'auto',maxHeight:'60vh'}}>
+          {nazoratSection === 'orders' ? (
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Sana</th>
+                  <th>Dostavchik</th>
+                  <th>Sklad</th>
+                  <th style={{textAlign:'right'}}>Zakaz suv soni</th>
+                  <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
+                  <th style={{textAlign:'right'}}>Farq</th>
+                  <th>Holat</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{fontWeight:700,fontSize:12.5,marginBottom:8}}>2) Kunlik suv sonlari</div>
-        <div style={{overflow:'auto',maxHeight:'38vh'}}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Sana</th>
-                <th>Dostavchik</th>
-                <th>Sklad</th>
-                <th style={{textAlign:'right'}}>Zakaz suv soni</th>
-                <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
-                <th style={{textAlign:'right'}}>Farq</th>
-              </tr>
-            </thead>
-            <tbody>
-              {dailyControlRows.length === 0 ? (
-                <tr><td colSpan={6} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Nazorat uchun ma'lumot topilmadi</td></tr>
-              ) : (
-                <>
-                  {dailyControlRows.map((r, i) => (
-                    <tr key={`d_${i}_${r.driver}_${r.date}`}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
-                      <td>{r.driver}</td>
-                      <td>{r.warehouse}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
-                    </tr>
-                  ))}
-                  <tr style={{background:'var(--s2)'}}>
-                    <td colSpan={3} style={{fontWeight:800}}>ITOG</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--gr)'}}>{fmt(controlTotals.orderQty)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--bl)'}}>{fmt(controlTotals.transferQty)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:controlTotals.orderQty-controlTotals.transferQty===0?'var(--gr)':'var(--rd)'}}>
-                      {fmt(controlTotals.orderQty - controlTotals.transferQty)}
-                    </td>
+              </thead>
+              <tbody>
+                {nazoratFilteredRows.length === 0 ? (
+                  <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
+                ) : (
+                  <>
+                    {nazoratFilteredRows.map((r, i) => (
+                      <tr key={`nord_${i}_${r.driver}_${r.date}`} style={r.status === 'OK' ? undefined : {background:'rgba(248,81,73,.07)'}}>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
+                        <td>{r.driver}</td>
+                        <td>{r.warehouse}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
+                        <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
+                      </tr>
+                    ))}
+                    {nazoratView === 'all' && (
+                      <tr style={{background:'var(--s2)'}}>
+                        <td colSpan={3} style={{fontWeight:800}}>ITOG</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--gr)'}}>{fmt(orderDisplayTotals.orderQty)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--bl)'}}>{fmt(orderDisplayTotals.transferQty)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:orderDisplayTotals.orderQty-orderDisplayTotals.transferQty===0?'var(--gr)':'var(--rd)'}}>
+                          {fmt(orderDisplayTotals.orderQty - orderDisplayTotals.transferQty)}
+                        </td>
+                        <td />
+                      </tr>
+                    )}
+                  </>
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Sana</th>
+                  <th>Mijoz ID</th>
+                  <th>Mijoz</th>
+                  <th>Vozvrat zakaz</th>
+                  <th style={{textAlign:'right'}}>Vozvrat suv soni</th>
+                  <th>Dostavchik</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nazoratFilteredRows.length === 0 ? (
+                  <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
+                ) : nazoratFilteredRows.map((r, i) => (
+                  <tr key={`nret_${i}_${r.customerId}_${r.date}`} style={r.hasOrder ? undefined : {background:'rgba(248,81,73,.08)'}}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
+                    <td>{r.customer}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.returnNo || '-'}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--or)'}}>{fmt(r.qty)}</td>
+                    <td>{r.driver}</td>
+                    <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
                   </tr>
-                </>
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
       )}
@@ -6927,9 +7060,6 @@ function SettingsPanel({
               </div>
             </div>
           )}
-        </>
-      )}
-
       {tab==='app' && (viewerConf.visible?.settings_app ?? true) && (
         <div className="card" style={{padding:14}}>
           <div style={{fontWeight:700,marginBottom:8}}>Access API URL</div>
@@ -8198,8 +8328,6 @@ export default function App() {
                 <>
                   <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{D.customers.length} mijoz</span>
                   <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{(D.rawOrders||[]).length} zakaz</span>
-                </>
-              )}
             </div>
             <div style={{display:'flex',gap:6}}>
               {canSwitchCompany ? (
@@ -8256,8 +8384,6 @@ export default function App() {
                       <div style={{fontSize:56,marginBottom:16}}>i</div>
                       <div style={{fontSize:18,fontWeight:700,marginBottom:12}}>Ma'lumot yuklanmagan</div>
                       <button className="btn btn-gh" onClick={()=>setUp(true)}>Excel fayl yuklash</button>
-                    </>
-                  )}
                 </div>
               </div>
             ) : (
@@ -8285,7 +8411,17 @@ export default function App() {
                   onPublishAllNew={publishObzvonNewRowsToGoogleSheet}
                 />
               )}
-                {page==='doljniki'&& canViewPage('doljniki') && <Doljniki rows={doljniki} otherRows={otherDoljniki} D={D} kulerRows={D.kulerInstallments || []} onAddToObzvon={addObzvonRows} currentUser={effectiveUser} company={activeCompany} />}
+                {page==='doljniki'&& canViewPage('doljniki') && (
+                  <Doljniki
+                    rows={doljniki}
+                    otherRows={otherDoljniki}
+                    D={D}
+                    kulerRows={D.kulerInstallments || []}
+                    onAddToObzvon={addObzvonRows}
+                    currentUser={effectiveUser}
+                    company={activeCompany}
+                  />
+                )}
                 {page==='reports' && canViewPage('reports') && (
                   <Reports
                     D={D}
@@ -8327,8 +8463,6 @@ export default function App() {
                   />
                 )}
                 {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} D={D} company={activeCompany} />}
-              </>
-            )}
           </div>
         </div>
       </div>
@@ -8352,6 +8486,7 @@ export default function App() {
     </>
   );
 }
+
 
 
 
