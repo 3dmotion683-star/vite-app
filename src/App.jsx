@@ -1,11 +1,11 @@
-import { Fragment, useState, useMemo, useCallback, useEffect, useDeferredValue, useRef } from 'react';
+﻿import { Fragment, useState, useMemo, useCallback, useEffect, useDeferredValue, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import {
   BarChart, Bar, AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ EXCLUDED MERCHANT KEYWORDS Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў EXCLUDED MERCHANT KEYWORDS Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const EXCLUDED_KEYWORDS = [
   'Dividend','UOS','Rasxod','Rasxodnik','Postavshik',
   'Personal','Dolg','VIP','KULER','Ofis',
@@ -14,7 +14,7 @@ const isExcludedMerchant = (name) => {
   const nl = (name || '').toLowerCase();
   return EXCLUDED_KEYWORDS.some((k) => nl.includes(k.toLowerCase()));
 };
-const ALLOWED_AA_KEYWORD = 'murodbash';
+const ALLOWED_AA_KEYWORD = 'murodbaxsh';
 const EXCLUDED_Z_CATEGORIES = [
   'mijozlar qatoriga kiritilmaganlar',
   'dividend',
@@ -38,21 +38,20 @@ const isExcludedZCategory = (v) => {
 };
 const normCurrency = (v) => {
   const s = String(v || '').trim().toUpperCase();
-  if (['USD', '$', 'Р В РІР‚СњР В РЎвЂєР В РІР‚С”Р В РІР‚С”Р В РЎвЂ™Р В Р’В '].includes(s)) return 'USD';
+  if (['USD', '$'].includes(s)) return 'USD';
   return 'UZS';
 };
 const isCommonDistrictLabel = (v) => {
-  const s = String(v || '').trim().toLowerCase();
+  const s = String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
   if (!s) return false;
-  // Normal Cyrillic + ehtimoliy buzilgan kodirovka ko'rinishlari
   return (
-    s.includes('Р С•Р В±РЎвЂ°Р В°РЎРЏ РЎвЂљР ВµРЎР‚РЎР‚Р С‘РЎвЂљР С•РЎР‚Р С‘РЎРЏ') ||
-    s.includes('Р С•Р В±РЎвЂ°Р В°РЎРЏ') ||
+    s.includes('РѕР±С‰Р°СЏ С‚РµСЂСЂРёС‚РѕСЂРёСЏ') ||
+    s === 'РѕР±С‰Р°СЏ' ||
     s.includes('territoriya') ||
     s.includes('territoria') ||
-    s.includes('РЎР‚РЎвЂєРЎР‚Р’В±РЎРѓРІР‚В°РЎР‚Р’В°РЎРѓРЎСџ') ||
-    s.includes('РЎР‚РЎвЂєРЎР‚Р’В±РЎРѓРІР‚В°') ||
-    s.includes('obshaya')
+    s.includes('obshaya') ||
+    s.includes('obshchaya') ||
+    s.includes('common territory')
   );
 };
 const pickPreferredDistrict = (raw) => {
@@ -120,7 +119,7 @@ function recalcInstallment(row, monthsRaw) {
   return { ...row, months, monthly, remaining, paidMonths, monthsLeft, dueCount, overdueAmount };
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ CONFIG Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў CONFIG Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const SHEET_CONFIG = {
   url: 'https://docs.google.com/spreadsheets/d/1RND6D5JIWh6vnk8i_FO1mx1if4hx182VNaPzGQtKuQM/edit?gid=1272423090#gid=1272423090',
   gids: { merchants: '', balans: '', orders: '', cashbox: '', integration: '', mijozlar: '', warehouseTransfer: '' },
@@ -138,7 +137,7 @@ const ACCESS_UPDATED_AT_KEY = 'aq-access-updated-at';
 // Access konfiguratsiya sinxroni uchun Cloudflare Worker API URL:
 const OBZVON_WEBHOOK_DEFAULT = 'https://solitary-brook-4889aquabiz-api.3dmotion683.workers.dev';
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ HELPERS Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў HELPERS Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const fmt  = (n) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
 const fmtM = (n) =>
   n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' :
@@ -612,18 +611,16 @@ const pickObzvonCustomerName = (row) => {
   return fromJ || fromB;
 };
 const isNameExcludedForActiveStats = (name) => {
-  const n = String(name || '').trim().toUpperCase();
+  const n = String(name || '').trim().toLowerCase();
   if (!n) return true;
   if (isNameInactiveByPrefix(n)) return true;
-  if (/^[KР С™]\b/.test(n)) return true;
+  if (/^(k|к)\b/.test(n)) return true;
   return false;
 };
 const isNameInactiveByPrefix = (name) => {
-  const n = String(name || '').trim().toUpperCase().replace(/\s+/g, ' ');
+  const n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
   if (!n) return false;
-  if (n.startsWith('Р Р‡') || n.startsWith('Р В Р вЂЎ') || n.startsWith('YA')) return true;
-  if ((n.includes('TUGATILDI') || n.includes('ESKI')) && (n.includes('Р Р‡') || n.includes('Р В Р вЂЎ') || n.includes('YA'))) return true;
-  return false;
+  return /^(я|ya|ря|рї)\s+(tugatildi|eski)\b/.test(n);
 };
 const isAhmadteaTag = (v) => {
   const s = normText(v).replace(/[\s._-]+/g, '');
@@ -728,7 +725,7 @@ function toDate(v) {
   const d = new Date(s);
   return isNaN(d) ? null : d;
 }
-const fmtD = (v) => { const d = toDate(v); return d ? d.toLocaleDateString('ru-RU') : 'РІР‚вЂќ'; };
+const fmtD = (v) => { const d = toDate(v); return d ? d.toLocaleDateString('ru-RU') : 'Р Р†Р вЂљРІР‚Сњ'; };
 const daysAgo = (v) => {
   const d = toDate(v); if (!d) return null;
   const n = new Date(); n.setHours(0,0,0,0); d.setHours(0,0,0,0);
@@ -861,46 +858,88 @@ const cleanDistrictDisplay = (v) => {
   const raw = String(v || '').trim();
   if (!raw) return '';
   const parts = raw.split(';').map((x) => String(x || '').trim()).filter(Boolean);
-  const filtered = parts.filter((p) => {
-    const n = p.toLowerCase();
-    return !n.includes('Р С•Р В±РЎвЂ°Р В°РЎРЏ РЎвЂљР ВµРЎР‚РЎР‚Р С‘РЎвЂљР С•РЎР‚Р С‘РЎРЏ') && n !== 'Р С•Р В±РЎвЂ°Р В°РЎРЏ';
-  });
+  const filtered = parts.filter((p) => !isCommonDistrictLabel(p));
   return filtered[0] || '';
 };
+const normalizeMatchText = (v) =>
+  String(v || '')
+    .trim()
+    .toLowerCase()
+    .replace(/ё/g, 'е')
+    .replace(/[^a-z0-9а-я\s.$-]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+const textHasAny = (text, needles = []) =>
+  needles.some((n) => text === n || text.includes(n));
+const pickFirstBy = (candidates = [], predicate) => {
+  for (const v of candidates) {
+    if (predicate(v)) return String(v || '').trim();
+  }
+  return '';
+};
 const isOrderDoc = (v) => {
-  const t = normText(v);
-  return ['Р В·Р В°Р С”Р В°Р В·', 'РЎР‚Р’В·РЎР‚Р’В°РЎР‚РЎвЂќРЎР‚Р’В°РЎР‚Р’В·', 'zakaz'].includes(t);
+  const t = normalizeMatchText(v);
+  if (!t) return false;
+  if (textHasAny(t, ['заказ', 'zakaz'])) return true;
+  return t.includes('зак') || t.includes('zak');
 };
 const isReturnDoc = (v) => {
-  const t = normText(v);
-  return ['Р Р†Р С•Р В·Р Р†РЎР‚Р В°РЎвЂљ', 'РЎР‚РЎвЂ“РЎвЂўРЎР‚Р’В·РЎР‚РЎвЂ“Р’В°РЎРѓРІР‚С™', 'vozvrat'].includes(t);
+  const t = normalizeMatchText(v);
+  if (!t) return false;
+  if (textHasAny(t, ['возврат', 'vozvrat'])) return true;
+  return t.includes('возв') || t.includes('vozvr');
 };
 const isPaymentFromCounterparty = (v) => {
-  const t = normText(v);
+  const t = normalizeMatchText(v);
+  if (!t) return false;
+  if (textHasAny(t, [
+    'оплата от контрагента',
+    'oplata ot kontragenta',
+    'payment from counterparty',
+  ])) return true;
   return (
-    t === 'Р С•Р С—Р В»Р В°РЎвЂљР В° Р С•РЎвЂљ Р С”Р С•Р Р…РЎвЂљРЎР‚Р В°Р С–Р ВµР Р…РЎвЂљР В°' ||
-    t === 'РЎР‚РЎвЂўРЎР‚РЎвЂ”РЎР‚Р’В»РЎР‚Р’В°РЎРѓРІР‚С™РЎР‚Р’В° РЎР‚РЎвЂўРЎРѓРІР‚С™ РЎР‚РЎвЂќРЎР‚РЎвЂўРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂ™РЎР‚Р’В°РЎР‚РЎвЂ“РЎР‚Р’ВµРЎР‚РЎвЂўРЎРѓРІР‚С™РЎР‚Р’В°' ||
-    t === 'oplata ot kontragenta' ||
-    t.includes('Р С”Р С•Р Р…РЎвЂљРЎР‚Р В°Р С–Р ВµР Р…РЎвЂљР В°') ||
-    t.includes('РЎР‚РЎвЂќРЎР‚РЎвЂўРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂ™РЎР‚Р’В°РЎР‚РЎвЂ“РЎР‚Р’ВµРЎР‚РЎвЂўРЎРѓРІР‚С™РЎР‚Р’В°')
+    (t.includes('оплата') && t.includes('контрагент') && (t.includes(' от ') || t.endsWith(' от') || t.startsWith('от '))) ||
+    (t.includes('oplata') && t.includes('kontragent') && (t.includes(' ot ') || t.includes(' from ')))
   );
 };
 const isPaymentToCounterparty = (v) => {
-  const t = normText(v);
+  const t = normalizeMatchText(v);
+  if (!t) return false;
+  if (textHasAny(t, [
+    'оплата контрагенту',
+    'oplata kontragentu',
+    'payment to counterparty',
+  ])) return true;
   return (
-    t === 'Р С•Р С—Р В»Р В°РЎвЂљР В° Р С”Р С•Р Р…РЎвЂљРЎР‚Р В°Р С–Р ВµР Р…РЎвЂљРЎС“' ||
-    t === 'РЎР‚РЎвЂўРЎР‚РЎвЂ”РЎР‚Р’В»РЎР‚Р’В°РЎРѓРІР‚С™РЎР‚Р’В° РЎР‚РЎвЂќРЎР‚РЎвЂўРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂ™РЎР‚Р’В°РЎР‚РЎвЂ“РЎР‚Р’ВµРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂњ' ||
-    t === 'oplata kontragentu' ||
-    t.includes('Р С”Р С•Р Р…РЎвЂљРЎР‚Р В°Р С–Р ВµР Р…РЎвЂљРЎС“') ||
-    t.includes('РЎР‚РЎвЂќРЎР‚РЎвЂўРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂ™РЎР‚Р’В°РЎР‚РЎвЂ“РЎР‚Р’ВµРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂњ')
+    (t.includes('оплата') && t.includes('контрагент') && !isPaymentFromCounterparty(v)) ||
+    (t.includes('oplata') && t.includes('kontragent') && t.includes(' to '))
   );
+};
+const isLikelyDocType = (v) => {
+  const s = String(v || '').trim();
+  if (!s) return false;
+  return isOrderDoc(s) || isReturnDoc(s);
+};
+const isLikelyStatus = (v) => {
+  const st = normalizeMatchText(v);
+  if (!st) return false;
+  return textHasAny(st, [
+    'доставлен',
+    'получен на склад',
+    'отменено',
+    'новый',
+    'в пути',
+    'new',
+    'cancelled',
+    'in transit',
+  ]);
 };
 function parseObzvonAllRows(rows = []) {
   if (!Array.isArray(rows) || rows.length < 2) return [];
   const headerIdx = rows.findIndex((r) => {
     const c0 = String((r || [])[0] || '').trim().toLowerCase();
     const c1 = String((r || [])[1] || '').trim().toLowerCase();
-    return c0 === 'РІвЂћвЂ“' || c0 === 'Р Р†РІР‚С›РІР‚вЂњ' || c0 === 'no' || c1.includes('Р С”Р С•Р Р…РЎвЂљРЎР‚Р В°Р С–Р ВµР Р…РЎвЂљ') || c1.includes('РЎР‚РЎвЂќРЎР‚РЎвЂўРЎР‚РЎвЂўРЎРѓРІР‚С™РЎРѓРЎвЂ™РЎР‚Р’В°РЎР‚РЎвЂ“РЎР‚Р’ВµРЎР‚РЎвЂўРЎРѓРІР‚С™') || c1.includes('kontragent');
+    return c0 === 'Р Р†РІР‚С›РІР‚вЂњ' || c0 === 'Р В Р вЂ Р Р†Р вЂљРЎвЂєР Р†Р вЂљРІР‚Сљ' || c0 === 'no' || c1.includes('Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™') || c1.includes('Р РЋР вЂљР РЋРІР‚СњР РЋР вЂљР РЋРІР‚СћР РЋР вЂљР РЋРІР‚СћР РЋР С“Р Р†Р вЂљРЎв„ўР РЋР С“Р РЋРІР‚в„ўР РЋР вЂљР вЂ™Р’В°Р РЋР вЂљР РЋРІР‚вЂњР РЋР вЂљР вЂ™Р’ВµР РЋР вЂљР РЋРІР‚СћР РЋР С“Р Р†Р вЂљРЎв„ў') || c1.includes('kontragent');
   });
   const start = headerIdx >= 0 ? headerIdx + 1 : 0;
   return rows.slice(start)
@@ -960,28 +999,30 @@ function extractAccessConfigFromRows(rows = []) {
   return decoded;
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ STATUS HELPERS Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
-// Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ va Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ РІР‚вЂќ ikkisi ham yetkazilgan hisoblanadi
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў STATUS HELPERS Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
+// Р В Р’В Р Р†Р вЂљРЎСљР В Р’В Р РЋРІР‚С”Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™ va Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚С”Р В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р В РІвЂљВ¬Р В Р’В Р вЂ™Р’В§Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™ Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚в„ў Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРЎСљ Р Р†Р вЂљРІР‚Сњ ikkisi ham yetkazilgan hisoblanadi
 const isDeliveredStatus = (s) => {
-  const st = normText(s);
-  return (
-    st === 'Р Т‘Р С•РЎРѓРЎвЂљР В°Р Р†Р В»Р ВµР Р…' ||
-    st === 'Р С—Р С•Р В»РЎС“РЎвЂЎР ВµР Р… Р Р…Р В° РЎРѓР С”Р В»Р В°Р Т‘' ||
-    st === 'РЎР‚РІР‚СњРЎР‚РЎвЂєРЎР‚РЎС›РЎР‚РЎвЂ™РЎР‚РІР‚в„ўРЎР‚РІР‚С”РЎР‚РІР‚СћРЎР‚РЎСљ' ||
-    st === 'poluchen na sklad'
-  );
+  const st = normalizeMatchText(s);
+  if (!st) return false;
+  return textHasAny(st, [
+    'доставлен',
+    'получен на склад',
+    'dostavlen',
+    'poluchen na sklad',
+  ]);
 };
 // Bekor qilingan
 const isCancelledStatus = (s) => {
-  const st = normText(s);
-  return st === 'Р С•РЎвЂљР СР ВµР Р…Р ВµР Р…Р С•' || st === 'РЎР‚РЎвЂєРЎРѓРІР‚С™РЎР‚РЎС™РЎР‚РІР‚СћРЎР‚РЎСљРЎР‚РІР‚СћРЎР‚РЎСљРЎР‚РЎвЂє';
+  const st = normalizeMatchText(s);
+  return textHasAny(st, ['отменено', 'otmeneno', 'cancelled']);
 };
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ MAHSULOT ANIQLASH Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
-const normProduct = (p) => normText(p).replace(/\s+/g, ' ');
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў MAHSULOT ANIQLASH Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
+const normProduct = (p) => normalizeMatchText(p).replace(/\s+/g, ' ');
 const WATER_PRODUCT_NAMES = new Set([
   'murodbaxsh 18.9l',
-  'Р В±Р С•Р Р…РЎС“РЎРѓ murodbaxsh 18.9l',
+  'бонус murodbaxsh 18.9l',
+  'bonus murodbaxsh 18.9l',
 ]);
 // Tara ga ta'sir qiladigan mahsulotlar (zakaz=+, vozvrat=-)
 const isTaraAffectingProduct = (p) => {
@@ -990,19 +1031,23 @@ const isTaraAffectingProduct = (p) => {
   if (!pl.includes('18.9l')) return false;
   return (
     pl.includes('tara') ||
-    pl.includes('РЎвЂљР В°РЎР‚Р В°') ||
-    pl.includes('РЎР‚РЎС›РЎР‚Р’В°РЎРѓРЎвЂ™РЎР‚Р’В°') ||
-    pl.includes('Р С—РЎС“РЎРѓРЎвЂљР С•Р в„–') ||
+    pl.includes('тара') ||
+    pl.includes('пустой') ||
+    pl.includes('pustoy') ||
     pl.includes('empty')
   );
 };
 // Faqat suv mahsulotlari (daromad hisoblash uchun)
 const isWaterProduct = (p) => {
   const pl = normProduct(p);
-  return WATER_PRODUCT_NAMES.has(pl);
+  if (WATER_PRODUCT_NAMES.has(pl)) return true;
+  // Nom variatsiyalari ko'p bo'lgani uchun kengroq tekshiruv.
+  if (pl.includes('murodbaxsh') && pl.includes('18.9')) return true;
+  if (pl.includes('муродбахш') && pl.includes('18.9')) return true;
+  return false;
 };
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ EXCEL READER Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў EXCEL READER Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function readExcelFile(file) {
   return new Promise((res, rej) => {
     const reader = new FileReader();
@@ -1021,7 +1066,7 @@ function readExcelFile(file) {
   });
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ GOOGLE SHEETS Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў GOOGLE SHEETS Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function buildGsUrl(sheetId, gid) {
   return `https://docs.google.com/spreadsheets/d/${sheetId}/pub?gid=${gid}&single=true&output=csv`;
 }
@@ -1188,11 +1233,11 @@ function extractGid(url) {
   return m ? m[1] : '';
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ DATA PROCESSING Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў DATA PROCESSING Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function processAll(mainData) {
   if (!mainData) return { customers:[], orders:[], cashbox:[], contacts:[] };
 
-  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 1. MERCHANTS Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ
+  /* Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™ 1. MERCHANTS Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™
      A(r[0])=ID  C(r[2])=Nom  D(r[3])=Tel  E(r[4])=Kontakt
      O(r[14])=Manzil  V(r[21])=Rayon  Y(r[24])=EskiID  Z(r[25])=Manba */
   const merchantSheet = mainData.sheets['public.view_merchants'];
@@ -1217,14 +1262,14 @@ function processAll(mainData) {
         source,
         aaTag: aaValue,
         merchantNote: merchNote,
-        eskiId:   String(r[24] || '').trim(), // Y ustun РІР‚вЂќ eski ID (integratsiya uchun)
+        eskiId:   String(r[24] || '').trim(), // Y ustun Р Р†Р вЂљРІР‚Сњ eski ID (integratsiya uchun)
       });
     });
   }
   const contactById = {};
   contacts.forEach((c) => { contactById[c.id] = c; });
 
-  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 2. BALANS Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ
+  /* Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™ 2. BALANS Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™
      8-qatordan boshlanadi (slice(7))
      G(r[6])=MijozID  D(r[3])=BalansUZS  C(r[2])=BalansUSD */
   const balMapUZS = {};
@@ -1251,10 +1296,10 @@ function processAll(mainData) {
     });
   }
 
-  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 3. INTIGRATSIYA Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ
+  /* Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™ 3. INTIGRATSIYA Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™
      2-qatordan boshlanadi (slice(1))
      A(r[0])=EskiID  H(r[7])=TaraOstatka
-     Logika: merchants.eskiId === intigratsiya.eskiId Р Р†РІР‚В РІР‚в„ў boshlang'ich tara */
+     Logika: merchants.eskiId === intigratsiya.eskiId Р В Р вЂ Р Р†Р вЂљР’В Р Р†Р вЂљРІвЂћСћ boshlang'ich tara */
   const integTaraByEskiId = {};
   const integSheet = mainData.sheets['intigratsiya'];
   if (integSheet) {
@@ -1266,7 +1311,7 @@ function processAll(mainData) {
     });
   }
 
-  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 4. ZAKAZLAR Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ
+  /* Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™ 4. ZAKAZLAR Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™
      A(r[0])=ZakazNom  D(r[3])=Mahsulot  H(r[7])=Miqdor  I(r[8])=Summa
      J(r[9])=Kat  K(r[10])=KontragentNom  L(r[11])=Valyuta
      M(r[12])=HujjatTuri  N(r[13])=Status  R(r[17])=UniqueID
@@ -1275,21 +1320,38 @@ function processAll(mainData) {
   const rawOrders = [];
   if (orderSheet) {
     orderSheet.slice(1).forEach((r) => {
-      const soNum      = String(r[0]  || '').trim();
-      const product    = String(r[3]  || '').trim();
-      const qty        = toNum(r[7]);
-      const sum        = toNum(r[8]);
-      const cat        = String(r[9]  || '').trim();
-      const contName   = String(r[10] || '').trim();
-      const currency   = String(r[11] || '').trim();
-      const docType    = String(r[12] || '').trim();
-      const status     = String(r[13] || '').trim();
-      const uniqueId   = String(r[17] || '').trim();
-      const agent      = String(r[21] || '').trim();
-      const delivPerson= String(r[23] || '').trim(); // X ustun = dostavchik ismi
-      const orderDate  = String(r[22] || '').trim(); // W ustun = yetib borgan sana
-      const mId        = normId(r[29]);
-      const price      = qty && qty !== 0 ? Math.abs(sum / qty) : 0;
+      const soNum = pickFirstBy([r[0], r[1]], (v) => String(v || '').trim().length > 0);
+      const product = pickFirstBy([r[3], r[4], r[5]], (v) => String(v || '').trim().length > 0);
+      const qty = toNum(pickFirstBy([r[7], r[8], r[6]], (v) => String(v ?? '').trim() !== ''));
+      const sum = toNum(pickFirstBy([r[8], r[9], r[7]], (v) => String(v ?? '').trim() !== ''));
+      const cat = pickFirstBy([r[9], r[10]], (v) => String(v || '').trim().length > 0);
+      const contName = pickFirstBy([r[10], r[11], r[2]], (v) => String(v || '').trim().length > 0);
+      const currency = normCurrency(pickFirstBy([r[11], r[12], r[10]], (v) => String(v || '').trim().length > 0));
+
+      // Ustun siljigan fayllar uchun himoya: docType/status/date ni bir nechta ustundan qidiramiz.
+      const detectedDocType = pickFirstBy([r[12], r[13], r[11], r[14]], (v) => isLikelyDocType(v));
+      let docType = detectedDocType || String(r[12] || '').trim();
+      if (!isLikelyDocType(docType)) {
+        docType = qty < 0 || sum < 0 ? 'Возврат' : 'Заказ';
+      }
+
+      const detectedStatus = pickFirstBy([r[13], r[14], r[12], r[15]], (v) => isLikelyStatus(v));
+      let status = detectedStatus || String(r[13] || '').trim();
+
+      const uniqueId = String(r[17] || r[18] || '').trim();
+      const agent = pickFirstBy([r[21], r[20], r[18]], (v) => String(v || '').trim().length > 0);
+      const delivPerson = pickFirstBy([r[23], r[24], r[22]], (v) => String(v || '').trim().length > 0); // X
+      const orderDate = pickFirstBy([r[22], r[24], r[23], r[21], r[20]], (v) => !!toDate(v)); // W
+      const mId = normId(pickFirstBy([r[29], r[30], r[28], r[27]], (v) => String(v || '').trim().length > 0));
+
+      if (!isLikelyStatus(status) && orderDate) {
+        const od = toDate(orderDate);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (od && od <= today) status = 'ДОСТАВЛЕН';
+      }
+
+      const price = qty && qty !== 0 ? Math.abs(sum / qty) : 0;
 
       if (!soNum || soNum === 'id') return;
       rawOrders.push({
@@ -1302,7 +1364,7 @@ function processAll(mainData) {
     });
   }
 
-  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 5. KASSA Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ
+  /* Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™ 5. KASSA Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™
      A(r[0])=OpStatus  B(r[1])=OpNom  E(r[4])=Summa  N(r[13])=Izoh
      R(r[17])=OpTuri  S(r[18])=Operator  T(r[19])=KontragentNom
      U(r[20])=Kassa   V(r[21])=Sana   X(r[23])=MijozID */
@@ -1322,7 +1384,7 @@ function processAll(mainData) {
       const mId      = normId(r[23]);
       const note     = String(r[13] || '').trim();
 
-      if (!opNum || opNum === 'Р В РЎСљР В РЎвЂўР В РЎВР В Р’ВµР РЋР вЂљ Р В РЎвЂўР В РЎвЂ”Р В Р’ВµР РЋР вЂљР В Р’В°Р РЋРІР‚В Р В РЎвЂР В РЎвЂ') return;
+      if (!opNum || opNum === 'Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚СћР В Р’В Р РЋР’ВР В Р’В Р вЂ™Р’ВµР В Р Р‹Р В РІР‚С™ Р В Р’В Р РЋРІР‚СћР В Р’В Р РЋРІР‚вЂќР В Р’В Р вЂ™Р’ВµР В Р Р‹Р В РІР‚С™Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљР’В Р В Р’В Р РЋРІР‚ВР В Р’В Р РЋРІР‚В') return;
       rawCash.push({ opStatus, opNum, sana, amount, currency, opType, operator, contName, kassa, mId, note });
     });
   }
@@ -1357,7 +1419,7 @@ function processAll(mainData) {
     });
   }
 
-  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 6. GURUHLASH Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ */
+  /* Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™ 6. GURUHLASH Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™ */
   const ordersByMId = {};
   rawOrders.forEach((o) => {
     const mid = o.mId || o.contName;
@@ -1385,7 +1447,7 @@ function processAll(mainData) {
     });
   }
 
-  /* Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ 7. MIJOZLAR YARATISH Р Р†РІР‚СњР вЂљР Р†РІР‚СњР вЂљ */
+  /* Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™ 7. MIJOZLAR YARATISH Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™Р В Р вЂ Р Р†Р вЂљРЎСљР В РІР‚С™ */
   const customers = contacts.map((c) => {
     const myOrders = ordersByMId[c.id] || [];
     const myCash   = cashByMId[c.id]   || [];
@@ -1398,7 +1460,7 @@ function processAll(mainData) {
     const deliveredTaraRows = myOrders.filter(
       (o) => isTaraAffectingProduct(o.product) && isDeliveredStatus(o.status)
     );
-    // Boshlang'ich tara: merchants.eskiId Р Р†РІР‚В РІР‚в„ў intigratsiya.A Р Р†РІР‚В РІР‚в„ў intigratsiya.H
+    // Boshlang'ich tara: merchants.eskiId Р В Р вЂ Р Р†Р вЂљР’В Р Р†Р вЂљРІвЂћСћ intigratsiya.A Р В Р вЂ Р Р†Р вЂљР’В Р Р†Р вЂљРІвЂћСћ intigratsiya.H
     const integTara  = c.eskiId ? (integTaraByEskiId[c.eskiId] || 0) : 0;
     const taraDelta = deliveredTaraRows.reduce((s, o) => {
       const q = Math.abs(toNum(o.qty));
@@ -1418,7 +1480,7 @@ function processAll(mainData) {
 
     const kulerOrds = myOrders.filter(
       (o) => (o.product || '').toLowerCase().includes('kuler') ||
-              (o.product || '').toLowerCase().includes('Р В РЎвЂќР РЋРЎвЂњР В Р’В»Р В Р’ВµР РЋР вЂљ')
+              (o.product || '').toLowerCase().includes('Р В Р’В Р РЋРІР‚СњР В Р Р‹Р РЋРІР‚СљР В Р’В Р вЂ™Р’В»Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р В РІР‚С™')
     );
     const kulers = kulerOrds.filter((o) => isOrderDoc(o.docType)).length;
 
@@ -1443,7 +1505,7 @@ function processAll(mainData) {
     return {
       id: c.id,
       name: c.name,
-      phone: c.phone || 'РІР‚вЂќ',
+      phone: c.phone || 'Р Р†Р вЂљРІР‚Сњ',
       district: c.district,
       source: c.source,
       aaTag: c.aaTag || '',
@@ -1484,7 +1546,7 @@ function processAll(mainData) {
   );
   const isKulerProduct = (p) => {
     const pl = (p || '').toLowerCase();
-    return pl.includes('kuler') || pl.includes('Р В РЎвЂќР РЋРЎвЂњР В Р’В»Р В Р’ВµР РЋР вЂљ');
+    return pl.includes('kuler') || pl.includes('Р В Р’В Р РЋРІР‚СњР В Р Р‹Р РЋРІР‚СљР В Р’В Р вЂ™Р’В»Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р В РІР‚С™');
   };
 
   const deliveredKulerOrders = rawOrders.filter((o) =>
@@ -1564,8 +1626,8 @@ function processAll(mainData) {
       source: customer?.source || 'KULER',
       note: customer?.merchantNote || '',
       purchaseDate: firstOrder?.orderDate || '',
-      orderNo: firstOrder?.soNum || 'РІР‚вЂќ',
-      operator: firstOrder?.agent || 'РІР‚вЂќ',
+      orderNo: firstOrder?.soNum || 'Р Р†Р вЂљРІР‚Сњ',
+      operator: firstOrder?.agent || 'Р Р†Р вЂљРІР‚Сњ',
       product: firstOrder?.product || 'Kuler',
       payments: [...k.payments].sort((a,b) => (toDate(a.sana)||0) - (toDate(b.sana)||0)),
       months,
@@ -1588,7 +1650,7 @@ function processAll(mainData) {
   };
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ SVERKA Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў SVERKA Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function buildSverka(customer, ordersByMId, cashByMId) {
   const cid = customer.id;
   const myOrders = (ordersByMId[cid] || []).map((o) => ({
@@ -1614,7 +1676,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
       const isVoz  = isReturnDoc(row.docType);
       const isTara = isTaraAffectingProduct(row.product);
       const isWater = isWaterProduct(row.product);
-      // Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє bo'lmagan va Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ/Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ bo'lgan Р Р†РІР‚В РІР‚в„ў balansga ta'sir qiladi
+      // Р В Р’В Р РЋРІР‚С”Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРЎв„ўР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚С” bo'lmagan va Р В Р’В Р Р†Р вЂљРЎСљР В Р’В Р РЋРІР‚С”Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™/Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚С”Р В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р В РІвЂљВ¬Р В Р’В Р вЂ™Р’В§Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™ Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚в„ў Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРЎСљ bo'lgan Р В Р вЂ Р Р†Р вЂљР’В Р Р†Р вЂљРІвЂћСћ balansga ta'sir qiladi
       const countsForBalance = isDeliveredStatus(row.status);
       const orderSum  = row.sum || 0;
       const isCancelled = isCancelledStatus(row.status);
@@ -1626,7 +1688,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
       return {
         kod: row.soNum,
         sana: fmtD(row._dateStr),
-        dokument: row.docType || 'Р В РІР‚вЂќР В Р’В°Р В РЎвЂќР В Р’В°Р В Р’В·',
+        dokument: row.docType || 'Р В Р’В Р Р†Р вЂљРІР‚СњР В Р’В Р вЂ™Р’В°Р В Р’В Р РЋРІР‚СњР В Р’В Р вЂ™Р’В°Р В Р’В Р вЂ™Р’В·',
         produkt: row.product,
         qty: row.qty,
         narx: row.price,
@@ -1637,7 +1699,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
         currency: row.currency || 'UZS',
         agent: row.agent,
         note: '',
-        driver: row.delivPerson, // X ustun РІР‚вЂќ dostavchik ismi
+        driver: row.delivPerson, // X ustun Р Р†Р вЂљРІР‚Сњ dostavchik ismi
         status: row.status,
         _isVoz: isVoz,
         _isTara: isTara,
@@ -1652,7 +1714,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
       return {
         kod: row.opNum,
         sana: fmtD(row._dateStr),
-        dokument: row.opType || "Р В РЎвЂєР В РЎвЂ”Р В Р’В»Р В Р’В°Р РЋРІР‚С™Р В Р’В° Р В РЎвЂўР РЋРІР‚С™ Р В РЎвЂќР В РЎвЂўР В Р вЂ¦Р РЋРІР‚С™Р РЋР вЂљР В Р’В°Р В РЎвЂ“Р В Р’ВµР В Р вЂ¦Р РЋРІР‚С™Р В Р’В°",
+        dokument: row.opType || "Р В Р’В Р РЋРІР‚С”Р В Р’В Р РЋРІР‚вЂќР В Р’В Р вЂ™Р’В»Р В Р’В Р вЂ™Р’В°Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’В° Р В Р’В Р РЋРІР‚СћР В Р Р‹Р Р†Р вЂљРЎв„ў Р В Р’В Р РЋРІР‚СњР В Р’В Р РЋРІР‚СћР В Р’В Р В РІР‚В¦Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р Р‹Р В РІР‚С™Р В Р’В Р вЂ™Р’В°Р В Р’В Р РЋРІР‚вЂњР В Р’В Р вЂ™Р’ВµР В Р’В Р В РІР‚В¦Р В Р Р‹Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’В°",
         produkt: '',
         qty: null,
         narx: null,
@@ -1675,7 +1737,7 @@ function buildSverka(customer, ordersByMId, cashByMId) {
   });
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ EXCEL EXPORT Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў EXCEL EXPORT Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function exportSverkaExcel(customer, rows) {
   const wb = XLSX.utils.book_new();
   const headers = [
@@ -1764,12 +1826,12 @@ const buildColsFromAoa = (headers, rows) => {
 const EXCEL_NUM_FMT = '#,##0';
 const EXCEL_DATE_FMT = 'dd.mm.yyyy';
 const isDateLikeHeader = (h) => /(sana|date|oxirgi|keyingi|olingan|muddat)/i.test(String(h || '').trim());
-const isNumberLikeHeader = (h) => /(summa|balans|qarz|dona|soni|kol-vo|qty|oylar|qoldiq|to['`РІР‚в„ў]?langan|idish|jami|miqdor|suv soni|(^|\s)(no|РІвЂћвЂ“)(\s|$))/i.test(String(h || '').trim());
+const isNumberLikeHeader = (h) => /(summa|balans|qarz|dona|soni|kol-vo|qty|oylar|qoldiq|to['`Р Р†Р вЂљРІвЂћСћ]?langan|idish|jami|miqdor|suv soni|(^|\s)(no|Р Р†РІР‚С›РІР‚вЂњ)(\s|$))/i.test(String(h || '').trim());
 const isTextForcedHeader = (h) => /(^|\s)(id|kod|telefon|phone|operator|agent|kontragent|mijoz|rayon|status|mavzu|izoh|mahsulot|hujjat|tur)(\s|$)/i.test(String(h || '').trim());
 const parseExcelNumber = (v) => {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
   const s0 = String(v ?? '').trim();
-  if (!s0 || s0 === '-' || s0 === 'РІР‚вЂќ') return null;
+  if (!s0 || s0 === '-' || s0 === 'Р Р†Р вЂљРІР‚Сњ') return null;
   let s = s0
     .replace(/\s+/g, '')
     .replace(/[^\d,.\-]/g, '');
@@ -1868,7 +1930,7 @@ function exportAoaExcel({ fileName, sheetName = 'Hisobot', headers = [], rows = 
   XLSX.writeFile(wb, safeExcelName(fileName));
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ CSS Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў CSS Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
 :root{
@@ -1971,7 +2033,7 @@ const LIGHT_THEME_VARS = {
   '--pu2': '#efe6ff',
 };
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ LOCAL STORAGE Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў LOCAL STORAGE Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const S = {
   get: (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):d; } catch { return d; } },
   set: (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} },
@@ -2067,7 +2129,7 @@ function normalizeAccessConfig(user, cfg) {
   return normalized;
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ UPLOAD MODAL Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў UPLOAD MODAL Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function UploadModal({
   onLoad,
   hasData,
@@ -2182,7 +2244,7 @@ function UploadModal({
               </div>
               <div style={{marginBottom:14}}>
                 <div style={{fontSize:11.5,fontWeight:700,color:'var(--t3)',textTransform:'uppercase',letterSpacing:'.04em',marginBottom:8}}>
-                  Integratsiya fayli (ixtiyoriy РІР‚вЂќ eski baza ostatkasi)
+                  Integratsiya fayli (ixtiyoriy Р Р†Р вЂљРІР‚Сњ eski baza ostatkasi)
                 </div>
                 <div className={`drop-z${files.integration?' done':''}`}
                   onClick={()=>!loading&&pickFile('integration')} style={{padding:'16px',textAlign:'center'}}>
@@ -2191,7 +2253,7 @@ function UploadModal({
                     ? <div style={{fontWeight:700,color:'var(--gr)',fontSize:13}}>{files.integration.name}</div>
                     : <div>
                         <div style={{fontWeight:700,fontSize:13,marginBottom:3}}>Integratsiya faylini tanlang</div>
-                        <div style={{fontSize:11,color:'var(--t3)'}}>A=eski ID  Р’В·  H=tara ostatkasi  Р’В·  Varaq nomi: "intigratsiya"</div>
+                        <div style={{fontSize:11,color:'var(--t3)'}}>A=eski ID  Р вЂ™Р’В·  H=tara ostatkasi  Р вЂ™Р’В·  Varaq nomi: "intigratsiya"</div>
                       </div>
                   }
                 </div>
@@ -2239,7 +2301,7 @@ function UploadModal({
                   placeholder="https://docs.google.com/spreadsheets/d/..."
                   value={fixedObzvonUrl} readOnly/>
                 <div style={{fontSize:11,color:'var(--t3)',marginTop:5}}>
-                  "Р С›Р В±Р В·Р Р†Р С•Р Р… Р вЂ™Р РЋР вЂў" listi shu faylda bo'lishi kerak
+                  "Р В РЎвЂєР В Р’В±Р В Р’В·Р В Р вЂ Р В РЎвЂўР В Р вЂ¦ Р В РІР‚в„ўР В Р Р‹Р В РІР‚Сћ" listi shu faylda bo'lishi kerak
                 </div>
               </div>
               <div style={{background:'var(--yl2)',border:'1px solid var(--yl)',borderRadius:8,padding:'9px 14px',marginBottom:14,fontSize:12,color:'var(--yl)'}}>
@@ -2265,7 +2327,7 @@ function UploadModal({
   );
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ CUSTOMER DETAIL Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў CUSTOMER DETAIL Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function CustomerDetail({ c, D, onClose }) {
   const { ordersByMId, cashByMId } = D;
   const [activeTab, setTab] = useState('sverka');
@@ -2306,7 +2368,7 @@ function CustomerDetail({ c, D, onClose }) {
               {c.name}
             </div>
             <div style={{fontSize:11,color:'var(--t3)',fontFamily:'var(--mono)',marginTop:2}}>
-              ID: {c.id}  Р’В·  {c.district}  Р’В·  {c.phone}
+              ID: {c.id}  Р вЂ™Р’В·  {c.district}  Р вЂ™Р’В·  {c.phone}
             </div>
           </div>
           <div style={{display:'flex',gap:8,flexShrink:0,marginLeft:12}}>
@@ -2388,23 +2450,23 @@ function CustomerDetail({ c, D, onClose }) {
                           </td>
                           <td style={{maxWidth:175,color:'var(--t1)',fontWeight:row._type==='payment'?400:500}}>
                             <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:173}}>
-                              {row.produkt||'РІР‚вЂќ'}
+                              {row.produkt||'Р Р†Р вЂљРІР‚Сњ'}
                             </span>
                           </td>
                           <td style={{textAlign:'center',fontWeight:700,color:row.qty!=null?(row._isVoz?'var(--or)':row.qty>0?'var(--t1)':'var(--t3)'):'var(--t3)'}}>
-                            {row.qty!=null?(row._isVoz?'-':'')+Math.abs(row.qty):'РІР‚вЂќ'}
+                            {row.qty!=null?(row._isVoz?'-':'')+Math.abs(row.qty):'Р Р†Р вЂљРІР‚Сњ'}
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>
-                            {row.narx?fmt(Math.round(row.narx)):'РІР‚вЂќ'}
+                            {row.narx?fmt(Math.round(row.narx)):'Р Р†Р вЂљРІР‚Сњ'}
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:row.summa?'var(--rd)':'var(--t4)'}}>
-                            {row.summa?'-'+fmt(row.summa):'РІР‚вЂќ'}
+                            {row.summa?'-'+fmt(row.summa):'Р Р†Р вЂљРІР‚Сњ'}
                           </td>
                           <td style={{textAlign:'center'}}>
                             <span className={row.currency==='USD'?'cur-usd':'cur-uzs'}>{row.currency||'UZS'}</span>
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:row.tolov>0?'var(--gr)':row.tolov<0?'var(--rd)':'var(--t4)'}}>
-                            {row.tolov ? `${row.tolov > 0 ? '+' : '-'}${fmt(Math.abs(row.tolov))}` : 'РІР‚вЂќ'}
+                            {row.tolov ? `${row.tolov > 0 ? '+' : '-'}${fmt(Math.abs(row.tolov))}` : 'Р Р†Р вЂљРІР‚Сњ'}
                           </td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:row.balansUZS<0?'var(--rd)':row.balansUZS>0?'var(--gr)':'var(--t3)'}}>
                             {row.balansUZS<0?'-':row.balansUZS>0?'+':''}{fmt(Math.abs(row.balansUZS))}
@@ -2412,15 +2474,15 @@ function CustomerDetail({ c, D, onClose }) {
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:row.balansUSD<0?'var(--rd)':row.balansUSD>0?'var(--gr)':'var(--t3)',fontSize:11}}>
                             {row.balansUSD<0?'-':row.balansUSD>0?'+':''}{fmt(Math.abs(row.balansUSD))}$
                           </td>
-                          <td style={{fontSize:11,color:'var(--t3)'}}>{row.agent||'РІР‚вЂќ'}</td>
-                          <td style={{fontSize:11,color:'var(--t2)'}}>{row.driver||'РІР‚вЂќ'}</td>
+                          <td style={{fontSize:11,color:'var(--t3)'}}>{row.agent||'Р Р†Р вЂљРІР‚Сњ'}</td>
+                          <td style={{fontSize:11,color:'var(--t2)'}}>{row.driver||'Р Р†Р вЂљРІР‚Сњ'}</td>
                           <td>
                             <span className="tag" style={{
-                              background: row.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'?'var(--gr2)':row.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr2)':row.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--rd2)':'var(--s3)',
-                              color:      row.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'?'var(--gr)':row.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr)':row.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--t4)':'var(--t3)',
+                              background: row.status==='Р В Р’В Р Р†Р вЂљРЎСљР В Р’В Р РЋРІР‚С”Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™'?'var(--gr2)':row.status==='Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚С”Р В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р В РІвЂљВ¬Р В Р’В Р вЂ™Р’В§Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™ Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚в„ў Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРЎСљ'?'var(--gr2)':row.status==='Р В Р’В Р РЋРІР‚С”Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРЎв„ўР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚С”'?'var(--rd2)':'var(--s3)',
+                              color:      row.status==='Р В Р’В Р Р†Р вЂљРЎСљР В Р’В Р РЋРІР‚С”Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™'?'var(--gr)':row.status==='Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚С”Р В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р В РІвЂљВ¬Р В Р’В Р вЂ™Р’В§Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™ Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚в„ў Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРЎСљ'?'var(--gr)':row.status==='Р В Р’В Р РЋРІР‚С”Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРЎв„ўР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚С”'?'var(--t4)':'var(--t3)',
                               fontSize:9.5,
                             }}>
-                              {row.status||'РІР‚вЂќ'}
+                              {row.status||'Р Р†Р вЂљРІР‚Сњ'}
                             </span>
                           </td>
                         </tr>
@@ -2431,12 +2493,12 @@ function CustomerDetail({ c, D, onClose }) {
               </div>
               {sverkaRows.length>0 && (
                 <div style={{marginTop:10,fontSize:12,color:'var(--t3)',textAlign:'right'}}>
-                  Jami {sverkaRows.length} ta yozuv  Р’В· {' '}
-                  {sverkaRows.filter((r)=>r._type==='order'&&!r._isCancelled).length} ta zakaz  Р’В· {' '}
+                  Jami {sverkaRows.length} ta yozuv  Р вЂ™Р’В· {' '}
+                  {sverkaRows.filter((r)=>r._type==='order'&&!r._isCancelled).length} ta zakaz  Р вЂ™Р’В· {' '}
                   {sverkaRows.filter((r)=>r._type==='payment').length} ta to'lov
                   {sverkaRows.some((r)=>r._isCancelled) && (
                     <span style={{color:'var(--rd)',marginLeft:8}}>
-                       Р’В·  {sverkaRows.filter((r)=>r._isCancelled).length} ta otmena
+                       Р вЂ™Р’В·  {sverkaRows.filter((r)=>r._isCancelled).length} ta otmena
                     </span>
                   )}
                 </div>
@@ -2449,7 +2511,7 @@ function CustomerDetail({ c, D, onClose }) {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>Zakaz Р Р†РІР‚С›РІР‚вЂњ</th><th>Sana</th><th>Mahsulot</th>
+                    <th>Zakaz Р В Р вЂ Р Р†Р вЂљРЎвЂєР Р†Р вЂљРІР‚Сљ</th><th>Sana</th><th>Mahsulot</th>
                     <th>Kol-vo</th><th>Narx</th><th>Summa</th>
                     <th>Valyuta</th><th>Agent</th><th>Dostavchik</th><th>Status</th>
                   </tr>
@@ -2465,15 +2527,15 @@ function CustomerDetail({ c, D, onClose }) {
                           <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178}}>{o.product}</span>
                         </td>
                         <td style={{textAlign:'center',fontWeight:700}}>{Math.abs(o.qty)}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'РІР‚вЂќ'}</td>
-                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{o.sum?fmt(o.sum):'РІР‚вЂќ'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'Р Р†Р вЂљРІР‚Сњ'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{o.sum?fmt(o.sum):'Р Р†Р вЂљРІР‚Сњ'}</td>
                         <td><span className={o.currency==='USD'?'cur-usd':'cur-uzs'}>{o.currency||'UZS'}</span></td>
-                        <td style={{fontSize:11}}>{o.agent||'РІР‚вЂќ'}</td>
-                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'РІР‚вЂќ'}</td>
+                        <td style={{fontSize:11}}>{o.agent||'Р Р†Р вЂљРІР‚Сњ'}</td>
+                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'Р Р†Р вЂљРІР‚Сњ'}</td>
                         <td>
                           <span className="tag" style={{
-                            background:o.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'||o.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr2)':o.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--rd2)':'var(--s3)',
-                            color:o.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'||o.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr)':o.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--t4)':'var(--t3)',
+                            background:o.status==='Р В Р’В Р Р†Р вЂљРЎСљР В Р’В Р РЋРІР‚С”Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™'||o.status==='Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚С”Р В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р В РІвЂљВ¬Р В Р’В Р вЂ™Р’В§Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™ Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚в„ў Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРЎСљ'?'var(--gr2)':o.status==='Р В Р’В Р РЋРІР‚С”Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРЎв„ўР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚С”'?'var(--rd2)':'var(--s3)',
+                            color:o.status==='Р В Р’В Р Р†Р вЂљРЎСљР В Р’В Р РЋРІР‚С”Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™'||o.status==='Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚С”Р В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р В РІвЂљВ¬Р В Р’В Р вЂ™Р’В§Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™ Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚в„ў Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРЎСљ'?'var(--gr)':o.status==='Р В Р’В Р РЋРІР‚С”Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРЎв„ўР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚С”'?'var(--t4)':'var(--t3)',
                             fontSize:10,
                           }}>{o.status}</span>
                         </td>
@@ -2490,7 +2552,7 @@ function CustomerDetail({ c, D, onClose }) {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>Vozvrat Р Р†РІР‚С›РІР‚вЂњ</th><th>Sana</th><th>Mahsulot</th>
+                    <th>Vozvrat Р В Р вЂ Р Р†Р вЂљРЎвЂєР Р†Р вЂљРІР‚Сљ</th><th>Sana</th><th>Mahsulot</th>
                     <th>Kol-vo</th><th>Narx</th><th>Summa</th>
                     <th>Valyuta</th><th>Agent</th><th>Dostavchik</th><th>Status</th>
                   </tr>
@@ -2506,15 +2568,15 @@ function CustomerDetail({ c, D, onClose }) {
                           <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178}}>{o.product}</span>
                         </td>
                         <td style={{textAlign:'center',fontWeight:700,color:'var(--or)'}}>-{Math.abs(o.qty)}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'РІР‚вЂќ'}</td>
-                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--or)'}}>{o.sum?fmt(Math.abs(o.sum)):'РІР‚вЂќ'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{o.price?fmt(Math.round(o.price)):'Р Р†Р вЂљРІР‚Сњ'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontWeight:700,color:'var(--or)'}}>{o.sum?fmt(Math.abs(o.sum)):'Р Р†Р вЂљРІР‚Сњ'}</td>
                         <td><span className={o.currency==='USD'?'cur-usd':'cur-uzs'}>{o.currency||'UZS'}</span></td>
-                        <td style={{fontSize:11}}>{o.agent||'РІР‚вЂќ'}</td>
-                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'РІР‚вЂќ'}</td>
+                        <td style={{fontSize:11}}>{o.agent||'Р Р†Р вЂљРІР‚Сњ'}</td>
+                        <td style={{fontSize:11,color:'var(--t2)'}}>{o.delivPerson||'Р Р†Р вЂљРІР‚Сњ'}</td>
                         <td>
                           <span className="tag" style={{
-                            background:o.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'||o.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr2)':o.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--rd2)':'var(--s3)',
-                            color:o.status==='Р В РІР‚СњР В РЎвЂєР В Р Р‹Р В РЎС›Р В РЎвЂ™Р В РІР‚в„ўР В РІР‚С”Р В РІР‚СћР В РЎСљ'||o.status==='Р В РЎСџР В РЎвЂєР В РІР‚С”Р В Р в‚¬Р В Р’В§Р В РІР‚СћР В РЎСљ Р В РЎСљР В РЎвЂ™ Р В Р Р‹Р В РЎв„ўР В РІР‚С”Р В РЎвЂ™Р В РІР‚Сњ'?'var(--gr)':o.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--t4)':'var(--t3)',
+                            background:o.status==='Р В Р’В Р Р†Р вЂљРЎСљР В Р’В Р РЋРІР‚С”Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™'||o.status==='Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚С”Р В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р В РІвЂљВ¬Р В Р’В Р вЂ™Р’В§Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™ Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚в„ў Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРЎСљ'?'var(--gr2)':o.status==='Р В Р’В Р РЋРІР‚С”Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРЎв„ўР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚С”'?'var(--rd2)':'var(--s3)',
+                            color:o.status==='Р В Р’В Р Р†Р вЂљРЎСљР В Р’В Р РЋРІР‚С”Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™'||o.status==='Р В Р’В Р РЋРЎСџР В Р’В Р РЋРІР‚С”Р В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р В РІвЂљВ¬Р В Р’В Р вЂ™Р’В§Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™ Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚в„ў Р В Р’В Р В Р вЂ№Р В Р’В Р РЋРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂќР В Р’В Р РЋРІР‚в„ўР В Р’В Р Р†Р вЂљРЎСљ'?'var(--gr)':o.status==='Р В Р’В Р РЋРІР‚С”Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРЎв„ўР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚С”'?'var(--t4)':'var(--t3)',
                             fontSize:10,
                           }}>{o.status}</span>
                         </td>
@@ -2530,7 +2592,7 @@ function CustomerDetail({ c, D, onClose }) {
             <div style={{overflow:'auto',maxHeight:'60vh',borderRadius:9,border:'1px solid var(--b2)'}}>
               <table className="tbl">
                 <thead>
-                  <tr><th>Op Р Р†РІР‚С›РІР‚вЂњ</th><th>Sana</th><th>Summa</th><th>Valyuta</th><th>Kassa</th><th>Operator</th><th>Izoh</th></tr>
+                  <tr><th>Op Р В Р вЂ Р Р†Р вЂљРЎвЂєР Р†Р вЂљРІР‚Сљ</th><th>Sana</th><th>Summa</th><th>Valyuta</th><th>Kassa</th><th>Operator</th><th>Izoh</th></tr>
                 </thead>
                 <tbody>
                   {myPays.length===0
@@ -2545,9 +2607,9 @@ function CustomerDetail({ c, D, onClose }) {
                           {signed>=0?'+':'-'}{fmt(Math.abs(signed))}
                         </td>
                         <td><span className={p.currency==='USD'?'cur-usd':'cur-uzs'}>{p.currency||'UZS'}</span></td>
-                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.kassa||'РІР‚вЂќ'}</td>
-                        <td style={{fontSize:11}}>{p.operator||'РІР‚вЂќ'}</td>
-                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.note||'РІР‚вЂќ'}</td>
+                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.kassa||'Р Р†Р вЂљРІР‚Сњ'}</td>
+                        <td style={{fontSize:11}}>{p.operator||'Р Р†Р вЂљРІР‚Сњ'}</td>
+                        <td style={{fontSize:11,color:'var(--t3)'}}>{p.note||'Р Р†Р вЂљРІР‚Сњ'}</td>
                       </tr>
                     )})
                   }
@@ -2561,7 +2623,7 @@ function CustomerDetail({ c, D, onClose }) {
   );
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ STAT CARD Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў STAT CARD Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function StatCard({ l, v, s, c }) {
   return (
     <div className="stat" style={{padding:'13px 15px'}}>
@@ -2573,7 +2635,7 @@ function StatCard({ l, v, s, c }) {
   );
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ DASHBOARD Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў DASHBOARD Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function Dashboard({ D }) {
   const { customers, cashbox, rawOrders, debtorsByBalance=[] } = D;
   const now = new Date();
@@ -2642,7 +2704,7 @@ function Dashboard({ D }) {
       : wDel.filter((o) => monthKey(o.orderDate) === agentMonth);
     const m = {};
     source.forEach((o) => {
-      const a=o.agent||'РІР‚вЂќ';
+      const a=o.agent||'Р Р†Р вЂљРІР‚Сњ';
       if (!m[a]) m[a]={name:a,qty:0,sum:0};
       m[a].qty+=Math.abs(o.qty); m[a].sum+=o.sum;
     });
@@ -2767,7 +2829,7 @@ function Dashboard({ D }) {
   );
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ MIJOZLAR Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў MIJOZLAR Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById={}, company='murodbaxsh' }) {
   const { customers } = D;
   const [segment, setSegment] = useState('all');
@@ -2924,7 +2986,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   const tog = (col) => setSort((s) => s.col===col?{col,dir:s.dir==='asc'?'desc':'asc'}:{col,dir:'asc'});
   const SI = ({c:col}) => sort.col===col
     ? <span style={{marginLeft:3}}>{sort.dir==='asc'?'^':'v'}</span>
-    : <span style={{marginLeft:3,opacity:.2}}>Р’В¦</span>;
+    : <span style={{marginLeft:3,opacity:.2}}>Р вЂ™Р’В¦</span>;
   const balColor = (v) => v<0?'var(--rd)':v>0?'var(--gr)':'var(--t3)';
   const debt = getDebtStats(segmentCustomers);
 
@@ -3047,15 +3109,15 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
                       {c.address && <div style={{fontSize:10.5,color:'var(--t3)',maxWidth:205,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.address}</div>}
                     </td>
                     <td><a href={`tel:${c.phone}`} onClick={(e)=>e.stopPropagation()} style={{color:'var(--bl)',textDecoration:'none',fontFamily:'var(--mono)',fontSize:11.5}}>{c.phone}</a></td>
-                    <td style={{fontSize:12}}>{c.district||'РІР‚вЂќ'}</td>
+                    <td style={{fontSize:12}}>{c.district||'Р Р†Р вЂљРІР‚Сњ'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:balColor(c.balanceUZS)}}>{c.balanceUZS<0?'-':c.balanceUZS>0?'+':''}{fmt(Math.abs(c.balanceUZS))}</td>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:balColor(c.balanceUSD)}}>{c.balanceUSD!==0?<>{c.balanceUSD<0?'-':c.balanceUSD>0?'+':''}{fmt(Math.abs(c.balanceUSD))}$</>:'РІР‚вЂќ'}</td>
-                    <td style={{textAlign:'center',fontWeight:700,color:c.tara<0?'var(--rd)':'var(--bl)'}}>{c.tara!==0?(c.tara<0?'-':'')+Math.abs(c.tara):'РІР‚вЂќ'}</td>
-                    <td style={{textAlign:'center'}}>{c.kulers>0?<span className="tag" style={{background:'var(--yl2)',color:'var(--yl)'}}>{c.kulers}</span>:'РІР‚вЂќ'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:balColor(c.balanceUSD)}}>{c.balanceUSD!==0?<>{c.balanceUSD<0?'-':c.balanceUSD>0?'+':''}{fmt(Math.abs(c.balanceUSD))}$</>:'Р Р†Р вЂљРІР‚Сњ'}</td>
+                    <td style={{textAlign:'center',fontWeight:700,color:c.tara<0?'var(--rd)':'var(--bl)'}}>{c.tara!==0?(c.tara<0?'-':'')+Math.abs(c.tara):'Р Р†Р вЂљРІР‚Сњ'}</td>
+                    <td style={{textAlign:'center'}}>{c.kulers>0?<span className="tag" style={{background:'var(--yl2)',color:'var(--yl)'}}>{c.kulers}</span>:'Р Р†Р вЂљРІР‚Сњ'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.lastOrderDate)}</td>
-                    <td>{c.daysAgo!=null&&c.daysAgo>=0 ? <span className="tag" style={{background:c.daysAgo>30?'var(--rd2)':c.daysAgo>14?'var(--yl2)':c.daysAgo>7?'var(--or2)':'var(--s3)',color:c.daysAgo>30?'var(--rd)':c.daysAgo>14?'var(--yl)':c.daysAgo>7?'var(--or)':'var(--t3)'}}>{c.daysAgo}k</span> : 'РІР‚вЂќ'}</td>
-                    <td style={{textAlign:'center'}}>{c.lastQty||'РІР‚вЂќ'}</td>
-                    <td style={{fontSize:12}}>{c.lastAgent||'РІР‚вЂќ'}</td>
+                    <td>{c.daysAgo!=null&&c.daysAgo>=0 ? <span className="tag" style={{background:c.daysAgo>30?'var(--rd2)':c.daysAgo>14?'var(--yl2)':c.daysAgo>7?'var(--or2)':'var(--s3)',color:c.daysAgo>30?'var(--rd)':c.daysAgo>14?'var(--yl)':c.daysAgo>7?'var(--or)':'var(--t3)'}}>{c.daysAgo}k</span> : 'Р Р†Р вЂљРІР‚Сњ'}</td>
+                    <td style={{textAlign:'center'}}>{c.lastQty||'Р Р†Р вЂљРІР‚Сњ'}</td>
+                    <td style={{fontSize:12}}>{c.lastAgent||'Р Р†Р вЂљРІР‚Сњ'}</td>
                   </tr>
                 ))
               }
@@ -3068,7 +3130,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   );
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ SO DETAIL MODAL Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў SO DETAIL MODAL Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function SoDetailModal({ soGroup, onClose }) {
   return (
     <div className="modal-ov fade" onClick={(e)=>e.target===e.currentTarget&&onClose()}>
@@ -3080,8 +3142,8 @@ function SoDetailModal({ soGroup, onClose }) {
               <span style={{fontSize:13,color:'var(--t2)',fontWeight:500}}>{soGroup.contName}</span>
             </div>
             <div style={{fontSize:11,color:'var(--t3)',marginTop:4,fontFamily:'var(--mono)'}}>
-              {fmtD(soGroup.orderDate)}  Р’В·  {soGroup.agent||'РІР‚вЂќ'}  Р’В·  {soGroup.items.length} ta mahsulot
-              {soGroup.delivPerson && <span>  Р’В·  {E.driver} {soGroup.delivPerson}</span>}
+              {fmtD(soGroup.orderDate)}  Р вЂ™Р’В·  {soGroup.agent||'Р Р†Р вЂљРІР‚Сњ'}  Р вЂ™Р’В·  {soGroup.items.length} ta mahsulot
+              {soGroup.delivPerson && <span>  Р вЂ™Р’В·  {E.driver} {soGroup.delivPerson}</span>}
             </div>
           </div>
           <button className="btn btn-gh btn-sm" onClick={onClose}>X</button>
@@ -3103,8 +3165,8 @@ function SoDetailModal({ soGroup, onClose }) {
                   <tr key={i}>
                     <td style={{fontWeight:500,color:'var(--t1)'}}>{item.product}</td>
                     <td style={{textAlign:'center',fontWeight:700,color:item.qty<0?'var(--or)':'var(--t1)'}}>{item.qty}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{item.price?fmt(Math.round(item.price)):'РІР‚вЂќ'}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{item.sum?fmt(item.sum):'РІР‚вЂќ'}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{item.price?fmt(Math.round(item.price)):'Р Р†Р вЂљРІР‚Сњ'}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{item.sum?fmt(item.sum):'Р Р†Р вЂљРІР‚Сњ'}</td>
                     <td style={{textAlign:'center'}}><span className={item.currency==='USD'?'cur-usd':'cur-uzs'}>{item.currency||'UZS'}</span></td>
                   </tr>
                 ))}
@@ -3113,9 +3175,9 @@ function SoDetailModal({ soGroup, onClose }) {
           </div>
           <div style={{marginTop:12,display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <span className="tag" style={{
-              background:isDeliveredStatus(soGroup.status)?'var(--gr2)':soGroup.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--rd2)':'var(--s3)',
-              color:isDeliveredStatus(soGroup.status)?'var(--gr)':soGroup.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--t4)':'var(--t3)',
-            }}>{soGroup.status||'РІР‚вЂќ'}</span>
+              background:isDeliveredStatus(soGroup.status)?'var(--gr2)':soGroup.status==='Р В Р’В Р РЋРІР‚С”Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРЎв„ўР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚С”'?'var(--rd2)':'var(--s3)',
+              color:isDeliveredStatus(soGroup.status)?'var(--gr)':soGroup.status==='Р В Р’В Р РЋРІР‚С”Р В Р’В Р РЋРЎвЂєР В Р’В Р РЋРЎв„ўР В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р Р†Р вЂљРЎС›Р В Р’В Р РЋРЎС™Р В Р’В Р РЋРІР‚С”'?'var(--t4)':'var(--t3)',
+            }}>{soGroup.status||'Р Р†Р вЂљРІР‚Сњ'}</span>
             <div style={{display:'flex',gap:12,fontWeight:700,fontSize:13}}>
               {soGroup.totalSumUZS>0 && <span style={{color:'var(--gr)'}}>{fmt(soGroup.totalSumUZS)} so'm</span>}
               {soGroup.totalSumUSD>0 && <span style={{color:'var(--yl)'}}>{fmt(soGroup.totalSumUSD)} $</span>}
@@ -3127,7 +3189,7 @@ function SoDetailModal({ soGroup, onClose }) {
   );
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ ZAKAZLAR Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў ZAKAZLAR Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function Orders({ D }) {
   const { rawOrders=[], customers=[] } = D;
   const [search,setS]  = useState('');
@@ -3358,7 +3420,7 @@ function Orders({ D }) {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Zakaz РІвЂћвЂ“</th><th>Kontragent</th><th>Rayon</th><th>Sana</th>
+                <th>Zakaz Р Р†РІР‚С›РІР‚вЂњ</th><th>Kontragent</th><th>Rayon</th><th>Sana</th>
                 <th>Dostavchik</th><th style={{textAlign:'center'}}>Dona</th>
                 <th style={{textAlign:'right'}}>Summa UZS</th>
                 <th style={{textAlign:'right'}}>Summa USD</th>
@@ -3375,15 +3437,15 @@ function Orders({ D }) {
                     <td style={{maxWidth:180,fontWeight:600}}>
                       <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178,fontSize:12}}>{g.contName}</span>
                     </td>
-                    <td style={{fontSize:11,color:'var(--t3)'}}>{g.district || 'РІР‚вЂќ'}</td>
+                    <td style={{fontSize:11,color:'var(--t3)'}}>{g.district || 'Р Р†Р вЂљРІР‚Сњ'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(g.orderDate)}</td>
-                    <td style={{fontSize:11,color:'var(--t2)'}}>{g.delivPerson||'РІР‚вЂќ'}</td>
+                    <td style={{fontSize:11,color:'var(--t2)'}}>{g.delivPerson||'Р Р†Р вЂљРІР‚Сњ'}</td>
                     <td style={{textAlign:'center',fontWeight:700,color:'var(--t1)'}}>{g.totalQty}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:g.totalSumUZS?'var(--gr)':'var(--t4)'}}>
-                      {g.totalSumUZS?fmt(g.totalSumUZS):'РІР‚вЂќ'}
+                      {g.totalSumUZS?fmt(g.totalSumUZS):'Р Р†Р вЂљРІР‚Сњ'}
                     </td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:g.totalSumUSD?'var(--yl)':'var(--t4)'}}>
-                      {g.totalSumUSD?fmt(g.totalSumUSD)+' $':'РІР‚вЂќ'}
+                      {g.totalSumUSD?fmt(g.totalSumUSD)+' $':'Р Р†Р вЂљРІР‚Сњ'}
                     </td>
                     <td style={{textAlign:'center'}}>
                       <span className="tag" style={{background:'var(--s3)',color:'var(--t3)',cursor:'pointer'}}>{g.items.length} ta</span>
@@ -3393,11 +3455,11 @@ function Orders({ D }) {
                         {g.docType}
                       </span>
                     </td>
-                    <td style={{fontSize:12}}>{g.agent||'РІР‚вЂќ'}</td>
+                    <td style={{fontSize:12}}>{g.agent||'Р Р†Р вЂљРІР‚Сњ'}</td>
                     <td>
                       <span className="tag" style={{
-                        background:isDeliveredStatus(g.status)?'var(--gr2)':g.status==='Р С›Р СћР СљР вЂўР СњР вЂўР СњР С›'?'var(--rd2)':'var(--s3)',
-                        color:isDeliveredStatus(g.status)?'var(--gr)':g.status==='Р С›Р СћР СљР вЂўР СњР вЂўР СњР С›'?'var(--t4)':'var(--t3)',
+                        background:isDeliveredStatus(g.status)?'var(--gr2)':g.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--rd2)':'var(--s3)',
+                        color:isDeliveredStatus(g.status)?'var(--gr)':g.status==='Р В РЎвЂєР В РЎС›Р В РЎС™Р В РІР‚СћР В РЎСљР В РІР‚СћР В РЎСљР В РЎвЂє'?'var(--t4)':'var(--t3)',
                         fontSize:10,
                       }}>{g.status}</span>
                     </td>
@@ -3552,13 +3614,13 @@ function Kassa({ D }) {
       <div className="g4">
         <StatCard l={`KIRIM (${curMonthKey})`}  v={fmt(totalIn)+" so'm"}  s={paysMonth.length+' ta operatsiya'}   c="var(--gr)"/>
         <StatCard l={`CHIQIM (${curMonthKey})`} v={fmt(totalOut)+" so'm"} s={spendsMonth.length+' ta operatsiya'} c="var(--rd)"/>
-        <StatCard l="SALDO (OYLIK)" v={fmt(totalIn-totalOut)+" so'm"} s="joriy oy: kirim Р Р†РІвЂљВ¬РІР‚в„ў chiqim" c={totalIn-totalOut>=0?'var(--gr)':'var(--rd)'}/>
+        <StatCard l="SALDO (OYLIK)" v={fmt(totalIn-totalOut)+" so'm"} s="joriy oy: kirim Р В Р вЂ Р Р†РІР‚С™Р’В¬Р Р†Р вЂљРІвЂћСћ chiqim" c={totalIn-totalOut>=0?'var(--gr)':'var(--rd)'}/>
         <StatCard l="OYLIK OPR."   v={cashMonth.length+' ta'}  s="joriy oy yozuvlari" c="var(--bl)"/>
       </div>
       <div style={{display:'flex',gap:8,alignItems:'center'}}>
         <div className="sb" style={{flex:1}}>
           <span style={{color:'var(--t3)'}}>{E.find}</span>
-          <input placeholder="Mijoz, operatsiya Р Р†РІР‚С›РІР‚вЂњ..." value={search} onChange={(e)=>setS(e.target.value)}/>
+          <input placeholder="Mijoz, operatsiya Р В Р вЂ Р Р†Р вЂљРЎвЂєР Р†Р вЂљРІР‚Сљ..." value={search} onChange={(e)=>setS(e.target.value)}/>
         </div>
         <div style={{position:'relative'}}>
           <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
@@ -3632,7 +3694,7 @@ function Kassa({ D }) {
           <table className="tbl">
             <thead>
               <tr>
-                <th>Sana</th><th>Op Р Р†РІР‚С›РІР‚вЂњ</th><th>Tur</th>
+                <th>Sana</th><th>Op Р В Р вЂ Р Р†Р вЂљРЎвЂєР Р†Р вЂљРІР‚Сљ</th><th>Tur</th>
                 <th>Kassa</th><th>Kontragent</th><th>Rayon</th><th>Summa</th><th>Operator</th>
               </tr>
             </thead>
@@ -3652,16 +3714,16 @@ function Kassa({ D }) {
                         </span>
                       </td>
                       <td style={{fontSize:11.5,color:'var(--t3)',maxWidth:110}}>
-                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:108}}>{c.kassa||'РІР‚вЂќ'}</span>
+                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:108}}>{c.kassa||'Р Р†Р вЂљРІР‚Сњ'}</span>
                       </td>
                       <td style={{maxWidth:220}}>
-                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:218,fontSize:12}}>{c.contName||'РІР‚вЂќ'}</span>
+                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:218,fontSize:12}}>{c.contName||'Р Р†Р вЂљРІР‚Сњ'}</span>
                       </td>
-                      <td style={{fontSize:11.5,color:'var(--t3)'}}>{districtById[String(c.mId || '').trim()] || 'РІР‚вЂќ'}</td>
+                      <td style={{fontSize:11.5,color:'var(--t3)'}}>{districtById[String(c.mId || '').trim()] || 'Р Р†Р вЂљРІР‚Сњ'}</td>
                       <td style={{fontFamily:'var(--mono)',fontWeight:700,color:isIn?'var(--gr)':isPaymentToCounterparty(c.opType)?'var(--rd)':'var(--t2)'}}>
                         {isIn?'+':isPaymentToCounterparty(c.opType)?'-':''}{fmt(c.amount)}
                       </td>
-                      <td style={{fontSize:11.5,color:'var(--t3)'}}>{c.operator||'РІР‚вЂќ'}</td>
+                      <td style={{fontSize:11.5,color:'var(--t3)'}}>{c.operator||'Р Р†Р вЂљРІР‚Сњ'}</td>
                     </tr>
                   );
                 })
@@ -3674,7 +3736,7 @@ function Kassa({ D }) {
   );
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ OBZVON Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў OBZVON Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function Obzvon({
   D,
   company='murodbaxsh',
@@ -4220,7 +4282,7 @@ function Obzvon({
         lastCallDate: lastCall?.callDate || '',
         lastNote: lastCall?.note || '',
         nextDate: lastCall?.nextDate || '',
-        operator: D.assignmentById?.[c.id] || 'РІР‚вЂќ',
+        operator: D.assignmentById?.[c.id] || 'Р Р†Р вЂљРІР‚Сњ',
       };
     });
     if (currentUser !== 'Admin') rows = rows.filter((r) => r.operator === currentUser);
@@ -4366,7 +4428,7 @@ function Obzvon({
                       if (i < 0) return null;
                       return (
                       <tr key={r._rid || i}>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id || 'РІР‚вЂќ'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id || 'Р Р†Р вЂљРІР‚Сњ'}</td>
                         <td style={{minWidth:420}}>
                           <div style={{position:'relative'}}>
                             <input
@@ -4526,15 +4588,15 @@ function Obzvon({
                     visibleAllRows.map((r,i)=>(
                       <tr key={i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || i+1}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || 'РІР‚вЂќ'}</td>
-                        <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : 'РІР‚вЂќ')}</span></td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || 'Р Р†Р вЂљРІР‚Сњ'}</td>
+                        <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : 'Р Р†Р вЂљРІР‚Сњ')}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.callDate)}</td>
-                        <td>{r.topic || 'РІР‚вЂќ'}</td>
-                        <td style={{maxWidth:300}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || 'РІР‚вЂќ'}</span></td>
+                        <td>{r.topic || 'Р Р†Р вЂљРІР‚Сњ'}</td>
+                        <td style={{maxWidth:300}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || 'Р Р†Р вЂљРІР‚Сњ'}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.nextDate)}</td>
-                        <td>{r.orderCount || 'РІР‚вЂќ'}</td>
+                        <td>{r.orderCount || 'Р Р†Р вЂљРІР‚Сњ'}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.orderDate)}</td>
-                        <td>{r.operator || 'РІР‚вЂќ'}</td>
+                        <td>{r.operator || 'Р Р†Р вЂљРІР‚Сњ'}</td>
                       </tr>
                     ))
                   }
@@ -4606,12 +4668,12 @@ function Obzvon({
                       return (
                       <tr key={r.rid || i}>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || i+1}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || 'РІР‚вЂќ'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId || 'Р Р†Р вЂљРІР‚Сњ'}</td>
                         <td style={{maxWidth:360}}>
                           {isEdit ? (
                             <input className="input" value={d.customer || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), customer:e.target.value}))} />
                           ) : (
-                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : 'РІР‚вЂќ')}</span>
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : 'Р Р†Р вЂљРІР‚Сњ')}</span>
                           )}
                         </td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
@@ -4626,25 +4688,25 @@ function Obzvon({
                               <option>Baza to'g'irlash</option>
                               <option>Qarzini so'rash</option>
                             </select>
-                          ) : (r.topic || 'РІР‚вЂќ')}
+                          ) : (r.topic || 'Р Р†Р вЂљРІР‚Сњ')}
                         </td>
                         <td style={{maxWidth:300}}>
                           {isEdit ? (
                             <input className="input" value={d.note || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), note:e.target.value}))} />
                           ) : (
-                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || 'РІР‚вЂќ'}</span>
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || 'Р Р†Р вЂљРІР‚Сњ'}</span>
                           )}
                         </td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
                           {isEdit ? <input className="input" type="date" value={String(d.nextDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), nextDate:e.target.value}))} /> : fmtD(r.nextDate)}
                         </td>
                         <td>
-                          {isEdit ? <input className="input" value={d.orderCount || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), orderCount:e.target.value}))} /> : (r.orderCount || 'РІР‚вЂќ')}
+                          {isEdit ? <input className="input" value={d.orderCount || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), orderCount:e.target.value}))} /> : (r.orderCount || 'Р Р†Р вЂљРІР‚Сњ')}
                         </td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
                           {isEdit ? <input className="input" type="date" value={String(d.orderDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), orderDate:e.target.value}))} /> : fmtD(r.orderDate)}
                         </td>
-                        <td>{r.operator || 'РІР‚вЂќ'}</td>
+                        <td>{r.operator || 'Р Р†Р вЂљРІР‚Сњ'}</td>
                         {(canEditAllNew || canDeleteAllNew) && (
                           <td>
                             <div style={{display:'flex',gap:6}}>
@@ -4897,7 +4959,7 @@ function Obzvon({
                       >
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
                         <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</span></td>
-                        <td style={{maxWidth:140}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.district || 'РІР‚вЂќ'}</span></td>
+                        <td style={{maxWidth:140}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.district || 'Р Р†Р вЂљРІР‚Сњ'}</span></td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.balance<0?'var(--rd)':r.balance>0?'var(--gr)':'var(--t3)'}}>{fmt(r.balance)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
                           <div style={{display:'flex',justifyContent:'space-between',gap:10}}>
@@ -4915,7 +4977,7 @@ function Obzvon({
                         <td>{r.operator}</td>
                         <td style={{maxWidth:260}}>
                           <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                            {r.lastNote || 'РІР‚вЂќ'}
+                            {r.lastNote || 'Р Р†Р вЂљРІР‚Сњ'}
                           </span>
                         </td>
                       </tr>
@@ -4967,7 +5029,7 @@ function Obzvon({
   );
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ DOLJNIKI Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў DOLJNIKI Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function DoljnikModal({ row, D, onClose }) {
   const customer = (D.customers || []).find((c) => c.id === row.id);
   const rows = customer ? buildSverka(customer, D.ordersByMId || {}, D.cashByMId || {}) : [];
@@ -4977,7 +5039,7 @@ function DoljnikModal({ row, D, onClose }) {
         <div className="mhdr">
           <div>
             <div style={{fontWeight:800,fontSize:14}}>{row.name}</div>
-            <div style={{fontSize:11,color:'var(--t3)'}}>ID: {row.id}  Р’В·  Qarz zakaz: {row.orderNo || 'РІР‚вЂќ'}</div>
+            <div style={{fontSize:11,color:'var(--t3)'}}>ID: {row.id}  Р вЂ™Р’В·  Qarz zakaz: {row.orderNo || 'Р Р†Р вЂљРІР‚Сњ'}</div>
           </div>
           <button className="btn btn-gh btn-sm" onClick={onClose}>X</button>
         </div>
@@ -4992,9 +5054,9 @@ function DoljnikModal({ row, D, onClose }) {
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.kod}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.sana}</td>
                       <td>{r.dokument}</td>
-                      <td style={{maxWidth:280,overflow:'hidden',textOverflow:'ellipsis'}}>{r.produkt || 'РІР‚вЂќ'}</td>
-                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.summa?'var(--rd)':'var(--t4)'}}>{r.summa?'-'+fmt(r.summa):'РІР‚вЂќ'}</td>
-                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.tolov?'var(--gr)':'var(--t4)'}}>{r.tolov?'+'+fmt(r.tolov):'РІР‚вЂќ'}</td>
+                      <td style={{maxWidth:280,overflow:'hidden',textOverflow:'ellipsis'}}>{r.produkt || 'Р Р†Р вЂљРІР‚Сњ'}</td>
+                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.summa?'var(--rd)':'var(--t4)'}}>{r.summa?'-'+fmt(r.summa):'Р Р†Р вЂљРІР‚Сњ'}</td>
+                      <td style={{fontFamily:'var(--mono)',textAlign:'right',color:r.tolov?'var(--gr)':'var(--t4)'}}>{r.tolov?'+'+fmt(r.tolov):'Р Р†Р вЂљРІР‚Сњ'}</td>
                       <td style={{fontFamily:'var(--mono)',textAlign:'right',fontWeight:700,color:r.balansUZS<0?'var(--rd)':r.balansUZS>0?'var(--gr)':'var(--t3)'}}>{r.balansUZS<0?'-':r.balansUZS>0?'+':''}{fmt(Math.abs(r.balansUZS))}</td>
                     </tr>
                   ))
@@ -5030,7 +5092,7 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
           <div>
             <div style={{fontWeight:800,fontSize:14}}>{row.customerName}</div>
             <div style={{fontSize:11,color:'var(--t3)'}}>
-              ID: {row.customerId}  Р’В·  Zakaz: {row.orderNo}  Р’В·  Olingan: {fmtD(row.purchaseDate)}
+              ID: {row.customerId}  Р вЂ™Р’В·  Zakaz: {row.orderNo}  Р вЂ™Р’В·  Olingan: {fmtD(row.purchaseDate)}
             </div>
           </div>
           <div style={{display:'flex',gap:8}}>
@@ -5056,16 +5118,16 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
           {tab==='payments' && (
             <div className="card" style={{overflow:'auto',maxHeight:'52vh'}}>
               <table className="tbl">
-                <thead><tr><th>Sana</th><th>Op Р Р†РІР‚С›РІР‚вЂњ</th><th>Operator</th><th>Kassa</th><th>To'lov</th></tr></thead>
+                <thead><tr><th>Sana</th><th>Op Р В Р вЂ Р Р†Р вЂљРЎвЂєР Р†Р вЂљРІР‚Сљ</th><th>Operator</th><th>Kassa</th><th>To'lov</th></tr></thead>
                 <tbody>
                   {kulerPayments.length===0 ? (
                     <tr><td colSpan={5} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>To'lovlar topilmadi</td></tr>
                   ) : kulerPayments.map((p, i) => (
                     <tr key={i}>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(p.sana)}</td>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{p.opNum||'РІР‚вЂќ'}</td>
-                      <td>{p.operator||'РІР‚вЂќ'}</td>
-                      <td>{p.kassa||'РІР‚вЂќ'}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{p.opNum||'Р Р†Р вЂљРІР‚Сњ'}</td>
+                      <td>{p.operator||'Р Р†Р вЂљРІР‚Сњ'}</td>
+                      <td>{p.kassa||'Р Р†Р вЂљРІР‚Сњ'}</td>
                       <td style={{fontFamily:'var(--mono)',color:'var(--gr)',fontWeight:700}}>+{fmt(p.amount)} so'm</td>
                     </tr>
                   ))}
@@ -5326,16 +5388,16 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
                       <td style={{maxWidth:280}}>
                         <div style={{fontWeight:700,fontSize:12.5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</div>
-                        <div style={{fontSize:10.5,color:'var(--t3)'}}>Qarz zakaz: {r.orderNo || 'РІР‚вЂќ'} {r.lastOrderProduct ? ` Р’В·  ${r.lastOrderProduct}` : ''}</div>
+                        <div style={{fontSize:10.5,color:'var(--t3)'}}>Qarz zakaz: {r.orderNo || 'Р Р†Р вЂљРІР‚Сњ'} {r.lastOrderProduct ? ` Р вЂ™Р’В·  ${r.lastOrderProduct}` : ''}</div>
                       </td>
                       <td style={{fontSize:11.5,color:'var(--t2)'}}>{r.category}</td>
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--rd)'}}>-{fmt(Math.abs(r.debtUZS))}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.lastOrderDate)}</td>
                       <td style={{textAlign:'center'}}>
-                        {r.days != null ? <span className="tag" style={{background:r.days>30?'var(--rd2)':r.days>15?'var(--yl2)':'var(--s3)',color:r.days>30?'var(--rd)':r.days>15?'var(--yl)':'var(--t3)'}}>{r.days}k</span> : 'РІР‚вЂќ'}
+                        {r.days != null ? <span className="tag" style={{background:r.days>30?'var(--rd2)':r.days>15?'var(--yl2)':'var(--s3)',color:r.days>30?'var(--rd)':r.days>15?'var(--yl)':'var(--t3)'}}>{r.days}k</span> : 'Р Р†Р вЂљРІР‚Сњ'}
                       </td>
                       <td style={{maxWidth:260}}>
-                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11,color:'var(--t3)'}}>{r.note || 'РІР‚вЂќ'}</span>
+                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11,color:'var(--t3)'}}>{r.note || 'Р Р†Р вЂљРІР‚Сњ'}</span>
                       </td>
                     </tr>
                   ))}
@@ -5418,7 +5480,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
   );
 }
 
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ HISOBOTLAR / NAZORAT Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў HISOBOTLAR / NAZORAT Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 function Reports({
   D,
   company='murodbaxsh',
@@ -5531,7 +5593,7 @@ function Reports({
   const dailyByOperator = useMemo(() => {
     const ops = new Map();
     rowsToday.forEach((r) => {
-      const op = String(r.operator || 'РІР‚вЂќ').trim() || 'РІР‚вЂќ';
+      const op = String(r.operator || 'Р Р†Р вЂљРІР‚Сњ').trim() || 'Р Р†Р вЂљРІР‚Сњ';
       if (!ops.has(op)) ops.set(op, []);
       ops.get(op).push(r);
     });
@@ -5542,7 +5604,7 @@ function Reports({
       const debtSum = qarzRows.reduce((s,x)=>s + Math.abs(toIntFromMixed(x.orderCount || 0)), 0);
       const byOrderDate = {};
       buyRows.forEach((x) => {
-        const k = toIsoDate(x.orderDate) || 'РІР‚вЂќ';
+        const k = toIsoDate(x.orderDate) || 'Р Р†Р вЂљРІР‚Сњ';
         byOrderDate[k] = (byOrderDate[k] || 0) + Math.max(0, toIntFromMixed(x.orderCount || 0));
       });
       const dateEntries = Object.entries(byOrderDate)
@@ -5577,8 +5639,8 @@ function Reports({
     const s = normalizeWarehouseKey(v).replace(/\s+/g, '');
     if (!s) return false;
     return (
-      s.includes('Р С•РЎРѓР Р…Р С•Р Р†Р Р…Р С•Р в„–РЎРѓР С”Р В»Р В°Р Т‘') ||
-      s.includes('Р С•РЎРѓР Р…Р С•Р Р†Р Р…Р С•Р в„–') ||
+      s.includes('Р В РЎвЂўР РЋР С“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В РІвЂћвЂ“Р РЋР С“Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂ') ||
+      s.includes('Р В РЎвЂўР РЋР С“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В РІвЂћвЂ“') ||
       s.includes('osnovnoysklad') ||
       s.includes('osnovnoy') ||
       s.includes('asosnoysklad') ||
@@ -5681,7 +5743,7 @@ function Reports({
         out.push({
           date,
           driver,
-          warehouse: warehouse || 'РІР‚вЂќ',
+          warehouse: warehouse || 'Р Р†Р вЂљРІР‚Сњ',
           orderQty,
           transferQty,
           diff: orderQty - transferQty,
@@ -5736,7 +5798,7 @@ function Reports({
       {showReport && (
       <div className="g4">
         <StatCard
-          l={`SUV (${currentMonth}) Р’В· ${companyLabelByKey(company)}`}
+          l={`SUV (${currentMonth}) Р вЂ™Р’В· ${companyLabelByKey(company)}`}
           v={`${fmt(monthWaterQty)} ta`}
           s={`${fmt(monthWaterSum)} so'm`}
           c="var(--bl)"
@@ -5744,7 +5806,7 @@ function Reports({
         <StatCard
           l="BUGUNGI PLAN QOLDIQ"
           v={`${fmt(nextWorkDayPlan)} ta`}
-          s={`Keyingi ish kuni (${nextWorkDate ? toIsoDate(nextWorkDate) : '-'}) rejasi: ${fmt(nextWorkDayPlan)} Р’В· oy qoldiq: ${fmt(remainingMonthPlanQty)} Р’В· ish kun: ${fmt(remainingWorkDays)}`}
+          s={`Keyingi ish kuni (${nextWorkDate ? toIsoDate(nextWorkDate) : '-'}) rejasi: ${fmt(nextWorkDayPlan)} Р вЂ™Р’В· oy qoldiq: ${fmt(remainingMonthPlanQty)} Р вЂ™Р’В· ish kun: ${fmt(remainingWorkDays)}`}
           c="var(--gr)"
         />
         <StatCard
@@ -5793,19 +5855,19 @@ function Reports({
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.buyurtmaQty)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.debtCount)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--rd)'}}>{fmt(r.debtSum)}</td>
-                        <td style={{fontSize:11,color:'var(--t2)'}}>РІР‚вЂќ</td>
+                        <td style={{fontSize:11,color:'var(--t2)'}}>Р Р†Р вЂљРІР‚Сњ</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
                       </tr>
                       {(r.dateEntries || []).map((d, j) => (
                         <tr key={`rep_${i}_${j}_${d.date}`} style={{background:'rgba(88,166,255,.05)'}}>
                           <td style={{color:'var(--t3)',fontSize:11}}>sana</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>РІР‚вЂќ</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>РІР‚вЂќ</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>Р Р†Р вЂљРІР‚Сњ</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>Р Р†Р вЂљРІР‚Сњ</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(d.qty)}</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>РІР‚вЂќ</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>РІР‚вЂќ</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>Р Р†Р вЂљРІР‚Сњ</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>Р Р†Р вЂљРІР‚Сњ</td>
                           <td style={{fontFamily:'var(--mono)',fontSize:11}}>{d.date}</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>РІР‚вЂќ</td>
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>Р Р†Р вЂљРІР‚Сњ</td>
                         </tr>
                       ))}
                     </Fragment>
@@ -5817,7 +5879,7 @@ function Reports({
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--gr)'}}>{fmt(dailyTotals.buyurtmaQty)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.debtCount)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--rd)'}}>{fmt(dailyTotals.debtSum)}</td>
-                    <td style={{fontWeight:700,color:'var(--t3)'}}>РІР‚вЂќ</td>
+                    <td style={{fontWeight:700,color:'var(--t3)'}}>Р Р†Р вЂљРІР‚Сњ</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
                   </tr>
                 </>
@@ -5854,7 +5916,7 @@ function Reports({
                 <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--gr)'}}>Hatolik topilmadi</td></tr>
               ) : mismatchRows.map((r, i) => (
                 <tr key={`m_${i}_${r.driver}_${r.date}`} style={{background:'rgba(248,81,73,.07)'}}>
-                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || 'РІР‚вЂќ'}</td>
+                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || 'Р Р†Р вЂљРІР‚Сњ'}</td>
                   <td>{r.driver}</td>
                   <td>{r.warehouse}</td>
                   <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.orderQty)}</td>
@@ -5887,7 +5949,7 @@ function Reports({
                 <>
                   {dailyControlRows.map((r, i) => (
                     <tr key={`d_${i}_${r.driver}_${r.date}`}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || 'РІР‚вЂќ'}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || 'Р Р†Р вЂљРІР‚Сњ'}</td>
                       <td>{r.driver}</td>
                       <td>{r.warehouse}</td>
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
@@ -5968,7 +6030,7 @@ function PlanPage({
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12}}>
       <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap'}}>
         <div className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>
-          Operatorlar: {operators.join(', ')} Р’В· Kompaniya: {companyLabelByKey(company)}
+          Operatorlar: {operators.join(', ')} Р вЂ™Р’В· Kompaniya: {companyLabelByKey(company)}
         </div>
         <div style={{display:'flex',gap:8}}>
           <button className="btn btn-gr btn-sm" onClick={exportPlan}>Excel</button>
@@ -6103,8 +6165,8 @@ function SettingsPanel({
     const s = normalizeWarehouseKey(v).replace(/\s+/g, '');
     if (!s) return false;
     return (
-      s.includes('Р С•РЎРѓР Р…Р С•Р Р†Р Р…Р С•Р в„–РЎРѓР С”Р В»Р В°Р Т‘') ||
-      s.includes('Р С•РЎРѓР Р…Р С•Р Р†Р Р…Р С•Р в„–') ||
+      s.includes('Р В РЎвЂўР РЋР С“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В РІвЂћвЂ“Р РЋР С“Р В РЎвЂќР В Р’В»Р В Р’В°Р В РўвЂ') ||
+      s.includes('Р В РЎвЂўР РЋР С“Р В Р вЂ¦Р В РЎвЂўР В Р вЂ Р В Р вЂ¦Р В РЎвЂўР В РІвЂћвЂ“') ||
       s.includes('osnovnoysklad') ||
       s.includes('osnovnoy') ||
       s.includes('asosnoysklad') ||
@@ -6144,7 +6206,7 @@ function SettingsPanel({
 
   const addUser = () => {
     if (!isAdminSession) {
-      alert('Yangi login qoРІР‚Вshish faqat Admin uchun ochiq');
+      alert('Yangi login qoР Р†Р вЂљР’Вshish faqat Admin uchun ochiq');
       return;
     }
     const name = prompt("Yangi login nomi:");
@@ -6607,7 +6669,7 @@ function SettingsPanel({
             </button>
           </div>
           <div style={{marginTop:12,fontSize:12,color:'var(--t3)'}}>
-            Tanlangan foydalanuvchi: <strong style={{color:'var(--t1)'}}>{currentUser}</strong> Р’В· Joriy tema: <strong style={{color:'var(--bl)'}}>{(uiConf.ui?.theme || 'dark') === 'light' ? 'Oq' : 'Qora'}</strong>
+            Tanlangan foydalanuvchi: <strong style={{color:'var(--t1)'}}>{currentUser}</strong> Р вЂ™Р’В· Joriy tema: <strong style={{color:'var(--bl)'}}>{(uiConf.ui?.theme || 'dark') === 'light' ? 'Oq' : 'Qora'}</strong>
           </div>
         </div>
       )}
@@ -6671,7 +6733,7 @@ function LoginScreen({ users=[], onLogin, onResetCreds }) {
     </div>
   );
 }
-/* Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ ROOT APP Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™Р Р†РІР‚СћРЎвЂ™ */
+/* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў ROOT APP Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const NAV = [
   { id:'dash',    label:'Dashboard',  icon:E.home },
   { id:'cust',    label:'Mijozlar',   icon:E.users, badge:'d' },
@@ -7406,7 +7468,7 @@ export default function App() {
   const handleLoad = (result) => {
     setData(result);
     setUp(false);
-    notify(`OK: ${result.customers.length} mijoz Р’В· ${result.rawOrders.length} zakaz Р’В· ${result.cashbox.length} kassa`);
+    notify(`OK: ${result.customers.length} mijoz Р вЂ™Р’В· ${result.rawOrders.length} zakaz Р вЂ™Р’В· ${result.cashbox.length} kassa`);
   };
 
   const loadFromConfig = useCallback(async () => {
@@ -7422,7 +7484,7 @@ export default function App() {
       const d = processAll(raw);
       setData(d);
       setAutoLoad({ loading:false, progress:'', error:'' });
-      notify(`OK: ${d.customers.length} mijoz Р’В· ${d.rawOrders.length} zakaz`);
+      notify(`OK: ${d.customers.length} mijoz Р вЂ™Р’В· ${d.rawOrders.length} zakaz`);
     } catch (e) {
       setAutoLoad({ loading:false, progress:'', error:e.message });
       notify('Xato: '+e.message, 'err');
@@ -7533,17 +7595,17 @@ export default function App() {
         const debtOrderDate = debtOrder?.orderDate || c.lastOrderDate || '';
         return {
           lastOrderProduct: debtOrder?.product || '',
-          id: c.id || 'РІР‚вЂќ',
-          category: c.source || 'РІР‚вЂќ',
-          name: c.name || 'РІР‚вЂќ',
+          id: c.id || 'Р Р†Р вЂљРІР‚Сњ',
+          category: c.source || 'Р Р†Р вЂљРІР‚Сњ',
+          name: c.name || 'Р Р†Р вЂљРІР‚Сњ',
           debtUZS: c.balanceUZS,
           lastOrderDate: debtOrderDate,
           days: debtOrderDate ? daysAgo(debtOrderDate) : c.daysAgo,
-          orderNo: c.lastDocNum || 'РІР‚вЂќ',
+          orderNo: c.lastDocNum || 'Р Р†Р вЂљРІР‚Сњ',
           qty: c.lastQty || 0,
           lastSum: c.lastSum || 0,
-          agent: c.lastAgent || 'РІР‚вЂќ',
-          note: c.merchantNote || 'РІР‚вЂќ',
+          agent: c.lastAgent || 'Р Р†Р вЂљРІР‚Сњ',
+          note: c.merchantNote || 'Р Р†Р вЂљРІР‚Сњ',
         };
       })
       .sort((a, b) => a.debtUZS - b.debtUZS);
@@ -7556,17 +7618,17 @@ export default function App() {
         const debtOrderDate = debtOrder?.orderDate || c.lastOrderDate || '';
         return {
           lastOrderProduct: debtOrder?.product || '',
-          id: c.id || 'РІР‚вЂќ',
-          category: c.source || 'РІР‚вЂќ',
-          name: c.name || 'РІР‚вЂќ',
+          id: c.id || 'Р Р†Р вЂљРІР‚Сњ',
+          category: c.source || 'Р Р†Р вЂљРІР‚Сњ',
+          name: c.name || 'Р Р†Р вЂљРІР‚Сњ',
           debtUZS: c.balanceUZS,
           lastOrderDate: debtOrderDate,
           days: debtOrderDate ? daysAgo(debtOrderDate) : c.daysAgo,
-          orderNo: c.lastDocNum || 'РІР‚вЂќ',
+          orderNo: c.lastDocNum || 'Р Р†Р вЂљРІР‚Сњ',
           qty: c.lastQty || 0,
           lastSum: c.lastSum || 0,
-          agent: c.lastAgent || 'РІР‚вЂќ',
-          note: c.merchantNote || 'РІР‚вЂќ',
+          agent: c.lastAgent || 'Р Р†Р вЂљРІР‚Сњ',
+          note: c.merchantNote || 'Р Р†Р вЂљРІР‚Сњ',
         };
       })
       .sort((a, b) => a.debtUZS - b.debtUZS);
@@ -7822,6 +7884,7 @@ export default function App() {
     </>
   );
 }
+
 
 
 
