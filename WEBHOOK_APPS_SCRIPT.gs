@@ -26,6 +26,9 @@ function doPost(e) {
     const action = safe(data && data.action);
     if (action === 'access_set') return setAccessConfig_(data && data.accessConfig);
     if (action === 'obzvon_new_upsert') return upsertObzvonNewRows_(data && data.rows, data && data.by);
+    if (action === 'obzvon_new_sheet_append' || action === 'obzvon_new_export') {
+      return appendObzvonNewRowsToSheet_(data);
+    }
     return json_({ ok: false, error: 'Unsupported action', mode: 'access_only' });
   } catch (err) {
     return json_({ ok: false, error: String(err && err.message || err) });
@@ -95,6 +98,72 @@ function upsertObzvonNewRows_(rows, by) {
     saved: true,
     by: safe(by),
     count: merged.length,
+  });
+}
+
+function appendObzvonNewRowsToSheet_(data) {
+  const sheetId = safe(data && data.sheetId);
+  const sheetName = safe(data && data.sheetName) || 'Barcha_obzvon_yangi';
+  const withHeaders = Boolean(data && data.withHeaders);
+  const rows = Array.isArray(data && data.rows) ? data.rows : [];
+  if (!sheetId) return json_({ ok: false, error: 'sheetId berilmagan' });
+
+  const fallbackHeaders = ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator', 'Kompaniya', 'RID', 'UpdatedAt'];
+  const fallbackKeys = ['no', 'customerId', 'customer', 'callDate', 'topic', 'note', 'nextDate', 'orderCount', 'orderDate', 'operator', 'company', 'rid', 'updatedAt'];
+  const labelToKey = {
+    'No': 'no',
+    'ID': 'customerId',
+    'Mijoz': 'customer',
+    'Sana': 'callDate',
+    'Mavzu': 'topic',
+    'Izoh': 'note',
+    'Keyingi sana': 'nextDate',
+    'Z.soni / summa': 'orderCount',
+    'Zakaz sanasi': 'orderDate',
+    'Operator': 'operator',
+    'Kompaniya': 'company',
+    'RID': 'rid',
+    'UpdatedAt': 'updatedAt',
+  };
+
+  let headers = Array.isArray(data && data.headers)
+    ? data.headers.map((h) => safe(h)).filter(Boolean)
+    : [];
+  if (!headers.length) headers = fallbackHeaders;
+  const keys = headers.map((h) => labelToKey[h] || h);
+
+  const ss = SpreadsheetApp.openById(sheetId);
+  let sh = ss.getSheetByName(sheetName);
+  if (!sh) sh = ss.insertSheet(sheetName);
+
+  const lastRow = sh.getLastRow();
+  if (withHeaders && lastRow === 0) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  const prepared = rows.map((r) => {
+    if (Array.isArray(r)) {
+      const arr = [];
+      for (let i = 0; i < headers.length; i++) arr.push(safe(r[i]));
+      return arr;
+    }
+    const obj = (r && typeof r === 'object') ? r : {};
+    if (keys.length !== headers.length) {
+      return fallbackKeys.map((k) => safe(obj[k]));
+    }
+    return keys.map((k) => safe(obj[k]));
+  }).filter((arr) => arr.some((v) => safe(v)));
+
+  if (prepared.length) {
+    const start = sh.getLastRow() + 1;
+    sh.getRange(start, 1, prepared.length, headers.length).setValues(prepared);
+  }
+
+  return json_({
+    ok: true,
+    saved: true,
+    inserted: prepared.length,
+    sheetName: sheetName,
   });
 }
 

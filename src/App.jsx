@@ -6879,10 +6879,14 @@ export default function App() {
   const [isLoggedIn,setIsLoggedIn] = useState(() => !!S.get('aq-session-user', ''));
   const [mainSheetUrl, setMainSheetUrl] = useState(() => SHEET_CONFIG.url || '');
   const [obzvonSheetUrl, setObzvonSheetUrl] = useState(() => OBZVON_ALL_SHEET_URL || '');
-  // Muhim: barcha qurilmalar bir xil endpointga yozishi/o'qishi uchun
-  // access sync URL ni hard-fixed qilamiz (lokal eski URL lar aralashib ketmasin).
-  const [obzvonWebhook,setObzvonWebhook] = useState(() => OBZVON_WEBHOOK_DEFAULT);
-  const accessApiUrl = useMemo(() => OBZVON_WEBHOOK_DEFAULT, []);
+  // Muhim: barcha qurilmalarda bir xil endpoint ishlashi uchun URL saqlanadi va normallashtiriladi.
+  const [obzvonWebhook,setObzvonWebhook] = useState(() =>
+    normalizeAccessApiUrl(S.get(ACCESS_SYNC_URL_KEY, OBZVON_WEBHOOK_DEFAULT))
+  );
+  const accessApiUrl = useMemo(
+    () => normalizeAccessApiUrl(obzvonWebhook),
+    [obzvonWebhook]
+  );
   const [showUp,setUp]     = useState(false);
   const [notif,setNotif]   = useState(null);
   const [side,setSide]     = useState(true);
@@ -7362,10 +7366,21 @@ export default function App() {
           const actionBody = { ...postBody, action };
           let actionOk = false;
           try {
+            const reqInit = isAppsScript
+              ? {
+                  method: 'POST',
+                  mode: 'cors',
+                  cache: 'no-store',
+                  headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+                  body: JSON.stringify(actionBody),
+                }
+              : {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(actionBody),
+                };
             const resp = await fetch(url, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(actionBody),
+              ...reqInit,
             });
             const rawText = await resp.text().catch(() => '');
             const js = parseResponse(rawText);
@@ -7380,21 +7395,6 @@ export default function App() {
           if (actionOk) {
             ok = true;
             break;
-          }
-          if (!isAppsScript) continue;
-          // Apps Script uchun CORS preflight bloklansa, simple no-cors so'rov fallback.
-          try {
-            await fetch(url, {
-              method: 'POST',
-              mode: 'no-cors',
-              cache: 'no-store',
-              headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-              body: JSON.stringify(actionBody),
-            });
-            ok = true;
-            break;
-          } catch (e) {
-            lastErr = String(e?.message || e || 'unknown');
           }
         }
       }
@@ -7426,8 +7426,11 @@ export default function App() {
   useEffect(() => { S.set('aq-session-user', sessionUser || ''); }, [sessionUser]);
   useEffect(() => { S.set('aq-company-filter', companyFilter); }, [companyFilter]);
   useEffect(() => {
-    const normalized = OBZVON_WEBHOOK_DEFAULT;
-    if (obzvonWebhook !== normalized) setObzvonWebhook(normalized);
+    const normalized = normalizeAccessApiUrl(obzvonWebhook);
+    if (normalized !== String(obzvonWebhook || '').trim()) {
+      setObzvonWebhook(normalized);
+      return;
+    }
     S.set(ACCESS_SYNC_URL_KEY, normalized || '');
     S.set('aq-obzvon-webhook', normalized || '');
   }, [obzvonWebhook]);
@@ -7441,13 +7444,6 @@ export default function App() {
     const fixed = OBZVON_ALL_SHEET_URL || '';
     if (obzvonSheetUrl !== fixed) setObzvonSheetUrl(fixed);
   }, [obzvonSheetUrl]);
-  useEffect(() => {
-    // Access sync URL doim Workers URL bo'lsin (boshqa URL kirsa defaultga qaytariladi).
-    const normalized = normalizeAccessApiUrl(obzvonWebhook);
-    if (normalized !== String(obzvonWebhook || '').trim()) {
-      setObzvonWebhook(normalized);
-    }
-  }, [obzvonWebhook]);
   useEffect(() => { S.set('aq-obzvon-records', obzvonRecords || []); }, [obzvonRecords]);
   useEffect(() => { S.set('aq-obzvon-all-rows', obzvonAllRows || []); }, [obzvonAllRows]);
   useEffect(() => { S.set('aq-obzvon-all-new-rows', obzvonAllNewRows || []); }, [obzvonAllNewRows]);
