@@ -538,13 +538,21 @@ function UniversalFilterPanel({
                   <select className="select" value={st.mode || 'show'} onChange={(e)=>upd(col.key, { mode:e.target.value })}>
                     {UNIVERSAL_FILTER_MODES.map((m)=><option key={m.value} value={m.value}>{m.label}</option>)}
                   </select>
-                  <input
-                    className="input"
-                    type={col.type === 'date' ? 'date' : col.type === 'number' ? 'number' : 'text'}
-                    value={st.value || ''}
-                    placeholder={col.type === 'number' ? 'son kiriting' : col.type === 'date' ? 'sanani tanlang' : 'qiymat yozing'}
-                    onChange={(e)=>upd(col.key, { value:e.target.value })}
-                  />
+                  {col.type === 'date' ? (
+                    <ModernDateInput
+                      value={st.value || ''}
+                      placeholder="sanani tanlang"
+                      onChange={(e)=>upd(col.key, { value:e.target.value })}
+                    />
+                  ) : (
+                    <input
+                      className="input"
+                      type={col.type === 'number' ? 'number' : 'text'}
+                      value={st.value || ''}
+                      placeholder={col.type === 'number' ? 'son kiriting' : 'qiymat yozing'}
+                      onChange={(e)=>upd(col.key, { value:e.target.value })}
+                    />
+                  )}
                   <button className="btn btn-gh btn-sm" onClick={()=>upd(col.key, { optionsOpen: !st.optionsOpen })}>{st.optionsOpen ? 'Yop' : "Ro'yxat"}</button>
                 </div>
                 {st.optionsOpen && (
@@ -894,6 +902,131 @@ const toIsoDate = (v) => {
   const d = toDate(v);
   return d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
 };
+const shiftMonthKey = (monthKeyValue, delta = 0) => {
+  const m = String(monthKeyValue || '').match(/^(\d{4})-(\d{2})$/);
+  const base = m ? new Date(Number(m[1]), Number(m[2]) - 1 + Number(delta || 0), 1) : new Date();
+  return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`;
+};
+const buildCalendarMonth = (monthKeyValue) => {
+  const m = String(monthKeyValue || '').match(/^(\d{4})-(\d{2})$/);
+  const base = m ? new Date(Number(m[1]), Number(m[2]) - 1, 1) : new Date();
+  base.setHours(0, 0, 0, 0);
+  const start = new Date(base);
+  const mondayIdx = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - mondayIdx);
+  const cells = [];
+  for (let i = 0; i < 42; i += 1) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    cells.push({
+      iso: toIsoDate(d),
+      day: d.getDate(),
+      inMonth: d.getMonth() === base.getMonth() && d.getFullYear() === base.getFullYear(),
+      weekday: d.getDay(),
+    });
+  }
+  return {
+    monthLabel: base.toLocaleDateString('uz-UZ', { month: 'long', year: 'numeric' }),
+    cells,
+  };
+};
+const isDateInRange = (iso, min, max) => {
+  if (!iso) return false;
+  if (min && iso < String(min)) return false;
+  if (max && iso > String(max)) return false;
+  return true;
+};
+function ModernDateInput({
+  value = '',
+  onChange = () => {},
+  placeholder = 'Sanani tanlang',
+  disabled = false,
+  style,
+  min = '',
+  max = '',
+}) {
+  const wrapRef = useRef(null);
+  const selectedIso = toIsoDate(value);
+  const [open, setOpen] = useState(false);
+  const [monthKeyValue, setMonthKeyValue] = useState(() => (selectedIso ? selectedIso.slice(0, 7) : toIsoDate(new Date()).slice(0, 7)));
+  useEffect(() => {
+    if (!selectedIso) return;
+    setMonthKeyValue(selectedIso.slice(0, 7));
+  }, [selectedIso]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    const onEsc = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown, true);
+    document.addEventListener('touchstart', onDown, true);
+    window.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onDown, true);
+      document.removeEventListener('touchstart', onDown, true);
+      window.removeEventListener('keydown', onEsc);
+    };
+  }, [open]);
+  const calendar = useMemo(() => buildCalendarMonth(monthKeyValue), [monthKeyValue]);
+  const todayIso = toIsoDate(new Date());
+  const emit = (nextIso) => {
+    onChange?.({ target: { value: String(nextIso || '') } });
+  };
+  return (
+    <div ref={wrapRef} className="modern-date-wrap" style={style} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className="input modern-date-btn"
+        disabled={disabled}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className={`modern-date-label${selectedIso ? '' : ' ph'}`}>{selectedIso ? fmtD(selectedIso) : placeholder}</span>
+        <span className="modern-date-icon" aria-hidden="true">📅</span>
+      </button>
+      {open && (
+        <div className="modern-date-pop card">
+          <div className="modern-date-head">
+            <button type="button" className="btn btn-gh btn-sm" onClick={() => setMonthKeyValue((prev) => shiftMonthKey(prev, -1))}>{'<'}</button>
+            <div className="modern-date-month">{calendar.monthLabel}</div>
+            <button type="button" className="btn btn-gh btn-sm" onClick={() => setMonthKeyValue((prev) => shiftMonthKey(prev, 1))}>{'>'}</button>
+          </div>
+          <div className="modern-date-week">
+            {WEEKDAY_OPTIONS.map((d) => <span key={`wk_${d.key}`}>{d.label}</span>)}
+          </div>
+          <div className="modern-date-grid">
+            {calendar.cells.map((c) => {
+              const enabled = !disabled && isDateInRange(c.iso, min, max);
+              const isSel = selectedIso === c.iso;
+              const isToday = c.iso === todayIso;
+              return (
+                <button
+                  key={`cd_${c.iso}`}
+                  type="button"
+                  disabled={!enabled}
+                  className={`modern-date-day${c.inMonth ? '' : ' out'}${isSel ? ' on' : ''}${isToday ? ' today' : ''}`}
+                  onClick={() => {
+                    emit(c.iso);
+                    setOpen(false);
+                  }}
+                  title={c.iso}
+                >
+                  {c.day}
+                </button>
+              );
+            })}
+          </div>
+          <div className="modern-date-actions">
+            <button type="button" className="btn btn-gh btn-sm" onClick={() => emit('')}>Tozalash</button>
+            <button type="button" className="btn btn-bl btn-sm" onClick={() => setOpen(false)}>Yopish</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 const normId = (v) => {
   const s = String(v ?? '').trim();
   if (!s) return '';
@@ -1425,6 +1558,15 @@ function processAll(mainData) {
       const orderDate = pickFirstBy([r[22], r[24], r[23], r[21], r[20]], (v) => !!toDate(v)); // W
       const warehouse = pickFirstBy([r[19], r[20], r[18], r[16], r[25]], (v) => isLikelyWarehouseName(v));
       const mId = normId(pickFirstBy([r[29], r[30], r[28], r[27]], (v) => String(v || '').trim().length > 0));
+      const note = pickFirstBy(
+        [r[14], r[15], r[16], r[26], r[27], r[31], r[32], r[33], r[34]],
+        (v) => {
+          const s = String(v || '').trim();
+          if (!s) return false;
+          if (isLikelyDocType(s) || isLikelyStatus(s) || isLikelyWarehouseName(s) || toDate(s)) return false;
+          return !/^\d+$/.test(s);
+        }
+      );
 
       if (!isLikelyStatus(status) && orderDate) {
         const od = toDate(orderDate);
@@ -1441,7 +1583,7 @@ function processAll(mainData) {
         docType, status, uniqueId, agent,
         delivPerson, // dostavchik ismi
         orderDate,   // zakaz/vozvrat sanasi
-        mId, price, warehouse,
+        mId, price, warehouse, note,
       });
     });
   }
@@ -2063,12 +2205,29 @@ body,input,select,button{font-family:var(--sans)}
   font-size:13px;color:var(--t1);background:var(--s3);background:linear-gradient(180deg,var(--s3),color-mix(in oklab, var(--s3) 82%, var(--bg)));
   outline:none;transition:border-color .16s ease, box-shadow .16s ease, background .16s ease}
 .input:focus{border-color:var(--bl);box-shadow:0 0 0 3px rgba(88,166,255,.12)}
-.input[type="date"]{padding-right:36px;min-height:36px}
-.input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.92;filter:invert(.75) sepia(.7) saturate(3.2) hue-rotate(175deg)}
-.input[type="date"]::-webkit-datetime-edit{padding-right:4px}
 .select{padding:7px 10px;border:1px solid var(--b1);border-radius:var(--r);
   font-size:12.5px;color:var(--t1);background:var(--s3);background:linear-gradient(180deg,var(--s3),color-mix(in oklab, var(--s3) 82%, var(--bg)));cursor:pointer;outline:none;transition:border-color .16s ease, box-shadow .16s ease}
 .select:focus{border-color:var(--bl);box-shadow:0 0 0 3px rgba(88,166,255,.12)}
+.select, select{color-scheme:dark}
+.select option, select option{background:var(--s1);color:var(--t1)}
+.modern-date-wrap{position:relative;width:100%}
+.modern-date-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left}
+.modern-date-label{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.modern-date-label.ph{color:var(--t3)}
+.modern-date-icon{font-size:14px;opacity:.85}
+.modern-date-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:120;min-width:280px;padding:10px;box-shadow:0 16px 40px rgba(0,0,0,.58)}
+.modern-date-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.modern-date-month{font-size:12.5px;font-weight:700;text-transform:capitalize;color:var(--t1)}
+.modern-date-week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:4px}
+.modern-date-week span{font-size:10px;color:var(--t3);text-align:center}
+.modern-date-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.modern-date-day{border:1px solid var(--b1);border-radius:8px;background:var(--s3);min-height:30px;font-size:12px;color:var(--t2);cursor:pointer;transition:all .14s}
+.modern-date-day:hover{border-color:var(--bl);color:var(--t1)}
+.modern-date-day.out{opacity:.5}
+.modern-date-day.on{background:var(--bl2);border-color:var(--bl);color:var(--bl);font-weight:700}
+.modern-date-day.today:not(.on){border-style:dashed}
+.modern-date-day:disabled{opacity:.35;cursor:not-allowed}
+.modern-date-actions{display:flex;justify-content:space-between;gap:8px;margin-top:8px}
 .card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl)}
 .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono)}
 .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px;backdrop-filter:blur(5px)}
@@ -3190,8 +3349,8 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
                   <input className="input" placeholder="Kun gacha" value={adv.daysTo} onChange={(e)=>setAdv((p)=>({...p,daysTo:e.target.value}))}/>
                 </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                  <input className="input" type="date" value={adv.lastFrom} onChange={(e)=>setAdv((p)=>({...p,lastFrom:e.target.value}))}/>
-                  <input className="input" type="date" value={adv.lastTo} onChange={(e)=>setAdv((p)=>({...p,lastTo:e.target.value}))}/>
+                  <ModernDateInput value={adv.lastFrom} onChange={(e)=>setAdv((p)=>({...p,lastFrom:e.target.value}))} />
+                  <ModernDateInput value={adv.lastTo} onChange={(e)=>setAdv((p)=>({...p,lastTo:e.target.value}))} />
                 </div>
               </div>
             </div>
@@ -3514,8 +3673,8 @@ function Orders({ D }) {
                 </div>
                 <div style={{display:'grid',gap:6}}>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                    <input className="input" type="date" value={fDateFrom} onChange={(e)=>setDateFrom(e.target.value)} />
-                    <input className="input" type="date" value={fDateTo} onChange={(e)=>setDateTo(e.target.value)} />
+                    <ModernDateInput value={fDateFrom} onChange={(e)=>setDateFrom(e.target.value)} />
+                    <ModernDateInput value={fDateTo} onChange={(e)=>setDateTo(e.target.value)} />
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
                     <input className="input" placeholder="Dona dan" value={fQtyFrom} onChange={(e)=>setQtyFrom(e.target.value)} />
@@ -3789,8 +3948,8 @@ function Kassa({ D }) {
                 </div>
                 <div style={{display:'grid',gap:6}}>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                    <input className="input" type="date" value={fDateFrom} onChange={(e)=>setDateFrom(e.target.value)} />
-                    <input className="input" type="date" value={fDateTo} onChange={(e)=>setDateTo(e.target.value)} />
+                    <ModernDateInput value={fDateFrom} onChange={(e)=>setDateFrom(e.target.value)} />
+                    <ModernDateInput value={fDateTo} onChange={(e)=>setDateTo(e.target.value)} />
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
                     <input className="input" placeholder="Summa dan" value={fAmountFrom} onChange={(e)=>setAmountFrom(e.target.value)} />
@@ -4631,7 +4790,7 @@ function Obzvon({
                             )}
                           </div>
                         </td>
-                        <td><input className="input" type="date" value={String(r.callDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,callDate:e.target.value}:x))} /></td>
+                        <td><ModernDateInput value={String(r.callDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,callDate:e.target.value}:x))} /></td>
                         <td>
                           <select
                             className="select"
@@ -4650,7 +4809,7 @@ function Obzvon({
                           </select>
                         </td>
                         <td><input className="input" value={r.note||''} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,note:e.target.value}:x))} /></td>
-                        <td><input className="input" type="date" value={String(r.nextDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,nextDate:e.target.value}:x))} /></td>
+                        <td><ModernDateInput value={String(r.nextDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,nextDate:e.target.value}:x))} /></td>
                         <td>
                           <input
                             className="input"
@@ -4660,7 +4819,7 @@ function Obzvon({
                             style={{maxWidth:120}}
                           />
                         </td>
-                        <td><input className="input" type="date" value={String(r.orderDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,orderDate:e.target.value}:x))} /></td>
+                        <td><ModernDateInput value={String(r.orderDate||'').slice(0,10)} onChange={(e)=>saveRecords(records.map((x,j)=>j===i?{...x,orderDate:e.target.value}:x))} /></td>
                         <td>{r.operator || currentUser}</td>
                         <td><button className="btn btn-gh btn-sm" onClick={()=>saveRecords(records.filter((_,j)=>j!==i))}>X</button></td>
                       </tr>
@@ -4823,7 +4982,7 @@ function Obzvon({
                           )}
                         </td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
-                          {isEdit ? <input className="input" type="date" value={String(d.callDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), callDate:e.target.value}))} /> : fmtD(r.callDate)}
+                          {isEdit ? <ModernDateInput value={String(d.callDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), callDate:e.target.value}))} /> : fmtD(r.callDate)}
                         </td>
                         <td>
                           {isEdit ? (
@@ -4844,13 +5003,13 @@ function Obzvon({
                           )}
                         </td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
-                          {isEdit ? <input className="input" type="date" value={String(d.nextDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), nextDate:e.target.value}))} /> : fmtD(r.nextDate)}
+                          {isEdit ? <ModernDateInput value={String(d.nextDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), nextDate:e.target.value}))} /> : fmtD(r.nextDate)}
                         </td>
                         <td>
                           {isEdit ? <input className="input" value={d.orderCount || ''} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), orderCount:e.target.value}))} /> : (r.orderCount || '-')}
                         </td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>
-                          {isEdit ? <input className="input" type="date" value={String(d.orderDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), orderDate:e.target.value}))} /> : fmtD(r.orderDate)}
+                          {isEdit ? <ModernDateInput value={String(d.orderDate || '').slice(0,10)} onChange={(e)=>setAllNewEditDraft((p)=>({...(p||{}), orderDate:e.target.value}))} /> : fmtD(r.orderDate)}
                         </td>
                         <td>{r.operator || '-'}</td>
                         {(canEditAllNew || canDeleteAllNew) && (
@@ -5910,7 +6069,7 @@ function Reports({
   );
   const returnControlRows = useMemo(() => {
     const scopedRows = (rawOrders || []).filter((o) => {
-      if (!isWaterProduct(o.product)) return false;
+      if (!isOrderDoc(o.docType) && !isReturnDoc(o.docType)) return false;
       if (isCancelledStatus(o.status)) return false;
       const date = toIsoDate(o.orderDate);
       if (!date) return false;
@@ -5940,6 +6099,7 @@ function Reports({
           returnNo: String(o.soNum || '').trim(),
           qty: Math.abs(toNum(o.qty)),
           driver: String(o.delivPerson || o.agent || '').trim() || '-',
+          note: String(o.note || o.cat || '').trim() || '-',
           hasOrder,
           status: hasOrder ? 'Zakazi bor' : "Zakazi yo'q",
         };
@@ -5966,6 +6126,7 @@ function Reports({
     { key:'returnNo', label:'Vozvrat zakaz', type:'text' },
     { key:'qty', label:'Vozvrat suv soni', type:'number' },
     { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'note', label:'Izoh', type:'text' },
     { key:'status', label:'Status', type:'text' },
   ]), []);
   const activeNazoratColumns = nazoratSection === 'orders' ? nazoratOrderColumns : nazoratReturnColumns;
@@ -6023,8 +6184,8 @@ function Reports({
     exportAoaExcel({
       fileName: `Vozvrat_nazorati_${todayIso}.xlsx`,
       sheetName: 'Vozvrat_nazorati',
-      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Vozvrat zakaz', 'Vozvrat suv soni', 'Dostavchik', 'Status'],
-      columnTypes: ['date', 'text', 'text', 'text', 'number', 'text', 'text'],
+      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Vozvrat zakaz', 'Vozvrat suv soni', 'Dostavchik', 'Izoh', 'Status'],
+      columnTypes: ['date', 'text', 'text', 'text', 'number', 'text', 'text', 'text'],
       rows: nazoratFilteredRows.map((r) => [
         r.date,
         r.customerId,
@@ -6032,6 +6193,7 @@ function Reports({
         r.returnNo,
         r.qty,
         r.driver,
+        r.note,
         r.status,
       ]),
     });
@@ -6139,7 +6301,7 @@ function Reports({
       )}
 
       {showNazorat && (
-      <div className="card" style={{padding:16}}>
+      <div style={{display:'grid',gap:10,minHeight:0}}>
         <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:10}}>
           <div className="tabs" style={{display:'inline-flex'}}>
             <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
@@ -6173,7 +6335,7 @@ function Reports({
 
         {nazoratSection === 'orders' && (
           <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
-            Faqat "Основной склад"dan urilgan zakazlar hisobga olinadi. Dostavchik-sklad biriktirish: Nastroyka {'>'} Biriktirish bo'limida.
+            Faqat "Основной склад"dan urilgan zakazlar hisobga olinadi. Dostavchik-sklad biriktirish: Nastroyka &gt; Biriktirish bo'limida.
           </div>
         )}
         {nazoratSection === 'returns' && (
@@ -6182,7 +6344,8 @@ function Reports({
           </div>
         )}
 
-        <div style={{overflow:'auto',maxHeight:'60vh'}}>
+        <div className="card" style={{overflow:'hidden',minHeight:'calc(100vh - 250px)'}}>
+          <div style={{overflow:'auto',maxHeight:'calc(100vh - 250px)'}}>
           {nazoratSection === 'orders' ? (
             <table className="tbl">
               <thead>
@@ -6237,12 +6400,13 @@ function Reports({
                   <th>Vozvrat zakaz</th>
                   <th style={{textAlign:'right'}}>Vozvrat suv soni</th>
                   <th>Dostavchik</th>
+                  <th>Izoh</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {nazoratFilteredRows.length === 0 ? (
-                  <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
+                  <tr><td colSpan={8} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
                 ) : nazoratFilteredRows.map((r, i) => (
                   <tr key={`nret_${i}_${r.customerId}_${r.date}`} style={r.hasOrder ? undefined : {background:'rgba(248,81,73,.08)'}}>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
@@ -6251,12 +6415,14 @@ function Reports({
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.returnNo || '-'}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--or)'}}>{fmt(r.qty)}</td>
                     <td>{r.driver}</td>
+                    <td style={{maxWidth:280}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
                     <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
+          </div>
         </div>
       </div>
       )}
@@ -6451,9 +6617,7 @@ function PlanPage({
                 </button>
               </div>
               <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-                <input
-                  className="input"
-                  type="date"
+                <ModernDateInput
                   value={holidayDateInput}
                   disabled={!canEdit}
                   onChange={(e)=>setHolidayDateInput(e.target.value)}
