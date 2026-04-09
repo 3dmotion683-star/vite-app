@@ -172,7 +172,7 @@ const E = {
   phone: '\u{1F4DE}',
   doc: '\u{1F4C4}',
   report: '\u{1F4CA}',
-  plan: '\u{1F4C5}',
+  plan: '📆',
   water: '\u{1F4A7}',
   uzs: '\u{1F4B4}',
   usd: '\u{1F4B5}',
@@ -1897,8 +1897,8 @@ const buildColsFromAoa = (headers, rows) => {
 const EXCEL_NUM_FMT = '#,##0';
 const EXCEL_DATE_FMT = 'dd.mm.yyyy';
 const isDateLikeHeader = (h) => /(sana|date|oxirgi|keyingi|olingan|muddat)/i.test(String(h || '').trim());
-const isNumberLikeHeader = (h) => /(summa|balans|qarz|dona|soni|kol-vo|qty|oylar|qoldiq|to['`Р Р†Р вЂљРІвЂћСћ]?langan|idish|jami|miqdor|suv soni|(^|\s)(no|Р Р†РІР‚С›РІР‚вЂњ)(\s|$))/i.test(String(h || '').trim());
-const isTextForcedHeader = (h) => /(^|\s)(id|kod|telefon|phone|operator|agent|kontragent|mijoz|rayon|status|mavzu|izoh|mahsulot|hujjat|tur)(\s|$)/i.test(String(h || '').trim());
+const isNumberLikeHeader = (h) => /(summa|balans|qarz|dona|soni|kol-vo|qty|oylar|qoldiq|to['`Р Р†Р вЂљРІвЂћСћ]?langan|idish|jami|miqdor|suv soni|plan|kunlik|itog|operatorga|count|(^|\s)(no|Р Р†РІР‚С›РІР‚вЂњ)(\s|$))/i.test(String(h || '').trim());
+const isTextForcedHeader = (h) => /(^|\s)(id|kod|telefon|phone|operator|agent|kontragent|mijoz|rayon|status|mavzu|izoh|mahsulot|hujjat|tur|oy)(\s|$)/i.test(String(h || '').trim());
 const parseExcelNumber = (v) => {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
   const s0 = String(v ?? '').trim();
@@ -1964,8 +1964,13 @@ const detectExcelColumnType = (header, rows, colIndex) => {
   if (numHits / sample.length >= 0.7) return 'number';
   return 'text';
 };
-const buildTypedAoa = (headers = [], rows = []) => {
-  const colTypes = headers.map((h, idx) => detectExcelColumnType(h, rows, idx));
+const normalizeExcelColumnType = (v) => {
+  const t = String(v || '').trim().toLowerCase();
+  if (t === 'date' || t === 'number' || t === 'text') return t;
+  return '';
+};
+const buildTypedAoa = (headers = [], rows = [], forcedTypes = []) => {
+  const colTypes = headers.map((h, idx) => normalizeExcelColumnType(forcedTypes[idx]) || detectExcelColumnType(h, rows, idx));
   const typedRows = (rows || []).map((r) => headers.map((_, colIndex) => {
     const type = colTypes[colIndex];
     const raw = (r || [])[colIndex];
@@ -1978,8 +1983,8 @@ const buildTypedAoa = (headers = [], rows = []) => {
   }));
   return { typedRows, colTypes };
 };
-const buildTypedExcelSheet = (headers = [], rows = []) => {
-  const { typedRows, colTypes } = buildTypedAoa(headers, rows);
+const buildTypedExcelSheet = (headers = [], rows = [], forcedTypes = []) => {
+  const { typedRows, colTypes } = buildTypedAoa(headers, rows, forcedTypes);
   const ws = XLSX.utils.aoa_to_sheet([headers, ...typedRows], { cellDates:true, raw:true });
   ws['!cols'] = buildColsFromAoa(headers, typedRows);
   headers.forEach((_, colIndex) => {
@@ -1990,13 +1995,18 @@ const buildTypedExcelSheet = (headers = [], rows = []) => {
       if (!cell) continue;
       if (type === 'number' && cell.t === 'n') cell.z = EXCEL_NUM_FMT;
       if (type === 'date' && (cell.t === 'd' || cell.t === 'n')) cell.z = EXCEL_DATE_FMT;
+      if (type === 'text') {
+        cell.t = 's';
+        cell.v = cell.v == null ? '' : String(cell.v);
+        cell.z = '@';
+      }
     }
   });
   return ws;
 };
-function exportAoaExcel({ fileName, sheetName = 'Hisobot', headers = [], rows = [] }) {
+function exportAoaExcel({ fileName, sheetName = 'Hisobot', headers = [], rows = [], columnTypes = [] }) {
   const wb = XLSX.utils.book_new();
-  const ws = buildTypedExcelSheet(headers, rows);
+  const ws = buildTypedExcelSheet(headers, rows, columnTypes);
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
   XLSX.writeFile(wb, safeExcelName(fileName));
 }
@@ -2025,18 +2035,29 @@ body,input,select,button{font-family:var(--sans)}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--b1);border-radius:6px}
 .btn{cursor:pointer;border:none;font-size:12.5px;font-weight:600;border-radius:var(--r);
-  padding:7px 13px;transition:all .13s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.btn-bl{background:var(--bl);color:#000}.btn-bl:hover{opacity:.85}
-.btn-gr{background:var(--gr);color:#000}.btn-gr:hover{opacity:.85}
+  padding:7px 13px;transition:transform .12s ease, box-shadow .18s ease, background .18s ease, color .18s ease;
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap;position:relative;overflow:hidden}
+.btn::after{content:'';position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 20% 20%, rgba(255,255,255,.22), transparent 55%);opacity:0;transition:opacity .2s ease}
+.btn:hover::after,.btn:focus-visible::after{opacity:1}
+.btn:active{transform:translateY(1px) scale(.985)}
+.btn:focus-visible{outline:2px solid var(--bl);outline-offset:2px}
+.btn-bl{background:var(--bl);color:#000;box-shadow:0 4px 14px rgba(88,166,255,.18)}
+.btn-bl:hover{filter:brightness(1.03)}
+.btn-gr{background:var(--gr);color:#000;box-shadow:0 4px 14px rgba(63,185,80,.16)}
+.btn-gr:hover{filter:brightness(1.03)}
 .btn-gh{background:transparent;color:var(--t2);border:1px solid var(--b1)}
 .btn-gh:hover{background:var(--s3);color:var(--t1)}
 .btn-sm{padding:5px 10px;font-size:11.5px}
 .input{width:100%;padding:8px 11px;border:1px solid var(--b1);border-radius:var(--r);
-  font-size:13px;color:var(--t1);background:var(--s3);outline:none}
-.input:focus{border-color:var(--bl);box-shadow:0 0 0 3px rgba(88,166,255,.1)}
+  font-size:13px;color:var(--t1);background:var(--s3);background:linear-gradient(180deg,var(--s3),color-mix(in oklab, var(--s3) 82%, var(--bg)));
+  outline:none;transition:border-color .16s ease, box-shadow .16s ease, background .16s ease}
+.input:focus{border-color:var(--bl);box-shadow:0 0 0 3px rgba(88,166,255,.12)}
+.input[type="date"]{padding-right:36px;min-height:36px}
+.input[type="date"]::-webkit-calendar-picker-indicator{cursor:pointer;opacity:.92;filter:invert(.75) sepia(.7) saturate(3.2) hue-rotate(175deg)}
+.input[type="date"]::-webkit-datetime-edit{padding-right:4px}
 .select{padding:7px 10px;border:1px solid var(--b1);border-radius:var(--r);
-  font-size:12.5px;color:var(--t1);background:var(--s3);cursor:pointer;outline:none}
-.select:focus{border-color:var(--bl)}
+  font-size:12.5px;color:var(--t1);background:var(--s3);background:linear-gradient(180deg,var(--s3),color-mix(in oklab, var(--s3) 82%, var(--bg)));cursor:pointer;outline:none;transition:border-color .16s ease, box-shadow .16s ease}
+.select:focus{border-color:var(--bl);box-shadow:0 0 0 3px rgba(88,166,255,.12)}
 .card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl)}
 .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono)}
 .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px;backdrop-filter:blur(5px)}
@@ -2065,10 +2086,13 @@ body,input,select,button{font-family:var(--sans)}
 .drop-z.done{border-color:var(--gr);background:var(--gr3)}
 .tabs{display:flex;gap:2px;background:var(--s2);border-radius:var(--r);padding:3px}
 .tab{padding:5px 13px;border-radius:6px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--t2);transition:all .13s;border:none;background:none}
+.tab:focus-visible{outline:2px solid var(--bl);outline-offset:1px}
 .tab.on{background:var(--s1);color:var(--t1);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.tab:active{transform:translateY(1px)}
 .nav-i{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--r);cursor:pointer;color:var(--t2);font-size:13px;font-weight:500;transition:all .13s;user-select:none;position:relative}
 .nav-i:hover{background:var(--s2);color:var(--t1)}
 .nav-i.on{background:var(--bl2);color:var(--bl)}
+.nav-i:active{transform:translateY(1px)}
 .notif{position:fixed;bottom:18px;right:18px;z-index:999;padding:10px 16px;border-radius:var(--r);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;box-shadow:0 4px 24px rgba(0,0,0,.6);animation:up .2s ease}
 .sv-tbl td{font-size:11.5px}
 .sv-tbl tr.payment td{background:rgba(63,185,80,.04)}
@@ -2081,6 +2105,26 @@ body,input,select,button{font-family:var(--sans)}
 .toggle.on{background:var(--gr2);border-color:var(--gr)}
 .toggle .knob{position:absolute;top:1px;left:1px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .16s}
 .toggle.on .knob{left:17px}
+.staff-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}
+.staff-user-card{background:var(--s1);border:1px solid var(--b2);border-radius:12px;padding:12px;display:grid;gap:8px;cursor:pointer;transition:border-color .16s ease, transform .12s ease, box-shadow .16s ease}
+.staff-user-card:hover{border-color:var(--bl);box-shadow:0 8px 20px rgba(88,166,255,.12)}
+.staff-user-card:active{transform:translateY(1px)}
+.staff-user-card.on{border-color:var(--bl);box-shadow:0 10px 24px rgba(88,166,255,.16)}
+.perm-section{border:1px solid var(--b2);border-radius:10px;background:var(--s2);overflow:hidden}
+.perm-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;background:transparent;border:none;color:inherit;cursor:pointer}
+.perm-title{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--t1)}
+.perm-body{padding:8px 10px 10px;border-top:1px solid var(--b2);display:grid;gap:6px;background:var(--s1)}
+.perm-row{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--s3);border:1px solid var(--b2);border-radius:8px;padding:7px 8px}
+.perm-row span{font-size:11.5px;color:var(--t2)}
+.hol-week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.hol-week span{font-size:10.5px;color:var(--t3);text-align:center}
+.hol-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
+.hol-day{border:1px solid var(--b1);border-radius:8px;background:var(--s3);min-height:34px;font-size:12px;color:var(--t2);cursor:pointer;transition:all .14s}
+.hol-day:hover{border-color:var(--bl);color:var(--t1)}
+.hol-day.on{background:var(--bl2);color:var(--bl);border-color:var(--bl);font-weight:700}
+.hol-day.out{opacity:.55}
+.hol-day.weekly:not(.on){border-style:dashed}
+.hol-day:disabled{cursor:not-allowed;opacity:.6}
 `;
 const LIGHT_THEME_VARS = {
   '--bg': '#f4f7fb',
@@ -3389,6 +3433,7 @@ function Orders({ D }) {
       fileName: `Zakazlar_${new Date().toISOString().slice(0,10)}.xlsx`,
       sheetName: 'Zakazlar',
       headers: ['Zakaz', 'Mijoz', 'ID', 'Sana', 'Tur', 'Status', 'Valyuta', 'Dona', 'Summa UZS', 'Summa USD', 'Agent', 'Dostavchik', 'Mahsulot soni'],
+      columnTypes: ['text', 'text', 'text', 'date', 'text', 'text', 'text', 'number', 'number', 'number', 'text', 'text', 'number'],
       rows: list.map((g) => [
         g.soNum,
         g.contName,
@@ -3664,6 +3709,7 @@ function Kassa({ D }) {
       fileName: `Kassa_${new Date().toISOString().slice(0,10)}.xlsx`,
       sheetName: 'Kassa',
       headers: ['Sana', 'Op No', 'Tur', 'Kassa', 'Kontragent', 'Summa', 'Operator', 'Status', 'Valyuta', 'Mijoz ID', 'Izoh'],
+      columnTypes: ['date', 'text', 'text', 'text', 'text', 'number', 'text', 'text', 'text', 'text', 'text'],
       rows: list.map((c) => [
         fmtD(c.sana),
         c.opNum || '',
@@ -4399,6 +4445,7 @@ function Obzvon({
         fileName: `Obzvon_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'Obzvon',
         headers: ['ID', 'Mijoz', 'Sana', 'Maqsad', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator'],
+        columnTypes: ['text', 'text', 'date', 'text', 'text', 'date', 'number', 'date', 'text'],
         rows: (records || []).map((r) => [r.id || '', r.customer || '', fmtD(r.callDate), r.topic || '', r.note || '', fmtD(r.nextDate), r.orderCount || '', fmtD(r.orderDate), r.operator || '']),
       });
       return;
@@ -4408,6 +4455,7 @@ function Obzvon({
         fileName: `Barcha_obzvon_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'BarchaObzvon',
         headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator'],
+        columnTypes: ['number', 'text', 'text', 'date', 'text', 'text', 'date', 'number', 'date', 'text'],
         rows: allList.map((r, i) => [r.no || i + 1, r.customerId || '', r.customer || '', fmtD(r.callDate), r.topic || '', r.note || '', fmtD(r.nextDate), r.orderCount || '', fmtD(r.orderDate), r.operator || '']),
       });
       return;
@@ -4417,6 +4465,7 @@ function Obzvon({
         fileName: `Barcha_obzvon_yangi_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'BarchaObzvonYangi',
         headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator'],
+        columnTypes: ['number', 'text', 'text', 'date', 'text', 'text', 'date', 'number', 'date', 'text'],
         rows: allNewList.map((r, i) => [r.no || i + 1, r.customerId || '', r.customer || '', fmtD(r.callDate), r.topic || '', r.note || '', fmtD(r.nextDate), r.orderCount || '', fmtD(r.orderDate), r.operator || '']),
       });
       return;
@@ -4426,6 +4475,7 @@ function Obzvon({
         fileName: `Vaqti_kelgan_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'VaqtiKelgan',
         headers: ['ID', 'Mijoz', 'Telefon', 'Oxirgi zakazlar', 'Otgan kun', "Qongiroq meyori"],
+        columnTypes: ['text', 'text', 'text', 'text', 'number', 'number'],
         rows: dueCandidates.map((r) => [r.id, r.name, r.phone || '', r.last3Info || '', r.passed ?? '', r.shouldIn ?? '']),
       });
       return;
@@ -4435,6 +4485,7 @@ function Obzvon({
         fileName: `Ikki_oydan_otgan_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: '2OydanOtgan',
         headers: ['ID', 'Mijoz', 'Telefon', 'Oxirgi zakazlar', 'Otgan kun', "Qongiroq meyori"],
+        columnTypes: ['text', 'text', 'text', 'text', 'number', 'number'],
         rows: staleCandidates.map((r) => [r.id, r.name, r.phone || '', r.last3Info || '', r.passed ?? '', r.shouldIn ?? '']),
       });
       return;
@@ -4444,6 +4495,7 @@ function Obzvon({
         fileName: `Operator_jadvali_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'OperatorJadvali',
         headers: ['ID', 'Mijoz', 'Rayon', 'Balans', 'Oxirgi zakaz sana', 'Oldingi zakaz sana', 'Zakaz soni', "Oxirgi qongiroq", 'Keyingi sana', 'Operator', 'Oxirgi izoh'],
+        columnTypes: ['text', 'text', 'text', 'number', 'date', 'date', 'number', 'date', 'date', 'text', 'text'],
         rows: operatorTableRows.map((r) => [r.id, r.name, r.district || '', r.balance || 0, fmtD(r.ord1), fmtD(r.ord2), r.lastQty || 0, fmtD(r.lastCallDate), fmtD(r.nextDate), r.operator || '', r.lastNote || '']),
       });
     }
@@ -5351,6 +5403,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
       fileName: `Doljniki_${new Date().toISOString().slice(0,10)}.xlsx`,
       sheetName: 'Doljniki',
       headers: ['ID', 'Mijoz', 'Kategoriya', 'Qarz UZS', 'Qarz zakaz', 'Sana', 'Kun', 'Izoh (T)', 'Agent'],
+      columnTypes: ['text', 'text', 'text', 'number', 'text', 'date', 'number', 'text', 'text'],
       rows: list.map((r) => [
         r.id,
         r.name,
@@ -5369,6 +5422,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
       fileName: `Kuler_nasiya_${new Date().toISOString().slice(0,10)}.xlsx`,
       sheetName: 'KulerNasiya',
       headers: ['Mijoz ID', 'Mijoz', 'Zakaz', 'Mahsulot', 'Olingan sana', 'Oylar', 'Asosiy summa', 'Tolangan', 'Qoldiq', 'Oylik tolov', 'Muddati kelgan'],
+      columnTypes: ['text', 'text', 'text', 'text', 'date', 'number', 'number', 'number', 'number', 'number', 'number'],
       rows: kulerList.map((k) => [
         k.customerId,
         k.customerName,
@@ -5847,6 +5901,7 @@ function Reports({
       fileName: `Hisobot_${todayIso}.xlsx`,
       sheetName: 'Hisobot',
       headers: ['Operator', 'Bugun obzvon', 'Buyurtma soni', 'Suv soni', 'Qarz mijoz', 'Qarz summa'],
+      columnTypes: ['text', 'number', 'number', 'number', 'number', 'number'],
       rows: dailyRows.map((r) => [r.operator, r.calls, r.buyurtmaCount, r.buyurtmaQty, r.debtCount, r.debtSum]),
     });
   };
@@ -5856,6 +5911,7 @@ function Reports({
       fileName: `Nazorat_${todayIso}.xlsx`,
       sheetName: 'Nazorat',
       headers: ['Sana', 'Dostavchik', 'Sklad', 'Zakaz suv soni', 'Permesheniya (obshiyga)', 'Farq', 'Holat'],
+      columnTypes: ['date', 'text', 'text', 'number', 'number', 'number', 'text'],
       rows: dailyControlRows.map((r) => [
         r.date,
         r.driver,
@@ -6071,6 +6127,10 @@ function PlanPage({
   useEffect(() => { setOffDayConfig(normalizeOffDaysConfig(planOffDays)); }, [planOffDays]);
   const [showHolidayPicker, setShowHolidayPicker] = useState(false);
   const [holidayDateInput, setHolidayDateInput] = useState('');
+  const [holidayMonth, setHolidayMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const offDays = offDayConfig.weekdays || [];
   const extraOffDates = offDayConfig.dates || [];
 
@@ -6085,13 +6145,20 @@ function PlanPage({
     const n = Math.max(0, Math.round(Number(value || 0)));
     setRows((prev) => prev.map((r) => r.month === month ? { ...r, [key]: key === 'workDays' ? Math.max(1, n) : n } : r));
   };
-  const addExtraOffDay = () => {
-    if (!holidayDateInput) return;
+  const toggleExtraOffDay = (dateIso) => {
+    const d = String(dateIso || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
     setOffDayConfig((prev) => {
       const cfg = normalizeOffDaysConfig(prev);
-      if (cfg.dates.includes(holidayDateInput)) return cfg;
-      return normalizeOffDaysConfig({ ...cfg, dates: [...cfg.dates, holidayDateInput] });
+      if (cfg.dates.includes(d)) {
+        return normalizeOffDaysConfig({ ...cfg, dates: cfg.dates.filter((x) => x !== d) });
+      }
+      return normalizeOffDaysConfig({ ...cfg, dates: [...cfg.dates, d] });
     });
+  };
+  const addExtraOffDay = () => {
+    if (!holidayDateInput) return;
+    toggleExtraOffDay(holidayDateInput);
     setHolidayDateInput('');
   };
   const removeExtraOffDay = (dateIso) => {
@@ -6100,6 +6167,30 @@ function PlanPage({
       return normalizeOffDaysConfig({ ...cfg, dates: cfg.dates.filter((d) => d !== dateIso) });
     });
   };
+  const holidayCalendar = useMemo(() => {
+    const m = String(holidayMonth || '').match(/^(\d{4})-(\d{2})$/);
+    const base = m ? new Date(Number(m[1]), Number(m[2]) - 1, 1) : new Date();
+    base.setHours(0, 0, 0, 0);
+    const start = new Date(base);
+    const mondayIdx = (start.getDay() + 6) % 7;
+    start.setDate(start.getDate() - mondayIdx);
+    const cells = [];
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      cells.push({
+        iso,
+        day: d.getDate(),
+        inMonth: d.getMonth() === base.getMonth() && d.getFullYear() === base.getFullYear(),
+        weekday: d.getDay(),
+      });
+    }
+    return {
+      monthLabel: base.toLocaleDateString('uz-UZ', { month: 'long', year: 'numeric' }),
+      cells,
+    };
+  }, [holidayMonth]);
   const savePlan = () => {
     const next = normalizePlanRows(rows);
     setRows(next);
@@ -6116,6 +6207,7 @@ function PlanPage({
       fileName: `Plan_${new Date().toISOString().slice(0,10)}.xlsx`,
       sheetName: 'Plan',
       headers: ['Oy', 'Suv plan', 'Kuler plan', 'Ish kuni', 'Kunlik suv', 'Kunlik kuler', 'Operatorga suv', 'Operatorga kuler'],
+      columnTypes: ['text', 'number', 'number', 'number', 'number', 'number', 'number', 'number'],
       rows: rows.map((r) => {
         const wd = Math.max(1, Number(r.workDays || 1));
         const waterDay = Math.ceil(Number(r.waterPlan || 0) / wd);
@@ -6175,18 +6267,70 @@ function PlanPage({
         {showHolidayPicker && (
           <div style={{marginTop:10,padding:10,border:'1px dashed var(--b1)',borderRadius:8,display:'grid',gap:8}}>
             <div style={{fontSize:11,color:'var(--t3)'}}>Qo'shimcha dam kunlari (bayram va boshqa kunlar)</div>
-            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-              <input
-                className="input"
-                type="date"
-                value={holidayDateInput}
-                disabled={!canEdit}
-                onChange={(e)=>setHolidayDateInput(e.target.value)}
-                style={{maxWidth:180}}
-              />
-              <button className="btn btn-bl btn-sm" disabled={!canEdit || !holidayDateInput} onClick={addExtraOffDay}>
-                Qo'shish
-              </button>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,flexWrap:'wrap'}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <button
+                  className="btn btn-gh btn-sm"
+                  disabled={!canEdit}
+                  onClick={() => {
+                    setHolidayMonth((prev) => {
+                      const m = String(prev || '').match(/^(\d{4})-(\d{2})$/);
+                      const d = m ? new Date(Number(m[1]), Number(m[2]) - 2, 1) : new Date();
+                      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                    });
+                  }}
+                >
+                  {'<'}
+                </button>
+                <div style={{fontWeight:700,fontSize:12.5,textTransform:'capitalize'}}>{holidayCalendar.monthLabel}</div>
+                <button
+                  className="btn btn-gh btn-sm"
+                  disabled={!canEdit}
+                  onClick={() => {
+                    setHolidayMonth((prev) => {
+                      const m = String(prev || '').match(/^(\d{4})-(\d{2})$/);
+                      const d = m ? new Date(Number(m[1]), Number(m[2]), 1) : new Date();
+                      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                    });
+                  }}
+                >
+                  {'>'}
+                </button>
+              </div>
+              <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                <input
+                  className="input"
+                  type="date"
+                  value={holidayDateInput}
+                  disabled={!canEdit}
+                  onChange={(e)=>setHolidayDateInput(e.target.value)}
+                  style={{maxWidth:180}}
+                />
+                <button className="btn btn-bl btn-sm" disabled={!canEdit || !holidayDateInput} onClick={addExtraOffDay}>
+                  Qo'shish
+                </button>
+              </div>
+            </div>
+            <div className="hol-week">
+              {['Du','Se','Cho','Pa','Ju','Sha','Yak'].map((x) => <span key={x}>{x}</span>)}
+            </div>
+            <div className="hol-grid">
+              {holidayCalendar.cells.map((c) => {
+                const on = extraOffDates.includes(c.iso);
+                const weeklyOff = offDays.includes(c.weekday);
+                return (
+                  <button
+                    key={c.iso}
+                    type="button"
+                    className={`hol-day${on ? ' on' : ''}${c.inMonth ? '' : ' out'}${weeklyOff ? ' weekly' : ''}`}
+                    disabled={!canEdit}
+                    onClick={() => toggleExtraOffDay(c.iso)}
+                    title={c.iso}
+                  >
+                    {c.day}
+                  </button>
+                );
+              })}
             </div>
             <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
               {extraOffDates.length === 0 ? (
@@ -6267,11 +6411,12 @@ function SettingsPanel({
 }) {
   const [tab, setTab] = useState('staff');
   const [sel, setSel] = useState(currentUser || users[0] || 'Admin');
+  const [staffModalUser, setStaffModalUser] = useState('');
+  const [openPermSection, setOpenPermSection] = useState('cust');
   const [editUser, setEditUser] = useState('');
   const [editLogin, setEditLogin] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const conf = normalizeAccessConfig(sel, access[sel]);
   const pages = ['dash','cust','orders','kassa','obzvon','doljniki','nazorat','reports','plan','refresh','settings'];
   const settingsSections = [
     { key:'settings_staff', label:"Hodimlar ruhsatlari" },
@@ -6429,6 +6574,55 @@ function SettingsPanel({
     setSel(newLogin);
     closeCredEditor();
   };
+  const canManageStaff = Boolean(isAdminSession);
+  const openStaffModal = (u) => {
+    setSel(u);
+    setStaffModalUser(u);
+    setOpenPermSection('cust');
+  };
+  const closeStaffModal = () => {
+    setStaffModalUser('');
+    closeCredEditor();
+  };
+  const updateUserAccess = (u, updater) => {
+    if (!u) return;
+    setAccess((prev) => {
+      const current = normalizeAccessConfig(u, prev[u] || access[u]);
+      const updated = normalizeAccessConfig(u, updater(current) || current);
+      const next = { ...prev, [u]: updated };
+      S.set('aq-access', next);
+      return next;
+    });
+  };
+  const activeStaffConf = staffModalUser ? normalizeAccessConfig(staffModalUser, access[staffModalUser]) : null;
+  const permissionGroupDefs = [
+    { key: 'dash', label: 'Dashboard', fallback: true, children: [] },
+    {
+      key: 'cust',
+      label: "Mijozlar",
+      fallback: true,
+      children: customerTabDefs.map((t) => ({ key: t.key, label: t.label, kind: 'customerTabs', fallback: true })),
+    },
+    { key: 'orders', label: 'Zakazlar', fallback: true, children: [] },
+    { key: 'kassa', label: 'Kassa', fallback: true, children: [] },
+    {
+      key: 'obzvon',
+      label: 'Obzvon',
+      fallback: true,
+      children: obzvonNewPermSections.map((s) => ({ key: s.key, label: s.label, kind: 'visible', fallback: false })),
+    },
+    { key: 'doljniki', label: 'Doljniki', fallback: true, children: [] },
+    { key: 'nazorat', label: 'Nazorat', fallback: true, children: [] },
+    { key: 'reports', label: 'Hisobotlar', fallback: true, children: [] },
+    { key: 'plan', label: 'Plan', fallback: true, children: [] },
+    { key: 'refresh', label: 'Yangilash', fallback: true, children: [] },
+    {
+      key: 'settings',
+      label: 'Nastroyka',
+      fallback: false,
+      children: settingsSections.map((s) => ({ key: s.key, label: s.label, kind: 'visible', fallback: true })),
+    },
+  ];
 
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12}}>
@@ -6498,270 +6692,241 @@ function SettingsPanel({
 
       {tab==='staff' && (viewerConf.visible?.settings_staff ?? true) && (
         <>
-          <div className="g4">
-            <StatCard l="LOGINS" v={users.length+' ta'} c="var(--bl)"/>
-            <StatCard l="AKTIV LOGIN" v={currentUser} c="var(--gr)"/>
-            <StatCard l="TANLANGAN" v={sel} c="var(--yl)"/>
-            <StatCard l="SCOPE" v={conf.scope==='all'?'Barcha':'O`ziga'} c="var(--pu)"/>
-          </div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Foydalanuvchi</span>
-            {users.map((u) => (
-              <button
-                key={u}
-                className={`btn btn-sm ${sel === u ? 'btn-bl' : 'btn-gh'}`}
-                onClick={() => setSel(u)}
-              >
-                {u}
-              </button>
-            ))}
+            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Foydalanuvchilar: {users.length}</span>
             {isAdminSession ? (
               <select className="select" value={currentUser} onChange={(e)=>onSwitchUser ? onSwitchUser(e.target.value) : setCurrentUser(e.target.value)}>
                 {users.map((u)=><option key={u}>{u}</option>)}
               </select>
             ) : (
-              <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{currentUser}</span>
+              <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Aktiv: {currentUser}</span>
             )}
             <button className="btn btn-gh btn-sm" onClick={addUser} disabled={!isAdminSession}>+ Login qo'shish</button>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:10}}>
-            {users.filter((u) => u === sel).map((u) => {
+          <div className="staff-grid">
+            {users.map((u) => {
               const uc = normalizeAccessConfig(u, access[u]);
+              const visibleCount = pages.filter((p) => ((uc.visible || {})[p] ?? defaultVisible[p] ?? true)).length;
+              const customerCount = customerTabDefs.filter((t) => ((uc.customerTabs || {})[t.key] ?? true)).length;
               return (
-                <div key={u} className="card" style={{padding:12,border:u===sel?'1px solid var(--bl)':'1px solid var(--b2)'}}>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
-                    <button
-                      type="button"
-                      onClick={() => isAdminSession && openCredEditor(u)}
-                      style={{
-                        display:'flex',alignItems:'center',gap:8,border:'none',background:'transparent',
-                        color:'inherit',cursor:isAdminSession?'pointer':'default',padding:0
-                      }}
-                    >
-                      <div style={{width:28,height:28,borderRadius:14,background:'var(--s3)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800}}>
+                <button
+                  key={u}
+                  className={`staff-user-card${sel === u ? ' on' : ''}`}
+                  onClick={() => openStaffModal(u)}
+                  type="button"
+                >
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <div style={{width:30,height:30,borderRadius:15,background:'var(--s3)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,color:'var(--t1)'}}>
                         {u.slice(0,1).toUpperCase()}
                       </div>
                       <div style={{textAlign:'left'}}>
-                        <div style={{fontWeight:700}}>{u}</div>
-                        <div style={{fontSize:10.5,color:'var(--t3)'}}>Ismga bosing: login/parol</div>
-                      </div>
-                    </button>
-                    <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Sozlama</span>
-                  </div>
-                  {editUser === u && (
-                    <div style={{background:'var(--s3)',border:'1px solid var(--b1)',borderRadius:8,padding:8,marginBottom:8}}>
-                      <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Login</div>
-                      <input
-                        className="input"
-                        value={editLogin}
-                        onChange={(e)=>setEditLogin(e.target.value)}
-                        disabled={!isAdminSession}
-                        style={{padding:'6px 8px',fontSize:12,marginBottom:8}}
-                      />
-                      <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Parol</div>
-                      <div style={{display:'flex',gap:6}}>
-                        <input
-                          className="input"
-                          type={showPassword ? 'text' : 'password'}
-                          value={editPassword}
-                          onChange={(e)=>setEditPassword(e.target.value)}
-                          disabled={!isAdminSession}
-                          style={{padding:'6px 8px',fontSize:12,flex:1}}
-                        />
-                        <button className="btn btn-gh btn-sm" onClick={()=>setShowPassword((v)=>!v)} type="button">
-                          {showPassword ? "Yop" : "Ko'r"}
-                        </button>
-                        <button className="btn btn-gh btn-sm" onClick={()=>setEditPassword('')} type="button" disabled={!isAdminSession}>
-                          Tozalash
-                        </button>
-                      </div>
-                      <div style={{display:'flex',justifyContent:'flex-end',gap:6,marginTop:8}}>
-                        <button className="btn btn-gh btn-sm" onClick={closeCredEditor} type="button">Bekor</button>
-                        <button className="btn btn-bl btn-sm" onClick={saveCredEditor} type="button" disabled={!isAdminSession}>Saqlash</button>
+                        <div style={{fontWeight:700,color:'var(--t1)'}}>{u}</div>
+                        <div style={{fontSize:10.5,color:'var(--t3)'}}>{uc.role || 'operator'}</div>
                       </div>
                     </div>
-                  )}
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                    <span style={{fontSize:12,color:'var(--t3)'}}>Faqat o'z mijozlari</span>
-                    <button className={`toggle${uc.scope==='own'?' on':''}`} onClick={() => {
-                      setAccess((prev) => {
-                        const confU = normalizeAccessConfig(u, prev[u] || uc);
-                        const nextScope = confU.scope === 'own' ? 'all' : 'own';
-                        const next = { ...prev, [u]: normalizeAccessConfig(u, { ...confU, scope: nextScope }) };
-                        S.set('aq-access', next);
-                        return next;
-                      });
-                    }}><span className="knob" /></button>
+                    <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{uc.scope === 'all' ? 'Barcha' : "O'ziga"}</span>
                   </div>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,gap:8}}>
-                    <span style={{fontSize:12,color:'var(--t3)'}}>Lavozim</span>
-                    <select
-                      className="select"
-                      value={uc.role || (u==='Admin' ? 'admin' : 'operator')}
-                      onChange={(e)=>{
-                        const role = e.target.value;
-                        setAccess((prev)=>{
-                          const confU = normalizeAccessConfig(u, prev[u] || uc);
-                          const next = { ...prev, [u]: normalizeAccessConfig(u, { ...confU, role }) };
-                          S.set('aq-access', next);
-                          return next;
-                        });
-                      }}
-                    >
-                      <option value="operator">Operator</option>
-                      <option value="supervisor">Supervisor</option>
-                      <option value="admin">Admin</option>
-                    </select>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                    <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Bo'lim: {visibleCount}</span>
+                    <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Mijoz tab: {customerCount}</span>
+                    <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>{companyLabelByKey(uc.company?.default || 'murodbaxsh')}</span>
                   </div>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
-                    <span style={{fontSize:12,color:'var(--t3)'}}>Kompaniya almashtirish tugmasi</span>
-                    <button className={`toggle${(uc.company?.canSwitch ?? false)?' on':''}`} onClick={() => {
-                      setAccess((prev) => {
-                        const confU = normalizeAccessConfig(u, prev[u] || uc);
-                        const next = {
-                          ...prev,
-                          [u]: normalizeAccessConfig(u, {
-                            ...confU,
-                            company: {
-                              ...(confU.company || {}),
-                              canSwitch: !(confU.company?.canSwitch ?? false),
-                              default: normalizeCompanyKey(confU.company?.default || 'murodbaxsh'),
-                            },
-                          }),
-                        };
-                        S.set('aq-access', next);
-                        return next;
-                      });
-                    }}><span className="knob" /></button>
+                </button>
+              );
+            })}
+          </div>
+          {staffModalUser && activeStaffConf && (
+            <div className="modal-ov fade" onClick={(e)=>e.target===e.currentTarget&&closeStaffModal()}>
+              <div className="modal ani" style={{maxWidth:980}}>
+                <div className="mhdr">
+                  <div>
+                    <div style={{fontWeight:800,fontSize:16}}>{staffModalUser} ruxsatlari</div>
+                    <div style={{fontSize:12,color:'var(--t3)',marginTop:2}}>
+                      Bo'lim nomini bossangiz ichki ruxsatlar ochiladi
+                    </div>
                   </div>
-                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8,gap:8}}>
-                    <span style={{fontSize:12,color:'var(--t3)'}}>
-                      {(uc.company?.canSwitch ?? false) ? "Boshlang'ich kompaniya" : "Biriktirilgan kompaniya"}
-                    </span>
-                    <select
-                      className="select"
-                      value={normalizeCompanyKey(uc.company?.default || 'murodbaxsh')}
-                      onChange={(e)=>{
-                        const nextCompany = normalizeCompanyKey(e.target.value);
-                        setAccess((prev)=>{
-                          const confU = normalizeAccessConfig(u, prev[u] || uc);
-                          const next = {
-                            ...prev,
-                            [u]: normalizeAccessConfig(u, {
-                              ...confU,
-                              company: {
-                                ...(confU.company || {}),
-                                default: nextCompany,
-                              },
-                            }),
-                          };
-                          S.set('aq-access', next);
-                          return next;
-                        });
-                      }}
-                    >
-                      {COMPANY_OPTIONS.map((x)=><option key={x.key} value={x.key}>{x.label}</option>)}
-                    </select>
-                  </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:6}}>Mijozlar bo'limlari</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,marginBottom:8}}>
-                    {customerTabDefs.map((t) => {
-                      const onTab = ((uc.customerTabs || {})[t.key] ?? true);
-                      return (
-                        <div key={t.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--s3)',borderRadius:8,padding:'6px 8px'}}>
-                          <span style={{fontSize:11,color:'var(--t2)'}}>{t.label}</span>
-                          <button className={`toggle${onTab?' on':''}`} onClick={() => {
-                            setAccess((prev) => {
-                              const confU = normalizeAccessConfig(u, prev[u] || uc);
-                              const next = {
-                                ...prev,
-                                [u]: normalizeAccessConfig(u, {
-                                  ...confU,
-                                  customerTabs: { ...(confU.customerTabs || {}), [t.key]: !onTab },
-                                }),
-                              };
-                              S.set('aq-access', next);
-                              return next;
-                            });
-                          }}><span className="knob" /></button>
+                  <button className="btn btn-gh btn-sm" type="button" onClick={closeStaffModal}>Yopish</button>
+                </div>
+                <div className="mbdy" style={{display:'grid',gridTemplateColumns:'minmax(260px,320px) 1fr',gap:12}}>
+                  <div className="card" style={{padding:12,display:'grid',gap:8,alignSelf:'start'}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                      <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Login va profil</span>
+                      <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{activeStaffConf.scope === 'all' ? 'Barcha' : "O'ziga"}</span>
+                    </div>
+                    {editUser === staffModalUser ? (
+                      <div style={{background:'var(--s3)',border:'1px solid var(--b1)',borderRadius:8,padding:8}}>
+                        <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Login</div>
+                        <input
+                          className="input"
+                          value={editLogin}
+                          onChange={(e)=>setEditLogin(e.target.value)}
+                          disabled={!canManageStaff}
+                          style={{padding:'6px 8px',fontSize:12,marginBottom:8}}
+                        />
+                        <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Parol</div>
+                        <div style={{display:'flex',gap:6}}>
+                          <input
+                            className="input"
+                            type={showPassword ? 'text' : 'password'}
+                            value={editPassword}
+                            onChange={(e)=>setEditPassword(e.target.value)}
+                            disabled={!canManageStaff}
+                            style={{padding:'6px 8px',fontSize:12,flex:1}}
+                          />
+                          <button className="btn btn-gh btn-sm" onClick={()=>setShowPassword((v)=>!v)} type="button">
+                            {showPassword ? "Yop" : "Ko'r"}
+                          </button>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                    {pages.map((p) => {
-                      const on = ((uc.visible||{})[p] ?? defaultVisible[p] ?? true);
-                      return (
-                      <div key={p} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--s3)',borderRadius:8,padding:'6px 8px'}}>
-                        <span style={{fontSize:11,color:'var(--t2)'}}>{p}</span>
-                        <button className={`toggle${on?' on':''}`} onClick={() => {
-                          setAccess((prev) => {
-                            const confU = normalizeAccessConfig(u, prev[u] || uc);
-                            const currentOn = ((confU.visible || {})[p] ?? defaultVisible[p] ?? true);
-                            const next = { ...prev, [u]: normalizeAccessConfig(u, { ...confU, visible: { ...(confU.visible || {}), [p]: !currentOn } }) };
-                            S.set('aq-access', next);
-                            return next;
-                          });
-                        }}><span className="knob" /></button>
+                        <div style={{display:'flex',justifyContent:'flex-end',gap:6,marginTop:8}}>
+                          <button className="btn btn-gh btn-sm" onClick={closeCredEditor} type="button">Bekor</button>
+                          <button className="btn btn-bl btn-sm" onClick={saveCredEditor} type="button" disabled={!canManageStaff}>Saqlash</button>
+                        </div>
                       </div>
-                    )})}
+                    ) : (
+                      <button
+                        className="btn btn-gh btn-sm"
+                        type="button"
+                        disabled={!canManageStaff}
+                        onClick={() => openCredEditor(staffModalUser)}
+                      >
+                        Login/parolni tahrirlash
+                      </button>
+                    )}
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                      <span style={{fontSize:12,color:'var(--t2)'}}>Faqat o'z mijozlari</span>
+                      <button
+                        className={`toggle${activeStaffConf.scope==='own'?' on':''}`}
+                        disabled={!canManageStaff}
+                        onClick={() => updateUserAccess(staffModalUser, (confU) => ({ ...confU, scope: confU.scope === 'own' ? 'all' : 'own' }))}
+                      ><span className="knob" /></button>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                      <span style={{fontSize:12,color:'var(--t2)'}}>Lavozim</span>
+                      <select
+                        className="select"
+                        value={activeStaffConf.role || (staffModalUser==='Admin' ? 'admin' : 'operator')}
+                        disabled={!canManageStaff}
+                        onChange={(e)=>updateUserAccess(staffModalUser, (confU) => ({ ...confU, role: e.target.value }))}
+                      >
+                        <option value="operator">Operator</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                      <span style={{fontSize:12,color:'var(--t2)'}}>Kompaniya almashtirish tugmasi</span>
+                      <button
+                        className={`toggle${(activeStaffConf.company?.canSwitch ?? false)?' on':''}`}
+                        disabled={!canManageStaff}
+                        onClick={() => updateUserAccess(staffModalUser, (confU) => ({
+                          ...confU,
+                          company: {
+                            ...(confU.company || {}),
+                            canSwitch: !(confU.company?.canSwitch ?? false),
+                            default: normalizeCompanyKey(confU.company?.default || 'murodbaxsh'),
+                          },
+                        }))}
+                      ><span className="knob" /></button>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8}}>
+                      <span style={{fontSize:12,color:'var(--t2)'}}>
+                        {(activeStaffConf.company?.canSwitch ?? false) ? "Boshlang'ich kompaniya" : "Biriktirilgan kompaniya"}
+                      </span>
+                      <select
+                        className="select"
+                        value={normalizeCompanyKey(activeStaffConf.company?.default || 'murodbaxsh')}
+                        disabled={!canManageStaff}
+                        onChange={(e)=>updateUserAccess(staffModalUser, (confU) => ({
+                          ...confU,
+                          company: { ...(confU.company || {}), default: normalizeCompanyKey(e.target.value) },
+                        }))}
+                      >
+                        {COMPANY_OPTIONS.map((x)=><option key={x.key} value={x.key}>{x.label}</option>)}
+                      </select>
+                    </div>
                   </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginTop:8,marginBottom:6}}>Nastroyka qatorlari</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr',gap:6}}>
-                    {settingsSections.map((s) => {
-                      const on = ((uc.visible || {})[s.key] ?? true);
+                  <div style={{display:'grid',gap:8,alignContent:'start'}}>
+                    {permissionGroupDefs.map((grp) => {
+                      const topOn = ((activeStaffConf.visible || {})[grp.key] ?? defaultVisible[grp.key] ?? grp.fallback);
+                      const hasChildren = Array.isArray(grp.children) && grp.children.length > 0;
+                      const isOpen = openPermSection === grp.key;
                       return (
-                        <div key={s.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--s3)',borderRadius:8,padding:'6px 8px'}}>
-                          <span style={{fontSize:11,color:'var(--t2)'}}>{s.label}</span>
-                          <button className={`toggle${on?' on':''}`} onClick={() => {
-                            setAccess((prev) => {
-                              const confU = normalizeAccessConfig(u, prev[u] || uc);
-                              const currentOn = ((confU.visible || {})[s.key] ?? true);
-                              const next = {
-                                ...prev,
-                                [u]: normalizeAccessConfig(u, {
-                                  ...confU,
-                                  visible: { ...(confU.visible || {}), [s.key]: !currentOn },
-                                }),
-                              };
-                              S.set('aq-access', next);
-                              return next;
-                            });
-                          }}><span className="knob" /></button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginTop:8,marginBottom:6}}>Obzvon yangi ruxsatlari</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr',gap:6}}>
-                    {obzvonNewPermSections.map((s) => {
-                      const on = ((uc.visible || {})[s.key] ?? false);
-                      return (
-                        <div key={s.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--s3)',borderRadius:8,padding:'6px 8px'}}>
-                          <span style={{fontSize:11,color:'var(--t2)'}}>{s.label}</span>
-                          <button className={`toggle${on?' on':''}`} onClick={() => {
-                            setAccess((prev) => {
-                              const confU = normalizeAccessConfig(u, prev[u] || uc);
-                              const currentOn = ((confU.visible || {})[s.key] ?? false);
-                              const next = {
-                                ...prev,
-                                [u]: normalizeAccessConfig(u, {
-                                  ...confU,
-                                  visible: { ...(confU.visible || {}), [s.key]: !currentOn },
-                                }),
-                              };
-                              S.set('aq-access', next);
-                              return next;
-                            });
-                          }}><span className="knob" /></button>
+                        <div key={grp.key} className="perm-section">
+                          <div
+                            className="perm-head"
+                            role={hasChildren ? 'button' : undefined}
+                            tabIndex={hasChildren ? 0 : -1}
+                            onClick={() => hasChildren && setOpenPermSection((p) => p === grp.key ? '' : grp.key)}
+                            onKeyDown={(e) => {
+                              if (!hasChildren) return;
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setOpenPermSection((p) => p === grp.key ? '' : grp.key);
+                              }
+                            }}
+                          >
+                            <div className="perm-title">
+                              <span style={{fontFamily:'var(--mono)',color:'var(--t3)',minWidth:14}}>
+                                {hasChildren ? (isOpen ? 'v' : '>') : ' '}
+                              </span>
+                              <span>{grp.label}</span>
+                            </div>
+                            <button
+                              className={`toggle${topOn?' on':''}`}
+                              disabled={!canManageStaff}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateUserAccess(staffModalUser, (confU) => {
+                                  const currentOn = ((confU.visible || {})[grp.key] ?? defaultVisible[grp.key] ?? grp.fallback);
+                                  return {
+                                    ...confU,
+                                    visible: { ...(confU.visible || {}), [grp.key]: !currentOn },
+                                  };
+                                });
+                              }}
+                            ><span className="knob" /></button>
+                          </div>
+                          {hasChildren && isOpen && (
+                            <div className="perm-body">
+                              {grp.children.map((child) => {
+                                const isCustomerTab = child.kind === 'customerTabs';
+                                const currentOn = isCustomerTab
+                                  ? ((activeStaffConf.customerTabs || {})[child.key] ?? child.fallback ?? true)
+                                  : ((activeStaffConf.visible || {})[child.key] ?? child.fallback ?? true);
+                                return (
+                                  <div key={child.key} className="perm-row">
+                                    <span>{child.label}</span>
+                                    <button
+                                      className={`toggle${currentOn ? ' on' : ''}`}
+                                      disabled={!canManageStaff}
+                                      onClick={() => {
+                                        if (isCustomerTab) {
+                                          updateUserAccess(staffModalUser, (confU) => ({
+                                            ...confU,
+                                            customerTabs: { ...(confU.customerTabs || {}), [child.key]: !((confU.customerTabs || {})[child.key] ?? child.fallback ?? true) },
+                                          }));
+                                          return;
+                                        }
+                                        updateUserAccess(staffModalUser, (confU) => ({
+                                          ...confU,
+                                          visible: { ...(confU.visible || {}), [child.key]: !((confU.visible || {})[child.key] ?? child.fallback ?? true) },
+                                        }));
+                                      }}
+                                    ><span className="knob" /></button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 
