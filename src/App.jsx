@@ -4673,6 +4673,8 @@ function Obzvon({
           <div style={{display:'flex',justifyContent:'flex-end'}}>
             <button className="btn btn-bl btn-sm" onClick={()=>appendRows(1000)}>+ 1000 ta qator qo'shish</button>
           </div>
+        </>
+      )}
       {tab==='all' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -4736,6 +4738,8 @@ function Obzvon({
               </table>
             </div>
           </div>
+        </>
+      )}
       {tab==='all_new' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -4768,7 +4772,7 @@ function Obzvon({
               {E.refresh} Yangilash
             </button>
             {canPublishAllNew && (
-              <>
+              <div style={{display:'flex',gap:8}}>
                 <button
                   className="btn btn-gr btn-sm"
                   onClick={async () => {
@@ -4789,6 +4793,8 @@ function Obzvon({
                 >
                   Sheetni to'liq almashtirish
                 </button>
+              </div>
+            )}
             <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{visibleAllNewRows.length} / {allNewList.length} ta yozuv</span>
             {allNewList.length > 500 && (
               <button className="btn btn-gh btn-sm" onClick={()=>setAllShowMode((m)=>m==='all'?'smart':'all')}>
@@ -4864,6 +4870,8 @@ function Obzvon({
               </table>
             </div>
           </div>
+        </>
+      )}
       {tab==='due' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -4954,6 +4962,8 @@ function Obzvon({
               </button>
             </div>
           )}
+        </>
+      )}
       {tab==='late2m' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -5044,6 +5054,8 @@ function Obzvon({
               </button>
             </div>
           )}
+        </>
+      )}
       {tab==='op' && (
         <>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -5146,6 +5158,8 @@ function Obzvon({
               </button>
             </div>
           )}
+        </>
+      )}
     </div>
   );
 }
@@ -6116,6 +6130,8 @@ function Reports({
                     <td style={{fontWeight:700,color:'var(--t3)'}}>-</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
                   </tr>
+                </>
+              )}
             </tbody>
           </table>
         </div>
@@ -7063,6 +7079,7 @@ function SettingsPanel({
                 </div>
               </div>
             </div>
+          </>
           )}
       {tab==='app' && (viewerConf.visible?.settings_app ?? true) && (
         <div className="card" style={{padding:14}}>
@@ -8332,6 +8349,8 @@ export default function App() {
                 <>
                   <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{D.customers.length} mijoz</span>
                   <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{(D.rawOrders||[]).length} zakaz</span>
+                </>
+              )}
             </div>
             <div style={{display:'flex',gap:6}}>
               {canSwitchCompany ? (
@@ -8388,6 +8407,8 @@ export default function App() {
                       <div style={{fontSize:56,marginBottom:16}}>i</div>
                       <div style={{fontSize:18,fontWeight:700,marginBottom:12}}>Ma'lumot yuklanmagan</div>
                       <button className="btn btn-gh" onClick={()=>setUp(true)}>Excel fayl yuklash</button>
+                    </>
+                  )}
                 </div>
               </div>
             ) : (
@@ -8467,6 +8488,8 @@ export default function App() {
                   />
                 )}
                 {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} D={D} company={activeCompany} />}
+              </>
+            )}
           </div>
         </div>
       </div>
