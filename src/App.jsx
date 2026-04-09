@@ -130,6 +130,8 @@ const OBZVON_ALL_LOCAL_XLSX = '/obzvon-vse.xlsx';
 const OBZVON_ALL_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=0#gid=0';
 const OBZVON_NEW_EXPORT_SHEET_ID = '1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8';
 const OBZVON_NEW_EXPORT_SHEET_NAME = 'Barcha_obzvon_yangi';
+const OBZVON_NEW_EXPORT_SHEET_GID = '979057575';
+const OBZVON_NEW_EXPORT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=979057575#gid=979057575';
 const OBZVON_NEW_EXPORT_HOUR = 3;
 const OBZVON_NEW_EXPORTED_MAP_KEY = 'aq-obzvon-new-exported-map';
 const OBZVON_NEW_LAST_AUTO_DATE_KEY = 'aq-obzvon-new-last-auto-date';
@@ -138,6 +140,8 @@ const ACCESS_SYNC_URL_KEY = 'aq-access-api-url';
 const ACCESS_UPDATED_AT_KEY = 'aq-access-updated-at';
 // Access konfiguratsiya sinxroni uchun Cloudflare Worker API URL:
 const OBZVON_WEBHOOK_DEFAULT = 'https://solitary-brook-4889aquabiz-api.3dmotion683.workers.dev';
+// Google Sheetga yozish uchun fallback Apps Script URL
+const OBZVON_EXPORT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyi1OP_a_5C7-TBujLuo9dDast0RLVelhQsTiO6dlN_mefi55vnTHm_ZRXpDFFTTXb7qA/exec';
 
 /* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў HELPERS Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const fmt  = (n) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
@@ -5273,13 +5277,13 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
     return applyUniversalFilters(r, kulerFilterColumns, kulerFilterState);
   }, [kulerActive, kulerSearch, kulerFilterColumns, kulerFilterState]);
   const kulerDebtTotal = useMemo(
-    () => kulerActive.reduce((s, k) => s + Math.max(0, Number(k.remaining || 0)), 0),
+    () => kulerActive.reduce((s, k) => s + (Number(k.overdueAmount || 0) > 0 ? Number(k.overdueAmount || 0) : 0), 0),
     [kulerActive]
   );
   const kulerDebtorCount = useMemo(() => {
     const ids = new Set(
       kulerActive
-        .filter((k) => Number(k.remaining || 0) > 0)
+        .filter((k) => Number(k.overdueAmount || 0) > 0)
         .map((k) => String(k.customerId || k.customerName || '').trim())
         .filter(Boolean)
     );
@@ -7331,37 +7335,47 @@ export default function App() {
 
       const withHeaders = !S.get(OBZVON_NEW_HEADERS_WRITTEN_KEY, false);
       const postBody = {
-        action: 'obzvon_new_sheet_append',
         sheetId: OBZVON_NEW_EXPORT_SHEET_ID,
         sheetName: OBZVON_NEW_EXPORT_SHEET_NAME,
+        sheetGid: OBZVON_NEW_EXPORT_SHEET_GID,
+        gid: OBZVON_NEW_EXPORT_SHEET_GID,
+        sheetUrl: OBZVON_NEW_EXPORT_SHEET_URL,
         withHeaders,
         headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator', 'Kompaniya', 'RID', 'UpdatedAt'],
         rows: payloadRows,
         by: sessionUser || currentUser || 'unknown',
       };
       let ok = false;
-      try {
-        const resp = await fetch(accessApiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(postBody),
-        });
-        const js = await resp.json().catch(() => ({}));
-        ok = !!js?.ok;
-      } catch {}
-      if (!ok) {
-        try {
-          const resp = await fetch(accessApiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...postBody, action: 'obzvon_new_export' }),
-          });
-          const js = await resp.json().catch(() => ({}));
-          ok = !!js?.ok;
-        } catch {}
+      const urlsToTry = Array.from(new Set([accessApiUrl, OBZVON_EXPORT_APPS_SCRIPT_URL].filter(Boolean)));
+      const actionsToTry = ['obzvon_new_sheet_append', 'obzvon_new_export'];
+      let lastErr = '';
+      for (const url of urlsToTry) {
+        if (ok) break;
+        for (const action of actionsToTry) {
+          try {
+            const resp = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...postBody, action }),
+            });
+            const js = await resp.json().catch(() => ({}));
+            if (resp.ok && js?.ok) {
+              ok = true;
+              break;
+            }
+            lastErr = js?.error || `HTTP ${resp.status} (${action})`;
+          } catch (e) {
+            lastErr = String(e?.message || e || 'unknown');
+          }
+        }
       }
       if (!ok) {
-        if (manual) notify("Google Sheetga joylashda xato bo'ldi", 'err');
+        if (manual) {
+          notify(
+            `Google Sheetga joylashda xato bo'ldi${lastErr ? `: ${lastErr}` : ''}`,
+            'err'
+          );
+        }
         return false;
       }
 
