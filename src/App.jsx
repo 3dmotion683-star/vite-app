@@ -7294,10 +7294,6 @@ export default function App() {
     setTimeout(() => setNotif(null), 5000);
   };
   const publishObzvonNewRowsToGoogleSheet = useCallback(async ({ manual=false } = {}) => {
-    if (!accessApiUrl) {
-      if (manual) notify("API URL topilmadi", 'err');
-      return false;
-    }
     if (obzvonExportBusyRef.current) return false;
     obzvonExportBusyRef.current = true;
     try {
@@ -7347,23 +7343,56 @@ export default function App() {
       };
       let ok = false;
       const urlsToTry = Array.from(new Set([accessApiUrl, OBZVON_EXPORT_APPS_SCRIPT_URL].filter(Boolean)));
+      if (!urlsToTry.length) {
+        if (manual) notify("Eksport URL topilmadi", 'err');
+        return false;
+      }
       const actionsToTry = ['obzvon_new_sheet_append', 'obzvon_new_export'];
       let lastErr = '';
+      const parseResponse = (text) => {
+        const t = String(text || '').trim();
+        if (!t) return {};
+        try { return JSON.parse(t); } catch (_) { return { raw: t }; }
+      };
       for (const url of urlsToTry) {
         if (ok) break;
+        const isAppsScript = /script\.google\.com/i.test(String(url || ''));
         for (const action of actionsToTry) {
+          if (ok) break;
+          const actionBody = { ...postBody, action };
+          let actionOk = false;
           try {
             const resp = await fetch(url, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...postBody, action }),
+              body: JSON.stringify(actionBody),
             });
-            const js = await resp.json().catch(() => ({}));
-            if (resp.ok && js?.ok) {
-              ok = true;
-              break;
+            const rawText = await resp.text().catch(() => '');
+            const js = parseResponse(rawText);
+            if (resp.ok && (js?.ok || String(js?.status || '').toLowerCase() === 'ok')) {
+              actionOk = true;
+            } else {
+              lastErr = js?.error || js?.message || `HTTP ${resp.status} (${action})`;
             }
-            lastErr = js?.error || `HTTP ${resp.status} (${action})`;
+          } catch (e) {
+            lastErr = String(e?.message || e || 'unknown');
+          }
+          if (actionOk) {
+            ok = true;
+            break;
+          }
+          if (!isAppsScript) continue;
+          // Apps Script uchun CORS preflight bloklansa, simple no-cors so'rov fallback.
+          try {
+            await fetch(url, {
+              method: 'POST',
+              mode: 'no-cors',
+              cache: 'no-store',
+              headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+              body: JSON.stringify(actionBody),
+            });
+            ok = true;
+            break;
           } catch (e) {
             lastErr = String(e?.message || e || 'unknown');
           }
