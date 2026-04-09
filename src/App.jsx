@@ -2396,6 +2396,8 @@ function UploadModal({
                   {loading?'O Yuklanmoqda...':`${E.ok} Yuklash`}
                 </button>
               </div>
+            </>
+          )}
           {tab==='sheets' && (
             <>
               <div style={{marginBottom:14}}>
@@ -2442,6 +2444,8 @@ function UploadModal({
                   {loading?'O Ulanmoqda...':`${E.sheets} Ulash`}
                 </button>
               </div>
+            </>
+          )}
         </div>
       </div>
     </div>
