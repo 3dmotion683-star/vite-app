@@ -173,6 +173,7 @@ const E = {
   doc: '\u{1F4C4}',
   report: '\u{1F4CA}',
   plan: '📆',
+  bell: '\u{1F514}',
   water: '\u{1F4A7}',
   uzs: '\u{1F4B4}',
   usd: '\u{1F4B5}',
@@ -663,6 +664,32 @@ const isNameInactiveByPrefix = (name) => {
   const n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
   if (!n) return false;
   return /^(я|ya|ря|рї)\s+(tugatildi|eski)\b/.test(n);
+};
+const isNearlyZero = (v) => Math.abs(Number(v || 0)) < 0.0001;
+const hasTagWord = (text, key) => {
+  const t = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const k = String(key || '').toLowerCase().trim();
+  if (!t || !k) return false;
+  return t.includes(k);
+};
+const isTugatildiMarker = (text) => hasTagWord(text, 'tugatildi');
+const isEskiMarker = (text) => hasTagWord(text, 'eski');
+const toDateTimeInputValue = (iso) => {
+  const d = toDate(iso);
+  if (!d) return '';
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+};
+const fromDateTimeInputValue = (v) => {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString();
+};
+const fmtDateTime = (iso) => {
+  const d = toDate(iso);
+  if (!d) return '-';
+  return `${fmtD(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
 const isAhmadteaTag = (v) => {
   const s = normText(v).replace(/[\s._-]+/g, '');
@@ -2264,6 +2291,13 @@ body,input,select,button{font-family:var(--sans)}
 .nav-i.on{background:var(--bl2);color:var(--bl)}
 .nav-i:active{transform:translateY(1px)}
 .notif{position:fixed;bottom:18px;right:18px;z-index:999;padding:10px 16px;border-radius:var(--r);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;box-shadow:0 4px 24px rgba(0,0,0,.6);animation:up .2s ease}
+.alert-topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.alert-topic-card{border:1px solid var(--b2);border-radius:10px;background:var(--s2);padding:10px;display:grid;gap:8px;transition:border-color .14s ease, transform .12s ease}
+.alert-topic-card:hover{border-color:var(--bl)}
+.alert-topic-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.alert-topic-count{font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:999px;background:var(--bl2);color:var(--bl)}
+.alert-item{border:1px solid var(--b2);background:var(--s2);border-radius:10px;padding:10px;display:grid;gap:7px}
+.alert-item .meta{font-size:11px;color:var(--t3)}
 .sv-tbl td{font-size:11.5px}
 .sv-tbl tr.payment td{background:rgba(63,185,80,.04)}
 .sv-tbl tr.vozvrat td{background:rgba(240,136,62,.04)}
@@ -2340,7 +2374,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -2349,7 +2383,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -2358,7 +2392,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'all',
     role: 'admin',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true },
+    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
     ui: { theme:'dark' },
     company: { canSwitch:true, default:'murodbaxsh' },
   },
@@ -2374,7 +2408,7 @@ function normalizeAccessConfig(user, cfg) {
         activeScope:'all',
         role:'admin',
         customerTabs:{ ...DEFAULT_CUSTOMER_TABS },
-        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true },
+        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
         ui:{ theme:'dark' },
         company:{ canSwitch:true, default:'murodbaxsh' },
       }
@@ -2383,7 +2417,7 @@ function normalizeAccessConfig(user, cfg) {
         activeScope:'own',
         role:'operator',
         customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS },
-        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false },
+        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
         ui:{ theme:'dark' },
         company:{ canSwitch:false, default:'murodbaxsh' },
       };
@@ -5953,9 +5987,13 @@ function Reports({
     setDriverWarehouseMap(S.get(mapStorageKey, {}));
   }, [mapStorageKey]);
   const [nazoratSection, setNazoratSection] = useState('orders');
+  const [nazoratOrderSection, setNazoratOrderSection] = useState('transfer');
   const [nazoratView, setNazoratView] = useState('errors');
   const [nazoratFilterOpen, setNazoratFilterOpen] = useState(false);
   const [nazoratFilterState, setNazoratFilterState] = useState({});
+  useEffect(() => {
+    if (nazoratSection !== 'orders') setNazoratOrderSection('transfer');
+  }, [nazoratSection]);
 
   const controlOrderRows = useMemo(() => {
     let rows = (rawOrders || []).filter((o) => {
@@ -6067,6 +6105,54 @@ function Reports({
     () => orderControlRows.filter((r) => r.mappingMissing || r.diff !== 0),
     [orderControlRows]
   );
+  const duplicateOrderRows = useMemo(() => {
+    const grouped = new Map();
+    (rawOrders || []).forEach((o) => {
+      if (!isWaterProduct(o.product)) return;
+      if (!isOrderDoc(o.docType)) return;
+      if (isCancelledStatus(o.status)) return;
+      if (!isMainWarehouseLabel(o.warehouse)) return;
+      const date = toIsoDate(o.orderDate);
+      const customerId = String(o.mId || '').trim();
+      if (!date || !customerId) return;
+      const driver = String(o.delivPerson || o.agent || '').trim() || '-';
+      if (!canSeeAll && driver !== String(currentUser || '').trim()) return;
+      const key = `${date}__${customerId}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          date,
+          customerId,
+          customer: String(o.contName || '').trim() || `ID ${customerId}`,
+          docs: [],
+          drivers: new Set(),
+          qty: 0,
+          sumUZS: 0,
+        });
+      }
+      const row = grouped.get(key);
+      row.docs.push(String(o.soNum || '').trim() || '-');
+      row.drivers.add(driver);
+      row.qty += Math.abs(toNum(o.qty));
+      if (String(o.currency || '').toUpperCase() !== 'USD') row.sumUZS += Number(o.sum || 0);
+    });
+    return Array.from(grouped.values())
+      .map((r) => ({
+        date: r.date,
+        customerId: r.customerId,
+        customer: r.customer,
+        docsCount: r.docs.length,
+        docsText: Array.from(new Set(r.docs)).join(', '),
+        driversText: Array.from(r.drivers).join(', '),
+        qty: r.qty,
+        sumUZS: r.sumUZS,
+        status: r.docs.length > 1 ? 'Dublikat' : 'OK',
+      }))
+      .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
+  }, [rawOrders, canSeeAll, currentUser]);
+  const duplicateMismatchRows = useMemo(
+    () => duplicateOrderRows.filter((r) => r.docsCount > 1),
+    [duplicateOrderRows]
+  );
   const returnControlRows = useMemo(() => {
     const scopedRows = (rawOrders || []).filter((o) => {
       if (!isOrderDoc(o.docType) && !isReturnDoc(o.docType)) return false;
@@ -6099,7 +6185,8 @@ function Reports({
           returnNo: String(o.soNum || '').trim(),
           qty: Math.abs(toNum(o.qty)),
           driver: String(o.delivPerson || o.agent || '').trim() || '-',
-          note: String(o.note || o.cat || '').trim() || '-',
+          warehouse: String(o.warehouse || '').trim() || '-',
+          note: String(o.note || '').trim() || String(o.cat || '').trim() || '-',
           hasOrder,
           status: hasOrder ? 'Zakazi bor' : "Zakazi yo'q",
         };
@@ -6119,6 +6206,17 @@ function Reports({
     { key:'diff', label:'Farq', type:'number' },
     { key:'status', label:'Holat', type:'text' },
   ]), []);
+  const nazoratOrderDuplicateColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'docsCount', label:'Zakazlar soni', type:'number' },
+    { key:'qty', label:'Suv soni', type:'number' },
+    { key:'sumUZS', label:'Summa UZS', type:'number' },
+    { key:'driversText', label:'Dostavchik', type:'text' },
+    { key:'docsText', label:'Zakazlar', type:'text' },
+    { key:'status', label:'Holat', type:'text' },
+  ]), []);
   const nazoratReturnColumns = useMemo(() => ([
     { key:'date', label:'Sana', type:'date' },
     { key:'customerId', label:'Mijoz ID', type:'text' },
@@ -6126,16 +6224,20 @@ function Reports({
     { key:'returnNo', label:'Vozvrat zakaz', type:'text' },
     { key:'qty', label:'Vozvrat suv soni', type:'number' },
     { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'warehouse', label:'Sklad', type:'text' },
     { key:'note', label:'Izoh', type:'text' },
     { key:'status', label:'Status', type:'text' },
   ]), []);
-  const activeNazoratColumns = nazoratSection === 'orders' ? nazoratOrderColumns : nazoratReturnColumns;
+  const activeNazoratColumns = nazoratSection === 'orders'
+    ? (nazoratOrderSection === 'duplicates' ? nazoratOrderDuplicateColumns : nazoratOrderColumns)
+    : nazoratReturnColumns;
   const activeNazoratBaseRows = useMemo(() => {
     if (nazoratSection === 'orders') {
+      if (nazoratOrderSection === 'duplicates') return nazoratView === 'errors' ? duplicateMismatchRows : duplicateOrderRows;
       return nazoratView === 'errors' ? orderMismatchRows : orderControlRows;
     }
     return nazoratView === 'errors' ? returnMismatchRows : returnControlRows;
-  }, [nazoratSection, nazoratView, orderMismatchRows, orderControlRows, returnMismatchRows, returnControlRows]);
+  }, [nazoratSection, nazoratOrderSection, nazoratView, orderMismatchRows, orderControlRows, duplicateMismatchRows, duplicateOrderRows, returnMismatchRows, returnControlRows]);
   useEffect(() => {
     setNazoratFilterState((prev) => ensureUniversalFilterState(activeNazoratColumns, prev));
   }, [activeNazoratColumns]);
@@ -6164,6 +6266,26 @@ function Reports({
 
   const exportNazorat = () => {
     if (nazoratSection === 'orders') {
+      if (nazoratOrderSection === 'duplicates') {
+        exportAoaExcel({
+          fileName: `Dublikat_zakazlar_${todayIso}.xlsx`,
+          sheetName: 'Dublikat_zakazlar',
+          headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakazlar soni', 'Suv soni', 'Summa UZS', 'Dostavchik', 'Zakazlar', 'Holat'],
+          columnTypes: ['date', 'text', 'text', 'number', 'number', 'number', 'text', 'text', 'text'],
+          rows: nazoratFilteredRows.map((r) => [
+            r.date,
+            r.customerId,
+            r.customer,
+            r.docsCount,
+            r.qty,
+            r.sumUZS,
+            r.driversText,
+            r.docsText,
+            r.status,
+          ]),
+        });
+        return;
+      }
       exportAoaExcel({
         fileName: `Zakaz_nazorati_${todayIso}.xlsx`,
         sheetName: 'Zakaz_nazorati',
@@ -6184,8 +6306,8 @@ function Reports({
     exportAoaExcel({
       fileName: `Vozvrat_nazorati_${todayIso}.xlsx`,
       sheetName: 'Vozvrat_nazorati',
-      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Vozvrat zakaz', 'Vozvrat suv soni', 'Dostavchik', 'Izoh', 'Status'],
-      columnTypes: ['date', 'text', 'text', 'text', 'number', 'text', 'text', 'text'],
+      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Vozvrat zakaz', 'Vozvrat suv soni', 'Dostavchik', 'Sklad', 'Izoh', 'Status'],
+      columnTypes: ['date', 'text', 'text', 'text', 'number', 'text', 'text', 'text', 'text'],
       rows: nazoratFilteredRows.map((r) => [
         r.date,
         r.customerId,
@@ -6193,6 +6315,7 @@ function Reports({
         r.returnNo,
         r.qty,
         r.driver,
+        r.warehouse,
         r.note,
         r.status,
       ]),
@@ -6200,7 +6323,7 @@ function Reports({
   };
 
   return (
-    <div className="ani" style={{display:'flex',flexDirection:'column',gap:14}}>
+    <div className="ani" style={{display:'flex',flexDirection:'column',gap:showNazorat ? 10 : 14, minHeight:showNazorat ? '100%' : 0}}>
       <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
         {showReport && <button className="btn btn-gr btn-sm" onClick={exportReports}>Hisobot Excel</button>}
         {showNazorat && <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>}
@@ -6301,11 +6424,19 @@ function Reports({
       )}
 
       {showNazorat && (
-      <div style={{display:'grid',gap:10,minHeight:0}}>
-        <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:10}}>
-          <div className="tabs" style={{display:'inline-flex'}}>
-            <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
-            <button className={`tab${nazoratSection==='returns'?' on':''}`} onClick={()=>setNazoratSection('returns')}>Vozvrat nazorati</button>
+      <div style={{display:'grid',gap:8,minHeight:0,flex:1}}>
+        <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <div style={{display:'grid',gap:6}}>
+            <div className="tabs" style={{display:'inline-flex'}}>
+              <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
+              <button className={`tab${nazoratSection==='returns'?' on':''}`} onClick={()=>setNazoratSection('returns')}>Vozvrat nazorati</button>
+            </div>
+            {nazoratSection === 'orders' && (
+              <div className="tabs" style={{display:'inline-flex',width:'fit-content'}}>
+                <button className={`tab${nazoratOrderSection==='transfer'?' on':''}`} onClick={()=>setNazoratOrderSection('transfer')}>Permesheniya nazorati</button>
+                <button className={`tab${nazoratOrderSection==='duplicates'?' on':''}`} onClick={()=>setNazoratOrderSection('duplicates')}>Dublikat zakazlar</button>
+              </div>
+            )}
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <div style={{position:'relative'}}>
@@ -6317,7 +6448,9 @@ function Reports({
               </button>
               <UniversalFilterPanel
                 open={nazoratFilterOpen}
-                title={nazoratSection === 'orders' ? 'Zakaz nazorati filtri' : 'Vozvrat nazorati filtri'}
+                title={nazoratSection === 'orders'
+                  ? (nazoratOrderSection === 'duplicates' ? 'Dublikat zakazlar filtri' : 'Zakaz nazorati filtri')
+                  : 'Vozvrat nazorati filtri'}
                 columns={activeNazoratColumns}
                 rows={activeNazoratBaseRows}
                 state={nazoratFilterState}
@@ -6333,95 +6466,135 @@ function Reports({
           </div>
         </div>
 
-        {nazoratSection === 'orders' && (
-          <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
+        {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' && (
+          <div style={{fontSize:11,color:'var(--t3)'}}>
             Faqat "Основной склад"dan urilgan zakazlar hisobga olinadi. Dostavchik-sklad biriktirish: Nastroyka &gt; Biriktirish bo'limida.
           </div>
         )}
+        {nazoratSection === 'orders' && nazoratOrderSection === 'duplicates' && (
+          <div style={{fontSize:11,color:'var(--t3)'}}>
+            Shu sana va shu mijozga 2 yoki undan ko'p zakaz urilgan holatlar dublikat deb ko'rsatiladi.
+          </div>
+        )}
         {nazoratSection === 'returns' && (
-          <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
+          <div style={{fontSize:11,color:'var(--t3)'}}>
             Vozvrat tekshiruvi: shu sana va shu mijoz bo'yicha zakaz bo'lsa "Zakazi bor", bo'lmasa "Zakazi yo'q".
           </div>
         )}
 
-        <div className="card" style={{overflow:'hidden',minHeight:'calc(100vh - 250px)'}}>
-          <div style={{overflow:'auto',maxHeight:'calc(100vh - 250px)'}}>
-          {nazoratSection === 'orders' ? (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Sana</th>
-                  <th>Dostavchik</th>
-                  <th>Sklad</th>
-                  <th style={{textAlign:'right'}}>Zakaz suv soni</th>
-                  <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
-                  <th style={{textAlign:'right'}}>Farq</th>
-                  <th>Holat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {nazoratFilteredRows.length === 0 ? (
-                  <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
-                ) : (
-                  <>
-                    {nazoratFilteredRows.map((r, i) => (
-                      <tr key={`nord_${i}_${r.driver}_${r.date}`} style={r.status === 'OK' ? undefined : {background:'rgba(248,81,73,.07)'}}>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
-                        <td>{r.driver}</td>
-                        <td>{r.warehouse}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
-                        <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
-                      </tr>
-                    ))}
-                    {nazoratView === 'all' && (
-                      <tr style={{background:'var(--s2)'}}>
-                        <td colSpan={3} style={{fontWeight:800}}>ITOG</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--gr)'}}>{fmt(orderDisplayTotals.orderQty)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--bl)'}}>{fmt(orderDisplayTotals.transferQty)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:orderDisplayTotals.orderQty-orderDisplayTotals.transferQty===0?'var(--gr)':'var(--rd)'}}>
-                          {fmt(orderDisplayTotals.orderQty - orderDisplayTotals.transferQty)}
-                        </td>
-                        <td />
-                      </tr>
-                    )}
-                  </>
-                )}
-              </tbody>
-            </table>
-          ) : (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Sana</th>
-                  <th>Mijoz ID</th>
-                  <th>Mijoz</th>
-                  <th>Vozvrat zakaz</th>
-                  <th style={{textAlign:'right'}}>Vozvrat suv soni</th>
-                  <th>Dostavchik</th>
-                  <th>Izoh</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {nazoratFilteredRows.length === 0 ? (
-                  <tr><td colSpan={8} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
-                ) : nazoratFilteredRows.map((r, i) => (
-                  <tr key={`nret_${i}_${r.customerId}_${r.date}`} style={r.hasOrder ? undefined : {background:'rgba(248,81,73,.08)'}}>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
-                    <td>{r.customer}</td>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.returnNo || '-'}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--or)'}}>{fmt(r.qty)}</td>
-                    <td>{r.driver}</td>
-                    <td style={{maxWidth:280}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
-                    <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
+        <div className="card" style={{overflow:'hidden',minHeight:0,flex:1,height:'calc(100vh - 176px)'}}>
+          <div style={{overflow:'auto',height:'100%'}}>
+            {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' ? (
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Sana</th>
+                    <th>Dostavchik</th>
+                    <th>Sklad</th>
+                    <th style={{textAlign:'right'}}>Zakaz suv soni</th>
+                    <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
+                    <th style={{textAlign:'right'}}>Farq</th>
+                    <th>Holat</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody>
+                  {nazoratFilteredRows.length === 0 ? (
+                    <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
+                  ) : (
+                    <>
+                      {nazoratFilteredRows.map((r, i) => (
+                        <tr key={`nord_${i}_${r.driver}_${r.date}`} style={r.status === 'OK' ? undefined : {background:'rgba(248,81,73,.07)'}}>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
+                          <td>{r.driver}</td>
+                          <td>{r.warehouse}</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
+                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
+                        </tr>
+                      ))}
+                      {nazoratView === 'all' && (
+                        <tr style={{background:'var(--s2)'}}>
+                          <td colSpan={3} style={{fontWeight:800}}>ITOG</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--gr)'}}>{fmt(orderDisplayTotals.orderQty)}</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--bl)'}}>{fmt(orderDisplayTotals.transferQty)}</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:orderDisplayTotals.orderQty-orderDisplayTotals.transferQty===0?'var(--gr)':'var(--rd)'}}>
+                            {fmt(orderDisplayTotals.orderQty - orderDisplayTotals.transferQty)}
+                          </td>
+                          <td />
+                        </tr>
+                      )}
+                    </>
+                  )}
+                </tbody>
+              </table>
+            ) : nazoratSection === 'orders' ? (
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Sana</th>
+                    <th>Mijoz ID</th>
+                    <th>Mijoz</th>
+                    <th style={{textAlign:'right'}}>Zakazlar soni</th>
+                    <th style={{textAlign:'right'}}>Suv soni</th>
+                    <th style={{textAlign:'right'}}>Summa UZS</th>
+                    <th>Dostavchik</th>
+                    <th>Zakazlar</th>
+                    <th>Holat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {nazoratFilteredRows.length === 0 ? (
+                    <tr><td colSpan={9} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Dublikat topilmadi' : "Ma'lumot topilmadi"}</td></tr>
+                  ) : nazoratFilteredRows.map((r, i) => (
+                    <tr key={`ndup_${i}_${r.customerId}_${r.date}`} style={r.docsCount > 1 ? {background:'rgba(248,81,73,.08)'} : undefined}>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
+                      <td>{r.customer}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.docsCount)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.qty)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
+                      <td style={{maxWidth:190}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.driversText || '-'}</span></td>
+                      <td style={{maxWidth:230}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.docsText || '-'}</span></td>
+                      <td style={{fontSize:11,color:r.docsCount > 1 ? 'var(--rd)' : 'var(--gr)'}}>{r.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Sana</th>
+                    <th>Mijoz ID</th>
+                    <th>Mijoz</th>
+                    <th>Vozvrat zakaz</th>
+                    <th style={{textAlign:'right'}}>Vozvrat suv soni</th>
+                    <th>Dostavchik</th>
+                    <th>Sklad</th>
+                    <th>Izoh</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {nazoratFilteredRows.length === 0 ? (
+                    <tr><td colSpan={9} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
+                  ) : nazoratFilteredRows.map((r, i) => (
+                    <tr key={`nret_${i}_${r.customerId}_${r.date}`} style={r.hasOrder ? undefined : {background:'rgba(248,81,73,.08)'}}>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
+                      <td>{r.customer}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.returnNo || '-'}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--or)'}}>{fmt(r.qty)}</td>
+                      <td>{r.driver}</td>
+                      <td>{r.warehouse || '-'}</td>
+                      <td style={{maxWidth:260}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
+                      <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       </div>
@@ -6929,7 +7102,14 @@ function SettingsPanel({
       children: obzvonNewPermSections.map((s) => ({ key: s.key, label: s.label, kind: 'visible', fallback: false })),
     },
     { key: 'doljniki', label: 'Doljniki', fallback: true, children: [] },
-    { key: 'nazorat', label: 'Nazorat', fallback: true, children: [] },
+    {
+      key: 'nazorat',
+      label: 'Nazorat',
+      fallback: true,
+      children: [
+        { key: 'nazorat_perm_handler', label: 'Permesheniya vazifasi (bildirishnoma)', kind: 'visible', fallback: false },
+      ],
+    },
     { key: 'reports', label: 'Hisobotlar', fallback: true, children: [] },
     { key: 'plan', label: 'Plan', fallback: true, children: [] },
     { key: 'refresh', label: 'Yangilash', fallback: true, children: [] },
@@ -7411,6 +7591,9 @@ export default function App() {
   );
   const [showUp,setUp]     = useState(false);
   const [notif,setNotif]   = useState(null);
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const [alertsTopicKey, setAlertsTopicKey] = useState('');
+  const [alertsReminders, setAlertsReminders] = useState({ topics:{}, items:{} });
   const [side,setSide]     = useState(true);
   const [companyFilter, setCompanyFilter] = useState(() =>
     normalizeCompanyKey(S.get('aq-company-filter', 'murodbaxsh'))
@@ -8324,6 +8507,10 @@ export default function App() {
     if (!scopeOwn) return rawD;
     return filterDataByCustomerIds(rawD, ownIds);
   }, [rawD, scopeOwn, ownIds]);
+  const companyWideData = useMemo(
+    () => filterDataByCompany(rawD, activeCompany),
+    [rawD, activeCompany]
+  );
   useEffect(() => {
     if (canSwitchCompany) return;
     if (normalizeCompanyKey(companyFilter) !== lockedCompany) {
@@ -8438,6 +8625,396 @@ export default function App() {
     ? 'dark'
     : (currentAccess.ui?.theme === 'light' ? 'light' : 'dark');
   const themeVars = currentTheme === 'light' ? LIGHT_THEME_VARS : {};
+  const alertReminderStorageKey = useMemo(
+    () => `aq-alert-reminders-${normalizeCompanyKey(activeCompany)}`,
+    [activeCompany]
+  );
+  useEffect(() => {
+    const saved = S.get(alertReminderStorageKey, { topics:{}, items:{} });
+    setAlertsReminders(saved && typeof saved === 'object' ? { topics:{...(saved.topics || {})}, items:{...(saved.items || {})} } : { topics:{}, items:{} });
+  }, [alertReminderStorageKey]);
+  useEffect(() => {
+    S.set(alertReminderStorageKey, alertsReminders || { topics:{}, items:{} });
+  }, [alertReminderStorageKey, alertsReminders]);
+  const setTopicReminder = useCallback((topicKey, inputValue) => {
+    const iso = fromDateTimeInputValue(inputValue);
+    setAlertsReminders((prev) => {
+      const topics = { ...((prev && prev.topics) || {}) };
+      if (iso) topics[topicKey] = iso;
+      else delete topics[topicKey];
+      return { topics, items: { ...((prev && prev.items) || {}) } };
+    });
+  }, []);
+  const setItemReminder = useCallback((itemKey, inputValue) => {
+    const iso = fromDateTimeInputValue(inputValue);
+    setAlertsReminders((prev) => {
+      const items = { ...((prev && prev.items) || {}) };
+      if (iso) items[itemKey] = iso;
+      else delete items[itemKey];
+      return { topics: { ...((prev && prev.topics) || {}) }, items };
+    });
+  }, []);
+  const nazoratHandlerEnabled = !!(currentAccess.visible?.nazorat_perm_handler);
+  const notifBindingMap = useMemo(
+    () => S.get(`aq-driver-warehouse-map-${normalizeCompanyKey(activeCompany)}`, {}),
+    [activeCompany, page, data]
+  );
+  const { companyOrderQtyByDriverDate, companyOrderDatesByDriver } = useMemo(() => {
+    const qtyMap = new Map();
+    const datesByDriver = new Map();
+    (companyWideData.rawOrders || []).forEach((o) => {
+      if (!isWaterProduct(o.product)) return;
+      if (!isOrderDoc(o.docType)) return;
+      if (isCancelledStatus(o.status)) return;
+      if (!isMainWarehouseLabel(o.warehouse)) return;
+      const date = toIsoDate(o.orderDate);
+      const driver = String(o.delivPerson || o.agent || '').trim();
+      if (!date || !driver) return;
+      const key = `${driver}__${date}`;
+      qtyMap.set(key, (qtyMap.get(key) || 0) + Math.abs(toNum(o.qty)));
+      if (!datesByDriver.has(driver)) datesByDriver.set(driver, new Set());
+      datesByDriver.get(driver).add(date);
+    });
+    return { companyOrderQtyByDriverDate: qtyMap, companyOrderDatesByDriver: datesByDriver };
+  }, [companyWideData.rawOrders]);
+  const { companyTransferQtyByWarehouseDate, companyTransferDatesByWarehouse } = useMemo(() => {
+    const qtyMap = new Map();
+    const datesByWarehouse = new Map();
+    (companyWideData.warehouseTransfers || []).forEach((r) => {
+      if (!isWaterProduct(r.product)) return;
+      if (!isMainWarehouseLabel(r.toWarehouse)) return;
+      const date = toIsoDate(r.moveDate);
+      const fromWarehouse = String(r.fromWarehouse || '').trim();
+      if (!date || !fromWarehouse) return;
+      const warehouseKey = normalizeWarehouseKey(fromWarehouse);
+      if (!warehouseKey) return;
+      const key = `${warehouseKey}__${date}`;
+      qtyMap.set(key, (qtyMap.get(key) || 0) + Math.abs(toNum(r.qty)));
+      if (!datesByWarehouse.has(warehouseKey)) datesByWarehouse.set(warehouseKey, new Set());
+      datesByWarehouse.get(warehouseKey).add(date);
+    });
+    return { companyTransferQtyByWarehouseDate: qtyMap, companyTransferDatesByWarehouse: datesByWarehouse };
+  }, [companyWideData.warehouseTransfers]);
+  const companyOrderMismatchRows = useMemo(() => {
+    const drivers = new Set([
+      ...Array.from(companyOrderDatesByDriver.keys()),
+      ...Object.keys(notifBindingMap || {}),
+    ]);
+    const out = [];
+    Array.from(drivers).filter(Boolean).forEach((driver) => {
+      const warehouse = String(notifBindingMap?.[driver] || '').trim();
+      const warehouseKey = normalizeWarehouseKey(warehouse);
+      const orderDates = companyOrderDatesByDriver.get(driver) || new Set();
+      const transferDates = warehouseKey ? (companyTransferDatesByWarehouse.get(warehouseKey) || new Set()) : new Set();
+      const allDates = Array.from(new Set([...orderDates, ...transferDates])).sort((a, b) => a.localeCompare(b));
+      allDates.forEach((date) => {
+        const orderQty = Number(companyOrderQtyByDriverDate.get(`${driver}__${date}`) || 0);
+        const transferQty = warehouseKey ? Number(companyTransferQtyByWarehouseDate.get(`${warehouseKey}__${date}`) || 0) : 0;
+        const diff = orderQty - transferQty;
+        const mappingMissing = !warehouse;
+        if (!(mappingMissing || diff !== 0)) return;
+        out.push({
+          id: `ord_${driver}_${date}`,
+          driver,
+          date,
+          warehouse: warehouse || '-',
+          orderQty,
+          transferQty,
+          diff,
+          status: mappingMissing ? 'Sklad biriktirilmagan' : 'Mos emas',
+        });
+      });
+    });
+    return out.sort((a, b) => (a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date)));
+  }, [companyOrderDatesByDriver, notifBindingMap, companyTransferDatesByWarehouse, companyOrderQtyByDriverDate, companyTransferQtyByWarehouseDate]);
+  const companyDuplicateMismatchRows = useMemo(() => {
+    const grouped = new Map();
+    (companyWideData.rawOrders || []).forEach((o) => {
+      if (!isWaterProduct(o.product)) return;
+      if (!isOrderDoc(o.docType)) return;
+      if (isCancelledStatus(o.status)) return;
+      if (!isMainWarehouseLabel(o.warehouse)) return;
+      const date = toIsoDate(o.orderDate);
+      const customerId = String(o.mId || '').trim();
+      if (!date || !customerId) return;
+      const key = `${date}__${customerId}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          date,
+          customerId,
+          customer: String(o.contName || '').trim() || `ID ${customerId}`,
+          docs: [],
+          drivers: new Set(),
+          qty: 0,
+        });
+      }
+      const row = grouped.get(key);
+      row.docs.push(String(o.soNum || '').trim() || '-');
+      row.drivers.add(String(o.delivPerson || o.agent || '').trim() || '-');
+      row.qty += Math.abs(toNum(o.qty));
+    });
+    return Array.from(grouped.values())
+      .filter((r) => r.docs.length > 1)
+      .map((r) => ({
+        id: `dup_${r.customerId}_${r.date}`,
+        date: r.date,
+        customerId: r.customerId,
+        customer: r.customer,
+        docsCount: r.docs.length,
+        docsText: Array.from(new Set(r.docs)).join(', '),
+        driversText: Array.from(r.drivers).join(', '),
+        qty: r.qty,
+      }))
+      .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
+  }, [companyWideData.rawOrders]);
+  const companyReturnMismatchRows = useMemo(() => {
+    const source = (companyWideData.rawOrders || []).filter((o) => {
+      if (!isOrderDoc(o.docType) && !isReturnDoc(o.docType)) return false;
+      if (isCancelledStatus(o.status)) return false;
+      const date = toIsoDate(o.orderDate);
+      const customerId = String(o.mId || '').trim();
+      return Boolean(date && customerId);
+    });
+    const orderSet = new Set(
+      source.filter((o) => isOrderDoc(o.docType)).map((o) => `${String(o.mId || '').trim()}__${toIsoDate(o.orderDate)}`)
+    );
+    return source
+      .filter((o) => isReturnDoc(o.docType))
+      .filter((o) => !orderSet.has(`${String(o.mId || '').trim()}__${toIsoDate(o.orderDate)}`))
+      .map((o) => ({
+        id: `ret_${String(o.mId || '').trim()}_${toIsoDate(o.orderDate)}_${String(o.soNum || '').trim()}`,
+        date: toIsoDate(o.orderDate),
+        customerId: String(o.mId || '').trim(),
+        customer: String(o.contName || '').trim() || `ID ${String(o.mId || '').trim()}`,
+        returnNo: String(o.soNum || '').trim() || '-',
+        qty: Math.abs(toNum(o.qty)),
+        driver: String(o.delivPerson || o.agent || '').trim() || '-',
+        warehouse: String(o.warehouse || '').trim() || '-',
+      }))
+      .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
+  }, [companyWideData.rawOrders]);
+  const customerStatusAlerts = useMemo(() => {
+    const tugatildi = [];
+    const eskiClose = [];
+    const eskiNeedOrder = [];
+    const eskiBalance = [];
+    const eskiTaraLeft = [];
+    (D.customers || []).forEach((c) => {
+      const markerText = `${String(c.source || '').trim()} ${String(c.name || '').trim()}`;
+      const isTugatildi = isTugatildiMarker(markerText);
+      const isEski = isEskiMarker(markerText);
+      if (!isTugatildi && !isEski) return;
+      const balanceUZS = Number(c.balanceUZS || 0);
+      const balanceUSD = Number(c.balanceUSD || 0);
+      const tara = Number(c.tara || 0);
+      const kulers = Number(c.kulers || 0);
+      const allZero = isNearlyZero(balanceUZS) && isNearlyZero(balanceUSD) && isNearlyZero(tara) && isNearlyZero(kulers);
+      const customerOrders = (D.ordersByMId?.[c.id] || []).filter((o) => isOrderDoc(o.docType) && !isCancelledStatus(o.status));
+      const hasOrder = customerOrders.length > 0;
+      const cid = String(c.id || '').trim() || '-';
+      if (isTugatildi && !allZero) {
+        tugatildi.push({
+          id: `tgt_${cid}`,
+          customerId: cid,
+          title: String(c.name || '').trim() || `ID ${cid}`,
+          subtitle: '"Я TUGATILDI" lekin qoldiq 0 emas',
+          meta: [
+            `Balans UZS: ${balanceUZS > 0 ? '+' : ''}${fmt(balanceUZS)} so'm`,
+            `Balans USD: ${balanceUSD > 0 ? '+' : ''}${fmt(balanceUSD)}`,
+            `Idish: ${tara > 0 ? '+' : ''}${fmt(tara)} ta`,
+            `Kuler: ${kulers > 0 ? '+' : ''}${fmt(kulers)} ta`,
+          ],
+        });
+      }
+      if (!isEski) return;
+      if (allZero) {
+        eskiClose.push({
+          id: `eskiclose_${cid}`,
+          customerId: cid,
+          title: String(c.name || '').trim() || `ID ${cid}`,
+          subtitle: '"Я Eski" mijoz toza: yopish mumkin',
+          meta: [
+            `Balans UZS: ${fmt(balanceUZS)} so'm`,
+            `Balans USD: ${fmt(balanceUSD)}`,
+            `Idish: ${fmt(tara)} ta`,
+            `Kuler: ${fmt(kulers)} ta`,
+          ],
+        });
+        return;
+      }
+      if (!isNearlyZero(tara) && !hasOrder) {
+        eskiNeedOrder.push({
+          id: `eskineed_${cid}`,
+          customerId: cid,
+          title: String(c.name || '').trim() || `ID ${cid}`,
+          subtitle: 'Zakaz urish va idishni qaytarib olish kerak',
+          meta: [`Idish qoldig'i: ${tara > 0 ? '+' : ''}${fmt(tara)} ta`, `Mijoz ID: ${cid}`],
+        });
+      }
+      if (!isNearlyZero(balanceUZS) || !isNearlyZero(balanceUSD)) {
+        const direction = balanceUZS < 0 || balanceUSD < 0 ? "Pulini olish kerak" : "Pulini berish kerak";
+        eskiBalance.push({
+          id: `eskibalance_${cid}`,
+          customerId: cid,
+          title: String(c.name || '').trim() || `ID ${cid}`,
+          subtitle: direction,
+          meta: [
+            `Balans UZS: ${balanceUZS > 0 ? '+' : ''}${fmt(balanceUZS)} so'm`,
+            `Balans USD: ${balanceUSD > 0 ? '+' : ''}${fmt(balanceUSD)}`,
+          ],
+        });
+      }
+      if (hasOrder && tara > 0) {
+        eskiTaraLeft.push({
+          id: `eskitara_${cid}`,
+          customerId: cid,
+          title: String(c.name || '').trim() || `ID ${cid}`,
+          subtitle: "Dostavchik hamma idishni olmagan bo'lishi mumkin",
+          meta: [`Qolgan idish: ${fmt(tara)} ta`, `Mijoz ID: ${cid}`],
+        });
+      }
+    });
+    return { tugatildi, eskiClose, eskiNeedOrder, eskiBalance, eskiTaraLeft };
+  }, [D.customers, D.ordersByMId]);
+  const debtSmsItems = useMemo(
+    () => (debtorsByBalance || []).map((c) => ({
+      id: `debt_${String(c.id || '').trim()}`,
+      customerId: String(c.id || '').trim(),
+      title: String(c.name || '').trim() || `ID ${String(c.id || '').trim()}`,
+      subtitle: 'Qarzdorlik bo\'yicha SMS yuborish kerak',
+      meta: [`Qarz: ${fmt(Math.abs(Number(c.balanceUZS || 0)))} so'm`, `Mijoz ID: ${String(c.id || '').trim()}`],
+    })),
+    [debtorsByBalance]
+  );
+  const alertTopics = useMemo(() => {
+    const topics = [];
+    if (debtSmsItems.length) {
+      topics.push({
+        key: 'debt_sms',
+        title: 'Qarzdorlarga SMS',
+        subtitle: 'Qarzdor mijozlarga eslatma yuborish',
+        items: debtSmsItems,
+      });
+    }
+    if (customerStatusAlerts.tugatildi.length) {
+      topics.push({
+        key: 'tugatildi_control',
+        title: '"Я TUGATILDI" nazorati',
+        subtitle: 'Balans/idish/kuler 0 bo\'lmaganlar',
+        items: customerStatusAlerts.tugatildi,
+      });
+    }
+    if (customerStatusAlerts.eskiClose.length) {
+      topics.push({
+        key: 'eski_close',
+        title: '"Я Eski" yopish',
+        subtitle: 'Hammasi 0 bo\'lgan mijozlar',
+        items: customerStatusAlerts.eskiClose,
+      });
+    }
+    if (customerStatusAlerts.eskiNeedOrder.length) {
+      topics.push({
+        key: 'eski_need_order',
+        title: '"Я Eski" idish qaytarish',
+        subtitle: 'Zakaz yo\'q, idish qoldig\'i bor',
+        items: customerStatusAlerts.eskiNeedOrder,
+      });
+    }
+    if (customerStatusAlerts.eskiBalance.length) {
+      topics.push({
+        key: 'eski_balance',
+        title: '"Я Eski" balans farqi',
+        subtitle: 'Pul olish/berish kerak bo\'lganlar',
+        items: customerStatusAlerts.eskiBalance,
+      });
+    }
+    if (customerStatusAlerts.eskiTaraLeft.length) {
+      topics.push({
+        key: 'eski_tara_left',
+        title: '"Я Eski" idish qoldig\'i',
+        subtitle: 'Zakaz bo\'lgan, lekin idish qolgan',
+        items: customerStatusAlerts.eskiTaraLeft,
+      });
+    }
+    if (nazoratHandlerEnabled) {
+      if (companyOrderMismatchRows.length) {
+        topics.push({
+          key: 'nazorat_perm_diff',
+          title: 'Permesheniya farqlari',
+          subtitle: 'Zakaz va permesheniya orasida farq bor',
+          items: companyOrderMismatchRows.map((r) => ({
+            id: r.id,
+            customerId: '',
+            title: `${r.date} | ${r.driver}`,
+            subtitle: r.status,
+            meta: [
+              `Sklad: ${r.warehouse}`,
+              `Zakaz: ${fmt(r.orderQty)} ta`,
+              `Permesheniya: ${fmt(r.transferQty)} ta`,
+              `Farq: ${fmt(r.diff)}`,
+            ],
+          })),
+        });
+      }
+      if (companyDuplicateMismatchRows.length) {
+        topics.push({
+          key: 'nazorat_duplicates',
+          title: 'Dublikat zakazlar',
+          subtitle: 'Bir kunda bir mijozga 2+ zakaz',
+          items: companyDuplicateMismatchRows.map((r) => ({
+            id: r.id,
+            customerId: r.customerId,
+            title: `${r.date} | ${r.customer}`,
+            subtitle: `${fmt(r.docsCount)} ta zakaz`,
+            meta: [
+              `Mijoz ID: ${r.customerId}`,
+              `Suv: ${fmt(r.qty)} ta`,
+              `Dostavchik: ${r.driversText || '-'}`,
+              `Zakazlar: ${r.docsText || '-'}`,
+            ],
+          })),
+        });
+      }
+      if (companyReturnMismatchRows.length) {
+        topics.push({
+          key: 'nazorat_return_mismatch',
+          title: 'Vozvrat xatolari',
+          subtitle: 'Vozvrat bor, zakaz topilmadi',
+          items: companyReturnMismatchRows.map((r) => ({
+            id: r.id,
+            customerId: r.customerId,
+            title: `${r.date} | ${r.customer}`,
+            subtitle: "Shu sana bo'yicha zakazi yo'q",
+            meta: [
+              `Mijoz ID: ${r.customerId}`,
+              `Vozvrat zakaz: ${r.returnNo}`,
+              `Suv: ${fmt(r.qty)} ta`,
+              `Dostavchik: ${r.driver}`,
+              `Sklad: ${r.warehouse}`,
+            ],
+          })),
+        });
+      }
+    }
+    return topics;
+  }, [debtSmsItems, customerStatusAlerts, nazoratHandlerEnabled, companyOrderMismatchRows, companyDuplicateMismatchRows, companyReturnMismatchRows]);
+  const alertTotalCount = useMemo(
+    () => alertTopics.reduce((s, t) => s + (t.items?.length || 0), 0),
+    [alertTopics]
+  );
+  const activeAlertTopic = useMemo(
+    () => alertTopics.find((t) => t.key === alertsTopicKey) || null,
+    [alertTopics, alertsTopicKey]
+  );
+  useEffect(() => {
+    if (!alertsTopicKey) return;
+    if (alertTopics.some((t) => t.key === alertsTopicKey)) return;
+    setAlertsTopicKey('');
+  }, [alertsTopicKey, alertTopics]);
+  useEffect(() => {
+    if (alertsOpen) return;
+    if (alertsTopicKey) setAlertsTopicKey('');
+  }, [alertsOpen, alertsTopicKey]);
   useEffect(() => {
     if (canViewPage(page)) return;
     const fallback = visibleNav[0]?.id || (canViewPage('settings') ? 'settings' : 'dash');
@@ -8507,8 +9084,9 @@ export default function App() {
               <button className="nav-i" onClick={()=>setSide(!side)} style={{padding:'4px 8px',border:'none',background:'transparent',cursor:'pointer'}}>
                 <span style={{fontSize:17,display:'inline-block',transform:side?'none':'rotate(180deg)',transition:'transform .2s'}}>{'<'}</span>
               </button>
-              <span style={{fontWeight:700,fontSize:14}}>
-                {pageMeta.icon} {pageMeta.label}
+              <span style={{fontWeight:700,fontSize:14,display:'inline-flex',alignItems:'center',gap:7}}>
+                <img src="/New.png" alt="logo" style={{width:18,height:18,borderRadius:5,objectFit:'cover',display:'block'}} />
+                <span>{pageMeta.icon} {pageMeta.label}</span>
               </span>
               {data && (
                 <>
@@ -8518,6 +9096,20 @@ export default function App() {
               )}
             </div>
             <div style={{display:'flex',gap:6}}>
+              <button
+                className="btn btn-gh btn-sm"
+                onClick={() => setAlertsOpen(true)}
+                style={{position:'relative'}}
+                title="Bildirishnomalar"
+              >
+                {E.bell}
+                Bildirishnoma
+                {alertTotalCount > 0 && (
+                  <span style={{position:'absolute',top:-7,right:-7,minWidth:18,height:18,padding:'0 5px',borderRadius:999,background:'var(--rd)',color:'#fff',fontSize:10,fontWeight:800,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+                    {alertTotalCount}
+                  </span>
+                )}
+              </button>
               {canSwitchCompany ? (
                 <select
                   className="select"
@@ -8547,7 +9139,7 @@ export default function App() {
             </div>
           </div>
 
-          <div data-filter-boundary="1" style={{flex:1,overflow:'auto',padding:16}}>
+          <div data-filter-boundary="1" style={{flex:1,overflow:'auto',padding:page==='nazorat'?8:12,display:'flex',flexDirection:'column'}}>
             {!data && page!=='doljniki' ? (
               <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <div style={{textAlign:'center',maxWidth:440}}>
@@ -8669,6 +9261,114 @@ export default function App() {
           obzvonSheetUrl={obzvonSheetUrl}
           setObzvonSheetUrl={setObzvonSheetUrl}
         />
+      )}
+      {alertsOpen && (
+        <div className="modal-ov" onMouseDown={()=>setAlertsOpen(false)}>
+          <div className="modal ani" style={{maxWidth:980,maxHeight:'92vh'}} onMouseDown={(e)=>e.stopPropagation()}>
+            <div className="mhdr">
+              <div>
+                <div style={{fontWeight:800,fontSize:16}}>Bildirishnomalar</div>
+                <div style={{fontSize:12,color:'var(--t3)',marginTop:4}}>
+                  {alertTotalCount} ta vazifa/eslatma
+                </div>
+              </div>
+              <button className="btn btn-gh btn-sm" onClick={()=>setAlertsOpen(false)}>Yopish</button>
+            </div>
+            <div className="mbdy" style={{display:'grid',gap:10}}>
+              {!activeAlertTopic ? (
+                <>
+                  {alertTopics.length === 0 ? (
+                    <div className="card" style={{padding:20,textAlign:'center',color:'var(--t3)'}}>
+                      Hozircha bildirishnoma yo'q
+                    </div>
+                  ) : (
+                    <div className="alert-topic-grid">
+                      {alertTopics.map((topic) => (
+                        <div key={topic.key} className="alert-topic-card">
+                          <div className="alert-topic-head">
+                            <div style={{fontWeight:700}}>{topic.title}</div>
+                            <span className="alert-topic-count">{topic.items.length} ta</span>
+                          </div>
+                          <div style={{fontSize:12,color:'var(--t3)'}}>{topic.subtitle}</div>
+                          <div style={{display:'grid',gap:6}}>
+                            <div style={{fontSize:11,color:'var(--t3)'}}>Mavzu bo'yicha eslatma</div>
+                            <input
+                              className="input"
+                              type="datetime-local"
+                              value={toDateTimeInputValue((alertsReminders?.topics || {})[topic.key] || '')}
+                              onChange={(e)=>setTopicReminder(topic.key, e.target.value)}
+                            />
+                            {(alertsReminders?.topics || {})[topic.key] && (
+                              <div style={{fontSize:11,color:'var(--bl)'}}>Eslatma: {fmtDateTime((alertsReminders?.topics || {})[topic.key])}</div>
+                            )}
+                          </div>
+                          <div style={{display:'flex',justifyContent:'flex-end'}}>
+                            <button className="btn btn-bl btn-sm" onClick={()=>setAlertsTopicKey(topic.key)}>Ko'rish</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <button className="btn btn-gh btn-sm" onClick={()=>setAlertsTopicKey('')}>{'<'}</button>
+                      <div>
+                        <div style={{fontWeight:800}}>{activeAlertTopic.title}</div>
+                        <div style={{fontSize:12,color:'var(--t3)'}}>{activeAlertTopic.items.length} ta yozuv</div>
+                      </div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:8}}>
+                      <span style={{fontSize:11,color:'var(--t3)'}}>Mavzu eslatmasi</span>
+                      <input
+                        className="input"
+                        type="datetime-local"
+                        style={{width:220}}
+                        value={toDateTimeInputValue((alertsReminders?.topics || {})[activeAlertTopic.key] || '')}
+                        onChange={(e)=>setTopicReminder(activeAlertTopic.key, e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div style={{display:'grid',gap:8,maxHeight:'60vh',overflow:'auto',paddingRight:2}}>
+                    {(activeAlertTopic.items || []).map((item, idx) => {
+                      const reminderKey = `${activeAlertTopic.key}__${item.id || idx}`;
+                      const itemReminder = (alertsReminders?.items || {})[reminderKey] || '';
+                      return (
+                        <div key={reminderKey} className="alert-item">
+                          <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'start',flexWrap:'wrap'}}>
+                            <div>
+                              <div style={{fontWeight:700}}>{item.title || '-'}</div>
+                              <div style={{fontSize:12,color:'var(--t2)',marginTop:2}}>{item.subtitle || '-'}</div>
+                            </div>
+                            {item.customerId ? <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>ID: {item.customerId}</span> : null}
+                          </div>
+                          {(item.meta || []).length > 0 && (
+                            <div style={{display:'grid',gap:4}}>
+                              {(item.meta || []).map((m, j) => <div key={`${reminderKey}_m_${j}`} className="meta">{m}</div>)}
+                            </div>
+                          )}
+                          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+                            <span className="meta">Shu yozuv bo'yicha eslatma</span>
+                            <input
+                              className="input"
+                              type="datetime-local"
+                              style={{width:220}}
+                              value={toDateTimeInputValue(itemReminder)}
+                              onChange={(e)=>setItemReminder(reminderKey, e.target.value)}
+                            />
+                            {itemReminder && <span className="meta" style={{color:'var(--bl)'}}>{fmtDateTime(itemReminder)}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
       {notif && (
         <div className="notif" style={{background:notif.type==='ok'?'var(--gr2)':'var(--rd2)',border:`1px solid ${notif.type==='ok'?'var(--gr)':'var(--rd)'}`,color:notif.type==='ok'?'var(--gr)':'var(--rd)'}}>
