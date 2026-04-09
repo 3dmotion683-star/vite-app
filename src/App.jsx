@@ -3876,7 +3876,7 @@ function Obzvon({
     { key:'district', label:'Rayon', type:'text' },
     { key:'balance', label:'Balans', type:'number' },
     { key:'ord1', label:'Oxirgi zakaz', type:'date' },
-    { key:'ord2', label:'Oldingi zakaz', type:'date' },
+    { key:'ord2', label:'Oxirgidan oldingi zakaz', type:'date' },
     { key:'lastQty', label:'Zakaz soni', type:'number' },
     { key:'lastCallDate', label:"Oxirgi qo'ng'iroq", type:'date' },
     { key:'nextDate', label:'Keyingi sana', type:'date' },
@@ -4335,6 +4335,8 @@ function Obzvon({
         String(r.id || '').includes(q) ||
         String(r.name || '').toLowerCase().includes(q) ||
         String(r.district || '').toLowerCase().includes(q) ||
+        String(r.ord1 || '').toLowerCase().includes(q) ||
+        String(r.ord2 || '').toLowerCase().includes(q) ||
         String(r.operator || '').toLowerCase().includes(q) ||
         String(r.lastNote || '').toLowerCase().includes(q)
       );
@@ -4984,9 +4986,9 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
               <table className="tbl">
-                <thead><tr><th>ID</th><th>Mijoz</th><th>Rayon</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi 2 zakaz</th><th style={{textAlign:'right'}}>Zakaz soni</th><th>Oxirgi qo'ng'iroq</th><th>Keyingi sana</th><th>Operator</th><th>Oxirgi izoh</th></tr></thead>
+                <thead><tr><th>ID</th><th>Mijoz</th><th>Rayon</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi zakaz</th><th>Oxirgidan oldingi zakaz</th><th style={{textAlign:'right'}}>Zakaz soni</th><th>Oxirgi qo'ng'iroq</th><th>Keyingi sana</th><th>Operator</th><th>Oxirgi izoh</th></tr></thead>
                 <tbody>
-                  {operatorTableRows.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
+                  {operatorTableRows.length===0 ? <tr><td colSpan={11} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
                     visibleOperatorRows.map((r, i) => (
                       <tr
                         key={i}
@@ -5000,16 +5002,8 @@ function Obzvon({
                         <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</span></td>
                         <td style={{maxWidth:140}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.district || '-'}</span></td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.balance<0?'var(--rd)':r.balance>0?'var(--gr)':'var(--t3)'}}>{fmt(r.balance)}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>
-                          <div style={{display:'flex',justifyContent:'space-between',gap:10}}>
-                            <span style={{color:'var(--t3)',fontSize:10}}>Oxirgi</span>
-                            <span>{fmtD(r.ord1)}</span>
-                          </div>
-                          <div style={{display:'flex',justifyContent:'space-between',gap:10,marginTop:2}}>
-                            <span style={{color:'var(--t3)',fontSize:10}}>Oldingi</span>
-                            <span>{fmtD(r.ord2)}</span>
-                          </div>
-                        </td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.ord1)}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.ord2)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,color:'var(--bl)'}}>{r.lastQty ? `${r.lastQty}` : '0'}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.lastCallDate)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.nextDate)}</td>
@@ -5278,6 +5272,19 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
     }
     return applyUniversalFilters(r, kulerFilterColumns, kulerFilterState);
   }, [kulerActive, kulerSearch, kulerFilterColumns, kulerFilterState]);
+  const kulerDebtTotal = useMemo(
+    () => kulerActive.reduce((s, k) => s + Math.max(0, Number(k.remaining || 0)), 0),
+    [kulerActive]
+  );
+  const kulerDebtorCount = useMemo(() => {
+    const ids = new Set(
+      kulerActive
+        .filter((k) => Number(k.remaining || 0) > 0)
+        .map((k) => String(k.customerId || k.customerName || '').trim())
+        .filter(Boolean)
+    );
+    return ids.size;
+  }, [kulerActive]);
   const kulerRemain = kulerActive.reduce((s, k) => s + k.remaining, 0);
   const kulerDue = kulerActive.filter((k) => k.overdueAmount > 0).length;
   const kulerDueAmount = kulerActive.reduce((s, k) => s + (k.overdueAmount > 0 ? k.overdueAmount : 0), 0);
@@ -5363,7 +5370,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
             <StatCard l={tab==='other_qarz' ? "BOSHQA QARZDORLAR" : "QARZDORLAR"} v={list.length+' ta'} s="UZS bo'yicha" c="var(--rd)"/>
             <StatCard l="JAMI QARZ" v={fmt(debtSum)+" so'm"} s="faqat UZS" c="var(--or)"/>
             <StatCard l="15+ KUN QARZDOR" v={d15.length+' ta'} s={fmt(d15Sum)+" so'm"} c="var(--yl)"/>
-            <StatCard l="QARZ RO'YXATI" v={fmt(debtSum)+" so'm"} s={`${list.length} ta mijoz`} c="var(--bl)"/>
+            <StatCard l="KULER QARZDORLIK" v={fmt(kulerDebtTotal)+" so'm"} s={`${kulerDebtorCount} ta mijoz qarzdor`} c="var(--bl)"/>
           </div>
 
           <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
