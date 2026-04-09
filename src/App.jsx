@@ -7474,8 +7474,9 @@ export default function App() {
         S.set(OBZVON_NEW_STABLE_ID_LAST_KEY, stableIdLast);
         return true;
       }
-      const payloadRows = rowsToSend.map((r, i) => ({
-        no: String(r.no || i + 1),
+      const payloadRows = rowsToSend.map((r) => ({
+        // Google Sheetda A ustun (No) sifatida ketma-ket SyncID saqlanadi
+        no: String(r.stableId || ensureStableId(r.rid || r._rid)),
         customerId: String(r.customerId || r.id || '').trim(),
         customer: String(r.customer || '').trim(),
         callDate: String(r.callDate || '').trim(),
@@ -7486,7 +7487,6 @@ export default function App() {
         orderDate: String(r.orderDate || '').trim(),
         operator: String(r.operator || '').trim(),
         company: String(r.company || '').trim(),
-        stableId: String(r.stableId || ensureStableId(r.rid || r._rid)),
         rid: String(r.rid || r._rid || '').trim(),
         updatedAt: String(r.updatedAt || '').trim(),
       }));
@@ -7499,7 +7499,7 @@ export default function App() {
         gid: OBZVON_NEW_EXPORT_SHEET_GID,
         sheetUrl: OBZVON_NEW_EXPORT_SHEET_URL,
         withHeaders,
-        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator', 'Kompaniya', 'SyncID', 'RID', 'UpdatedAt'],
+        headers: ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator', 'Kompaniya', 'RID', 'UpdatedAt'],
         rows: payloadRows,
         by: sessionUser || currentUser || 'unknown',
       };

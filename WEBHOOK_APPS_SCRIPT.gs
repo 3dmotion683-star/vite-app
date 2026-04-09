@@ -106,8 +106,8 @@ function upsertObzvonNewRows_(rows, by) {
 function getObzvonSheetConfig_(data) {
   const sheetId = safe(data && data.sheetId);
   const sheetName = safe(data && data.sheetName) || 'Barcha_obzvon_yangi';
-  const fallbackHeaders = ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator', 'Kompaniya', 'SyncID', 'RID', 'UpdatedAt'];
-  const fallbackKeys = ['no', 'customerId', 'customer', 'callDate', 'topic', 'note', 'nextDate', 'orderCount', 'orderDate', 'operator', 'company', 'stableId', 'rid', 'updatedAt'];
+  const fallbackHeaders = ['No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh', 'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi', 'Operator', 'Kompaniya', 'RID', 'UpdatedAt'];
+  const fallbackKeys = ['no', 'customerId', 'customer', 'callDate', 'topic', 'note', 'nextDate', 'orderCount', 'orderDate', 'operator', 'company', 'rid', 'updatedAt'];
   const labelToKey = {
     'No': 'no',
     'ID': 'customerId',
@@ -130,7 +130,12 @@ function getObzvonSheetConfig_(data) {
   if (!headers.length) headers = fallbackHeaders;
   const keys = headers.map((h) => labelToKey[h] || h);
   const ridIndex = Math.max(0, headers.findIndex((h) => safe(h).toUpperCase() === 'RID'));
-  const stableIdIndex = headers.findIndex((h) => safe(h).toUpperCase() === 'SYNCID');
+  // Eski strukturada SyncID alohida ustun edi, yangi strukturada esa No ustuniga yoziladi
+  const stableIdIndex = (() => {
+    const syncIdx = headers.findIndex((h) => safe(h).toUpperCase() === 'SYNCID');
+    if (syncIdx >= 0) return syncIdx;
+    return headers.findIndex((h) => safe(h).toUpperCase() === 'NO');
+  })();
   return { sheetId, sheetName, headers, keys, ridIndex, stableIdIndex, fallbackKeys };
 }
 
