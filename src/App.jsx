@@ -4101,6 +4101,7 @@ function Obzvon({
   const [dueSelectedIds, setDueSelectedIds] = useState({});
   const [latePickMode, setLatePickMode] = useState(false);
   const [lateSelectedIds, setLateSelectedIds] = useState({});
+  const [selectedDueCustomer, setSelectedDueCustomer] = useState(null);
   const deferredSearchAll = useDeferredValue(searchAll);
   const deferredSearchAllNew = useDeferredValue(searchAllNew);
   const deferredOpSearch = useDeferredValue(opSearch);
@@ -4143,11 +4144,14 @@ function Obzvon({
     { key:'operator', label:'Operator', type:'text' },
   ]), []);
   const dueFilterColumns = useMemo(() => ([
+    { key:'no', label:'No', type:'number' },
     { key:'id', label:'ID', type:'text' },
     { key:'name', label:'Mijoz', type:'text' },
     { key:'district', label:'Rayon', type:'text' },
     { key:'phone', label:'Telefon', type:'text' },
-    { key:'last3Info', label:'Oxirgi zakazlar', type:'text' },
+    { key:'ord1', label:'Oxirgi zakaz', type:'date' },
+    { key:'ord2', label:'Oldingi zakaz', type:'date' },
+    { key:'tara', label:'Idish', type:'number' },
     { key:'passed', label:"O'tgan kun", type:'number' },
     { key:'shouldIn', label:"Qo'ng'iroq me'yori", type:'number' },
   ]), []);
@@ -4483,7 +4487,7 @@ function Obzvon({
       grouped[o.mId].push(o);
     });
     const out = [];
-    Object.entries(grouped).forEach(([mid, ords]) => {
+    Object.entries(grouped).forEach(([mid, ords], idx) => {
       const sorted = ords
         .filter((o) => toDate(o.orderDate))
         .sort((a,b)=>(toDate(b.orderDate)-toDate(a.orderDate)));
@@ -4517,7 +4521,11 @@ function Obzvon({
       }
       const passed = daysAgo(used[0].orderDate) ?? 0;
       out.push({
+        no: idx + 1,
         ...c,
+        ord1: used[0]?.orderDate || '',
+        ord2: used[1]?.orderDate || '',
+        tara: Number(c?.tara || 0),
         shouldIn,
         passed,
         sampleSize: useCount,
@@ -4682,9 +4690,9 @@ function Obzvon({
       exportAoaExcel({
         fileName: `Vaqti_kelgan_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'VaqtiKelgan',
-        headers: ['ID', 'Mijoz', 'Telefon', 'Oxirgi zakazlar', 'Otgan kun', "Qongiroq meyori"],
-        columnTypes: ['text', 'text', 'text', 'text', 'number', 'number'],
-        rows: dueCandidates.map((r) => [r.id, r.name, r.phone || '', r.last3Info || '', r.passed ?? '', r.shouldIn ?? '']),
+        headers: ['No', 'ID', 'Mijoz', 'Telefon', 'Oxirgi zakaz', 'Oldingi zakaz', 'Idish', 'Otgan kun', "Qongiroq meyori"],
+        columnTypes: ['number', 'text', 'text', 'text', 'date', 'date', 'number', 'number', 'number'],
+        rows: dueCandidates.map((r, i) => [i + 1, r.id, r.name, r.phone || '', fmtD(r.ord1), fmtD(r.ord2), Number(r.tara || 0), r.passed ?? '', r.shouldIn ?? '']),
       });
       return;
     }
@@ -4692,9 +4700,9 @@ function Obzvon({
       exportAoaExcel({
         fileName: `Ikki_oydan_otgan_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: '2OydanOtgan',
-        headers: ['ID', 'Mijoz', 'Telefon', 'Oxirgi zakazlar', 'Otgan kun', "Qongiroq meyori"],
-        columnTypes: ['text', 'text', 'text', 'text', 'number', 'number'],
-        rows: staleCandidates.map((r) => [r.id, r.name, r.phone || '', r.last3Info || '', r.passed ?? '', r.shouldIn ?? '']),
+        headers: ['No', 'ID', 'Mijoz', 'Telefon', 'Oxirgi zakaz', 'Oldingi zakaz', 'Idish', 'Otgan kun', "Qongiroq meyori"],
+        columnTypes: ['number', 'text', 'text', 'text', 'date', 'date', 'number', 'number', 'number'],
+        rows: staleCandidates.map((r, i) => [i + 1, r.id, r.name, r.phone || '', fmtD(r.ord1), fmtD(r.ord2), Number(r.tara || 0), r.passed ?? '', r.shouldIn ?? '']),
       });
       return;
     }
@@ -4753,14 +4761,15 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'58vh'}}>
               <table className="tbl">
-                <thead><tr><th>ID</th><th>Mijoz</th><th>Sana</th><th>Maqsad</th><th>Izoh</th><th>Keyingi sana</th><th>Z.soni / summa</th><th>Zakaz sana</th><th>Operator</th><th></th></tr></thead>
+                <thead><tr><th>No</th><th>ID</th><th>Mijoz</th><th>Sana</th><th>Maqsad</th><th>Izoh</th><th>Keyingi sana</th><th>Z.soni / summa</th><th>Zakaz sana</th><th>Operator</th><th></th></tr></thead>
                 <tbody>
-                  {mainRows.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Obzvon yozuvlari yo'q</td></tr> :
+                  {mainRows.length===0 ? <tr><td colSpan={11} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Obzvon yozuvlari yo'q</td></tr> :
                     mainRows.map((r)=>{
                       const i = (records || []).findIndex((x) => (x?._rid || '') === (r?._rid || ''));
                       if (i < 0) return null;
                       return (
                       <tr key={r._rid || i}>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id || '-'}</td>
                         <td style={{minWidth:420}}>
                           <div style={{position:'relative'}}>
@@ -5098,26 +5107,32 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
               <table className="tbl">
-                <thead><tr><th>Mijoz</th><th>ID</th><th>Oxirgi zakazlar</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
+                <thead><tr><th>No</th><th>Mijoz</th><th>ID</th><th>Oxirgi zakaz</th><th>Oldingi zakaz</th><th>Idish</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
                 <tbody>
-                  {filteredDueCandidates.length===0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Vaqti kelgan mijoz yo'q</td></tr> :
+                  {filteredDueCandidates.length===0 ? <tr><td colSpan={9} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Vaqti kelgan mijoz yo'q</td></tr> :
                     filteredDueCandidates.map((c,i)=>(
                       <tr
                         key={i}
                         onClick={()=>{
-                          if (!duePickMode) return;
+                          if (!duePickMode) {
+                            setSelectedDueCustomer({ id: c.id, name: c.name, orderNo: '-' });
+                            return;
+                          }
                           setDueSelectedIds((p)=>({ ...p, [c.id]: !p[c.id] }));
                         }}
                         style={duePickMode && dueSelectedIds[c.id] ? { background:'rgba(88,166,255,.11)' } : undefined}
                       >
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                         <td style={{maxWidth:340}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{c.id}</td>
-                        <td>{c.last3Info}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.ord1)}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.ord2)}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmt(c.tara || 0)}</td>
                         <td>{c.passed} kun</td>
                         <td>{c.shouldIn} kunda</td>
                         <td>
                           {!duePickMode ? (
-                            <button className="btn btn-bl btn-sm" onClick={()=>{ addRecord(c,'Buyurtma olish'); setTab('main'); }}>Obzvonga qo'shish</button>
+                            <button className="btn btn-bl btn-sm" onClick={(e)=>{ e.stopPropagation(); addRecord(c,'Buyurtma olish'); setTab('main'); }}>Obzvonga qo'shish</button>
                           ) : (
                             <span className="tag" style={{background:dueSelectedIds[c.id]?'var(--gr2)':'var(--s3)',color:dueSelectedIds[c.id]?'var(--gr)':'var(--t3)'}}>
                               {dueSelectedIds[c.id] ? 'Tanlangan' : 'Tanlash'}
@@ -5190,26 +5205,32 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
               <table className="tbl">
-                <thead><tr><th>Mijoz</th><th>ID</th><th>Oxirgi zakazlar</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
+                <thead><tr><th>No</th><th>Mijoz</th><th>ID</th><th>Oxirgi zakaz</th><th>Oldingi zakaz</th><th>Idish</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
                 <tbody>
-                  {filteredStaleCandidates.length===0 ? <tr><td colSpan={6} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>2 oydan o'tgan mijoz yo'q</td></tr> :
+                  {filteredStaleCandidates.length===0 ? <tr><td colSpan={9} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>2 oydan o'tgan mijoz yo'q</td></tr> :
                     filteredStaleCandidates.map((c,i)=>(
                       <tr
                         key={i}
                         onClick={()=>{
-                          if (!latePickMode) return;
+                          if (!latePickMode) {
+                            setSelectedDueCustomer({ id: c.id, name: c.name, orderNo: '-' });
+                            return;
+                          }
                           setLateSelectedIds((p)=>({ ...p, [c.id]: !p[c.id] }));
                         }}
                         style={latePickMode && lateSelectedIds[c.id] ? { background:'rgba(88,166,255,.11)' } : undefined}
                       >
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                         <td style={{maxWidth:340}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{c.id}</td>
-                        <td>{c.last3Info}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.ord1)}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.ord2)}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmt(c.tara || 0)}</td>
                         <td>{c.passed} kun</td>
                         <td>{c.shouldIn} kunda</td>
                         <td>
                           {!latePickMode ? (
-                            <button className="btn btn-bl btn-sm" onClick={()=>{ addRecord(c,'Buyurtma olish'); setTab('main'); }}>Obzvonga qo'shish</button>
+                            <button className="btn btn-bl btn-sm" onClick={(e)=>{ e.stopPropagation(); addRecord(c,'Buyurtma olish'); setTab('main'); }}>Obzvonga qo'shish</button>
                           ) : (
                             <span className="tag" style={{background:lateSelectedIds[c.id]?'var(--gr2)':'var(--s3)',color:lateSelectedIds[c.id]?'var(--gr)':'var(--t3)'}}>
                               {lateSelectedIds[c.id] ? 'Tanlangan' : 'Tanlash'}
@@ -5286,9 +5307,9 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
               <table className="tbl">
-                <thead><tr><th>ID</th><th>Mijoz</th><th>Rayon</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi zakaz</th><th>Oxirgidan oldingi zakaz</th><th style={{textAlign:'right'}}>Zakaz soni</th><th>Oxirgi qo'ng'iroq</th><th>Keyingi sana</th><th>Operator</th><th>Oxirgi izoh</th></tr></thead>
+                <thead><tr><th>No</th><th>ID</th><th>Mijoz</th><th>Rayon</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi zakaz</th><th>Oxirgidan oldingi zakaz</th><th style={{textAlign:'right'}}>Zakaz soni</th><th>Oxirgi qo'ng'iroq</th><th>Keyingi sana</th><th>Operator</th><th>Oxirgi izoh</th></tr></thead>
                 <tbody>
-                  {operatorTableRows.length===0 ? <tr><td colSpan={11} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
+                  {operatorTableRows.length===0 ? <tr><td colSpan={12} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
                     visibleOperatorRows.map((r, i) => (
                       <tr
                         key={i}
@@ -5298,6 +5319,7 @@ function Obzvon({
                         }}
                         style={opPickMode && opSelectedIds[r.id] ? { background:'rgba(88,166,255,.11)' } : undefined}
                       >
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
                         <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</span></td>
                         <td style={{maxWidth:140}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.district || '-'}</span></td>
@@ -5357,6 +5379,13 @@ function Obzvon({
             </div>
           )}
         </>
+      )}
+      {selectedDueCustomer && (
+        <DoljnikModal
+          row={selectedDueCustomer}
+          D={D}
+          onClose={() => setSelectedDueCustomer(null)}
+        />
       )}
     </div>
   );
@@ -5939,8 +5968,10 @@ function Reports({
     [nextWorkDate, monthEndDate, offDaysSet, offDatesSet]
   );
   const nextWorkDayPlan = remainingWorkDays > 0 ? Math.ceil(remainingMonthPlanQty / remainingWorkDays) : 0;
-  const nextWorkDayPlanPerOperator = Math.ceil(nextWorkDayPlan / Math.max(1, canSeeAll ? visibleOperators.length : 1));
-  const currentPlanTarget = canSeeAll ? nextWorkDayPlan : nextWorkDayPlanPerOperator;
+  const monthDailyPlan = Math.ceil(Number(selectedPlan.waterPlan || 0) / Math.max(1, Number(selectedPlan.workDays || 1)));
+  const basePlanForDisplay = nextWorkDayPlan > 0 ? nextWorkDayPlan : monthDailyPlan;
+  const operatorPlanTarget = Math.ceil(basePlanForDisplay / Math.max(1, visibleOperators.length || 1));
+  const currentPlanTarget = Math.max(0, operatorPlanTarget);
 
   const debtRowsToday = rowsToday.filter((r) => String(r.topic || '').toLowerCase().includes('qarz'));
   const callsToday = rowsToday.length;
@@ -6377,8 +6408,8 @@ function Reports({
         />
         <StatCard
           l="BUGUNGI PLAN QOLDIQ"
-          v={`${fmt(nextWorkDayPlan)} ta`}
-          s={`Keyingi ish kuni (${nextWorkDate ? toIsoDate(nextWorkDate) : '-'}) rejasi: ${fmt(nextWorkDayPlan)}  |  oy qoldiq: ${fmt(remainingMonthPlanQty)}  |  ish kun: ${fmt(remainingWorkDays)}`}
+          v={`${fmt(basePlanForDisplay)} ta`}
+          s={`Keyingi ish kuni (${nextWorkDate ? toIsoDate(nextWorkDate) : '-'}) rejasi: ${fmt(basePlanForDisplay)}  |  operatorga: ${fmt(currentPlanTarget)}  |  oy qoldiq: ${fmt(remainingMonthPlanQty)}  |  ish kun: ${fmt(remainingWorkDays)}`}
           c="var(--gr)"
         />
         <StatCard
@@ -6403,6 +6434,7 @@ function Reports({
           <table className="tbl">
             <thead>
               <tr>
+                <th>No</th>
                 <th>Operator</th>
                 <th style={{textAlign:'right'}}>Obzvon</th>
                 <th style={{textAlign:'right'}}>Buyurtma</th>
@@ -6415,12 +6447,13 @@ function Reports({
             </thead>
             <tbody>
               {dailyRows.length===0 ? (
-                <tr><td colSpan={8} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Bugungi natija yo'q</td></tr>
+                <tr><td colSpan={9} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Bugungi natija yo'q</td></tr>
               ) : (
                 <>
                   {dailyRows.map((r, i) => (
                     <Fragment key={`rep_${i}_${r.operator}`}>
                       <tr>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                         <td style={{fontWeight:700}}>{r.operator}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.calls)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.buyurtmaCount)}</td>
@@ -6432,6 +6465,7 @@ function Reports({
                       </tr>
                       {(r.dateEntries || []).map((d, j) => (
                         <tr key={`rep_${i}_${j}_${d.date}`} style={{background:'rgba(88,166,255,.05)'}}>
+                          <td style={{color:'var(--t3)',fontSize:11}} />
                           <td style={{color:'var(--t3)',fontSize:11}}>sana</td>
                           <td style={{textAlign:'right',color:'var(--t4)'}}>-</td>
                           <td style={{textAlign:'right',color:'var(--t4)'}}>-</td>
@@ -6445,6 +6479,7 @@ function Reports({
                     </Fragment>
                   ))}
                   <tr style={{background:'var(--s2)'}}>
+                    <td style={{fontWeight:800}}>#</td>
                     <td style={{fontWeight:800}}>ITOG</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.calls)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.buyurtmaCount)}</td>
@@ -6452,7 +6487,9 @@ function Reports({
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.debtCount)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--rd)'}}>{fmt(dailyTotals.debtSum)}</td>
                     <td style={{fontWeight:700,color:'var(--t3)'}}>-</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>
+                      {fmt(canSeeAll ? currentPlanTarget * Math.max(1, dailyRows.length) : currentPlanTarget)}
+                    </td>
                   </tr>
                 </>
               )}
@@ -6527,6 +6564,7 @@ function Reports({
               <table className="tbl">
                 <thead>
                   <tr>
+                    <th>No</th>
                     <th>Sana</th>
                     <th>Dostavchik</th>
                     <th>Sklad</th>
@@ -6538,11 +6576,12 @@ function Reports({
                 </thead>
                 <tbody>
                   {nazoratFilteredRows.length === 0 ? (
-                    <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
+                    <tr><td colSpan={8} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
                   ) : (
                     <>
                       {nazoratFilteredRows.map((r, i) => (
                         <tr key={`nord_${i}_${r.driver}_${r.date}`} style={r.status === 'OK' ? undefined : {background:'rgba(248,81,73,.07)'}}>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                           <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                           <td>{r.driver}</td>
                           <td>{r.warehouse}</td>
@@ -6554,6 +6593,7 @@ function Reports({
                       ))}
                       {nazoratView === 'all' && (
                         <tr style={{background:'var(--s2)'}}>
+                          <td style={{fontWeight:800}}>#</td>
                           <td colSpan={3} style={{fontWeight:800}}>ITOG</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--gr)'}}>{fmt(orderDisplayTotals.orderQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--bl)'}}>{fmt(orderDisplayTotals.transferQty)}</td>
@@ -6571,6 +6611,7 @@ function Reports({
               <table className="tbl">
                 <thead>
                   <tr>
+                    <th>No</th>
                     <th>Sana</th>
                     <th>Mijoz ID</th>
                     <th>Mijoz</th>
@@ -6584,9 +6625,10 @@ function Reports({
                 </thead>
                 <tbody>
                   {nazoratFilteredRows.length === 0 ? (
-                    <tr><td colSpan={9} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Dublikat topilmadi' : "Ma'lumot topilmadi"}</td></tr>
+                    <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Dublikat topilmadi' : "Ma'lumot topilmadi"}</td></tr>
                   ) : nazoratFilteredRows.map((r, i) => (
                     <tr key={`ndup_${i}_${r.customerId}_${r.date}`} style={r.docsCount > 1 ? {background:'rgba(248,81,73,.08)'} : undefined}>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                       <td>{r.customer}</td>
@@ -6604,6 +6646,7 @@ function Reports({
               <table className="tbl">
                 <thead>
                   <tr>
+                    <th>No</th>
                     <th>Sana</th>
                     <th>Mijoz ID</th>
                     <th>Mijoz</th>
@@ -6617,9 +6660,10 @@ function Reports({
                 </thead>
                 <tbody>
                   {nazoratFilteredRows.length === 0 ? (
-                    <tr><td colSpan={9} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
+                    <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
                   ) : nazoratFilteredRows.map((r, i) => (
                     <tr key={`nret_${i}_${r.customerId}_${r.date}`} style={r.hasOrder ? undefined : {background:'rgba(248,81,73,.08)'}}>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                       <td>{r.customer}</td>
@@ -8681,20 +8725,36 @@ export default function App() {
     S.set(alertReminderStorageKey, alertsReminders || { topics:{}, items:{} });
   }, [alertReminderStorageKey, alertsReminders]);
   const setTopicReminder = useCallback((topicKey, inputValue) => {
-    const iso = fromDateTimeInputValue(inputValue);
     setAlertsReminders((prev) => {
       const topics = { ...((prev && prev.topics) || {}) };
-      if (iso) topics[topicKey] = iso;
-      else delete topics[topicKey];
+      const raw = String(inputValue || '').trim();
+      if (!raw) {
+        delete topics[topicKey];
+        return { topics, items: { ...((prev && prev.items) || {}) } };
+      }
+      const iso = fromDateTimeInputValue(raw);
+      if (!iso) {
+        // Noto'liq typing paytida joriy qiymatni o'chirib yubormaslik.
+        return prev;
+      }
+      topics[topicKey] = iso;
       return { topics, items: { ...((prev && prev.items) || {}) } };
     });
   }, []);
   const setItemReminder = useCallback((itemKey, inputValue) => {
-    const iso = fromDateTimeInputValue(inputValue);
     setAlertsReminders((prev) => {
       const items = { ...((prev && prev.items) || {}) };
-      if (iso) items[itemKey] = iso;
-      else delete items[itemKey];
+      const raw = String(inputValue || '').trim();
+      if (!raw) {
+        delete items[itemKey];
+        return { topics: { ...((prev && prev.topics) || {}) }, items };
+      }
+      const iso = fromDateTimeInputValue(raw);
+      if (!iso) {
+        // Noto'liq typing paytida joriy qiymatni o'chirib yubormaslik.
+        return prev;
+      }
+      items[itemKey] = iso;
       return { topics: { ...((prev && prev.topics) || {}) }, items };
     });
   }, []);
