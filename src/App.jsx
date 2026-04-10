@@ -933,6 +933,287 @@ const toIsoDate = (v) => {
   const d = toDate(v);
   return d ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}` : '';
 };
+const LEFTOVER_ROLLOVER_HOUR = 3;
+const getYesterdayIsoDate = (baseDate = new Date()) => {
+  const d = new Date(baseDate);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - 1);
+  return toIsoDate(d);
+};
+const getLeftoverCompareDate = (baseDate = new Date(), rolloverHour = LEFTOVER_ROLLOVER_HOUR) => {
+  const d = new Date(baseDate);
+  if (Number.isNaN(d.getTime())) return '';
+  const backDays = d.getHours() < Number(rolloverHour || 3) ? 2 : 1;
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - backDays);
+  return toIsoDate(d);
+};
+const parseLeftoverReasonRows = (rawRows = []) => (
+  (rawRows || [])
+    .slice(1)
+    .map((r, i) => ({
+      rowId: `reason_${i + 1}`,
+      uid: String(r?.[0] || '').trim(),
+      date: toIsoDate(r?.[1]),
+      customerId: normalizeIdKey(r?.[2]),
+      customer: String(r?.[3] || '').trim(),
+      orderId: String(r?.[4] || '').trim(),
+      driver: String(r?.[5] || '').trim(),
+      reason: String(r?.[6] || '').trim(),
+    }))
+    .filter((r) => r.uid || r.orderId || r.customerId || r.reason || r.date)
+);
+const parseLeftoverArchiveRows = (rawRows = []) => (
+  (rawRows || [])
+    .slice(1)
+    .map((r, i) => ({
+      rowId: `arxiv_${i + 1}`,
+      date: toIsoDate(r?.[0]),
+      customerId: normalizeIdKey(r?.[2]),
+      customer: String(r?.[3] || '').trim(),
+      productGiven: String(r?.[4] || '').trim(),
+      qtyGiven: Math.abs(toNum(r?.[5])),
+      productTaken: String(r?.[6] || '').trim(),
+      qtyTaken: Math.abs(toNum(r?.[7])),
+      payType: String(r?.[8] || '').trim(),
+      payAmount: toNum(r?.[9]),
+      location: String(r?.[10] || '').trim(),
+      enteredAt: String(r?.[11] || '').trim(),
+      note: String(r?.[12] || '').trim(),
+      driver: String(r?.[13] || '').trim(),
+      uid: String(r?.[14] || '').trim(),
+    }))
+    .filter((r) => r.date || r.customerId || r.uid || r.qtyGiven || r.productGiven)
+);
+const buildOrderGroupsFromRawOrders = (rawOrders = []) => {
+  const groups = {};
+  (rawOrders || []).forEach((o) => {
+    if (!isOrderDoc(o?.docType)) return;
+    if (isCancelledStatus(o?.status)) return;
+    const soNum = String(o?.soNum || '').trim();
+    const customerId = normalizeIdKey(o?.mId);
+    const date = toIsoDate(o?.orderDate);
+    if (!soNum || !customerId || !date) return;
+    const key = `${soNum}__${customerId}__${date}`;
+    if (!groups[key]) {
+      groups[key] = {
+        key,
+        soNum,
+        contName: String(o?.contName || '').trim() || `ID ${customerId}`,
+        mId: customerId,
+        orderDate: date,
+        delivPerson: String(o?.delivPerson || o?.agent || '').trim() || '-',
+        agent: String(o?.agent || '').trim() || '-',
+        docType: String(o?.docType || '').trim(),
+        status: String(o?.status || '').trim(),
+        currency: String(o?.currency || '').trim().toUpperCase() || 'UZS',
+        items: [],
+        totalQty: 0,
+        totalSumUZS: 0,
+        totalSumUSD: 0,
+      };
+    }
+    const g = groups[key];
+    const qtyAbs = Math.abs(toNum(o?.qty));
+    const sumAbs = Math.abs(toNum(o?.sum));
+    g.items.push({
+      ...o,
+      product: String(o?.product || '').trim(),
+      qty: qtyAbs,
+      sum: sumAbs,
+      currency: String(o?.currency || '').trim().toUpperCase() || 'UZS',
+      uniqueId: String(o?.uniqueId || '').trim(),
+      note: String(o?.note || '').trim(),
+    });
+    g.totalQty += qtyAbs;
+    if ((String(o?.currency || '').trim().toUpperCase() || 'UZS') === 'USD') g.totalSumUSD += sumAbs;
+    else g.totalSumUZS += sumAbs;
+  });
+  return Object.values(groups).sort((a, b) => (
+    a.orderDate === b.orderDate
+      ? a.contName.localeCompare(b.contName, 'ru')
+      : b.orderDate.localeCompare(a.orderDate)
+  ));
+};
+const buildLeftoverAnalysis = ({
+  rawOrders = [],
+  rawReasonRows = [],
+  rawArchiveRows = [],
+  targetDate = '',
+  currentUser = 'Admin',
+  canSeeAll = true,
+}) => {
+  const compareDate = targetDate || getLeftoverCompareDate(new Date());
+  const allReasonRows = parseLeftoverReasonRows(rawReasonRows);
+  const reasonRows = canSeeAll
+    ? allReasonRows
+    : allReasonRows.filter((r) => {
+        const drv = normalizeMatchText(r.driver);
+        const usr = normalizeMatchText(currentUser);
+        if (!drv) return true;
+        return drv === usr;
+      });
+  const archiveRows = parseLeftoverArchiveRows(rawArchiveRows);
+  const orderGroups = buildOrderGroupsFromRawOrders(rawOrders);
+
+  const orderBySoNum = new Map();
+  const orderByUid = new Map();
+  const orderByDateCustomer = new Map();
+  orderGroups.forEach((g) => {
+    const soKey = normalizeMatchText(g.soNum);
+    if (soKey && !orderBySoNum.has(soKey)) orderBySoNum.set(soKey, g);
+    const dcKey = `${g.orderDate}__${g.mId}`;
+    if (!orderByDateCustomer.has(dcKey)) orderByDateCustomer.set(dcKey, g);
+    (g.items || []).forEach((it) => {
+      const u = normalizeMatchText(it.uniqueId);
+      if (u && !orderByUid.has(u)) orderByUid.set(u, g);
+    });
+  });
+
+  const reasonByOrder = new Map();
+  const reasonByDateCustomer = new Map();
+  reasonRows.forEach((r) => {
+    const soKey = normalizeMatchText(r.orderId);
+    const dcKey = `${r.date}__${r.customerId}`;
+    if (soKey) {
+      if (!reasonByOrder.has(soKey)) reasonByOrder.set(soKey, []);
+      if (r.reason) reasonByOrder.get(soKey).push(r.reason);
+    }
+    if (dcKey) {
+      if (!reasonByDateCustomer.has(dcKey)) reasonByDateCustomer.set(dcKey, []);
+      if (r.reason) reasonByDateCustomer.get(dcKey).push(r.reason);
+    }
+  });
+  const pickReasonText = (g) => {
+    const byOrder = reasonByOrder.get(normalizeMatchText(g.soNum)) || [];
+    const byDate = reasonByDateCustomer.get(`${g.orderDate}__${g.mId}`) || [];
+    return Array.from(new Set([...byOrder, ...byDate])).filter(Boolean).join(' | ');
+  };
+
+  const archiveByDateCustomer = new Map();
+  archiveRows.forEach((r) => {
+    if (!r.date || !r.customerId) return;
+    const key = `${r.date}__${r.customerId}`;
+    if (!archiveByDateCustomer.has(key)) archiveByDateCustomer.set(key, []);
+    archiveByDateCustomer.get(key).push(r);
+  });
+  const archiveByCustomerYesterday = new Map();
+  archiveRows.forEach((r) => {
+    if (!r.customerId || r.date !== compareDate) return;
+    if (!archiveByCustomerYesterday.has(r.customerId)) archiveByCustomerYesterday.set(r.customerId, []);
+    archiveByCustomerYesterday.get(r.customerId).push(r);
+  });
+
+  const missingRows = [];
+  const productGapRows = [];
+  orderGroups
+    .filter((g) => g.orderDate === compareDate)
+    .forEach((g) => {
+      const matchedArchiveRows = archiveByCustomerYesterday.get(g.mId) || [];
+      const hasArchive = matchedArchiveRows.length > 0;
+      const deliveredTotal = matchedArchiveRows.reduce((s, r) => s + Math.abs(toNum(r.qtyGiven)), 0);
+      const orderedTotal = Number(g.totalQty || 0);
+      const qtyDiff = orderedTotal - deliveredTotal;
+      const orderedByProduct = new Map();
+      const orderedLabelByProduct = new Map();
+      (g.items || []).forEach((it) => {
+        const pKey = normProduct(it.product || '');
+        if (!pKey) return;
+        orderedByProduct.set(pKey, (orderedByProduct.get(pKey) || 0) + Math.abs(toNum(it.qty)));
+        if (!orderedLabelByProduct.has(pKey)) orderedLabelByProduct.set(pKey, String(it.product || '').trim() || '-');
+      });
+      const deliveredByProduct = new Map();
+      matchedArchiveRows.forEach((a) => {
+        const pKey = normProduct(a.productGiven || '');
+        if (!pKey) return;
+        deliveredByProduct.set(pKey, (deliveredByProduct.get(pKey) || 0) + Math.abs(toNum(a.qtyGiven)));
+      });
+      const productDiff = [];
+      orderedByProduct.forEach((orderedQty, pKey) => {
+        const deliveredQty = Number(deliveredByProduct.get(pKey) || 0);
+        if (deliveredQty + 0.0001 >= orderedQty) return;
+        productDiff.push({
+          product: orderedLabelByProduct.get(pKey) || pKey,
+          orderedQty,
+          deliveredQty,
+          diffQty: orderedQty - deliveredQty,
+        });
+      });
+      const reasonText = pickReasonText(g);
+      const noteText = Array.from(new Set((g.items || []).map((it) => String(it.note || '').trim()).filter(Boolean))).join(' | ');
+
+      if (!hasArchive) {
+        missingRows.push({
+          id: `left_missing_${g.soNum}_${g.mId}_${g.orderDate}`,
+          date: g.orderDate,
+          customerId: g.mId,
+          customer: g.contName,
+          orderId: g.soNum,
+          uid: (g.items || []).map((it) => String(it.uniqueId || '').trim()).filter(Boolean)[0] || '',
+          driver: g.delivPerson || '-',
+          qty: orderedTotal,
+          sumUZS: Number(g.totalSumUZS || 0),
+          note: noteText,
+          reason: reasonText,
+          statusText: "Arxivda mijoz ID topilmadi (zakaz bormagan)",
+          soGroup: g,
+        });
+        return;
+      }
+
+      if (productDiff.length || Math.abs(qtyDiff) > 0.0001) {
+        const productDiffText = productDiff.length
+          ? productDiff.map((x) => `${x.product}: ${fmt(x.orderedQty)} / ${fmt(x.deliveredQty)}`).join(' | ')
+          : '-';
+        productGapRows.push({
+          id: `left_gap_${g.soNum}_${g.mId}_${g.orderDate}`,
+          date: g.orderDate,
+          customerId: g.mId,
+          customer: g.contName,
+          orderId: g.soNum,
+          driver: g.delivPerson || '-',
+          orderedQty: orderedTotal,
+          deliveredQty: deliveredTotal,
+          diffQty: qtyDiff,
+          productDiffText,
+          note: noteText,
+          reason: reasonText,
+          statusText: productDiff.length ? "Mahsulot to'liq berilmagan" : 'Soni mos emas',
+          soGroup: g,
+        });
+      }
+    });
+
+  const reasonDetailedRows = reasonRows.map((r) => {
+    const bySo = orderBySoNum.get(normalizeMatchText(r.orderId));
+    const byUid = orderByUid.get(normalizeMatchText(r.uid));
+    const byDate = orderByDateCustomer.get(`${r.date}__${r.customerId}`);
+    const soGroup = bySo || byUid || byDate || null;
+    const archiveMatched = archiveByDateCustomer.get(`${r.date}__${r.customerId}`) || [];
+    const archiveQty = archiveMatched.reduce((s, a) => s + Math.abs(toNum(a.qtyGiven)), 0);
+    return {
+      ...r,
+      qty: Number(soGroup?.totalQty || 0),
+      sumUZS: Number(soGroup?.totalSumUZS || 0),
+      orderNote: Array.from(new Set((soGroup?.items || []).map((it) => String(it.note || '').trim()).filter(Boolean))).join(' | '),
+      product: Array.from(new Set((soGroup?.items || []).map((it) => String(it.product || '').trim()).filter(Boolean))).join(' | '),
+      orderStatus: String(soGroup?.status || '').trim(),
+      archiveQty,
+      statusText: soGroup ? 'Zakaz topildi' : 'Zakaz topilmadi',
+      soGroup,
+    };
+  });
+
+  return {
+    compareDate,
+    reasonRows,
+    archiveRows,
+    orderGroups,
+    missingRows,
+    productGapRows,
+    reasonDetailedRows,
+  };
+};
 const shiftMonthKey = (monthKeyValue, delta = 0) => {
   const m = String(monthKeyValue || '').match(/^(\d{4})-(\d{2})$/);
   const base = m ? new Date(Number(m[1]), Number(m[2]) - 1 + Number(delta || 0), 1) : new Date();
@@ -6695,220 +6976,37 @@ function LeftOrdersPage({
   company='murodbaxsh',
   currentUser='Admin',
   currentAccess=null,
+  rawReasonSheetRows=[],
+  rawArchiveSheetRows=[],
+  loading=false,
+  loadError='',
+  onRefresh=()=>{},
+  targetDate='',
 }) {
   const canSeeAll = (currentAccess?.scope || 'all') === 'all';
   const [tab, setTab] = useState('left');
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState('');
-  const [rawReasonRows, setRawReasonRows] = useState([]);
-  const [rawArchiveRows, setRawArchiveRows] = useState([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterState, setFilterState] = useState({});
-  const sheetId = useMemo(() => extractSheetId(LEFTOVER_SHEET_URL) || LEFTOVER_SHEET_ID, []);
-  const normalizeKey = useCallback((v) => String(v || '').trim().toLowerCase(), []);
-  const loadSheets = useCallback(async () => {
-    if (!sheetId) {
-      setLoadError('Qolib ketgan zakazlar sheet ID topilmadi');
-      return;
-    }
-    setLoading(true);
-    setLoadError('');
-    try {
-      const [reasonSheet, archiveSheet] = await Promise.all([
-        fetchSheetCsv(sheetId, LEFTOVER_REASON_GID, 'Qolib_ketgan_zakazlar_Arxiv'),
-        fetchSheetCsv(sheetId, LEFTOVER_ARCHIVE_GID, 'Arxiv'),
-      ]);
-      setRawReasonRows(Array.isArray(reasonSheet) ? reasonSheet : []);
-      setRawArchiveRows(Array.isArray(archiveSheet) ? archiveSheet : []);
-    } catch (e) {
-      setLoadError(String(e?.message || e || 'Sheet yuklashda xato'));
-    } finally {
-      setLoading(false);
-    }
-  }, [sheetId]);
-  useEffect(() => {
-    loadSheets();
-  }, [loadSheets]);
-
-  const reasonRows = useMemo(() => {
-    const parsed = (rawReasonRows || []).slice(1).map((r, i) => ({
-      rowId: `reason_${i + 1}`,
-      uid: String(r?.[0] || '').trim(),
-      date: toIsoDate(r?.[1]),
-      customerId: normalizeIdKey(r?.[2]),
-      customer: String(r?.[3] || '').trim(),
-      orderId: String(r?.[4] || '').trim(),
-      driver: String(r?.[5] || '').trim(),
-      reason: String(r?.[6] || '').trim(),
-    })).filter((r) => r.uid || r.orderId || r.customerId || r.reason);
-    if (canSeeAll) return parsed;
-    return parsed.filter((r) => String(r.driver || '').trim() === String(currentUser || '').trim());
-  }, [rawReasonRows, canSeeAll, currentUser]);
-
-  const archiveRows = useMemo(() => {
-    const parsed = (rawArchiveRows || []).slice(1).map((r, i) => ({
-      rowId: `arxiv_${i + 1}`,
-      date: toIsoDate(r?.[0]),
-      customerId: normalizeIdKey(r?.[2]),
-      customer: String(r?.[3] || '').trim(),
-      productGiven: String(r?.[4] || '').trim(),
-      qtyGiven: Math.abs(toNum(r?.[5])),
-      productTaken: String(r?.[6] || '').trim(),
-      qtyTaken: Math.abs(toNum(r?.[7])),
-      payType: String(r?.[8] || '').trim(),
-      payAmount: toNum(r?.[9]),
-      note: String(r?.[12] || '').trim(),
-      driver: String(r?.[13] || '').trim(),
-      uid: String(r?.[14] || '').trim(),
-    })).filter((r) => r.uid || r.date || r.customerId || r.driver || r.qtyGiven || r.qtyTaken);
-    if (canSeeAll) return parsed;
-    return parsed.filter((r) => String(r.driver || '').trim() === String(currentUser || '').trim());
-  }, [rawArchiveRows, canSeeAll, currentUser]);
-
-  const orderRows = useMemo(() => {
-    let rows = (D.rawOrders || []).filter((o) => {
-      if (!isOrderDoc(o.docType)) return false;
-      if (isCancelledStatus(o.status)) return false;
-      const date = toIsoDate(o.orderDate);
-      const customerId = normalizeIdKey(o.mId);
-      if (!date || !customerId) return false;
-      return true;
-    }).map((o, i) => ({
-      rowId: `ord_${i}_${String(o.soNum || '').trim()}`,
-      date: toIsoDate(o.orderDate),
-      customerId: normalizeIdKey(o.mId),
-      customer: String(o.contName || '').trim(),
-      orderId: String(o.soNum || '').trim(),
-      uniqueId: String(o.uniqueId || '').trim(),
-      driver: String(o.delivPerson || o.agent || '').trim() || '-',
-      qty: Math.abs(toNum(o.qty)),
-      sumUZS: String(o.currency || '').toUpperCase() === 'USD' ? 0 : Number(o.sum || 0),
-      note: String(o.note || '').trim(),
-      product: String(o.product || '').trim(),
-      status: String(o.status || '').trim(),
-    }));
-    if (!canSeeAll) rows = rows.filter((r) => r.driver === String(currentUser || '').trim());
-    return rows.sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : b.date.localeCompare(a.date)));
-  }, [D.rawOrders, canSeeAll, currentUser]);
-
-  const minArchiveDate = useMemo(() => {
-    const vals = archiveRows.map((r) => r.date).filter(Boolean).sort((a, b) => a.localeCompare(b));
-    return vals[0] || '';
-  }, [archiveRows]);
-  const archiveUidSet = useMemo(() => {
-    const set = new Set();
-    archiveRows.forEach((r) => {
-      if (r.uid) set.add(normalizeKey(r.uid));
-    });
-    return set;
-  }, [archiveRows, normalizeKey]);
-  const archiveDateCustomerDriverSet = useMemo(() => {
-    const set = new Set();
-    archiveRows.forEach((r) => {
-      if (!r.date || !r.customerId) return;
-      const driver = normalizeKey(r.driver || '-');
-      set.add(`${r.date}__${r.customerId}__${driver}`);
-    });
-    return set;
-  }, [archiveRows, normalizeKey]);
-  const archiveDateCustomerSet = useMemo(() => {
-    const set = new Set();
-    archiveRows.forEach((r) => {
-      if (!r.date || !r.customerId) return;
-      set.add(`${r.date}__${r.customerId}`);
-    });
-    return set;
-  }, [archiveRows]);
-  const reasonByOrderId = useMemo(() => {
-    const m = new Map();
-    reasonRows.forEach((r) => {
-      const k = normalizeKey(r.orderId);
-      if (!k) return;
-      if (!m.has(k)) m.set(k, []);
-      if (r.reason && !m.get(k).includes(r.reason)) m.get(k).push(r.reason);
-    });
-    return m;
-  }, [reasonRows, normalizeKey]);
-  const reasonByUid = useMemo(() => {
-    const m = new Map();
-    reasonRows.forEach((r) => {
-      const k = normalizeKey(r.uid);
-      if (!k) return;
-      if (!m.has(k)) m.set(k, []);
-      if (r.reason && !m.get(k).includes(r.reason)) m.get(k).push(r.reason);
-    });
-    return m;
-  }, [reasonRows, normalizeKey]);
-  const reasonByTriplet = useMemo(() => {
-    const m = new Map();
-    reasonRows.forEach((r) => {
-      if (!r.date || !r.customerId) return;
-      const k = `${r.date}__${r.customerId}__${normalizeKey(r.driver || '-')}`;
-      if (!m.has(k)) m.set(k, []);
-      if (r.reason && !m.get(k).includes(r.reason)) m.get(k).push(r.reason);
-    });
-    return m;
-  }, [reasonRows, normalizeKey]);
-  const missingRows = useMemo(() => {
-    return orderRows
-      .filter((o) => (!minArchiveDate || o.date >= minArchiveDate))
-      .map((o) => {
-        const delivered = (
-          (o.uniqueId && archiveUidSet.has(normalizeKey(o.uniqueId))) ||
-          (o.orderId && archiveUidSet.has(normalizeKey(o.orderId))) ||
-          archiveDateCustomerDriverSet.has(`${o.date}__${o.customerId}__${normalizeKey(o.driver || '-')}`) ||
-          archiveDateCustomerSet.has(`${o.date}__${o.customerId}`)
-        );
-        const reasonParts = [
-          ...(reasonByOrderId.get(normalizeKey(o.orderId)) || []),
-          ...(reasonByUid.get(normalizeKey(o.uniqueId)) || []),
-          ...(reasonByTriplet.get(`${o.date}__${o.customerId}__${normalizeKey(o.driver || '-')}`) || []),
-        ];
-        const reason = Array.from(new Set(reasonParts)).join(' | ');
-        return {
-          ...o,
-          inArchive: delivered,
-          reason: reason || '',
-          statusText: delivered ? 'Arxivda bor' : (reason ? 'Qolib ketgan (sabab yozilgan)' : "Qolib ketgan (sabab yo'q)"),
-        };
-      })
-      .filter((r) => !r.inArchive);
-  }, [orderRows, minArchiveDate, archiveUidSet, archiveDateCustomerDriverSet, archiveDateCustomerSet, reasonByOrderId, reasonByUid, reasonByTriplet, normalizeKey]);
-
-  const orderByIdMap = useMemo(() => {
-    const m = new Map();
-    orderRows.forEach((o) => {
-      const so = normalizeKey(o.orderId);
-      if (so && !m.has(so)) m.set(so, o);
-      const uid = normalizeKey(o.uniqueId);
-      if (uid && !m.has(uid)) m.set(uid, o);
-    });
-    return m;
-  }, [orderRows, normalizeKey]);
-  const reasonDetailedRows = useMemo(() => {
-    return reasonRows.map((r) => {
-      const fromOrder = orderByIdMap.get(normalizeKey(r.orderId)) || orderByIdMap.get(normalizeKey(r.uid));
-      const fallback = !fromOrder
-        ? orderRows.find((o) => o.date === r.date && o.customerId === r.customerId && normalizeKey(o.driver || '-') === normalizeKey(r.driver || '-'))
-        : null;
-      const ord = fromOrder || fallback || null;
-      return {
-        ...r,
-        qty: ord?.qty || 0,
-        sumUZS: ord?.sumUZS || 0,
-        orderNote: ord?.note || '',
-        product: ord?.product || '',
-        orderStatus: ord?.status || '',
-      };
-    });
-  }, [reasonRows, orderByIdMap, orderRows, normalizeKey]);
+  const [selectedSO, setSelectedSO] = useState(null);
+  const compareDate = targetDate || getLeftoverCompareDate(new Date());
+  const analysis = useMemo(() => buildLeftoverAnalysis({
+    rawOrders: D.rawOrders || [],
+    rawReasonRows: rawReasonSheetRows || [],
+    rawArchiveRows: rawArchiveSheetRows || [],
+    targetDate: compareDate,
+    currentUser,
+    canSeeAll,
+  }), [D.rawOrders, rawReasonSheetRows, rawArchiveSheetRows, compareDate, currentUser, canSeeAll]);
+  const reasonRows = analysis.reasonRows || [];
+  const missingRows = analysis.missingRows || [];
+  const reasonDetailedRows = analysis.reasonDetailedRows || [];
+  const productGapRows = analysis.productGapRows || [];
 
   const leftColumns = useMemo(() => ([
     { key:'date', label:'Sana', type:'date' },
     { key:'customerId', label:'Mijoz ID', type:'text' },
     { key:'customer', label:'Mijoz', type:'text' },
     { key:'orderId', label:'Zakaz ID', type:'text' },
-    { key:'uniqueId', label:'UID', type:'text' },
     { key:'driver', label:'Dostavchik', type:'text' },
     { key:'qty', label:'Soni', type:'number' },
     { key:'sumUZS', label:'Summa', type:'number' },
@@ -6927,10 +7025,24 @@ function LeftOrdersPage({
     { key:'qty', label:'Soni', type:'number' },
     { key:'sumUZS', label:'Summa', type:'number' },
     { key:'orderNote', label:'Zakaz izohi', type:'text' },
+    { key:'archiveQty', label:'Arxiv soni', type:'number' },
     { key:'orderStatus', label:'Status', type:'text' },
   ]), []);
-  const activeColumns = tab === 'left' ? leftColumns : reasonColumns;
-  const activeBaseRows = tab === 'left' ? missingRows : reasonDetailedRows;
+  const gapColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'orderId', label:'Zakaz ID', type:'text' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'orderedQty', label:'Zakaz soni', type:'number' },
+    { key:'deliveredQty', label:'Arxiv soni', type:'number' },
+    { key:'diffQty', label:'Farq', type:'number' },
+    { key:'productDiffText', label:'Mahsulot farqi', type:'text' },
+    { key:'note', label:'Zakaz izohi', type:'text' },
+    { key:'statusText', label:'Holat', type:'text' },
+  ]), []);
+  const activeColumns = tab === 'left' ? leftColumns : (tab === 'reason' ? reasonColumns : gapColumns);
+  const activeBaseRows = tab === 'left' ? missingRows : (tab === 'reason' ? reasonDetailedRows : productGapRows);
   useEffect(() => {
     setFilterState((prev) => ensureUniversalFilterState(activeColumns, prev));
   }, [activeColumns]);
@@ -6942,22 +7054,32 @@ function LeftOrdersPage({
   const exportSheet = useCallback(() => {
     if (tab === 'left') {
       exportAoaExcel({
-        fileName: `Qolib_ketgan_zakazlar_${toIsoDate(new Date())}.xlsx`,
+        fileName: `Qolib_ketgan_zakazlar_${compareDate || toIsoDate(new Date())}.xlsx`,
         sheetName: 'QolibKetganZakazlar',
-        headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'UID', 'Dostavchik', 'Soni', 'Summa', 'Zakaz izohi', 'Sabab', 'Holat'],
-        columnTypes: ['date', 'text', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'text', 'text'],
-        rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.uniqueId, r.driver, r.qty, r.sumUZS, r.note, r.reason, r.statusText]),
+        headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Soni', 'Summa', 'Zakaz izohi', 'Sabab', 'Holat'],
+        columnTypes: ['date', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'text', 'text'],
+        rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.driver, r.qty, r.sumUZS, r.note, r.reason, r.statusText]),
+      });
+      return;
+    }
+    if (tab === 'reason') {
+      exportAoaExcel({
+        fileName: `Qolib_ketgan_zakazlar_sababi_${toIsoDate(new Date())}.xlsx`,
+        sheetName: 'QolibKetganSabab',
+        headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Sabab izohi', 'Mahsulot', 'Soni', 'Summa', 'Zakaz izohi', 'Arxiv soni', 'Status'],
+        columnTypes: ['date', 'text', 'text', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'number', 'text'],
+        rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.driver, r.reason, r.product, r.qty, r.sumUZS, r.orderNote, r.archiveQty, r.orderStatus || r.statusText]),
       });
       return;
     }
     exportAoaExcel({
-      fileName: `Qolib_ketgan_zakazlar_sababi_${toIsoDate(new Date())}.xlsx`,
-      sheetName: 'QolibKetganSabab',
-      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Sabab izohi', 'Mahsulot', 'Soni', 'Summa', 'Zakaz izohi', 'Status'],
-      columnTypes: ['date', 'text', 'text', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'text'],
-      rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.driver, r.reason, r.product, r.qty, r.sumUZS, r.orderNote, r.orderStatus]),
+      fileName: `Mahsulot_farqi_${compareDate || toIsoDate(new Date())}.xlsx`,
+      sheetName: 'MahsulotFarqi',
+      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Zakaz soni', 'Arxiv soni', 'Farq', 'Mahsulot farqi', 'Zakaz izohi', 'Holat'],
+      columnTypes: ['date', 'text', 'text', 'text', 'text', 'number', 'number', 'number', 'text', 'text', 'text'],
+      rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.driver, r.orderedQty, r.deliveredQty, r.diffQty, r.productDiffText, r.note, r.statusText]),
     });
-  }, [tab, filteredRows]);
+  }, [tab, filteredRows, compareDate]);
 
   return (
     <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
@@ -6966,13 +7088,16 @@ function LeftOrdersPage({
           <div className="tabs" style={{display:'inline-flex'}}>
             <button className={`tab${tab==='left'?' on':''}`} onClick={()=>setTab('left')}>Qolib ketgan zakazlar</button>
             <button className={`tab${tab==='reason'?' on':''}`} onClick={()=>setTab('reason')}>Qolib ketgan zakazlar sababi</button>
+            <button className={`tab${tab==='gap'?' on':''}`} onClick={()=>setTab('gap')}>Mahsulot berilmagan</button>
           </div>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Kompaniya: {companyLabelByKey(company)}</span>
+          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Sana: {compareDate || '-'}</span>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Qolib ketgan: {missingRows.length}</span>
+          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Mahsulot farqi: {productGapRows.length}</span>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Sabablar: {reasonRows.length}</span>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          <button className="btn btn-gh btn-sm" onClick={loadSheets} disabled={loading}>{loading ? 'Yuklanmoqda...' : 'Yangilash'}</button>
+          <button className="btn btn-gh btn-sm" onClick={onRefresh} disabled={loading}>{loading ? 'Yuklanmoqda...' : 'Yangilash'}</button>
           <div style={{position:'relative'}}>
             <button className="btn btn-gh btn-sm" onClick={()=>setFilterOpen((v)=>!v)}>
               <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -6982,7 +7107,7 @@ function LeftOrdersPage({
             </button>
             <UniversalFilterPanel
               open={filterOpen}
-              title={tab === 'left' ? 'Qolib ketgan zakazlar filtri' : 'Qolib ketgan zakazlar sababi filtri'}
+              title={tab === 'left' ? 'Qolib ketgan zakazlar filtri' : tab === 'reason' ? 'Qolib ketgan zakazlar sababi filtri' : 'Mahsulot berilmagan filtri'}
               columns={activeColumns}
               rows={activeBaseRows}
               state={filterState}
@@ -7011,7 +7136,6 @@ function LeftOrdersPage({
                   <th>Mijoz ID</th>
                   <th>Mijoz</th>
                   <th>Zakaz ID</th>
-                  <th>UID</th>
                   <th>Dostavchik</th>
                   <th style={{textAlign:'right'}}>Soni</th>
                   <th style={{textAlign:'right'}}>Summa</th>
@@ -7022,14 +7146,17 @@ function LeftOrdersPage({
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
-                  <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Qolib ketgan zakaz topilmadi</td></tr>
+                  <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Kechagi qolib ketgan zakaz topilmadi</td></tr>
                 ) : filteredRows.map((r, i) => (
-                  <tr key={`left_${i}_${r.orderId}_${r.date}`} style={{background:r.reason ? 'rgba(63,185,80,.06)' : 'rgba(248,81,73,.08)'}}>
+                  <tr
+                    key={`left_${i}_${r.orderId}_${r.date}`}
+                    style={{background:r.reason ? 'rgba(63,185,80,.06)' : 'rgba(248,81,73,.08)', cursor:r.soGroup ? 'pointer' : 'default'}}
+                    onClick={() => r.soGroup && setSelectedSO(r.soGroup)}
+                  >
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                     <td>{r.customer}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.orderId || '-'}</td>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.uniqueId || '-'}</td>
                     <td>{r.driver || '-'}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.qty)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
@@ -7040,7 +7167,7 @@ function LeftOrdersPage({
                 ))}
               </tbody>
             </table>
-          ) : (
+          ) : tab === 'reason' ? (
             <table className="tbl">
               <thead>
                 <tr>
@@ -7054,14 +7181,19 @@ function LeftOrdersPage({
                   <th style={{textAlign:'right'}}>Soni</th>
                   <th style={{textAlign:'right'}}>Summa</th>
                   <th>Zakaz izohi</th>
+                  <th style={{textAlign:'right'}}>Arxiv soni</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
-                  <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Sabab yozuvlari topilmadi</td></tr>
+                  <tr><td colSpan={12} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Sabab yozuvlari topilmadi</td></tr>
                 ) : filteredRows.map((r, i) => (
-                  <tr key={`reason_${i}_${r.uid}_${r.orderId}`}>
+                  <tr
+                    key={`reason_${i}_${r.uid}_${r.orderId}`}
+                    style={{cursor:r.soGroup ? 'pointer' : 'default'}}
+                    onClick={() => r.soGroup && setSelectedSO(r.soGroup)}
+                  >
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                     <td>{r.customer || '-'}</td>
@@ -7072,7 +7204,51 @@ function LeftOrdersPage({
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.qty)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
                     <td style={{maxWidth:220}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.orderNote || '-'}</span></td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.archiveQty)}</td>
                     <td style={{fontSize:11,color:r.orderStatus ? 'var(--t2)' : 'var(--yl)'}}>{r.orderStatus || 'Zakaz topilmadi'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Sana</th>
+                  <th>Mijoz ID</th>
+                  <th>Mijoz</th>
+                  <th>Zakaz ID</th>
+                  <th>Dostavchik</th>
+                  <th style={{textAlign:'right'}}>Zakaz soni</th>
+                  <th style={{textAlign:'right'}}>Arxiv soni</th>
+                  <th style={{textAlign:'right'}}>Farq</th>
+                  <th>Mahsulot farqi</th>
+                  <th>Zakaz izohi</th>
+                  <th>Holat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.length === 0 ? (
+                  <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Mahsulot farqi topilmadi</td></tr>
+                ) : filteredRows.map((r, i) => (
+                  <tr
+                    key={`gap_${i}_${r.orderId}_${r.date}`}
+                    style={{background:'rgba(255,193,7,.08)', cursor:r.soGroup ? 'pointer' : 'default'}}
+                    onClick={() => r.soGroup && setSelectedSO(r.soGroup)}
+                  >
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
+                    <td>{r.customer || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.orderId || '-'}</td>
+                    <td>{r.driver || '-'}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderedQty)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.deliveredQty)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:Math.abs(Number(r.diffQty || 0)) > 0.0001 ? 'var(--rd)' : 'var(--t3)'}}>
+                      {fmt(Math.abs(Number(r.diffQty || 0)))}
+                    </td>
+                    <td style={{maxWidth:260}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.productDiffText || '-'}</span></td>
+                    <td style={{maxWidth:220}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
+                    <td style={{fontSize:11,color:'var(--or)'}}>{r.statusText || '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -7080,6 +7256,7 @@ function LeftOrdersPage({
           )}
         </div>
       </div>
+      {selectedSO && <SoDetailModal soGroup={selectedSO} onClose={()=>setSelectedSO(null)}/>}
     </div>
   );
 }
@@ -8050,6 +8227,11 @@ export default function App() {
   const [obzvonRecords,setObzvonRecords] = useState(() => S.get('aq-obzvon-records', []));
   const [obzvonAllRows,setObzvonAllRows] = useState(() => S.get('aq-obzvon-all-rows', []));
   const [obzvonAllNewRows,setObzvonAllNewRows] = useState(() => S.get('aq-obzvon-all-new-rows', []));
+  const [leftoverReasonSheetRows, setLeftoverReasonSheetRows] = useState([]);
+  const [leftoverArchiveSheetRows, setLeftoverArchiveSheetRows] = useState([]);
+  const [leftoverSheetLoading, setLeftoverSheetLoading] = useState(false);
+  const [leftoverSheetError, setLeftoverSheetError] = useState('');
+  const [leftoverTargetDate, setLeftoverTargetDate] = useState(() => getLeftoverCompareDate(new Date()));
   const [planRows, setPlanRows] = useState(() => normalizePlanRows(S.get('aq-plan-rows', [])));
   const [planOffDays, setPlanOffDays] = useState(() => toOffDaysStorage(S.get('aq-plan-off-days', { weekdays:[0], dates:[] })));
   const [users,setUsers] = useState(() => S.get('aq-users', DEFAULT_USERS));
@@ -8500,6 +8682,27 @@ export default function App() {
     setObzvonAllNewRows(next);
     S.set('aq-obzvon-all-new-rows', next);
   }, [obzvonAllNewRows]);
+  const leftoverSheetId = useMemo(() => extractSheetId(LEFTOVER_SHEET_URL) || LEFTOVER_SHEET_ID, []);
+  const loadLeftoverSheets = useCallback(async () => {
+    if (!leftoverSheetId) {
+      setLeftoverSheetError('Qolib ketgan zakazlar sheet ID topilmadi');
+      return;
+    }
+    setLeftoverSheetLoading(true);
+    setLeftoverSheetError('');
+    try {
+      const [reasonSheet, archiveSheet] = await Promise.all([
+        fetchSheetCsv(leftoverSheetId, LEFTOVER_REASON_GID, 'Qolib_ketgan_zakazlar_Arxiv'),
+        fetchSheetCsv(leftoverSheetId, LEFTOVER_ARCHIVE_GID, 'Arxiv'),
+      ]);
+      setLeftoverReasonSheetRows(Array.isArray(reasonSheet) ? reasonSheet : []);
+      setLeftoverArchiveSheetRows(Array.isArray(archiveSheet) ? archiveSheet : []);
+    } catch (e) {
+      setLeftoverSheetError(String(e?.message || e || 'Qolib ketgan zakazlar sheet xatosi'));
+    } finally {
+      setLeftoverSheetLoading(false);
+    }
+  }, [leftoverSheetId]);
 
   const notify = (msg, type='ok') => {
     setNotif({ msg, type });
@@ -8838,6 +9041,22 @@ export default function App() {
     const t = setInterval(runAuto, 5 * 60 * 1000);
     return () => clearInterval(t);
   }, [isLoggedIn, accessApiUrl, publishObzvonNewRowsToGoogleSheet]);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const checkRollover = () => {
+      const nextDate = getLeftoverCompareDate(new Date());
+      setLeftoverTargetDate((prev) => (prev === nextDate ? prev : nextDate));
+    };
+    checkRollover();
+    const t = setInterval(checkRollover, 60 * 1000);
+    return () => clearInterval(t);
+  }, [isLoggedIn]);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    loadLeftoverSheets();
+    const t = setInterval(() => { loadLeftoverSheets(); }, 10 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [isLoggedIn, leftoverTargetDate, loadLeftoverSheets]);
 
   useEffect(() => {
     if (users.length === 0) return;
@@ -9105,6 +9324,16 @@ export default function App() {
     return (currentAccess.visible?.[id] ?? true);
   }, [currentAccess, companyBlockedPages]);
   const visibleNav = NAV.filter((n) => canViewPage(n.id));
+  const leftoverAlertAnalysis = useMemo(() => buildLeftoverAnalysis({
+    rawOrders: D.rawOrders || [],
+    rawReasonRows: leftoverReasonSheetRows || [],
+    rawArchiveRows: leftoverArchiveSheetRows || [],
+    targetDate: leftoverTargetDate,
+    currentUser: effectiveUser,
+    canSeeAll: (currentAccess?.scope || 'all') === 'all',
+  }), [D.rawOrders, leftoverReasonSheetRows, leftoverArchiveSheetRows, leftoverTargetDate, effectiveUser, currentAccess]);
+  const companyLeftMissingRows = leftoverAlertAnalysis.missingRows || [];
+  const companyLeftProductGapRows = leftoverAlertAnalysis.productGapRows || [];
   const pageMeta = NAV.find((n)=>n.id===page) || { id:'settings', icon:E.settings, label:'Nastroyka' };
   const localThemeOverride = String(S.get(`aq-ui-theme-${effectiveUser}`, '') || '').toLowerCase();
   const currentTheme = localThemeOverride === 'light'
@@ -9473,6 +9702,49 @@ export default function App() {
         items: customerStatusAlerts.eskiTaraLeft,
       });
     }
+    if (canViewPage('left_orders')) {
+      if (companyLeftMissingRows.length) {
+        topics.push({
+          key: 'left_orders_missing',
+          title: "Qolib ketgan zakazlar (kechagi)",
+          subtitle: `${leftoverTargetDate} sanada arxivda topilmagan zakazlar`,
+          items: companyLeftMissingRows.map((r) => ({
+            id: r.id,
+            customerId: r.customerId,
+            title: `${r.date} | ${r.customer}`,
+            subtitle: `Zakaz ID: ${r.orderId} | Zakaz bormagan`,
+            meta: [
+              `Mijoz ID: ${r.customerId}`,
+              `Dostavchik: ${r.driver || '-'}`,
+              `Zakaz soni: ${fmt(r.qty)} ta`,
+              `Summa: ${fmt(r.sumUZS || 0)} so'm`,
+              `Sabab: ${r.reason || '-'}`,
+            ],
+          })),
+        });
+      }
+      if (companyLeftProductGapRows.length) {
+        topics.push({
+          key: 'left_orders_gap',
+          title: "Qolib ketgan zakazlar (mahsulot/son farqi)",
+          subtitle: `${leftoverTargetDate} sanada mahsulot to'liq berilmagan yoki soni mos emas`,
+          items: companyLeftProductGapRows.map((r) => ({
+            id: r.id,
+            customerId: r.customerId,
+            title: `${r.date} | ${r.customer}`,
+            subtitle: `Zakaz ID: ${r.orderId} | ${r.statusText}`,
+            meta: [
+              `Mijoz ID: ${r.customerId}`,
+              `Dostavchik: ${r.driver || '-'}`,
+              `Zakaz soni: ${fmt(r.orderedQty)} ta`,
+              `Arxiv soni: ${fmt(r.deliveredQty)} ta`,
+              `Farq: ${fmt(Math.abs(Number(r.diffQty || 0)))} ta`,
+              `Mahsulot: ${r.productDiffText || '-'}`,
+            ],
+          })),
+        });
+      }
+    }
     if (nazoratHandlerEnabled) {
       if (companyOrderMismatchRows.length) {
         topics.push({
@@ -9534,7 +9806,7 @@ export default function App() {
       }
     }
     return topics;
-  }, [debtSmsItems, customerStatusAlerts, nazoratHandlerEnabled, companyOrderMismatchRows, companyDuplicateMismatchRows, companyReturnMismatchRows]);
+  }, [debtSmsItems, customerStatusAlerts, canViewPage, companyLeftMissingRows, companyLeftProductGapRows, leftoverTargetDate, nazoratHandlerEnabled, companyOrderMismatchRows, companyDuplicateMismatchRows, companyReturnMismatchRows]);
   const alertTotalCount = useMemo(
     () => alertTopics.reduce((s, t) => s + (t.items?.length || 0), 0),
     [alertTopics]
@@ -9552,6 +9824,18 @@ export default function App() {
     if (alertsOpen) return;
     if (alertsTopicKey) setAlertsTopicKey('');
   }, [alertsOpen, alertsTopicKey]);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    if (!canViewPage('left_orders')) return;
+    const pendingCount = (companyLeftMissingRows.length || 0) + (companyLeftProductGapRows.length || 0);
+    if (!pendingCount) return;
+    const popupKey = `aq-leftover-popup-${normalizeCompanyKey(activeCompany)}-${effectiveUser}-${leftoverTargetDate}`;
+    if (S.get(popupKey, false)) return;
+    setAlertsOpen(true);
+    if (companyLeftMissingRows.length) setAlertsTopicKey('left_orders_missing');
+    else setAlertsTopicKey('left_orders_gap');
+    S.set(popupKey, true);
+  }, [isLoggedIn, canViewPage, companyLeftMissingRows.length, companyLeftProductGapRows.length, activeCompany, effectiveUser, leftoverTargetDate]);
   const dismissDueReminder = useCallback((id) => {
     if (!id) return;
     const reminderShownKey = `aq-alert-reminders-shown-${normalizeCompanyKey(activeCompany)}`;
@@ -9779,6 +10063,12 @@ export default function App() {
                     company={activeCompany}
                     currentUser={effectiveUser}
                     currentAccess={currentAccess}
+                    rawReasonSheetRows={leftoverReasonSheetRows}
+                    rawArchiveSheetRows={leftoverArchiveSheetRows}
+                    loading={leftoverSheetLoading}
+                    loadError={leftoverSheetError}
+                    onRefresh={loadLeftoverSheets}
+                    targetDate={leftoverTargetDate}
                   />
                 )}
                 {page==='kassa'   && canViewPage('kassa') && <Kassa     D={D}/>}
