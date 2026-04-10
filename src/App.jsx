@@ -4587,7 +4587,10 @@ function Obzvon({
   }, [D.ordersByMId]);
 
   const operatorTableBaseRows = useMemo(() => {
-    let rows = (D.customers || []).map((c) => {
+    const normalizedCurrentOperator = String(currentUser || '').trim().toLowerCase();
+    let rows = (D.customers || [])
+      .filter((c) => !isNameInactiveByPrefix(c?.name || ''))
+      .map((c) => {
       const lastCall = latestCallByCustomer[c.id];
       const ord = latestOrdersByCustomer[c.id] || { ord1:'', ord2:'', lastQty:0 };
       return {
@@ -4605,7 +4608,9 @@ function Obzvon({
         operator: D.assignmentById?.[c.id] || '-',
       };
     });
-    if (currentUser !== 'Admin') rows = rows.filter((r) => r.operator === currentUser);
+    if (normalizedCurrentOperator && normalizedCurrentOperator !== 'admin') {
+      rows = rows.filter((r) => String(r.operator || '').trim().toLowerCase() === normalizedCurrentOperator);
+    }
     return rows;
   }, [D.customers, D.assignmentById, latestCallByCustomer, latestOrdersByCustomer, currentUser]);
   const operatorTableRows = useMemo(() => {
@@ -5840,8 +5845,18 @@ function Reports({
   const todayIso = toIsoDate(new Date());
   const currentMonth = normalizeMonthKey(todayIso.slice(0,7));
   const canSeeAll = (currentAccess?.scope || 'all') === 'all';
+  const canSeeAllNazorat = canSeeAll || !!(currentAccess?.visible?.nazorat_perm_handler);
+  const currentUserNorm = String(currentUser || '').trim().toLowerCase();
   const showReport = mode !== 'nazorat';
   const showNazorat = mode !== 'reports';
+  const activeControlCustomerIds = useMemo(() => {
+    return new Set(
+      (D.customers || [])
+        .filter((c) => !isExcludedZCategory(c?.source) && !isNameInactiveByPrefix(c?.name || ''))
+        .map((c) => String(c?.id || '').trim())
+        .filter(Boolean)
+    );
+  }, [D.customers]);
 
   const planByMonth = useMemo(() => {
     const m = {};
@@ -6011,9 +6026,11 @@ function Reports({
       driver: String(o.delivPerson || o.agent || '').trim(),
       qty: Math.abs(toNum(o.qty)),
     }));
-    if (!canSeeAll) rows = rows.filter((r) => r.driver === currentUser);
+    if (!canSeeAllNazorat) {
+      rows = rows.filter((r) => String(r.driver || '').trim().toLowerCase() === currentUserNorm);
+    }
     return rows;
-  }, [rawOrders, canSeeAll, currentUser]);
+  }, [rawOrders, canSeeAllNazorat, currentUserNorm]);
 
   const transferRows = useMemo(() => {
     return (warehouseTransfers || []).filter((r) => {
@@ -6063,9 +6080,9 @@ function Reports({
       ...Object.keys(driverWarehouseMap || {}),
     ]);
     let rows = Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b, 'ru'));
-    if (!canSeeAll) rows = rows.filter((x) => x === currentUser);
+    if (!canSeeAllNazorat) rows = rows.filter((x) => String(x || '').trim().toLowerCase() === currentUserNorm);
     return rows;
-  }, [orderDatesByDriver, driverWarehouseMap, canSeeAll, currentUser]);
+  }, [orderDatesByDriver, driverWarehouseMap, canSeeAllNazorat, currentUserNorm]);
 
   const dailyControlRows = useMemo(() => {
     const out = [];
@@ -6106,7 +6123,7 @@ function Reports({
     [orderControlRows]
   );
   const duplicateOrderRows = useMemo(() => {
-    const grouped = new Map();
+    const byOrder = new Map();
     (rawOrders || []).forEach((o) => {
       if (!isWaterProduct(o.product)) return;
       if (!isOrderDoc(o.docType)) return;
@@ -6116,39 +6133,60 @@ function Reports({
       const customerId = String(o.mId || '').trim();
       if (!date || !customerId) return;
       const driver = String(o.delivPerson || o.agent || '').trim() || '-';
-      if (!canSeeAll && driver !== String(currentUser || '').trim()) return;
-      const key = `${date}__${customerId}`;
-      if (!grouped.has(key)) {
-        grouped.set(key, {
+      if (!canSeeAllNazorat && String(driver).trim().toLowerCase() !== currentUserNorm) return;
+      const orderId = String(o.soNum || '').trim();
+      if (!orderId) return;
+      const key = `${date}__${customerId}__${orderId}`;
+      if (!byOrder.has(key)) {
+        byOrder.set(key, {
           date,
           customerId,
           customer: String(o.contName || '').trim() || `ID ${customerId}`,
+          orderId,
+          drivers: new Set(),
+          qty: 0,
+          sumUZS: 0,
+        });
+      }
+      const row = byOrder.get(key);
+      row.drivers.add(driver);
+      row.qty += Math.abs(toNum(o.qty));
+      if (String(o.currency || '').toUpperCase() !== 'USD') row.sumUZS += Number(o.sum || 0);
+    });
+    const byCustomerDay = new Map();
+    Array.from(byOrder.values()).forEach((r) => {
+      const key = `${r.date}__${r.customerId}`;
+      if (!byCustomerDay.has(key)) {
+        byCustomerDay.set(key, {
+          date: r.date,
+          customerId: r.customerId,
+          customer: r.customer,
           docs: [],
           drivers: new Set(),
           qty: 0,
           sumUZS: 0,
         });
       }
-      const row = grouped.get(key);
-      row.docs.push(String(o.soNum || '').trim() || '-');
-      row.drivers.add(driver);
-      row.qty += Math.abs(toNum(o.qty));
-      if (String(o.currency || '').toUpperCase() !== 'USD') row.sumUZS += Number(o.sum || 0);
+      const row = byCustomerDay.get(key);
+      row.docs.push(r.orderId);
+      r.drivers.forEach((d) => row.drivers.add(d));
+      row.qty += Math.abs(toNum(r.qty));
+      row.sumUZS += Number(r.sumUZS || 0);
     });
-    return Array.from(grouped.values())
+    return Array.from(byCustomerDay.values())
       .map((r) => ({
         date: r.date,
         customerId: r.customerId,
         customer: r.customer,
-        docsCount: r.docs.length,
+        docsCount: Array.from(new Set(r.docs)).length,
         docsText: Array.from(new Set(r.docs)).join(', '),
         driversText: Array.from(r.drivers).join(', '),
         qty: r.qty,
         sumUZS: r.sumUZS,
-        status: r.docs.length > 1 ? 'Dublikat' : 'OK',
+        status: Array.from(new Set(r.docs)).length > 1 ? 'Dublikat' : 'OK',
       }))
       .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
-  }, [rawOrders, canSeeAll, currentUser]);
+  }, [rawOrders, canSeeAllNazorat, currentUserNorm]);
   const duplicateMismatchRows = useMemo(
     () => duplicateOrderRows.filter((r) => r.docsCount > 1),
     [duplicateOrderRows]
@@ -6161,9 +6199,10 @@ function Reports({
       if (!date) return false;
       const customerId = String(o.mId || '').trim();
       if (!customerId) return false;
-      if (!canSeeAll) {
+      if (!activeControlCustomerIds.has(customerId)) return false;
+      if (!canSeeAllNazorat) {
         const person = String(o.delivPerson || o.agent || '').trim();
-        if (person !== String(currentUser || '').trim()) return false;
+        if (String(person || '').trim().toLowerCase() !== currentUserNorm) return false;
       }
       return true;
     });
@@ -6192,7 +6231,7 @@ function Reports({
         };
       })
       .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
-  }, [rawOrders, canSeeAll, currentUser]);
+  }, [rawOrders, activeControlCustomerIds, canSeeAllNazorat, currentUserNorm]);
   const returnMismatchRows = useMemo(
     () => returnControlRows.filter((r) => !r.hasOrder),
     [returnControlRows]
@@ -6473,7 +6512,7 @@ function Reports({
         )}
         {nazoratSection === 'orders' && nazoratOrderSection === 'duplicates' && (
           <div style={{fontSize:11,color:'var(--t3)'}}>
-            Shu sana va shu mijozga 2 yoki undan ko'p zakaz urilgan holatlar dublikat deb ko'rsatiladi.
+            Shu sana va shu mijoz uchun zakaz ID (soNum) 2 xil yoki undan ko'p bo'lsa dublikat deb ko'rsatiladi.
           </div>
         )}
         {nazoratSection === 'returns' && (
@@ -7594,6 +7633,7 @@ export default function App() {
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [alertsTopicKey, setAlertsTopicKey] = useState('');
   const [alertsReminders, setAlertsReminders] = useState({ topics:{}, items:{} });
+  const [dueReminderQueue, setDueReminderQueue] = useState([]);
   const [side,setSide]     = useState(true);
   const [companyFilter, setCompanyFilter] = useState(() =>
     normalizeCompanyKey(S.get('aq-company-filter', 'murodbaxsh'))
@@ -8518,6 +8558,10 @@ export default function App() {
     }
   }, [canSwitchCompany, companyFilter, lockedCompany]);
   const D = useMemo(() => filterDataByCompany(scopedD, activeCompany), [scopedD, activeCompany]);
+  const nazoratData = useMemo(
+    () => (currentAccess.visible?.nazorat_perm_handler ? companyWideData : D),
+    [currentAccess, companyWideData, D]
+  );
   const companyCustomerIds = useMemo(
     () => new Set((D.customers || []).map((c) => normalizeIdKey(c?.id)).filter(Boolean)),
     [D.customers]
@@ -8655,6 +8699,14 @@ export default function App() {
     });
   }, []);
   const nazoratHandlerEnabled = !!(currentAccess.visible?.nazorat_perm_handler);
+  const activeAlertCustomerIds = useMemo(() => {
+    return new Set(
+      (companyWideData.customers || [])
+        .filter((c) => !isExcludedZCategory(c?.source) && !isNameInactiveByPrefix(c?.name || ''))
+        .map((c) => String(c?.id || '').trim())
+        .filter(Boolean)
+    );
+  }, [companyWideData.customers]);
   const notifBindingMap = useMemo(
     () => S.get(`aq-driver-warehouse-map-${normalizeCompanyKey(activeCompany)}`, {}),
     [activeCompany, page, data]
@@ -8728,7 +8780,7 @@ export default function App() {
     return out.sort((a, b) => (a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date)));
   }, [companyOrderDatesByDriver, notifBindingMap, companyTransferDatesByWarehouse, companyOrderQtyByDriverDate, companyTransferQtyByWarehouseDate]);
   const companyDuplicateMismatchRows = useMemo(() => {
-    const grouped = new Map();
+    const byOrder = new Map();
     (companyWideData.rawOrders || []).forEach((o) => {
       if (!isWaterProduct(o.product)) return;
       if (!isOrderDoc(o.docType)) return;
@@ -8737,33 +8789,57 @@ export default function App() {
       const date = toIsoDate(o.orderDate);
       const customerId = String(o.mId || '').trim();
       if (!date || !customerId) return;
-      const key = `${date}__${customerId}`;
-      if (!grouped.has(key)) {
-        grouped.set(key, {
+      const orderId = String(o.soNum || '').trim();
+      if (!orderId) return;
+      const key = `${date}__${customerId}__${orderId}`;
+      if (!byOrder.has(key)) {
+        byOrder.set(key, {
           date,
           customerId,
           customer: String(o.contName || '').trim() || `ID ${customerId}`,
+          orderId,
+          drivers: new Set(),
+          qty: 0,
+          sumUZS: 0,
+        });
+      }
+      const row = byOrder.get(key);
+      row.drivers.add(String(o.delivPerson || o.agent || '').trim() || '-');
+      row.qty += Math.abs(toNum(o.qty));
+      if (String(o.currency || '').toUpperCase() !== 'USD') row.sumUZS += Number(o.sum || 0);
+    });
+    const byCustomerDay = new Map();
+    Array.from(byOrder.values()).forEach((r) => {
+      const key = `${r.date}__${r.customerId}`;
+      if (!byCustomerDay.has(key)) {
+        byCustomerDay.set(key, {
+          date: r.date,
+          customerId: r.customerId,
+          customer: r.customer,
           docs: [],
           drivers: new Set(),
           qty: 0,
+          sumUZS: 0,
         });
       }
-      const row = grouped.get(key);
-      row.docs.push(String(o.soNum || '').trim() || '-');
-      row.drivers.add(String(o.delivPerson || o.agent || '').trim() || '-');
-      row.qty += Math.abs(toNum(o.qty));
+      const row = byCustomerDay.get(key);
+      row.docs.push(r.orderId);
+      r.drivers.forEach((d) => row.drivers.add(d));
+      row.qty += Number(r.qty || 0);
+      row.sumUZS += Number(r.sumUZS || 0);
     });
-    return Array.from(grouped.values())
-      .filter((r) => r.docs.length > 1)
+    return Array.from(byCustomerDay.values())
+      .filter((r) => Array.from(new Set(r.docs)).length > 1)
       .map((r) => ({
         id: `dup_${r.customerId}_${r.date}`,
         date: r.date,
         customerId: r.customerId,
         customer: r.customer,
-        docsCount: r.docs.length,
+        docsCount: Array.from(new Set(r.docs)).length,
         docsText: Array.from(new Set(r.docs)).join(', '),
         driversText: Array.from(r.drivers).join(', '),
         qty: r.qty,
+        sumUZS: r.sumUZS,
       }))
       .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
   }, [companyWideData.rawOrders]);
@@ -8773,7 +8849,8 @@ export default function App() {
       if (isCancelledStatus(o.status)) return false;
       const date = toIsoDate(o.orderDate);
       const customerId = String(o.mId || '').trim();
-      return Boolean(date && customerId);
+      if (!date || !customerId) return false;
+      return activeAlertCustomerIds.has(customerId);
     });
     const orderSet = new Set(
       source.filter((o) => isOrderDoc(o.docType)).map((o) => `${String(o.mId || '').trim()}__${toIsoDate(o.orderDate)}`)
@@ -8792,7 +8869,7 @@ export default function App() {
         warehouse: String(o.warehouse || '').trim() || '-',
       }))
       .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
-  }, [companyWideData.rawOrders]);
+  }, [companyWideData.rawOrders, activeAlertCustomerIds]);
   const customerStatusAlerts = useMemo(() => {
     const tugatildi = [];
     const eskiClose = [];
@@ -9015,6 +9092,70 @@ export default function App() {
     if (alertsOpen) return;
     if (alertsTopicKey) setAlertsTopicKey('');
   }, [alertsOpen, alertsTopicKey]);
+  const dismissDueReminder = useCallback((id) => {
+    if (!id) return;
+    const reminderShownKey = `aq-alert-reminders-shown-${normalizeCompanyKey(activeCompany)}`;
+    const shownMap = S.get(reminderShownKey, {}) || {};
+    if (!shownMap[id]) {
+      S.set(reminderShownKey, { ...shownMap, [id]: new Date().toISOString() });
+    }
+    setDueReminderQueue((prev) => (prev || []).filter((x) => x.id !== id));
+  }, [activeCompany]);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const reminderShownKey = `aq-alert-reminders-shown-${normalizeCompanyKey(activeCompany)}`;
+    const buildDueEntries = () => {
+      const nowTs = Date.now();
+      const topicReminders = (alertsReminders?.topics || {});
+      const itemReminders = (alertsReminders?.items || {});
+      const due = [];
+      (alertTopics || []).forEach((topic) => {
+        const topicIso = String(topicReminders[topic.key] || '').trim();
+        const topicTs = topicIso ? (toDate(topicIso)?.getTime() || NaN) : NaN;
+        if (Number.isFinite(topicTs) && topicTs <= nowTs) {
+          due.push({
+            id: `topic::${topic.key}::${topicIso}`,
+            topicKey: topic.key,
+            title: topic.title || 'Eslatma',
+            subtitle: topic.subtitle || '',
+            when: topicIso,
+            type: 'topic',
+          });
+        }
+        (topic.items || []).forEach((item, idx) => {
+          const reminderKey = `${topic.key}__${item.id || idx}`;
+          const iso = String(itemReminders[reminderKey] || '').trim();
+          const ts = iso ? (toDate(iso)?.getTime() || NaN) : NaN;
+          if (!(Number.isFinite(ts) && ts <= nowTs)) return;
+          due.push({
+            id: `item::${reminderKey}::${iso}`,
+            topicKey: topic.key,
+            title: item.title || topic.title || 'Eslatma',
+            subtitle: item.subtitle || '',
+            when: iso,
+            type: 'item',
+          });
+        });
+      });
+      return due;
+    };
+    const runCheck = () => {
+      const dueEntries = buildDueEntries();
+      if (!dueEntries.length) return;
+      const shownMap = S.get(reminderShownKey, {}) || {};
+      const fresh = dueEntries.filter((x) => !shownMap[x.id]);
+      if (!fresh.length) return;
+      setDueReminderQueue((prev) => {
+        const list = Array.isArray(prev) ? prev : [];
+        const ids = new Set(list.map((x) => x.id));
+        const add = fresh.filter((x) => !ids.has(x.id));
+        return add.length ? [...list, ...add] : list;
+      });
+    };
+    runCheck();
+    const t = setInterval(runCheck, 30000);
+    return () => clearInterval(t);
+  }, [isLoggedIn, activeCompany, alertTopics, alertsReminders]);
   useEffect(() => {
     if (canViewPage(page)) return;
     const fallback = visibleNav[0]?.id || (canViewPage('settings') ? 'settings' : 'dash');
@@ -9085,8 +9226,7 @@ export default function App() {
                 <span style={{fontSize:17,display:'inline-block',transform:side?'none':'rotate(180deg)',transition:'transform .2s'}}>{'<'}</span>
               </button>
               <span style={{fontWeight:700,fontSize:14,display:'inline-flex',alignItems:'center',gap:7}}>
-                <img src="/New.png" alt="logo" style={{width:18,height:18,borderRadius:5,objectFit:'cover',display:'block'}} />
-                <span>{pageMeta.icon} {pageMeta.label}</span>
+                <span>{pageMeta.label}</span>
               </span>
               {data && (
                 <>
@@ -9099,13 +9239,13 @@ export default function App() {
               <button
                 className="btn btn-gh btn-sm"
                 onClick={() => setAlertsOpen(true)}
-                style={{position:'relative'}}
+                style={{position:'relative', overflow:'visible'}}
                 title="Bildirishnomalar"
               >
                 {E.bell}
                 Bildirishnoma
                 {alertTotalCount > 0 && (
-                  <span style={{position:'absolute',top:-7,right:-7,minWidth:18,height:18,padding:'0 5px',borderRadius:999,background:'var(--rd)',color:'#fff',fontSize:10,fontWeight:800,display:'inline-flex',alignItems:'center',justifyContent:'center'}}>
+                  <span style={{position:'absolute',top:-11,right:-10,minWidth:20,height:20,padding:'0 6px',borderRadius:999,background:'var(--rd)',border:'2px solid var(--s1)',color:'#fff',fontSize:10,fontWeight:800,display:'inline-flex',alignItems:'center',justifyContent:'center',zIndex:3,lineHeight:1}}>
                     {alertTotalCount}
                   </span>
                 )}
@@ -9220,7 +9360,7 @@ export default function App() {
                 )}
                 {page==='nazorat' && canViewPage('nazorat') && (
                   <Reports
-                    D={D}
+                    D={nazoratData}
                     company={activeCompany}
                     currentUser={effectiveUser}
                     currentAccess={currentAccess}
@@ -9366,6 +9506,43 @@ export default function App() {
                   </div>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {dueReminderQueue.length > 0 && (
+        <div className="modal-ov" onMouseDown={() => dismissDueReminder(dueReminderQueue[0]?.id)}>
+          <div className="modal ani" style={{maxWidth:560}} onMouseDown={(e)=>e.stopPropagation()}>
+            <div className="mhdr">
+              <div>
+                <div style={{fontWeight:800,fontSize:16}}>Eslatma vaqti keldi</div>
+                <div style={{fontSize:12,color:'var(--t3)',marginTop:4}}>
+                  {dueReminderQueue.length} ta vazifa kutmoqda
+                </div>
+              </div>
+            </div>
+            <div className="mbdy" style={{display:'grid',gap:12}}>
+              <div className="card" style={{padding:12,display:'grid',gap:8}}>
+                <div style={{fontWeight:700}}>{dueReminderQueue[0]?.title || 'Eslatma'}</div>
+                <div style={{fontSize:12,color:'var(--t2)'}}>{dueReminderQueue[0]?.subtitle || '-'}</div>
+                <div style={{fontSize:11,color:'var(--bl)'}}>Belgilangan vaqt: {fmtDateTime(dueReminderQueue[0]?.when || '')}</div>
+              </div>
+              <div style={{display:'flex',justifyContent:'flex-end',gap:8,flexWrap:'wrap'}}>
+                <button
+                  className="btn btn-bl btn-sm"
+                  onClick={() => {
+                    const first = dueReminderQueue[0];
+                    if (first?.topicKey) setAlertsTopicKey(first.topicKey);
+                    setAlertsOpen(true);
+                    dismissDueReminder(first?.id);
+                  }}
+                >
+                  Bildirishnomani ochish
+                </button>
+                <button className="btn btn-gh btn-sm" onClick={() => dismissDueReminder(dueReminderQueue[0]?.id)}>
+                  Keyinroq
+                </button>
+              </div>
             </div>
           </div>
         </div>
