@@ -8688,12 +8688,31 @@ export default function App() {
       setLeftoverSheetError('Qolib ketgan zakazlar sheet ID topilmadi');
       return;
     }
+    const loadOne = async (gid, sheetName, label) => {
+      let lastErr = '';
+      try {
+        return await fetchSheetCsv(leftoverSheetId, gid, label);
+      } catch (e) {
+        lastErr = String(e?.message || e || '');
+      }
+      try {
+        return await fetchSheetCsvByName(leftoverSheetId, sheetName, label);
+      } catch (e) {
+        lastErr = String(e?.message || e || lastErr || '');
+      }
+      try {
+        return await fetchSheetOpenSheet(leftoverSheetId, sheetName, label);
+      } catch (e) {
+        lastErr = String(e?.message || e || lastErr || '');
+      }
+      throw new Error(lastErr || `"${label}" varaqi yuklanmadi`);
+    };
     setLeftoverSheetLoading(true);
     setLeftoverSheetError('');
     try {
       const [reasonSheet, archiveSheet] = await Promise.all([
-        fetchSheetCsv(leftoverSheetId, LEFTOVER_REASON_GID, 'Qolib_ketgan_zakazlar_Arxiv'),
-        fetchSheetCsv(leftoverSheetId, LEFTOVER_ARCHIVE_GID, 'Arxiv'),
+        loadOne(LEFTOVER_REASON_GID, 'Qolib_ketgan_zakazlar_Arxiv', 'Qolib_ketgan_zakazlar_Arxiv'),
+        loadOne(LEFTOVER_ARCHIVE_GID, 'Arxiv', 'Arxiv'),
       ]);
       setLeftoverReasonSheetRows(Array.isArray(reasonSheet) ? reasonSheet : []);
       setLeftoverArchiveSheetRows(Array.isArray(archiveSheet) ? archiveSheet : []);
