@@ -144,6 +144,10 @@ const ACCESS_UPDATED_AT_KEY = 'aq-access-updated-at';
 const OBZVON_WEBHOOK_DEFAULT = 'https://solitary-brook-4889aquabiz-api.3dmotion683.workers.dev';
 // Google Sheetga yozish uchun fallback Apps Script URL
 const OBZVON_EXPORT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyi1OP_a_5C7-TBujLuo9dDast0RLVelhQsTiO6dlN_mefi55vnTHm_ZRXpDFFTTXb7qA/exec';
+const LEFTOVER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1n73ggQbkdpKj0gPJQAhlppUHmPTzfuAXjhHPrAJHgmo/edit?gid=971866254#gid=971866254';
+const LEFTOVER_SHEET_ID = '1n73ggQbkdpKj0gPJQAhlppUHmPTzfuAXjhHPrAJHgmo';
+const LEFTOVER_REASON_GID = '971866254'; // Qolib_ketgan_zakazlar_Arxiv
+const LEFTOVER_ARCHIVE_GID = '1642247768'; // Arxiv
 
 /* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў HELPERS Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const fmt  = (n) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
@@ -2374,7 +2378,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -2383,7 +2387,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -2392,7 +2396,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'all',
     role: 'admin',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
     ui: { theme:'dark' },
     company: { canSwitch:true, default:'murodbaxsh' },
   },
@@ -6686,6 +6690,400 @@ function Reports({
   );
 }
 
+function LeftOrdersPage({
+  D,
+  company='murodbaxsh',
+  currentUser='Admin',
+  currentAccess=null,
+}) {
+  const canSeeAll = (currentAccess?.scope || 'all') === 'all';
+  const [tab, setTab] = useState('left');
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [rawReasonRows, setRawReasonRows] = useState([]);
+  const [rawArchiveRows, setRawArchiveRows] = useState([]);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterState, setFilterState] = useState({});
+  const sheetId = useMemo(() => extractSheetId(LEFTOVER_SHEET_URL) || LEFTOVER_SHEET_ID, []);
+  const normalizeKey = useCallback((v) => String(v || '').trim().toLowerCase(), []);
+  const loadSheets = useCallback(async () => {
+    if (!sheetId) {
+      setLoadError('Qolib ketgan zakazlar sheet ID topilmadi');
+      return;
+    }
+    setLoading(true);
+    setLoadError('');
+    try {
+      const [reasonSheet, archiveSheet] = await Promise.all([
+        fetchSheetCsv(sheetId, LEFTOVER_REASON_GID, 'Qolib_ketgan_zakazlar_Arxiv'),
+        fetchSheetCsv(sheetId, LEFTOVER_ARCHIVE_GID, 'Arxiv'),
+      ]);
+      setRawReasonRows(Array.isArray(reasonSheet) ? reasonSheet : []);
+      setRawArchiveRows(Array.isArray(archiveSheet) ? archiveSheet : []);
+    } catch (e) {
+      setLoadError(String(e?.message || e || 'Sheet yuklashda xato'));
+    } finally {
+      setLoading(false);
+    }
+  }, [sheetId]);
+  useEffect(() => {
+    loadSheets();
+  }, [loadSheets]);
+
+  const reasonRows = useMemo(() => {
+    const parsed = (rawReasonRows || []).slice(1).map((r, i) => ({
+      rowId: `reason_${i + 1}`,
+      uid: String(r?.[0] || '').trim(),
+      date: toIsoDate(r?.[1]),
+      customerId: normalizeIdKey(r?.[2]),
+      customer: String(r?.[3] || '').trim(),
+      orderId: String(r?.[4] || '').trim(),
+      driver: String(r?.[5] || '').trim(),
+      reason: String(r?.[6] || '').trim(),
+    })).filter((r) => r.uid || r.orderId || r.customerId || r.reason);
+    if (canSeeAll) return parsed;
+    return parsed.filter((r) => String(r.driver || '').trim() === String(currentUser || '').trim());
+  }, [rawReasonRows, canSeeAll, currentUser]);
+
+  const archiveRows = useMemo(() => {
+    const parsed = (rawArchiveRows || []).slice(1).map((r, i) => ({
+      rowId: `arxiv_${i + 1}`,
+      date: toIsoDate(r?.[0]),
+      customerId: normalizeIdKey(r?.[2]),
+      customer: String(r?.[3] || '').trim(),
+      productGiven: String(r?.[4] || '').trim(),
+      qtyGiven: Math.abs(toNum(r?.[5])),
+      productTaken: String(r?.[6] || '').trim(),
+      qtyTaken: Math.abs(toNum(r?.[7])),
+      payType: String(r?.[8] || '').trim(),
+      payAmount: toNum(r?.[9]),
+      note: String(r?.[12] || '').trim(),
+      driver: String(r?.[13] || '').trim(),
+      uid: String(r?.[14] || '').trim(),
+    })).filter((r) => r.uid || r.date || r.customerId || r.driver || r.qtyGiven || r.qtyTaken);
+    if (canSeeAll) return parsed;
+    return parsed.filter((r) => String(r.driver || '').trim() === String(currentUser || '').trim());
+  }, [rawArchiveRows, canSeeAll, currentUser]);
+
+  const orderRows = useMemo(() => {
+    let rows = (D.rawOrders || []).filter((o) => {
+      if (!isOrderDoc(o.docType)) return false;
+      if (isCancelledStatus(o.status)) return false;
+      const date = toIsoDate(o.orderDate);
+      const customerId = normalizeIdKey(o.mId);
+      if (!date || !customerId) return false;
+      return true;
+    }).map((o, i) => ({
+      rowId: `ord_${i}_${String(o.soNum || '').trim()}`,
+      date: toIsoDate(o.orderDate),
+      customerId: normalizeIdKey(o.mId),
+      customer: String(o.contName || '').trim(),
+      orderId: String(o.soNum || '').trim(),
+      uniqueId: String(o.uniqueId || '').trim(),
+      driver: String(o.delivPerson || o.agent || '').trim() || '-',
+      qty: Math.abs(toNum(o.qty)),
+      sumUZS: String(o.currency || '').toUpperCase() === 'USD' ? 0 : Number(o.sum || 0),
+      note: String(o.note || '').trim(),
+      product: String(o.product || '').trim(),
+      status: String(o.status || '').trim(),
+    }));
+    if (!canSeeAll) rows = rows.filter((r) => r.driver === String(currentUser || '').trim());
+    return rows.sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : b.date.localeCompare(a.date)));
+  }, [D.rawOrders, canSeeAll, currentUser]);
+
+  const minArchiveDate = useMemo(() => {
+    const vals = archiveRows.map((r) => r.date).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    return vals[0] || '';
+  }, [archiveRows]);
+  const archiveUidSet = useMemo(() => {
+    const set = new Set();
+    archiveRows.forEach((r) => {
+      if (r.uid) set.add(normalizeKey(r.uid));
+    });
+    return set;
+  }, [archiveRows, normalizeKey]);
+  const archiveDateCustomerDriverSet = useMemo(() => {
+    const set = new Set();
+    archiveRows.forEach((r) => {
+      if (!r.date || !r.customerId) return;
+      const driver = normalizeKey(r.driver || '-');
+      set.add(`${r.date}__${r.customerId}__${driver}`);
+    });
+    return set;
+  }, [archiveRows, normalizeKey]);
+  const archiveDateCustomerSet = useMemo(() => {
+    const set = new Set();
+    archiveRows.forEach((r) => {
+      if (!r.date || !r.customerId) return;
+      set.add(`${r.date}__${r.customerId}`);
+    });
+    return set;
+  }, [archiveRows]);
+  const reasonByOrderId = useMemo(() => {
+    const m = new Map();
+    reasonRows.forEach((r) => {
+      const k = normalizeKey(r.orderId);
+      if (!k) return;
+      if (!m.has(k)) m.set(k, []);
+      if (r.reason && !m.get(k).includes(r.reason)) m.get(k).push(r.reason);
+    });
+    return m;
+  }, [reasonRows, normalizeKey]);
+  const reasonByUid = useMemo(() => {
+    const m = new Map();
+    reasonRows.forEach((r) => {
+      const k = normalizeKey(r.uid);
+      if (!k) return;
+      if (!m.has(k)) m.set(k, []);
+      if (r.reason && !m.get(k).includes(r.reason)) m.get(k).push(r.reason);
+    });
+    return m;
+  }, [reasonRows, normalizeKey]);
+  const reasonByTriplet = useMemo(() => {
+    const m = new Map();
+    reasonRows.forEach((r) => {
+      if (!r.date || !r.customerId) return;
+      const k = `${r.date}__${r.customerId}__${normalizeKey(r.driver || '-')}`;
+      if (!m.has(k)) m.set(k, []);
+      if (r.reason && !m.get(k).includes(r.reason)) m.get(k).push(r.reason);
+    });
+    return m;
+  }, [reasonRows, normalizeKey]);
+  const missingRows = useMemo(() => {
+    return orderRows
+      .filter((o) => (!minArchiveDate || o.date >= minArchiveDate))
+      .map((o) => {
+        const delivered = (
+          (o.uniqueId && archiveUidSet.has(normalizeKey(o.uniqueId))) ||
+          (o.orderId && archiveUidSet.has(normalizeKey(o.orderId))) ||
+          archiveDateCustomerDriverSet.has(`${o.date}__${o.customerId}__${normalizeKey(o.driver || '-')}`) ||
+          archiveDateCustomerSet.has(`${o.date}__${o.customerId}`)
+        );
+        const reasonParts = [
+          ...(reasonByOrderId.get(normalizeKey(o.orderId)) || []),
+          ...(reasonByUid.get(normalizeKey(o.uniqueId)) || []),
+          ...(reasonByTriplet.get(`${o.date}__${o.customerId}__${normalizeKey(o.driver || '-')}`) || []),
+        ];
+        const reason = Array.from(new Set(reasonParts)).join(' | ');
+        return {
+          ...o,
+          inArchive: delivered,
+          reason: reason || '',
+          statusText: delivered ? 'Arxivda bor' : (reason ? 'Qolib ketgan (sabab yozilgan)' : "Qolib ketgan (sabab yo'q)"),
+        };
+      })
+      .filter((r) => !r.inArchive);
+  }, [orderRows, minArchiveDate, archiveUidSet, archiveDateCustomerDriverSet, archiveDateCustomerSet, reasonByOrderId, reasonByUid, reasonByTriplet, normalizeKey]);
+
+  const orderByIdMap = useMemo(() => {
+    const m = new Map();
+    orderRows.forEach((o) => {
+      const so = normalizeKey(o.orderId);
+      if (so && !m.has(so)) m.set(so, o);
+      const uid = normalizeKey(o.uniqueId);
+      if (uid && !m.has(uid)) m.set(uid, o);
+    });
+    return m;
+  }, [orderRows, normalizeKey]);
+  const reasonDetailedRows = useMemo(() => {
+    return reasonRows.map((r) => {
+      const fromOrder = orderByIdMap.get(normalizeKey(r.orderId)) || orderByIdMap.get(normalizeKey(r.uid));
+      const fallback = !fromOrder
+        ? orderRows.find((o) => o.date === r.date && o.customerId === r.customerId && normalizeKey(o.driver || '-') === normalizeKey(r.driver || '-'))
+        : null;
+      const ord = fromOrder || fallback || null;
+      return {
+        ...r,
+        qty: ord?.qty || 0,
+        sumUZS: ord?.sumUZS || 0,
+        orderNote: ord?.note || '',
+        product: ord?.product || '',
+        orderStatus: ord?.status || '',
+      };
+    });
+  }, [reasonRows, orderByIdMap, orderRows, normalizeKey]);
+
+  const leftColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'orderId', label:'Zakaz ID', type:'text' },
+    { key:'uniqueId', label:'UID', type:'text' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'qty', label:'Soni', type:'number' },
+    { key:'sumUZS', label:'Summa', type:'number' },
+    { key:'note', label:'Zakaz izohi', type:'text' },
+    { key:'reason', label:'Sabab', type:'text' },
+    { key:'statusText', label:'Holat', type:'text' },
+  ]), []);
+  const reasonColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'orderId', label:'Zakaz ID', type:'text' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'reason', label:'Sabab izohi', type:'text' },
+    { key:'product', label:'Mahsulot', type:'text' },
+    { key:'qty', label:'Soni', type:'number' },
+    { key:'sumUZS', label:'Summa', type:'number' },
+    { key:'orderNote', label:'Zakaz izohi', type:'text' },
+    { key:'orderStatus', label:'Status', type:'text' },
+  ]), []);
+  const activeColumns = tab === 'left' ? leftColumns : reasonColumns;
+  const activeBaseRows = tab === 'left' ? missingRows : reasonDetailedRows;
+  useEffect(() => {
+    setFilterState((prev) => ensureUniversalFilterState(activeColumns, prev));
+  }, [activeColumns]);
+  const filteredRows = useMemo(
+    () => applyUniversalFilters(activeBaseRows, activeColumns, filterState),
+    [activeBaseRows, activeColumns, filterState]
+  );
+  const filterCount = useMemo(() => countUniversalFilters(filterState), [filterState]);
+  const exportSheet = useCallback(() => {
+    if (tab === 'left') {
+      exportAoaExcel({
+        fileName: `Qolib_ketgan_zakazlar_${toIsoDate(new Date())}.xlsx`,
+        sheetName: 'QolibKetganZakazlar',
+        headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'UID', 'Dostavchik', 'Soni', 'Summa', 'Zakaz izohi', 'Sabab', 'Holat'],
+        columnTypes: ['date', 'text', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'text', 'text'],
+        rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.uniqueId, r.driver, r.qty, r.sumUZS, r.note, r.reason, r.statusText]),
+      });
+      return;
+    }
+    exportAoaExcel({
+      fileName: `Qolib_ketgan_zakazlar_sababi_${toIsoDate(new Date())}.xlsx`,
+      sheetName: 'QolibKetganSabab',
+      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Sabab izohi', 'Mahsulot', 'Soni', 'Summa', 'Zakaz izohi', 'Status'],
+      columnTypes: ['date', 'text', 'text', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'text'],
+      rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.driver, r.reason, r.product, r.qty, r.sumUZS, r.orderNote, r.orderStatus]),
+    });
+  }, [tab, filteredRows]);
+
+  return (
+    <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <div className="tabs" style={{display:'inline-flex'}}>
+            <button className={`tab${tab==='left'?' on':''}`} onClick={()=>setTab('left')}>Qolib ketgan zakazlar</button>
+            <button className={`tab${tab==='reason'?' on':''}`} onClick={()=>setTab('reason')}>Qolib ketgan zakazlar sababi</button>
+          </div>
+          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Kompaniya: {companyLabelByKey(company)}</span>
+          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Qolib ketgan: {missingRows.length}</span>
+          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Sabablar: {reasonRows.length}</span>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <button className="btn btn-gh btn-sm" onClick={loadSheets} disabled={loading}>{loading ? 'Yuklanmoqda...' : 'Yangilash'}</button>
+          <div style={{position:'relative'}}>
+            <button className="btn btn-gh btn-sm" onClick={()=>setFilterOpen((v)=>!v)}>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+              </svg>
+              Filtr ({filterCount})
+            </button>
+            <UniversalFilterPanel
+              open={filterOpen}
+              title={tab === 'left' ? 'Qolib ketgan zakazlar filtri' : 'Qolib ketgan zakazlar sababi filtri'}
+              columns={activeColumns}
+              rows={activeBaseRows}
+              state={filterState}
+              setState={setFilterState}
+              onClose={()=>setFilterOpen(false)}
+              width={620}
+            />
+          </div>
+          <button className="btn btn-bl btn-sm" onClick={exportSheet}>Excel</button>
+        </div>
+      </div>
+
+      {loadError && (
+        <div className="card" style={{padding:10,color:'var(--rd)',borderColor:'var(--rd)'}}>
+          Sheet yuklashda xato: {loadError}
+        </div>
+      )}
+
+      <div className="card" style={{overflow:'hidden',minHeight:0,flex:1,height:'calc(100vh - 186px)'}}>
+        <div style={{overflow:'auto',height:'100%'}}>
+          {tab === 'left' ? (
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Sana</th>
+                  <th>Mijoz ID</th>
+                  <th>Mijoz</th>
+                  <th>Zakaz ID</th>
+                  <th>UID</th>
+                  <th>Dostavchik</th>
+                  <th style={{textAlign:'right'}}>Soni</th>
+                  <th style={{textAlign:'right'}}>Summa</th>
+                  <th>Zakaz izohi</th>
+                  <th>Sabab</th>
+                  <th>Holat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.length === 0 ? (
+                  <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Qolib ketgan zakaz topilmadi</td></tr>
+                ) : filteredRows.map((r, i) => (
+                  <tr key={`left_${i}_${r.orderId}_${r.date}`} style={{background:r.reason ? 'rgba(63,185,80,.06)' : 'rgba(248,81,73,.08)'}}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
+                    <td>{r.customer}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.orderId || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.uniqueId || '-'}</td>
+                    <td>{r.driver || '-'}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.qty)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
+                    <td style={{maxWidth:220}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
+                    <td style={{maxWidth:240}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.reason || '-'}</span></td>
+                    <td style={{fontSize:11,color:r.reason ? 'var(--gr)' : 'var(--rd)'}}>{r.statusText}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Sana</th>
+                  <th>Mijoz ID</th>
+                  <th>Mijoz</th>
+                  <th>Zakaz ID</th>
+                  <th>Dostavchik</th>
+                  <th>Sabab izohi</th>
+                  <th>Mahsulot</th>
+                  <th style={{textAlign:'right'}}>Soni</th>
+                  <th style={{textAlign:'right'}}>Summa</th>
+                  <th>Zakaz izohi</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.length === 0 ? (
+                  <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Sabab yozuvlari topilmadi</td></tr>
+                ) : filteredRows.map((r, i) => (
+                  <tr key={`reason_${i}_${r.uid}_${r.orderId}`}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
+                    <td>{r.customer || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.orderId || '-'}</td>
+                    <td>{r.driver || '-'}</td>
+                    <td style={{maxWidth:260}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.reason || '-'}</span></td>
+                    <td>{r.product || '-'}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.qty)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
+                    <td style={{maxWidth:220}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.orderNote || '-'}</span></td>
+                    <td style={{fontSize:11,color:r.orderStatus ? 'var(--t2)' : 'var(--yl)'}}>{r.orderStatus || 'Zakaz topilmadi'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PlanPage({
   company='murodbaxsh',
   users=[],
@@ -6990,7 +7388,7 @@ function SettingsPanel({
   const [editLogin, setEditLogin] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const pages = ['dash','cust','orders','kassa','obzvon','doljniki','nazorat','reports','plan','refresh','settings'];
+  const pages = ['dash','cust','orders','left_orders','kassa','obzvon','doljniki','nazorat','reports','plan','refresh','settings'];
   const settingsSections = [
     { key:'settings_staff', label:"Hodimlar ruhsatlari" },
     { key:'settings_app', label:'Ilova sozlamalari' },
@@ -7177,6 +7575,7 @@ function SettingsPanel({
       children: customerTabDefs.map((t) => ({ key: t.key, label: t.label, kind: 'customerTabs', fallback: true })),
     },
     { key: 'orders', label: 'Zakazlar', fallback: true, children: [] },
+    { key: 'left_orders', label: 'Qolib ketgan zakazlar', fallback: true, children: [] },
     { key: 'kassa', label: 'Kassa', fallback: true, children: [] },
     {
       key: 'obzvon',
@@ -7636,6 +8035,7 @@ const NAV = [
   { id:'dash',    label:'Dashboard',  icon:E.home },
   { id:'cust',    label:'Mijozlar',   icon:E.users, badge:'d' },
   { id:'orders',  label:'Zakazlar',   icon:E.order },
+  { id:'left_orders', label:'Qolib ketgan zakazlar', icon:'⏳' },
   { id:'kassa',   label:'Kassa',      icon:E.pay },
   { id:'obzvon',  label:'Obzvon',     icon:E.phone, badge:'o' },
   { id:'doljniki',label:'Doljniki',   icon:E.doc, badge:'dz' },
@@ -9373,6 +9773,14 @@ export default function App() {
                 {page==='dash'    && canViewPage('dash') && <Dashboard D={D}/>}
                 {page==='cust'    && canViewPage('cust') && <Customers D={D} currentUser={effectiveUser} currentAccess={currentAccess} assignmentById={D.assignmentById || {}} company={activeCompany}/>}
                 {page==='orders'  && canViewPage('orders') && <Orders    D={D}/>}
+                {page==='left_orders' && canViewPage('left_orders') && (
+                  <LeftOrdersPage
+                    D={D}
+                    company={activeCompany}
+                    currentUser={effectiveUser}
+                    currentAccess={currentAccess}
+                  />
+                )}
                 {page==='kassa'   && canViewPage('kassa') && <Kassa     D={D}/>}
                 {page==='obzvon'  && canViewPage('obzvon') && (
                   <Obzvon
