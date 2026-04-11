@@ -959,9 +959,26 @@ const isValidLatLng = (lat, lng) => {
   if (Math.abs(la) < 0.00001 && Math.abs(ln) < 0.00001) return false;
   return true;
 };
+const TASHKENT_CENTER = { lat: 41.311081, lng: 69.240562 };
+const toGeoNum = (raw) => {
+  const text = String(raw ?? '').trim();
+  if (!text) return 0;
+  const m = text.match(/-?\d{1,3}(?:[.,]\d+)?/);
+  if (!m) return 0;
+  return toNum(String(m[0]).replace(',', '.'));
+};
+const geoScoreToTashkent = (lat, lng) =>
+  Math.abs(Number(lat) - TASHKENT_CENTER.lat) + Math.abs(Number(lng) - TASHKENT_CENTER.lng);
+const pickBestGeoCandidate = (candidates = []) => {
+  const valid = (candidates || []).filter((c) => isValidLatLng(c?.lat, c?.lng));
+  if (!valid.length) return { lat: 0, lng: 0 };
+  return valid.reduce((best, cur) =>
+    geoScoreToTashkent(cur.lat, cur.lng) < geoScoreToTashkent(best.lat, best.lng) ? cur : best
+  );
+};
 const parsePairDirect = (firstRaw, secondRaw) => {
-  const lat = toNum(String(firstRaw ?? '').replace(',', '.'));
-  const lng = toNum(String(secondRaw ?? '').replace(',', '.'));
+  const lat = toGeoNum(firstRaw);
+  const lng = toGeoNum(secondRaw);
   return isValidLatLng(lat, lng) ? { lat, lng } : { lat: 0, lng: 0 };
 };
 const parseMerchantGeoFromQR = (qRaw, rRaw) => {
@@ -976,15 +993,38 @@ const parseArchiveGeoFromK = (value = '') => {
   try {
     text = decodeURIComponent(raw);
   } catch {}
-  const m = text.match(/(-?\d{1,3}(?:[.,]\d+)?)\s*[,;]\s*(-?\d{1,3}(?:[.,]\d+)?)/);
-  if (!m) return { lat: 0, lng: 0 };
-  const hasLngLatHint = /(?:^|[?&])(ll|pt)=/i.test(text) || /\b(?:ll|pt)\s*=/i.test(text);
-  let lat = toNum(String(hasLngLatHint ? m[2] : m[1]).replace(',', '.'));
-  let lng = toNum(String(hasLngLatHint ? m[1] : m[2]).replace(',', '.'));
-  if (isValidLatLng(lat, lng)) return { lat, lng };
-  const swapped = parsePairDirect(m[2], m[1]);
-  if (isValidLatLng(swapped.lat, swapped.lng)) return swapped;
-  return { lat: 0, lng: 0 };
+  const candidates = [];
+  const push = (latRaw, lngRaw) => {
+    const p = parsePairDirect(latRaw, lngRaw);
+    if (isValidLatLng(p.lat, p.lng)) candidates.push(p);
+  };
+
+  // URL query ko'rinishlari: ll=lng,lat | pt=lng,lat | whatshere[point]=lng,lat
+  const queryRe = /(?:^|[?&#])(ll|pt|whatshere(?:%5B|\[)point(?:%5D|\]))=([^&#]+)/ig;
+  let q;
+  while ((q = queryRe.exec(text))) {
+    let payload = String(q[2] || '');
+    try { payload = decodeURIComponent(payload); } catch {}
+    const pair = payload.match(/(-?\d{1,3}(?:[.,]\d+)?)\s*[,;]\s*(-?\d{1,3}(?:[.,]\d+)?)/);
+    if (pair) push(pair[2], pair[1]); // lng,lat -> lat,lng
+  }
+
+  // "@lat,lng" ko'rinishi
+  const atRe = /@(-?\d{1,3}(?:[.,]\d{4,})),\s*(-?\d{1,3}(?:[.,]\d{4,}))/g;
+  let at;
+  while ((at = atRe.exec(text))) {
+    push(at[1], at[2]);
+  }
+
+  // Umumiy ko'rinish (aniqroq: kamida 4 xonali kasr)
+  const pairRe = /(-?\d{1,3}(?:[.,]\d{4,}))\s*[,; ]\s*(-?\d{1,3}(?:[.,]\d{4,}))/g;
+  let m;
+  while ((m = pairRe.exec(text))) {
+    push(m[1], m[2]);
+    push(m[2], m[1]);
+  }
+
+  return pickBestGeoCandidate(candidates);
 };
 const parseLeftoverReasonRows = (rawRows = []) => (
   (rawRows || [])
@@ -4234,11 +4274,6 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
     if (email && employeeNameByEmail[email]) return employeeNameByEmail[email];
     return raw;
   }, [employeeNameById, employeeNameByEmail]);
-  const customerIdSet = useMemo(
-    () => new Set((customers || []).map((c) => String(c.id || '').trim()).filter(Boolean)),
-    [customers]
-  );
-
   const soGroups = useMemo(() => {
     const groups = {};
     (rawOrders || []).forEach((o) => {
@@ -4329,14 +4364,12 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
         g.agent = driverName || '-';
       }
     };
-    rows
-      .filter((r) => customerIdSet.has(String(r.customerId || '').trim()))
-      .forEach((r) => {
-        const qtyGiven = Math.abs(toNum(r.qtyGiven));
-        const qtyTaken = Math.abs(toNum(r.qtyTaken));
-        if (qtyGiven > 0.0001) upsert(r, 'order', qtyGiven, r.productGiven || r.productTaken || '-');
-        if (qtyTaken > 0.0001) upsert(r, 'return', qtyTaken, r.productTaken || r.productGiven || '-');
-      });
+    rows.forEach((r) => {
+      const qtyGiven = Math.abs(toNum(r.qtyGiven));
+      const qtyTaken = Math.abs(toNum(r.qtyTaken));
+      if (qtyGiven > 0.0001) upsert(r, 'order', qtyGiven, r.productGiven || r.productTaken || '-');
+      if (qtyTaken > 0.0001) upsert(r, 'return', qtyTaken, r.productTaken || r.productGiven || '-');
+    });
     return Array.from(groups.values())
       .sort((a, b) => {
         const da = toDate(a.orderDate || a._enteredAt);
@@ -4348,7 +4381,7 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
         const { _enteredAt, ...row } = g;
         return row;
       });
-  }, [rawArchiveSheetRows, customerIdSet, customerById, resolveDriverName]);
+  }, [rawArchiveSheetRows, customerById, resolveDriverName]);
 
   const activePool = dataMode === 'real' ? realGroups : soGroups;
   const allZakaz = activePool.filter((g) => isOrderDoc(g.docType));
@@ -4425,9 +4458,22 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
   }, [base, search, fAgents, fStatuses, fCurrencies, fDateFrom, fDateTo, fQtyFrom, fQtyTo, fSumFrom, fSumTo, orderFilterColumns, uFilterState]);
 
   const universalFilterCount = useMemo(() => countUniversalFilters(uFilterState), [uFilterState]);
+  const todayIso = useMemo(() => toIsoDate(new Date()), []);
+  const hasExplicitDateFilter = useMemo(() => {
+    if (String(fDateFrom || '').trim() || String(fDateTo || '').trim()) return true;
+    const uf = uFilterState?.orderDate || {};
+    const hasSelected = Array.isArray(uf.selected) && uf.selected.length > 0;
+    const hasValue = String(uf.value ?? '').trim() !== '';
+    return hasSelected || hasValue;
+  }, [fDateFrom, fDateTo, uFilterState]);
+  const mapList = useMemo(() => {
+    if (viewMode !== 'map') return list;
+    if (hasExplicitDateFilter) return list;
+    return list.filter((g) => toIsoDate(g.orderDate) === todayIso);
+  }, [viewMode, list, hasExplicitDateFilter, todayIso]);
 
   const mapPoints = useMemo(
-    () => list
+    () => mapList
       .map((g) => {
         let lat = 0;
         let lng = 0;
@@ -4449,14 +4495,14 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
         };
       })
       .filter(Boolean),
-    [list, customerById, dataMode]
+    [mapList, customerById, dataMode]
   );
 
   useEffect(() => {
     if (!mapSelected) return;
-    const ok = list.some((g) => String(g.soNum || '') === String(mapSelected.soNum || ''));
+    const ok = mapList.some((g) => String(g.soNum || '') === String(mapSelected.soNum || ''));
     if (!ok) setMapSelected(null);
-  }, [list, mapSelected]);
+  }, [mapList, mapSelected]);
 
   const exportOrders = () => {
     exportAoaExcel({
@@ -4625,6 +4671,9 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
               />
             </div>
             <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Nuqta: {mapPoints.length} ta</span>
+            {!hasExplicitDateFilter && (
+              <span className="tag" style={{background:'var(--bl2)',color:'var(--bl)'}}>Bugungi sana</span>
+            )}
             <span className="tag" style={{background:'var(--s2)',color:'var(--t3)'}}>
               {dataMode === 'real' ? 'Real arxiv lokatsiyasi' : 'Mijoz lokatsiyasi'}
             </span>
