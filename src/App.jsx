@@ -952,13 +952,22 @@ const getLeftoverCompareDate = (baseDate = new Date(), rolloverHour = LEFTOVER_R
   return toIsoDate(d);
 };
 const UZ_GEO_BOUNDS = { latMin: 37, latMax: 46.5, lngMin: 55, lngMax: 74.5 };
+// Bizning loyiha mijozlari Toshkent shahri/atrofi bo'yicha ishlaydi.
+// Noto'g'ri nuqtalarni xaritada ko'rsatmaslik uchun alohida "ishchi" diapazon.
+const TASHKENT_GEO_BOUNDS = { latMin: 40.8, latMax: 41.75, lngMin: 68.4, lngMax: 70.1 };
 const isLikelyUzGeoPoint = (lat, lng) => {
   const la = Number(lat);
   const ln = Number(lng);
   if (!Number.isFinite(la) || !Number.isFinite(ln)) return false;
   return la >= UZ_GEO_BOUNDS.latMin && la <= UZ_GEO_BOUNDS.latMax && ln >= UZ_GEO_BOUNDS.lngMin && ln <= UZ_GEO_BOUNDS.lngMax;
 };
-const normalizeGeoPair = (aRaw, bRaw, { preferUz = true } = {}) => {
+const isLikelyTashkentGeoPoint = (lat, lng) => {
+  const la = Number(lat);
+  const ln = Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(ln)) return false;
+  return la >= TASHKENT_GEO_BOUNDS.latMin && la <= TASHKENT_GEO_BOUNDS.latMax && ln >= TASHKENT_GEO_BOUNDS.lngMin && ln <= TASHKENT_GEO_BOUNDS.lngMax;
+};
+const normalizeGeoPair = (aRaw, bRaw, { preferUz = true, preferCity = false } = {}) => {
   const a = toNum(String(aRaw ?? '').replace(',', '.'));
   const b = toNum(String(bRaw ?? '').replace(',', '.'));
   const candidates = [
@@ -966,13 +975,17 @@ const normalizeGeoPair = (aRaw, bRaw, { preferUz = true } = {}) => {
     { lat: b, lng: a },
   ].filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng) && Math.abs(c.lat) <= 90 && Math.abs(c.lng) <= 180 && (Math.abs(c.lat) > 0.00001 || Math.abs(c.lng) > 0.00001));
   if (!candidates.length) return { lat: 0, lng: 0 };
+  if (preferCity) {
+    const city = candidates.find((c) => isLikelyTashkentGeoPoint(c.lat, c.lng));
+    if (city) return city;
+  }
   if (preferUz) {
     const uz = candidates.find((c) => isLikelyUzGeoPoint(c.lat, c.lng));
     return uz || { lat: 0, lng: 0 };
   }
   return candidates[0];
 };
-const parseGeoFromText = (value = '') => {
+const parseGeoFromText = (value = '', { preferUz = true, preferCity = false, allowUzFallback = true } = {}) => {
   const raw = String(value || '').trim();
   if (!raw) return { lat: 0, lng: 0 };
   let text = raw;
@@ -980,19 +993,28 @@ const parseGeoFromText = (value = '') => {
     text = decodeURIComponent(raw);
   } catch {}
   const pairRe = /(-?\d{1,3}(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:[.,]\d+)?)/g;
+  const cityCandidates = [];
   const uzCandidates = [];
   const anyCandidates = [];
   let m;
   while ((m = pairRe.exec(text))) {
-    const pairUz = normalizeGeoPair(m[1], m[2], { preferUz: true });
+    const pairCity = normalizeGeoPair(m[1], m[2], { preferUz: true, preferCity: true });
+    if (isLikelyTashkentGeoPoint(pairCity.lat, pairCity.lng)) {
+      cityCandidates.push(pairCity);
+      continue;
+    }
+    const pairUz = normalizeGeoPair(m[1], m[2], { preferUz: true, preferCity: false });
     if (isLikelyUzGeoPoint(pairUz.lat, pairUz.lng)) {
       uzCandidates.push(pairUz);
       continue;
     }
-    const pairAny = normalizeGeoPair(m[1], m[2], { preferUz: false });
+    const pairAny = normalizeGeoPair(m[1], m[2], { preferUz: false, preferCity: false });
     if (Math.abs(pairAny.lat) > 0.00001 || Math.abs(pairAny.lng) > 0.00001) anyCandidates.push(pairAny);
   }
-  if (uzCandidates.length) return uzCandidates[0];
+  if (preferCity && cityCandidates.length) return cityCandidates[0];
+  if (preferCity && !allowUzFallback) return { lat: 0, lng: 0 };
+  if ((preferUz || preferCity) && uzCandidates.length) return uzCandidates[0];
+  if (preferUz || preferCity) return { lat: 0, lng: 0 };
   return anyCandidates[0] || { lat: 0, lng: 0 };
 };
 const parseLeftoverReasonRows = (rawRows = []) => (
@@ -1015,10 +1037,12 @@ const parseLeftoverArchiveRows = (rawRows = []) => (
     .slice(1)
     .map((r, i) => {
       const location = String(r?.[10] || '').trim();
-      const geoMixed = parseGeoFromText(location);
-      const geoCols = normalizeGeoPair(r?.[16], r?.[17], { preferUz: true });
-      const lat = isLikelyUzGeoPoint(geoCols.lat, geoCols.lng) ? geoCols.lat : geoMixed.lat;
-      const lng = isLikelyUzGeoPoint(geoCols.lat, geoCols.lng) ? geoCols.lng : geoMixed.lng;
+      const geoMixed = parseGeoFromText(location, { preferCity: true, allowUzFallback: false });
+      const geoCols = normalizeGeoPair(r?.[16], r?.[17], { preferUz: true, preferCity: true });
+      const hasColsGeo = isLikelyTashkentGeoPoint(geoCols.lat, geoCols.lng);
+      const hasMixedGeo = isLikelyTashkentGeoPoint(geoMixed.lat, geoMixed.lng);
+      const lat = hasColsGeo ? geoCols.lat : hasMixedGeo ? geoMixed.lat : 0;
+      const lng = hasColsGeo ? geoCols.lng : hasMixedGeo ? geoMixed.lng : 0;
       return {
         rowId: `arxiv_${i + 1}`,
         date: toIsoDate(r?.[0]),
@@ -1588,7 +1612,6 @@ function GeoMapPanel({ points = [], selectedId = '', onPick = () => {}, height =
             }),
           });
           marker.on('click', () => onPickRef.current?.(p));
-          marker.bindTooltip(String(p?.label || '').trim() || 'Mijoz', { direction: 'top' });
           marker.addTo(layer);
         });
 
@@ -2064,7 +2087,7 @@ function processAll(mainData) {
       const source = String(r[25] || '').trim(); // Z ustun
       const merchNote = String(r[19] || '').trim(); // T ustun = primechaniya
       const aaValue = String(r[26] || '').trim(); // AA ustun
-      const merchantGeo = normalizeGeoPair(r[16], r[17], { preferUz: true });
+      const merchantGeo = normalizeGeoPair(r[16], r[17], { preferUz: true, preferCity: true });
       allMerchants.push({ id, name, source, merchNote, aaTag: aaValue });
       contacts.push({
         id,
@@ -2806,8 +2829,8 @@ body,input,select,button{font-family:var(--sans)}
 .btn-bl:hover{filter:brightness(1.03)}
 .btn-gr{background:var(--gr);color:#000;box-shadow:0 4px 14px rgba(63,185,80,.16)}
 .btn-gr:hover{filter:brightness(1.03)}
-.btn-gh{background:transparent;color:var(--t2);border:1px solid var(--b1)}
-.btn-gh:hover{background:var(--s3);color:var(--t1)}
+.btn-gh{background:color-mix(in oklab, var(--s2) 86%, #000 14%);color:var(--t2);border:1px solid var(--b1)}
+.btn-gh:hover{background:color-mix(in oklab, var(--s3) 90%, #000 10%);color:var(--t1)}
 .btn-sm{padding:5px 10px;font-size:11.5px}
 .input{width:100%;padding:8px 11px;border:1px solid var(--b1);border-radius:var(--r);
   font-size:13px;color:var(--t1);background:var(--s3);background:linear-gradient(180deg,var(--s3),color-mix(in oklab, var(--s3) 82%, var(--bg)));
@@ -2868,7 +2891,7 @@ body,input,select,button{font-family:var(--sans)}
 .tab.on{background:var(--s1);color:var(--t1);box-shadow:0 1px 4px rgba(0,0,0,.4)}
 .tab:active{transform:translateY(1px)}
 [data-filter-boundary="1"]{position:relative}
-.aq-map-wrap{position:relative;overflow:hidden}
+.aq-map-wrap{position:relative;overflow:visible}
 .aq-map-toolbar{position:absolute;top:10px;left:10px;right:10px;z-index:3200;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .aq-map-popup{position:absolute;left:10px;right:10px;bottom:10px;z-index:3200;background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:8px 10px;backdrop-filter:blur(8px)}
 .aq-map-pin{background:transparent!important;border:none!important}
@@ -3885,7 +3908,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   }, [segmentCustomers,search,sort,adv,segment,customerFilterColumns,uFilterState]);
   const mapPoints = useMemo(
     () => list
-      .filter((c) => isLikelyUzGeoPoint(c?.lat, c?.lng))
+      .filter((c) => isLikelyTashkentGeoPoint(c?.lat, c?.lng))
       .map((c) => ({
         id: String(c.id || ''),
         lat: Number(c.lat),
@@ -4069,12 +4092,12 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
           </div>
         </div>
       ) : (
-        <div className="card aq-map-wrap" style={{flex:1,minHeight:0,padding:8}}>
+        <div className="card aq-map-wrap" style={{flex:1,minHeight:0,padding:8,display:'flex'}}>
           <GeoMapPanel
             points={mapPoints}
             selectedId={mapSelected?.id || ''}
             onPick={(p) => setMapSelected(p?.row || null)}
-            height={Math.max(520, (typeof window !== 'undefined' ? window.innerHeight : 900) - 210)}
+            height="100%"
           />
           <div className="aq-map-toolbar">
             <div className="sb" style={{flex:'1 1 320px',minWidth:220,maxWidth:420}}>
@@ -4444,11 +4467,13 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
     () => list
       .map((g) => {
         const c = customerById[String(g.mId || '').trim()];
-        const gGeo = normalizeGeoPair(g.lat, g.lng, { preferUz: true });
-        const cGeo = normalizeGeoPair(c?.lat, c?.lng, { preferUz: true });
-        const lat = isLikelyUzGeoPoint(gGeo.lat, gGeo.lng) ? Number(gGeo.lat) : Number(cGeo.lat || 0);
-        const lng = isLikelyUzGeoPoint(gGeo.lat, gGeo.lng) ? Number(gGeo.lng) : Number(cGeo.lng || 0);
-        if (!isLikelyUzGeoPoint(lat, lng)) return null;
+        const gGeo = normalizeGeoPair(g.lat, g.lng, { preferUz: true, preferCity: true });
+        const cGeo = normalizeGeoPair(c?.lat, c?.lng, { preferUz: true, preferCity: true });
+        const hasOrderGeo = isLikelyTashkentGeoPoint(gGeo.lat, gGeo.lng);
+        const hasCustomerGeo = isLikelyTashkentGeoPoint(cGeo.lat, cGeo.lng);
+        const lat = hasOrderGeo ? Number(gGeo.lat) : hasCustomerGeo ? Number(cGeo.lat || 0) : 0;
+        const lng = hasOrderGeo ? Number(gGeo.lng) : hasCustomerGeo ? Number(cGeo.lng || 0) : 0;
+        if (!isLikelyTashkentGeoPoint(lat, lng)) return null;
         return {
           id: String(g.soNum || ''),
           lat,
@@ -4494,11 +4519,7 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
 
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
-      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-        <div className="sb" style={{flex:'0 1 380px'}}>
-          <span style={{color:'var(--t3)'}}>Qidiruv</span>
-          <input placeholder="Mijoz, zakaz no..." value={search} onChange={(e)=>setS(e.target.value)} />
-        </div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
         <div className="tabs" style={{display:'inline-flex'}}>
           <button className={`tab${dataMode==='system'?' on':''}`} onClick={()=>setDataMode('system')}>Sistem</button>
           <button className={`tab${dataMode==='real'?' on':''}`} onClick={()=>setDataMode('real')}>Real</button>
@@ -4512,26 +4533,34 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
           <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
           <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
         </div>
-        <div style={{position:'relative'}}>
-          <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-            </svg>
-            Filtr{universalFilterCount>0?` (${universalFilterCount})`:''}
-          </button>
-          <UniversalFilterPanel
-            open={uFilterOpen}
-            title={dataMode === 'real' ? "Real zakazlar filtri" : "Sistem zakazlar filtri"}
-            columns={orderFilterColumns}
-            rows={base}
-            state={uFilterState}
-            setState={setUFilterState}
-            onClose={()=>setUFilterOpen(false)}
-            width={620}
-          />
-        </div>
         <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>
       </div>
+      {viewMode === 'list' && (
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+          <div className="sb" style={{flex:'0 1 420px',minWidth:220}}>
+            <span style={{color:'var(--t3)'}}>Qidiruv</span>
+            <input placeholder="Mijoz, zakaz no..." value={search} onChange={(e)=>setS(e.target.value)} />
+          </div>
+          <div style={{position:'relative'}}>
+            <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+              </svg>
+              Filtr{universalFilterCount>0?` (${universalFilterCount})`:''}
+            </button>
+            <UniversalFilterPanel
+              open={uFilterOpen}
+              title={dataMode === 'real' ? "Real zakazlar filtri" : "Sistem zakazlar filtri"}
+              columns={orderFilterColumns}
+              rows={base}
+              state={uFilterState}
+              setState={setUFilterState}
+              onClose={()=>setUFilterOpen(false)}
+              width={620}
+            />
+          </div>
+        </div>
+      )}
 
       {viewMode === 'list' ? (
         <div className="card" style={{overflow:'hidden',flex:1}}>
@@ -4605,21 +4634,42 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
           </div>
         </div>
       ) : (
-        <div className="card aq-map-wrap" style={{padding:8,overflow:'hidden',flex:1,minHeight:0}}>
-          <div className="aq-map-toolbar" style={{right:'auto',maxWidth:520}}>
+        <div className="card aq-map-wrap" style={{padding:8,flex:1,minHeight:0,display:'flex'}}>
+          <div className="aq-map-toolbar">
+            <div className="sb" style={{flex:'1 1 360px',minWidth:220,maxWidth:520}}>
+              <span style={{color:'var(--t3)'}}>Qidiruv</span>
+              <input placeholder="Mijoz, zakaz no..." value={search} onChange={(e)=>setS(e.target.value)} />
+            </div>
+            <div style={{position:'relative'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                </svg>
+                Filtr{universalFilterCount>0?` (${universalFilterCount})`:''}
+              </button>
+              <UniversalFilterPanel
+                open={uFilterOpen}
+                title={dataMode === 'real' ? "Real zakazlar filtri" : "Sistem zakazlar filtri"}
+                columns={orderFilterColumns}
+                rows={base}
+                state={uFilterState}
+                setState={setUFilterState}
+                onClose={()=>setUFilterOpen(false)}
+                width={620}
+              />
+            </div>
+            <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>
             <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Nuqta: {mapPoints.length} ta</span>
             <span className="tag" style={{background:'var(--s2)',color:'var(--t3)'}}>
               {dataMode === 'real' ? 'Real arxiv lokatsiyasi' : 'Mijoz lokatsiyasi'}
             </span>
           </div>
-          <div style={{height:'100%'}}>
-            <GeoMapPanel
-              points={mapPoints}
-              selectedId={mapSelected?.soNum || ''}
-              onPick={(p) => setMapSelected(p?.row || null)}
-              height={Math.max(560, (typeof window !== 'undefined' ? window.innerHeight : 900) - 250)}
-            />
-          </div>
+          <GeoMapPanel
+            points={mapPoints}
+            selectedId={mapSelected?.soNum || ''}
+            onPick={(p) => setMapSelected(p?.row || null)}
+            height="100%"
+          />
           {mapSelected && (
             <div className="aq-map-popup">
               <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}>
