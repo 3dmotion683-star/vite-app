@@ -1521,113 +1521,106 @@ const isValidGeoPoint = (lat, lng) => {
   if (Math.abs(la) < 0.00001 && Math.abs(ln) < 0.00001) return false;
   return true;
 };
-const LEAFLET_CSS_ID = 'aq-leaflet-css';
-const LEAFLET_JS_ID = 'aq-leaflet-js';
-const LEAFLET_CSS_HREF = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-const LEAFLET_JS_SRC = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-const YANDEX_TILE_URL = 'https://core-renderer-tiles.maps.yandex.net/tiles?l=map&x={x}&y={y}&z={z}&lang=ru_RU';
-const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-let leafletLoadPromise = null;
-const ensureLeafletLoaded = () => {
+const YMAPS_JS_ID = 'aq-ymaps-js';
+const YMAPS_JS_SRC = 'https://api-maps.yandex.ru/2.1/?lang=ru_RU';
+let ymapsLoadPromise = null;
+const ensureYandexLoaded = () => {
   if (typeof window === 'undefined') return Promise.reject(new Error('window not available'));
-  if (window.L) return Promise.resolve(window.L);
-  if (leafletLoadPromise) return leafletLoadPromise;
-  leafletLoadPromise = new Promise((resolve, reject) => {
+  if (window.ymaps?.Map) {
+    return new Promise((resolve) => window.ymaps.ready(() => resolve(window.ymaps)));
+  }
+  if (ymapsLoadPromise) return ymapsLoadPromise;
+  ymapsLoadPromise = new Promise((resolve, reject) => {
     try {
-      if (!document.getElementById(LEAFLET_CSS_ID)) {
-        const link = document.createElement('link');
-        link.id = LEAFLET_CSS_ID;
-        link.rel = 'stylesheet';
-        link.href = LEAFLET_CSS_HREF;
-        document.head.appendChild(link);
-      }
-      const complete = () => (window.L ? resolve(window.L) : reject(new Error('Leaflet global topilmadi')));
-      const existing = document.getElementById(LEAFLET_JS_ID);
+      const complete = () => {
+        if (!window.ymaps?.Map) {
+          reject(new Error('Yandex Maps global topilmadi'));
+          return;
+        }
+        window.ymaps.ready(() => resolve(window.ymaps));
+      };
+      const existing = document.getElementById(YMAPS_JS_ID);
       if (existing) {
         if (existing.getAttribute('data-loaded') === '1') complete();
         else existing.addEventListener('load', complete, { once: true });
         return;
       }
       const script = document.createElement('script');
-      script.id = LEAFLET_JS_ID;
-      script.src = LEAFLET_JS_SRC;
+      script.id = YMAPS_JS_ID;
+      script.src = YMAPS_JS_SRC;
       script.async = true;
       script.onload = () => {
         script.setAttribute('data-loaded', '1');
         complete();
       };
-      script.onerror = () => reject(new Error('Leaflet script yuklanmadi'));
+      script.onerror = () => reject(new Error('Yandex Maps script yuklanmadi'));
       document.head.appendChild(script);
     } catch (e) {
       reject(e);
     }
   });
-  return leafletLoadPromise;
+  return ymapsLoadPromise;
 };
 function GeoMapPanel({ points = [], selectedId = '', onPick = () => {}, height = 420 }) {
   const hostRef = useRef(null);
   const mapRef = useRef(null);
-  const layerRef = useRef(null);
   const onPickRef = useRef(onPick);
   const [err, setErr] = useState('');
   useEffect(() => { onPickRef.current = onPick; }, [onPick]);
 
   useEffect(() => {
     let cancelled = false;
-    ensureLeafletLoaded()
-      .then((L) => {
+    ensureYandexLoaded()
+      .then((ymaps) => {
         if (cancelled || !hostRef.current) return;
         if (!mapRef.current) {
-          const map = L.map(hostRef.current, { zoomControl: true, attributionControl: true });
-          const yandexLayer = L.tileLayer(YANDEX_TILE_URL, {
-            maxZoom: 19,
-            attribution: '&copy; Yandex Maps',
+          mapRef.current = new ymaps.Map(hostRef.current, {
+            center: [41.311081, 69.240562],
+            zoom: 11,
+            controls: ['zoomControl'],
+          }, {
+            suppressMapOpenBlock: true,
+            yandexMapDisablePoiInteractivity: true,
           });
-          let fallbackAdded = false;
-          let yandexErrCount = 0;
-          yandexLayer.on('tileerror', () => {
-            yandexErrCount += 1;
-            if (fallbackAdded || yandexErrCount < 8) return;
-            fallbackAdded = true;
-            L.tileLayer(OSM_TILE_URL, {
-              maxZoom: 19,
-              attribution: '&copy; OpenStreetMap',
-            }).addTo(map);
-          });
-          yandexLayer.addTo(map);
-          mapRef.current = map;
-          layerRef.current = L.layerGroup().addTo(map);
         }
         const map = mapRef.current;
-        const layer = layerRef.current;
-        if (!map || !layer) return;
-        layer.clearLayers();
+        if (!map) return;
+        map.geoObjects.removeAll();
 
         const valid = (points || []).filter((p) => isValidGeoPoint(p?.lat, p?.lng));
         valid.forEach((p) => {
           const isSel = String(p?.id || '') === String(selectedId || '');
-          const marker = L.marker([Number(p.lat), Number(p.lng)], {
-            icon: L.divIcon({
-              className: `aq-map-pin${isSel ? ' on' : ''}`,
-              html: '<span></span>',
-              iconSize: [22, 22],
-              iconAnchor: [11, 22],
-              tooltipAnchor: [0, -18],
-            }),
-          });
-          marker.on('click', () => onPickRef.current?.(p));
-          marker.addTo(layer);
+          const marker = new ymaps.Placemark(
+            [Number(p.lat), Number(p.lng)],
+            { hintContent: String(p?.label || '').trim() || 'Nuqta' },
+            {
+              preset: isSel ? 'islands#greenCircleDotIcon' : 'islands#blueCircleDotIcon',
+              iconColor: isSel ? '#22c55e' : '#0ea5e9',
+              zIndex: isSel ? 600 : 400,
+            }
+          );
+          marker.events.add('click', () => onPickRef.current?.(p));
+          map.geoObjects.add(marker);
         });
 
         if (!valid.length) {
-          map.setView([41.311081, 69.240562], 11);
+          map.setCenter([41.311081, 69.240562], 11, { duration: 0 });
         } else if (valid.length === 1) {
-          map.setView([Number(valid[0].lat), Number(valid[0].lng)], 14);
+          map.setCenter([Number(valid[0].lat), Number(valid[0].lng)], 14, { duration: 0 });
         } else {
-          const bounds = L.latLngBounds(valid.map((p) => [Number(p.lat), Number(p.lng)]));
-          map.fitBounds(bounds.pad(0.2), { maxZoom: 14 });
+          const lats = valid.map((p) => Number(p.lat));
+          const lngs = valid.map((p) => Number(p.lng));
+          const bounds = [
+            [Math.min(...lats), Math.min(...lngs)],
+            [Math.max(...lats), Math.max(...lngs)],
+          ];
+          map.setBounds(bounds, {
+            checkZoomRange: true,
+            zoomMargin: 28,
+            duration: 0,
+          });
         }
-        setTimeout(() => map.invalidateSize(), 0);
+        setTimeout(() => map.container.fitToViewport(), 0);
       })
       .catch((e) => {
         if (cancelled) return;
@@ -1638,9 +1631,8 @@ function GeoMapPanel({ points = [], selectedId = '', onPick = () => {}, height =
 
   useEffect(() => () => {
     if (mapRef.current) {
-      mapRef.current.remove();
+      mapRef.current.destroy();
       mapRef.current = null;
-      layerRef.current = null;
     }
   }, []);
 
