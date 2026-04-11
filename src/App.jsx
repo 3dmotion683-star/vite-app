@@ -177,7 +177,7 @@ const E = {
   phone: '\u{1F4DE}',
   doc: '\u{1F4C4}',
   report: '\u{1F4CA}',
-  plan: '??',
+  plan: '\u{1F4C5}',
   bell: '\u{1F514}',
   water: '\u{1F4A7}',
   uzs: '\u{1F4B4}',
@@ -505,6 +505,7 @@ function UniversalFilterPanel({
           width:placement.panelWidth,
           maxWidth:'calc(100vw - 16px)',
           padding:12,
+          background:'var(--s1)',
           boxShadow:'0 24px 60px rgba(0,0,0,.6)',
           backdropFilter:'blur(10px)',
           overflow:'hidden',
@@ -950,19 +951,49 @@ const getLeftoverCompareDate = (baseDate = new Date(), rolloverHour = LEFTOVER_R
   d.setDate(d.getDate() - backDays);
   return toIsoDate(d);
 };
+const UZ_GEO_BOUNDS = { latMin: 37, latMax: 46.5, lngMin: 55, lngMax: 74.5 };
+const isLikelyUzGeoPoint = (lat, lng) => {
+  const la = Number(lat);
+  const ln = Number(lng);
+  if (!Number.isFinite(la) || !Number.isFinite(ln)) return false;
+  return la >= UZ_GEO_BOUNDS.latMin && la <= UZ_GEO_BOUNDS.latMax && ln >= UZ_GEO_BOUNDS.lngMin && ln <= UZ_GEO_BOUNDS.lngMax;
+};
+const normalizeGeoPair = (aRaw, bRaw, { preferUz = true } = {}) => {
+  const a = toNum(String(aRaw ?? '').replace(',', '.'));
+  const b = toNum(String(bRaw ?? '').replace(',', '.'));
+  const candidates = [
+    { lat: a, lng: b },
+    { lat: b, lng: a },
+  ].filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng) && Math.abs(c.lat) <= 90 && Math.abs(c.lng) <= 180 && (Math.abs(c.lat) > 0.00001 || Math.abs(c.lng) > 0.00001));
+  if (!candidates.length) return { lat: 0, lng: 0 };
+  if (preferUz) {
+    const uz = candidates.find((c) => isLikelyUzGeoPoint(c.lat, c.lng));
+    return uz || { lat: 0, lng: 0 };
+  }
+  return candidates[0];
+};
 const parseGeoFromText = (value = '') => {
-  const text = String(value || '').trim();
-  if (!text) return { lat: 0, lng: 0 };
-  const normalized = text.replace(/[;|]/g, ',');
-  const nums = normalized.match(/-?\d+(?:[.,]\d+)?/g) || [];
-  if (nums.length < 2) return { lat: 0, lng: 0 };
-  const a = Number(String(nums[0]).replace(',', '.'));
-  const b = Number(String(nums[1]).replace(',', '.'));
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return { lat: 0, lng: 0 };
-  // K ustunda ko'pincha "long,lat" yoki "lat,long" aralash keladi; diapazon bo'yicha tekshiramiz.
-  if (Math.abs(a) <= 90 && Math.abs(b) <= 180) return { lat: a, lng: b };
-  if (Math.abs(b) <= 90 && Math.abs(a) <= 180) return { lat: b, lng: a };
-  return { lat: 0, lng: 0 };
+  const raw = String(value || '').trim();
+  if (!raw) return { lat: 0, lng: 0 };
+  let text = raw;
+  try {
+    text = decodeURIComponent(raw);
+  } catch {}
+  const pairRe = /(-?\d{1,3}(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:[.,]\d+)?)/g;
+  const uzCandidates = [];
+  const anyCandidates = [];
+  let m;
+  while ((m = pairRe.exec(text))) {
+    const pairUz = normalizeGeoPair(m[1], m[2], { preferUz: true });
+    if (isLikelyUzGeoPoint(pairUz.lat, pairUz.lng)) {
+      uzCandidates.push(pairUz);
+      continue;
+    }
+    const pairAny = normalizeGeoPair(m[1], m[2], { preferUz: false });
+    if (Math.abs(pairAny.lat) > 0.00001 || Math.abs(pairAny.lng) > 0.00001) anyCandidates.push(pairAny);
+  }
+  if (uzCandidates.length) return uzCandidates[0];
+  return anyCandidates[0] || { lat: 0, lng: 0 };
 };
 const parseLeftoverReasonRows = (rawRows = []) => (
   (rawRows || [])
@@ -985,10 +1016,9 @@ const parseLeftoverArchiveRows = (rawRows = []) => (
     .map((r, i) => {
       const location = String(r?.[10] || '').trim();
       const geoMixed = parseGeoFromText(location);
-      const latCol = toNum(String(r?.[16] ?? '').replace(',', '.'));
-      const lngCol = toNum(String(r?.[17] ?? '').replace(',', '.'));
-      const lat = isValidGeoPoint(latCol, lngCol) ? latCol : geoMixed.lat;
-      const lng = isValidGeoPoint(latCol, lngCol) ? lngCol : geoMixed.lng;
+      const geoCols = normalizeGeoPair(r?.[16], r?.[17], { preferUz: true });
+      const lat = isLikelyUzGeoPoint(geoCols.lat, geoCols.lng) ? geoCols.lat : geoMixed.lat;
+      const lng = isLikelyUzGeoPoint(geoCols.lat, geoCols.lng) ? geoCols.lng : geoMixed.lng;
       return {
         rowId: `arxiv_${i + 1}`,
         date: toIsoDate(r?.[0]),
@@ -2034,6 +2064,7 @@ function processAll(mainData) {
       const source = String(r[25] || '').trim(); // Z ustun
       const merchNote = String(r[19] || '').trim(); // T ustun = primechaniya
       const aaValue = String(r[26] || '').trim(); // AA ustun
+      const merchantGeo = normalizeGeoPair(r[16], r[17], { preferUz: true });
       allMerchants.push({ id, name, source, merchNote, aaTag: aaValue });
       contacts.push({
         id,
@@ -2041,8 +2072,8 @@ function processAll(mainData) {
         phone:    String(r[3]  || '').trim().replace(/[^+\d]/g,'').slice(0,13),
         contact:  String(r[4]  || '').trim(),
         address:  String(r[14] || '').trim(),
-        lat: toNum(String(r[16] ?? '').replace(',', '.')), // Q
-        lng: toNum(String(r[17] ?? '').replace(',', '.')), // R
+        lat: merchantGeo.lat, // Q/R
+        lng: merchantGeo.lng, // Q/R
         district: pickPreferredDistrict(r[21]),
         source,
         aaTag: aaValue,
@@ -2839,7 +2870,7 @@ body,input,select,button{font-family:var(--sans)}
 [data-filter-boundary="1"]{position:relative}
 .aq-map-wrap{position:relative;overflow:hidden}
 .aq-map-toolbar{position:absolute;top:10px;left:10px;right:10px;z-index:3200;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.aq-map-popup{position:absolute;left:10px;right:10px;bottom:10px;z-index:3200;background:color-mix(in oklab, var(--s1) 92%, transparent);border:1px solid var(--b1);border-radius:10px;padding:8px 10px;backdrop-filter:blur(8px)}
+.aq-map-popup{position:absolute;left:10px;right:10px;bottom:10px;z-index:3200;background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:8px 10px;backdrop-filter:blur(8px)}
 .aq-map-pin{background:transparent!important;border:none!important}
 .aq-map-pin span{display:block;width:18px;height:18px;border-radius:11px 11px 11px 2px;transform:rotate(-45deg);background:linear-gradient(180deg,#38bdf8 0%,#0284c7 100%);border:2px solid #dff6ff;box-shadow:0 6px 16px rgba(2,132,199,.45)}
 .aq-map-pin.on span{background:linear-gradient(180deg,#4ade80 0%,#16a34a 100%);border-color:#dcfce7;box-shadow:0 6px 16px rgba(22,163,74,.42)}
@@ -3854,7 +3885,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   }, [segmentCustomers,search,sort,adv,segment,customerFilterColumns,uFilterState]);
   const mapPoints = useMemo(
     () => list
-      .filter((c) => isValidGeoPoint(c?.lat, c?.lng))
+      .filter((c) => isLikelyUzGeoPoint(c?.lat, c?.lng))
       .map((c) => ({
         id: String(c.id || ''),
         lat: Number(c.lat),
@@ -4413,9 +4444,11 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
     () => list
       .map((g) => {
         const c = customerById[String(g.mId || '').trim()];
-        const lat = isValidGeoPoint(g.lat, g.lng) ? Number(g.lat) : Number(c?.lat || 0);
-        const lng = isValidGeoPoint(g.lat, g.lng) ? Number(g.lng) : Number(c?.lng || 0);
-        if (!isValidGeoPoint(lat, lng)) return null;
+        const gGeo = normalizeGeoPair(g.lat, g.lng, { preferUz: true });
+        const cGeo = normalizeGeoPair(c?.lat, c?.lng, { preferUz: true });
+        const lat = isLikelyUzGeoPoint(gGeo.lat, gGeo.lng) ? Number(gGeo.lat) : Number(cGeo.lat || 0);
+        const lng = isLikelyUzGeoPoint(gGeo.lat, gGeo.lng) ? Number(gGeo.lng) : Number(cGeo.lng || 0);
+        if (!isLikelyUzGeoPoint(lat, lng)) return null;
         return {
           id: String(g.soNum || ''),
           lat,
@@ -4572,27 +4605,27 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
           </div>
         </div>
       ) : (
-        <div style={{display:'grid',gap:10,flex:1,minHeight:0}}>
-          <div className="card" style={{padding:'9px 12px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <span style={{fontSize:12,color:'var(--t2)'}}>Xaritadagi nuqtalar: {mapPoints.length} ta</span>
-            <span style={{fontSize:11,color:'var(--t3)'}}>{dataMode === 'real' ? 'Arxiv lokatsiyalari (Q/R)' : "Mijoz lokatsiyalari"}</span>
+        <div className="card aq-map-wrap" style={{padding:8,overflow:'hidden',flex:1,minHeight:0}}>
+          <div className="aq-map-toolbar" style={{right:'auto',maxWidth:520}}>
+            <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Nuqta: {mapPoints.length} ta</span>
+            <span className="tag" style={{background:'var(--s2)',color:'var(--t3)'}}>
+              {dataMode === 'real' ? 'Real arxiv lokatsiyasi' : 'Mijoz lokatsiyasi'}
+            </span>
           </div>
-          <div className="card" style={{padding:8,overflow:'hidden'}}>
+          <div style={{height:'100%'}}>
             <GeoMapPanel
               points={mapPoints}
               selectedId={mapSelected?.soNum || ''}
               onPick={(p) => setMapSelected(p?.row || null)}
-              height={460}
+              height={Math.max(560, (typeof window !== 'undefined' ? window.innerHeight : 900) - 250)}
             />
           </div>
-          <div className="card" style={{padding:12}}>
-            {!mapSelected ? (
-              <div style={{fontSize:12,color:'var(--t3)'}}>Marker ustiga bossangiz, zakaz ma'lumoti shu yerda chiqadi.</div>
-            ) : (
+          {mapSelected && (
+            <div className="aq-map-popup">
               <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}>
                 <div style={{minWidth:260}}>
                   <div style={{fontWeight:700}}>{mapSelected.contName}</div>
-                  <div style={{fontSize:11,color:'var(--t3)'}}>Zakaz: {mapSelected.soNum} | {fmtD(mapSelected.orderDate)} | {mapSelected.delivPerson || '-'}</div>
+                  <div style={{fontSize:11,color:'var(--t3)'}}>Sana: {fmtD(mapSelected.orderDate)} | Dostavchik: {mapSelected.delivPerson || '-'}</div>
                   <div style={{fontSize:11,color:'var(--t3)'}}>Miqdor: {fmt(mapSelected.totalQty)} ta | Lokatsiya: {mapSelected.location || '-'}</div>
                 </div>
                 <div style={{display:'flex',gap:8}}>
@@ -4607,10 +4640,11 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
                   >
                     Sverka
                   </button>
+                  <button className="btn btn-gh btn-sm" onClick={() => setMapSelected(null)}>Yopish</button>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -8766,7 +8800,7 @@ const NAV = [
   { id:'dash',    label:'Dashboard',  icon:E.home },
   { id:'cust',    label:'Mijozlar',   icon:E.users, badge:'d' },
   { id:'orders',  label:'Zakazlar',   icon:E.order },
-  { id:'left_orders', label:'Qolib ketgan zakazlar', icon:'?' },
+  { id:'left_orders', label:'Qolib ketgan zakazlar', icon:'\u23F3' },
   { id:'kassa',   label:'Kassa',      icon:E.pay },
   { id:'obzvon',  label:'Obzvon',     icon:E.phone, badge:'o' },
   { id:'doljniki',label:'Doljniki',   icon:E.doc, badge:'dz' },
