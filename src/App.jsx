@@ -148,6 +148,7 @@ const LEFTOVER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1n73ggQbkdpKj
 const LEFTOVER_SHEET_ID = '1n73ggQbkdpKj0gPJQAhlppUHmPTzfuAXjhHPrAJHgmo';
 const LEFTOVER_REASON_GID = '971866254'; // Qolib_ketgan_zakazlar_Arxiv
 const LEFTOVER_ARCHIVE_GID = '1642247768'; // Arxiv
+const LEFTOVER_EMPLOYEES_GID = '1637417945'; // XODIMLAR
 
 /* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў HELPERS Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const fmt  = (n) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
@@ -487,7 +488,7 @@ function UniversalFilterPanel({
   return (
     <>
       <div
-        style={{position:'fixed',inset:0,zIndex:79,background:'transparent',touchAction:'none'}}
+        style={{position:'fixed',inset:0,zIndex:3999,background:'transparent',touchAction:'none'}}
         onClick={onClose}
         onMouseDown={onClose}
         onTouchStart={onClose}
@@ -500,7 +501,7 @@ function UniversalFilterPanel({
           position:'absolute',
           top:40,
           ...(placement.side === 'left' ? { right:0, left:'auto' } : { left:0, right:'auto' }),
-          zIndex:80,
+          zIndex:4000,
           width:placement.panelWidth,
           maxWidth:'calc(100vw - 16px)',
           padding:12,
@@ -949,6 +950,20 @@ const getLeftoverCompareDate = (baseDate = new Date(), rolloverHour = LEFTOVER_R
   d.setDate(d.getDate() - backDays);
   return toIsoDate(d);
 };
+const parseGeoFromText = (value = '') => {
+  const text = String(value || '').trim();
+  if (!text) return { lat: 0, lng: 0 };
+  const normalized = text.replace(/[;|]/g, ',');
+  const nums = normalized.match(/-?\d+(?:[.,]\d+)?/g) || [];
+  if (nums.length < 2) return { lat: 0, lng: 0 };
+  const a = Number(String(nums[0]).replace(',', '.'));
+  const b = Number(String(nums[1]).replace(',', '.'));
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return { lat: 0, lng: 0 };
+  // K ustunda ko'pincha "long,lat" yoki "lat,long" aralash keladi; diapazon bo'yicha tekshiramiz.
+  if (Math.abs(a) <= 90 && Math.abs(b) <= 180) return { lat: a, lng: b };
+  if (Math.abs(b) <= 90 && Math.abs(a) <= 180) return { lat: b, lng: a };
+  return { lat: 0, lng: 0 };
+};
 const parseLeftoverReasonRows = (rawRows = []) => (
   (rawRows || [])
     .slice(1)
@@ -967,26 +982,45 @@ const parseLeftoverReasonRows = (rawRows = []) => (
 const parseLeftoverArchiveRows = (rawRows = []) => (
   (rawRows || [])
     .slice(1)
-    .map((r, i) => ({
-      rowId: `arxiv_${i + 1}`,
-      date: toIsoDate(r?.[0]),
-      customerId: normalizeIdKey(r?.[2]),
-      customer: String(r?.[3] || '').trim(),
-      productGiven: String(r?.[4] || '').trim(),
-      qtyGiven: Math.abs(toNum(r?.[5])),
-      productTaken: String(r?.[6] || '').trim(),
-      qtyTaken: Math.abs(toNum(r?.[7])),
-      payType: String(r?.[8] || '').trim(),
-      payAmount: toNum(r?.[9]),
-      location: String(r?.[10] || '').trim(),
-      enteredAt: String(r?.[11] || '').trim(),
-      note: String(r?.[12] || '').trim(),
-      driver: String(r?.[13] || '').trim(),
-      uid: String(r?.[14] || '').trim(),
-      lat: toNum(String(r?.[16] ?? '').replace(',', '.')),
-      lng: toNum(String(r?.[17] ?? '').replace(',', '.')),
-    }))
+    .map((r, i) => {
+      const location = String(r?.[10] || '').trim();
+      const geoMixed = parseGeoFromText(location);
+      const latCol = toNum(String(r?.[16] ?? '').replace(',', '.'));
+      const lngCol = toNum(String(r?.[17] ?? '').replace(',', '.'));
+      const lat = isValidGeoPoint(latCol, lngCol) ? latCol : geoMixed.lat;
+      const lng = isValidGeoPoint(latCol, lngCol) ? lngCol : geoMixed.lng;
+      return {
+        rowId: `arxiv_${i + 1}`,
+        date: toIsoDate(r?.[0]),
+        customerId: normalizeIdKey(r?.[2]),
+        customer: String(r?.[3] || '').trim(),
+        productGiven: String(r?.[4] || '').trim(),
+        qtyGiven: Math.abs(toNum(r?.[5])),
+        productTaken: String(r?.[6] || '').trim(),
+        qtyTaken: Math.abs(toNum(r?.[7])),
+        payType: String(r?.[8] || '').trim(),
+        payAmount: toNum(r?.[9]),
+        location,
+        enteredAt: String(r?.[11] || '').trim(),
+        note: String(r?.[12] || '').trim(),
+        driver: String(r?.[13] || '').trim(),
+        uid: String(r?.[14] || '').trim(),
+        lat,
+        lng,
+      };
+    })
     .filter((r) => r.date || r.customerId || r.uid || r.qtyGiven || r.productGiven)
+);
+const parseLeftoverEmployeesRows = (rawRows = []) => (
+  (rawRows || [])
+    .slice(1)
+    .map((r) => ({
+      id: normalizeIdKey(r?.[0]),
+      email: String(r?.[1] || '').trim().toLowerCase(),
+      name: String(r?.[2] || '').trim(),
+      role: String(r?.[3] || '').trim(),
+    }))
+    .filter((x) => x.id || x.email || x.name)
 );
 const LEFTOVER_WATER_PRODUCT_KEY = 'suv';
 const LEFTOVER_WATER_LABEL = 'Suv';
@@ -1433,6 +1467,8 @@ const LEAFLET_CSS_ID = 'aq-leaflet-css';
 const LEAFLET_JS_ID = 'aq-leaflet-js';
 const LEAFLET_CSS_HREF = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
 const LEAFLET_JS_SRC = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+const YANDEX_TILE_URL = 'https://core-renderer-tiles.maps.yandex.net/tiles?l=map&x={x}&y={y}&z={z}&lang=ru_RU';
+const OSM_TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 let leafletLoadPromise = null;
 const ensureLeafletLoaded = () => {
   if (typeof window === 'undefined') return Promise.reject(new Error('window not available'));
@@ -1485,10 +1521,22 @@ function GeoMapPanel({ points = [], selectedId = '', onPick = () => {}, height =
         if (cancelled || !hostRef.current) return;
         if (!mapRef.current) {
           const map = L.map(hostRef.current, { zoomControl: true, attributionControl: true });
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          const yandexLayer = L.tileLayer(YANDEX_TILE_URL, {
             maxZoom: 19,
-            attribution: '&copy; OpenStreetMap',
-          }).addTo(map);
+            attribution: '&copy; Yandex Maps',
+          });
+          let fallbackAdded = false;
+          let yandexErrCount = 0;
+          yandexLayer.on('tileerror', () => {
+            yandexErrCount += 1;
+            if (fallbackAdded || yandexErrCount < 8) return;
+            fallbackAdded = true;
+            L.tileLayer(OSM_TILE_URL, {
+              maxZoom: 19,
+              attribution: '&copy; OpenStreetMap',
+            }).addTo(map);
+          });
+          yandexLayer.addTo(map);
           mapRef.current = map;
           layerRef.current = L.layerGroup().addTo(map);
         }
@@ -1500,12 +1548,14 @@ function GeoMapPanel({ points = [], selectedId = '', onPick = () => {}, height =
         const valid = (points || []).filter((p) => isValidGeoPoint(p?.lat, p?.lng));
         valid.forEach((p) => {
           const isSel = String(p?.id || '') === String(selectedId || '');
-          const marker = L.circleMarker([Number(p.lat), Number(p.lng)], {
-            radius: isSel ? 9 : 7,
-            weight: 2,
-            color: isSel ? '#38bdf8' : '#67e8f9',
-            fillColor: isSel ? '#0ea5e9' : '#0284c7',
-            fillOpacity: 0.9,
+          const marker = L.marker([Number(p.lat), Number(p.lng)], {
+            icon: L.divIcon({
+              className: `aq-map-pin${isSel ? ' on' : ''}`,
+              html: '<span></span>',
+              iconSize: [22, 22],
+              iconAnchor: [11, 22],
+              tooltipAnchor: [0, -18],
+            }),
           });
           marker.on('click', () => onPickRef.current?.(p));
           marker.bindTooltip(String(p?.label || '').trim() || 'Mijoz', { direction: 'top' });
@@ -2786,6 +2836,14 @@ body,input,select,button{font-family:var(--sans)}
 .tab:focus-visible{outline:2px solid var(--bl);outline-offset:1px}
 .tab.on{background:var(--s1);color:var(--t1);box-shadow:0 1px 4px rgba(0,0,0,.4)}
 .tab:active{transform:translateY(1px)}
+[data-filter-boundary="1"]{position:relative}
+.aq-map-wrap{position:relative;overflow:hidden}
+.aq-map-toolbar{position:absolute;top:10px;left:10px;right:10px;z-index:3200;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.aq-map-popup{position:absolute;left:10px;right:10px;bottom:10px;z-index:3200;background:color-mix(in oklab, var(--s1) 92%, transparent);border:1px solid var(--b1);border-radius:10px;padding:8px 10px;backdrop-filter:blur(8px)}
+.aq-map-pin{background:transparent!important;border:none!important}
+.aq-map-pin span{display:block;width:18px;height:18px;border-radius:11px 11px 11px 2px;transform:rotate(-45deg);background:linear-gradient(180deg,#38bdf8 0%,#0284c7 100%);border:2px solid #dff6ff;box-shadow:0 6px 16px rgba(2,132,199,.45)}
+.aq-map-pin.on span{background:linear-gradient(180deg,#4ade80 0%,#16a34a 100%);border-color:#dcfce7;box-shadow:0 6px 16px rgba(22,163,74,.42)}
+.leaflet-pane,.leaflet-top,.leaflet-bottom{z-index:1200}
 .nav-i{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--r);cursor:pointer;color:var(--t2);font-size:13px;font-weight:500;transition:all .13s;user-select:none;position:relative}
 .nav-i:hover{background:var(--s2);color:var(--t1)}
 .nav-i.on{background:var(--bl2);color:var(--bl)}
@@ -3840,92 +3898,98 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
           <button key={t.id} className={`tab${segment===t.id?' on':''}`} onClick={()=>setSegment(t.id)}>{t.label}</button>
         ))}
       </div>
-      <div className="g4">
-        <StatCard l="JAMI MIJOZLAR" v={segmentCustomers.length} s={segmentCustomers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
-        <StatCard l="QARZDORLAR" v={debt.uzsCount+' ta'} s={fmt(debt.uzsSum)+" so'm"} c="var(--rd)"/>
-        <StatCard l="JAMI IDISH" v={segmentCustomers.reduce((s,c)=>s+c.tara,0)+' ta'} s="barcha mijozlarda" c="var(--pu)"/>
-        <StatCard l="FILTRLANGAN" v={list.length+' ta'} c="var(--gr)"/>
-      </div>
-      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',position:'relative'}}>
-        <div className="sb" style={{flex:'0 1 360px',minWidth:180}}>
-          <span style={{color:'var(--t3)'}}>{E.find}</span>
-          <input placeholder="Ism, telefon, ID bo'yicha..." value={search} onChange={(e)=>setS(e.target.value)}/>
+      {viewMode === 'list' && (
+        <div className="g4">
+          <StatCard l="JAMI MIJOZLAR" v={segmentCustomers.length} s={segmentCustomers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
+          <StatCard l="QARZDORLAR" v={debt.uzsCount+' ta'} s={fmt(debt.uzsSum)+" so'm"} c="var(--rd)"/>
+          <StatCard l="JAMI IDISH" v={segmentCustomers.reduce((s,c)=>s+c.tara,0)+' ta'} s="barcha mijozlarda" c="var(--pu)"/>
+          <StatCard l="FILTRLANGAN" v={list.length+' ta'} c="var(--gr)"/>
         </div>
-        <div className="tabs" style={{display:'inline-flex'}}>
-          <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
-          <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
-        </div>
-        <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
-          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-          </svg>
-          Filtr ({universalFilterCount})
-        </button>
-        <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
-        <UniversalFilterPanel
-          open={uFilterOpen}
-          title="Mijozlar filtri"
-          columns={customerFilterColumns}
-          rows={segmentCustomers}
-          state={uFilterState}
-          setState={setUFilterState}
-          onClose={()=>setUFilterOpen(false)}
-          width={620}
-        />
-
-        {showAdv && (
-            <div className="card" style={{position:'absolute',top:40,left:0,right:'auto',zIndex:50,width:'min(520px, calc(100vw - 24px))',padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)',overflow:'hidden'}}>
-            <div className="g2" style={{marginBottom:8}}>
-              <div>
-                <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Rayon</div>
-                <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                  {dists.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.districts.includes(d)} onChange={(e)=>setAdv((p)=>({...p,districts:e.target.checked?[...p.districts,d]:p.districts.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
-                </div>
-              </div>
-              <div>
-                <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Manba</div>
-                <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                  {sources.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.sources.includes(d)} onChange={(e)=>setAdv((p)=>({...p,sources:e.target.checked?[...p.sources,d]:p.sources.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
-                </div>
-              </div>
-              <div>
-                <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Agent</div>
-                <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                  {agents.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.agents.includes(d)} onChange={(e)=>setAdv((p)=>({...p,agents:e.target.checked?[...p.agents,d]:p.agents.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
-                </div>
-              </div>
-              <div style={{display:'grid',gap:6}}>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                  <input className="input" placeholder="Balans UZS dan" value={adv.uzsFrom} onChange={(e)=>setAdv((p)=>({...p,uzsFrom:e.target.value}))}/>
-                  <input className="input" placeholder="Balans UZS gacha" value={adv.uzsTo} onChange={(e)=>setAdv((p)=>({...p,uzsTo:e.target.value}))}/>
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                  <input className="input" placeholder="Balans USD dan" value={adv.usdFrom} onChange={(e)=>setAdv((p)=>({...p,usdFrom:e.target.value}))}/>
-                  <input className="input" placeholder="Balans USD gacha" value={adv.usdTo} onChange={(e)=>setAdv((p)=>({...p,usdTo:e.target.value}))}/>
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                  <input className="input" placeholder="Idish dan" value={adv.taraFrom} onChange={(e)=>setAdv((p)=>({...p,taraFrom:e.target.value}))}/>
-                  <input className="input" placeholder="Idish gacha" value={adv.taraTo} onChange={(e)=>setAdv((p)=>({...p,taraTo:e.target.value}))}/>
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                  <input className="input" placeholder="Kun dan" value={adv.daysFrom} onChange={(e)=>setAdv((p)=>({...p,daysFrom:e.target.value}))}/>
-                  <input className="input" placeholder="Kun gacha" value={adv.daysTo} onChange={(e)=>setAdv((p)=>({...p,daysTo:e.target.value}))}/>
-                </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                  <ModernDateInput value={adv.lastFrom} onChange={(e)=>setAdv((p)=>({...p,lastFrom:e.target.value}))} />
-                  <ModernDateInput value={adv.lastTo} onChange={(e)=>setAdv((p)=>({...p,lastTo:e.target.value}))} />
-                </div>
-              </div>
-            </div>
-            <div style={{display:'flex',justifyContent:'space-between'}}>
-              <button className="btn btn-gh btn-sm" onClick={()=>setAdv({ districts:[], sources:[], agents:[], uzsFrom:'', uzsTo:'', usdFrom:'', usdTo:'', taraFrom:'', taraTo:'', daysFrom:'', daysTo:'', lastFrom:'', lastTo:'' })}>
-                Tozalash
-              </button>
-              <button className="btn btn-bl btn-sm" onClick={()=>setShowAdv(false)}>Qo'llash</button>
-            </div>
+      )}
+      {viewMode === 'list' && (
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',position:'relative',zIndex:10}}>
+          <div className="sb" style={{flex:'0 1 360px',minWidth:180}}>
+            <span style={{color:'var(--t3)'}}>{E.find}</span>
+            <input placeholder="Ism, telefon, ID bo'yicha..." value={search} onChange={(e)=>setS(e.target.value)}/>
           </div>
-        )}
-      </div>
+          <div className="tabs" style={{display:'inline-flex'}}>
+            <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
+            <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
+          </div>
+          <div style={{position:'relative'}}>
+            <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+              </svg>
+              Filtr ({universalFilterCount})
+            </button>
+            <UniversalFilterPanel
+              open={uFilterOpen}
+              title="Mijozlar filtri"
+              columns={customerFilterColumns}
+              rows={segmentCustomers}
+              state={uFilterState}
+              setState={setUFilterState}
+              onClose={()=>setUFilterOpen(false)}
+              width={620}
+            />
+          </div>
+          <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
+
+          {showAdv && (
+              <div className="card" style={{position:'absolute',top:40,left:0,right:'auto',zIndex:50,width:'min(520px, calc(100vw - 24px))',padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)',overflow:'hidden'}}>
+              <div className="g2" style={{marginBottom:8}}>
+                <div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Rayon</div>
+                  <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
+                    {dists.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.districts.includes(d)} onChange={(e)=>setAdv((p)=>({...p,districts:e.target.checked?[...p.districts,d]:p.districts.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Manba</div>
+                  <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
+                    {sources.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.sources.includes(d)} onChange={(e)=>setAdv((p)=>({...p,sources:e.target.checked?[...p.sources,d]:p.sources.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Agent</div>
+                  <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
+                    {agents.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.agents.includes(d)} onChange={(e)=>setAdv((p)=>({...p,agents:e.target.checked?[...p.agents,d]:p.agents.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
+                  </div>
+                </div>
+                <div style={{display:'grid',gap:6}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    <input className="input" placeholder="Balans UZS dan" value={adv.uzsFrom} onChange={(e)=>setAdv((p)=>({...p,uzsFrom:e.target.value}))}/>
+                    <input className="input" placeholder="Balans UZS gacha" value={adv.uzsTo} onChange={(e)=>setAdv((p)=>({...p,uzsTo:e.target.value}))}/>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    <input className="input" placeholder="Balans USD dan" value={adv.usdFrom} onChange={(e)=>setAdv((p)=>({...p,usdFrom:e.target.value}))}/>
+                    <input className="input" placeholder="Balans USD gacha" value={adv.usdTo} onChange={(e)=>setAdv((p)=>({...p,usdTo:e.target.value}))}/>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    <input className="input" placeholder="Idish dan" value={adv.taraFrom} onChange={(e)=>setAdv((p)=>({...p,taraFrom:e.target.value}))}/>
+                    <input className="input" placeholder="Idish gacha" value={adv.taraTo} onChange={(e)=>setAdv((p)=>({...p,taraTo:e.target.value}))}/>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    <input className="input" placeholder="Kun dan" value={adv.daysFrom} onChange={(e)=>setAdv((p)=>({...p,daysFrom:e.target.value}))}/>
+                    <input className="input" placeholder="Kun gacha" value={adv.daysTo} onChange={(e)=>setAdv((p)=>({...p,daysTo:e.target.value}))}/>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    <ModernDateInput value={adv.lastFrom} onChange={(e)=>setAdv((p)=>({...p,lastFrom:e.target.value}))} />
+                    <ModernDateInput value={adv.lastTo} onChange={(e)=>setAdv((p)=>({...p,lastTo:e.target.value}))} />
+                  </div>
+                </div>
+              </div>
+              <div style={{display:'flex',justifyContent:'space-between'}}>
+                <button className="btn btn-gh btn-sm" onClick={()=>setAdv({ districts:[], sources:[], agents:[], uzsFrom:'', uzsTo:'', usdFrom:'', usdTo:'', taraFrom:'', taraTo:'', daysFrom:'', daysTo:'', lastFrom:'', lastTo:'' })}>
+                  Tozalash
+                </button>
+                <button className="btn btn-bl btn-sm" onClick={()=>setShowAdv(false)}>Qo'llash</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       {viewMode === 'list' ? (
         <div className="card" style={{overflow:'hidden',flex:1}}>
           <div style={{overflow:'auto',maxHeight:'100%'}}>
@@ -3974,35 +4038,58 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
           </div>
         </div>
       ) : (
-        <div style={{display:'grid',gap:10,flex:1,minHeight:0}}>
-          <div className="card" style={{padding:'9px 12px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <span style={{fontSize:12,color:'var(--t2)'}}>Xaritadagi mijozlar: {mapPoints.length} ta</span>
-            <span style={{fontSize:11,color:'var(--t3)'}}>Qidiruv va filtrlar xaritaga ham ta'sir qiladi</span>
+        <div className="card aq-map-wrap" style={{flex:1,minHeight:0,padding:8}}>
+          <GeoMapPanel
+            points={mapPoints}
+            selectedId={mapSelected?.id || ''}
+            onPick={(p) => setMapSelected(p?.row || null)}
+            height={Math.max(520, (typeof window !== 'undefined' ? window.innerHeight : 900) - 210)}
+          />
+          <div className="aq-map-toolbar">
+            <div className="sb" style={{flex:'1 1 320px',minWidth:220,maxWidth:420}}>
+              <span style={{color:'var(--t3)'}}>{E.find}</span>
+              <input placeholder="Ism, telefon, ID bo'yicha..." value={search} onChange={(e)=>setS(e.target.value)}/>
+            </div>
+            <div className="tabs" style={{display:'inline-flex'}}>
+              <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
+              <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
+            </div>
+            <div style={{position:'relative'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                </svg>
+                Filtr ({universalFilterCount})
+              </button>
+              <UniversalFilterPanel
+                open={uFilterOpen}
+                title="Mijozlar filtri"
+                columns={customerFilterColumns}
+                rows={segmentCustomers}
+                state={uFilterState}
+                setState={setUFilterState}
+                onClose={()=>setUFilterOpen(false)}
+                width={620}
+              />
+            </div>
+            <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
+            <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Xaritada: {mapPoints.length} ta</span>
           </div>
-          <div className="card" style={{padding:8,overflow:'hidden'}}>
-            <GeoMapPanel
-              points={mapPoints}
-              selectedId={mapSelected?.id || ''}
-              onPick={(p) => setMapSelected(p?.row || null)}
-              height={Math.max(360, window.innerHeight - 360)}
-            />
-          </div>
-          <div className="card" style={{padding:12}}>
-            {!mapSelected ? (
-              <div style={{fontSize:12,color:'var(--t3)'}}>Marker ustiga bossangiz, mijoz ma'lumoti shu yerda chiqadi.</div>
-            ) : (
-              <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+          {mapSelected && (
+            <div className="aq-map-popup">
+              <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center',flexWrap:'wrap'}}>
                 <div style={{minWidth:260}}>
-                  <div style={{fontWeight:700}}>{mapSelected.name}</div>
+                  <div style={{fontWeight:700,fontSize:13}}>{mapSelected.name}</div>
                   <div style={{fontSize:11,color:'var(--t3)'}}>ID: {mapSelected.id} | {mapSelected.phone || '-'} | {mapSelected.district || '-'}</div>
-                  <div style={{fontSize:11,color:'var(--t3)'}}>{mapSelected.address || '-'}</div>
+                  <div style={{fontSize:11,color:'var(--t3)',maxWidth:740,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mapSelected.address || '-'}</div>
                 </div>
                 <div style={{display:'flex',gap:8}}>
                   <button className="btn btn-bl btn-sm" onClick={() => setDet(mapSelected)}>Sverka</button>
+                  <button className="btn btn-gh btn-sm" onClick={() => setMapSelected(null)}>Yopish</button>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
       {det && <CustomerDetail c={det} D={D} onClose={()=>setDet(null)}/>}
@@ -4070,7 +4157,7 @@ function SoDetailModal({ soGroup, onClose }) {
 }
 
 /* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў ZAKAZLAR Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
-function Orders({ D, rawArchiveSheetRows = [] }) {
+function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
   const { rawOrders = [], customers = [] } = D;
   const [dataMode, setDataMode] = useState('system');
   const [viewMode, setViewMode] = useState('list');
@@ -4101,6 +4188,35 @@ function Orders({ D, rawArchiveSheetRows = [] }) {
     (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c; });
     return m;
   }, [customers]);
+  const employeeRows = useMemo(
+    () => parseLeftoverEmployeesRows(rawEmployeeSheetRows || []),
+    [rawEmployeeSheetRows]
+  );
+  const employeeNameById = useMemo(() => {
+    const m = {};
+    (employeeRows || []).forEach((r) => {
+      const id = normId(r.id);
+      if (id && r.name && !m[id]) m[id] = r.name;
+    });
+    return m;
+  }, [employeeRows]);
+  const employeeNameByEmail = useMemo(() => {
+    const m = {};
+    (employeeRows || []).forEach((r) => {
+      const email = String(r.email || '').trim().toLowerCase();
+      if (email && r.name && !m[email]) m[email] = r.name;
+    });
+    return m;
+  }, [employeeRows]);
+  const resolveDriverName = useCallback((rawDriver) => {
+    const raw = String(rawDriver || '').trim();
+    if (!raw) return '-';
+    const id = normId(raw);
+    if (id && employeeNameById[id]) return employeeNameById[id];
+    const email = raw.toLowerCase();
+    if (email && employeeNameByEmail[email]) return employeeNameByEmail[email];
+    return raw;
+  }, [employeeNameById, employeeNameByEmail]);
   const customerIdSet = useMemo(
     () => new Set((customers || []).map((c) => String(c.id || '').trim()).filter(Boolean)),
     [customers]
@@ -4142,51 +4258,80 @@ function Orders({ D, rawArchiveSheetRows = [] }) {
 
   const realGroups = useMemo(() => {
     const rows = parseLeftoverArchiveRows(rawArchiveSheetRows || []);
-    return rows
-      .filter((r) => customerIdSet.has(String(r.customerId || '').trim()))
-      .map((r, i) => {
-        const cid = String(r.customerId || '').trim();
-        const c = customerById[cid];
-        const qtyGiven = Math.abs(toNum(r.qtyGiven));
-        const qtyTaken = Math.abs(toNum(r.qtyTaken));
-        const isReturn = qtyTaken > 0.0001 && qtyGiven <= 0.0001;
-        const qty = isReturn ? qtyTaken : qtyGiven;
-        const product = (isReturn ? r.productTaken : r.productGiven) || r.productGiven || r.productTaken || '-';
-        const soNum = String(r.uid || '').trim() || `ARX-${r.date || 'nodate'}-${cid || 'nocid'}-${i + 1}`;
+    const groups = new Map();
+    const upsert = (r, type, qty, product) => {
+      const cid = String(r.customerId || '').trim();
+      const c = customerById[cid];
+      const dateKey = toIsoDate(r.date || r.enteredAt || '');
+      const key = `${dateKey || 'nodate'}__${cid}__${type}`;
+      const driverName = resolveDriverName(r.driver);
+      if (!groups.has(key)) {
         const lat = isValidGeoPoint(r.lat, r.lng) ? Number(r.lat) : Number(c?.lat || 0);
         const lng = isValidGeoPoint(r.lat, r.lng) ? Number(r.lng) : Number(c?.lng || 0);
-        return {
-          soNum,
+        groups.set(key, {
+          soNum: `ARX-${dateKey || 'nodate'}-${cid || 'nocid'}-${type}`,
           contName: String(r.customer || c?.name || `ID ${cid}`),
           mId: cid,
           district: c?.district || '',
-          orderDate: r.date || r.enteredAt || '',
-          delivPerson: r.driver || '-',
-          agent: r.driver || '-',
-          docType: isReturn ? 'Возврат' : 'Заказ',
+          orderDate: dateKey || r.enteredAt || '',
+          delivPerson: driverName || '-',
+          agent: driverName || '-',
+          docType: type === 'return' ? 'Возврат' : 'Заказ',
           status: 'Arxiv',
           currency: 'UZS',
-          items: [{
-            product,
-            qty: qty || 0,
-            sum: Math.abs(toNum(r.payAmount)),
-            price: qty > 0 ? Math.abs(toNum(r.payAmount)) / qty : 0,
-            currency: 'UZS',
-          }],
-          totalQty: qty || 0,
-          totalSumUZS: Math.abs(toNum(r.payAmount)),
+          items: [],
+          totalQty: 0,
+          totalSumUZS: 0,
           totalSumUSD: 0,
-          location: r.location || '',
+          location: String(r.location || '').trim(),
           lat,
           lng,
-        };
-      })
-      .sort((a, b) => {
-        const da = toDate(a.orderDate);
-        const db = toDate(b.orderDate);
-        return da && db ? (db - da) : 0;
+          _enteredAt: String(r.enteredAt || '').trim(),
+        });
+      }
+      const g = groups.get(key);
+      const lineQty = Math.abs(toNum(qty));
+      if (!lineQty) return;
+      const pay = Math.abs(toNum(r.payAmount));
+      g.items.push({
+        product: String(product || '-').trim() || '-',
+        qty: lineQty,
+        sum: pay,
+        price: lineQty > 0 ? pay / lineQty : 0,
+        currency: 'UZS',
       });
-  }, [rawArchiveSheetRows, customerIdSet, customerById]);
+      g.totalQty += lineQty;
+      if (type === 'order') g.totalSumUZS += pay;
+      if (!g.location && r.location) g.location = String(r.location || '').trim();
+      if (!isValidGeoPoint(g.lat, g.lng) && isValidGeoPoint(r.lat, r.lng)) {
+        g.lat = Number(r.lat);
+        g.lng = Number(r.lng);
+      }
+      if (!g.delivPerson || g.delivPerson === '-') {
+        g.delivPerson = driverName || '-';
+        g.agent = driverName || '-';
+      }
+    };
+    rows
+      .filter((r) => customerIdSet.has(String(r.customerId || '').trim()))
+      .forEach((r) => {
+        const qtyGiven = Math.abs(toNum(r.qtyGiven));
+        const qtyTaken = Math.abs(toNum(r.qtyTaken));
+        if (qtyGiven > 0.0001) upsert(r, 'order', qtyGiven, r.productGiven || r.productTaken || '-');
+        if (qtyTaken > 0.0001) upsert(r, 'return', qtyTaken, r.productTaken || r.productGiven || '-');
+      });
+    return Array.from(groups.values())
+      .sort((a, b) => {
+        const da = toDate(a.orderDate || a._enteredAt);
+        const db = toDate(b.orderDate || b._enteredAt);
+        if (da && db) return db - da;
+        return String(b.orderDate || '').localeCompare(String(a.orderDate || ''));
+      })
+      .map((g) => {
+        const { _enteredAt, ...row } = g;
+        return row;
+      });
+  }, [rawArchiveSheetRows, customerIdSet, customerById, resolveDriverName]);
 
   const activePool = dataMode === 'real' ? realGroups : soGroups;
   const allZakaz = activePool.filter((g) => isOrderDoc(g.docType));
@@ -4229,7 +4374,12 @@ function Orders({ D, rawArchiveSheetRows = [] }) {
   const list = useMemo(() => {
     let r = base;
     const q = search.toLowerCase();
-    if (q) r = r.filter((g) => (g.contName || '').toLowerCase().includes(q) || (g.soNum || '').toLowerCase().includes(q));
+    if (q) r = r.filter((g) =>
+      (g.contName || '').toLowerCase().includes(q) ||
+      (g.soNum || '').toLowerCase().includes(q) ||
+      String(g.mId || '').toLowerCase().includes(q) ||
+      String(g.delivPerson || '').toLowerCase().includes(q)
+    );
     if (fAgents.length) r = r.filter((g) => fAgents.includes(g.agent || ''));
     if (fStatuses.length) r = r.filter((g) => fStatuses.includes(g.status || ''));
     if (fCurrencies.length) r = r.filter((g) => fCurrencies.includes(g.currency || 'UZS'));
@@ -4356,33 +4506,65 @@ function Orders({ D, rawArchiveSheetRows = [] }) {
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>Zakaz No</th><th>Kontragent</th><th>Rayon</th><th>Sana</th>
-                  <th>Dostavchik</th><th style={{textAlign:'center'}}>Dona</th>
-                  <th style={{textAlign:'right'}}>Summa UZS</th>
-                  <th style={{textAlign:'right'}}>Summa USD</th>
-                  <th style={{textAlign:'center'}}>Mahsulotlar</th>
-                  <th>Tur</th><th>Agent</th><th>Status</th>
+                  <th>No</th>
+                  {dataMode === 'real' ? (
+                    <>
+                      <th>Mijoz ID</th><th>Kontragent</th><th>Sana</th>
+                      <th>Dostavchik</th><th style={{textAlign:'center'}}>Dona</th>
+                      <th style={{textAlign:'right'}}>Summa UZS</th>
+                      <th style={{textAlign:'center'}}>Mahsulotlar</th>
+                      <th>Tur</th><th>Status</th>
+                    </>
+                  ) : (
+                    <>
+                      <th>Zakaz No</th><th>Kontragent</th><th>Rayon</th><th>Sana</th>
+                      <th>Dostavchik</th><th style={{textAlign:'center'}}>Dona</th>
+                      <th style={{textAlign:'right'}}>Summa UZS</th>
+                      <th style={{textAlign:'right'}}>Summa USD</th>
+                      <th style={{textAlign:'center'}}>Mahsulotlar</th>
+                      <th>Tur</th><th>Agent</th><th>Status</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {list.length===0
-                  ? <tr><td colSpan={12} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
+                  ? <tr><td colSpan={dataMode === 'real' ? 10 : 13} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
                   : list.slice(0,600).map((g,i) => (
                     <tr key={i} onClick={()=>setSelectedSO(g)}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.soNum}</td>
-                      <td style={{maxWidth:180,fontWeight:600}}>
-                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178,fontSize:12}}>{g.contName}</span>
-                      </td>
-                      <td style={{fontSize:11,color:'var(--t3)'}}>{g.district || '-'}</td>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(g.orderDate)}</td>
-                      <td style={{fontSize:11,color:'var(--t2)'}}>{g.delivPerson||'-'}</td>
-                      <td style={{textAlign:'center',fontWeight:700,color:'var(--t1)'}}>{g.totalQty}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:g.totalSumUZS?'var(--gr)':'var(--t4)'}}>{g.totalSumUZS?fmt(g.totalSumUZS):'-'}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:g.totalSumUSD?'var(--yl)':'var(--t4)'}}>{g.totalSumUSD?fmt(g.totalSumUSD)+' $':'-'}</td>
-                      <td style={{textAlign:'center'}}><span className="tag" style={{background:'var(--s3)',color:'var(--t3)',cursor:'pointer'}}>{g.items.length} ta</span></td>
-                      <td><span className="tag" style={{background:isOrderDoc(g.docType)?'var(--bl3)':'var(--or2)',color:isOrderDoc(g.docType)?'var(--bl)':'var(--or)',fontSize:10}}>{g.docType}</span></td>
-                      <td style={{fontSize:12}}>{g.agent||'-'}</td>
-                      <td><span className="tag" style={{background:isDeliveredStatus(g.status)?'var(--gr2)':isCancelledStatus(g.status)?'var(--rd2)':'var(--s3)',color:isDeliveredStatus(g.status)?'var(--gr)':isCancelledStatus(g.status)?'var(--t4)':'var(--t3)',fontSize:10}}>{g.status}</span></td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
+                      {dataMode === 'real' ? (
+                        <>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.mId || '-'}</td>
+                          <td style={{maxWidth:240,fontWeight:600}}>
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:236,fontSize:12}}>{g.contName}</span>
+                          </td>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(g.orderDate)}</td>
+                          <td style={{fontSize:11,color:'var(--t2)'}}>{g.delivPerson||'-'}</td>
+                          <td style={{textAlign:'center',fontWeight:700,color:'var(--t1)'}}>{g.totalQty}</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:g.totalSumUZS?'var(--gr)':'var(--t4)'}}>{g.totalSumUZS?fmt(g.totalSumUZS):'-'}</td>
+                          <td style={{textAlign:'center'}}><span className="tag" style={{background:'var(--s3)',color:'var(--t3)',cursor:'pointer'}}>{g.items.length} ta</span></td>
+                          <td><span className="tag" style={{background:isOrderDoc(g.docType)?'var(--bl3)':'var(--or2)',color:isOrderDoc(g.docType)?'var(--bl)':'var(--or)',fontSize:10}}>{g.docType}</span></td>
+                          <td><span className="tag" style={{background:'var(--s3)',color:'var(--t3)',fontSize:10}}>{g.status}</span></td>
+                        </>
+                      ) : (
+                        <>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.soNum}</td>
+                          <td style={{maxWidth:180,fontWeight:600}}>
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178,fontSize:12}}>{g.contName}</span>
+                          </td>
+                          <td style={{fontSize:11,color:'var(--t3)'}}>{g.district || '-'}</td>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(g.orderDate)}</td>
+                          <td style={{fontSize:11,color:'var(--t2)'}}>{g.delivPerson||'-'}</td>
+                          <td style={{textAlign:'center',fontWeight:700,color:'var(--t1)'}}>{g.totalQty}</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:g.totalSumUZS?'var(--gr)':'var(--t4)'}}>{g.totalSumUZS?fmt(g.totalSumUZS):'-'}</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:g.totalSumUSD?'var(--yl)':'var(--t4)'}}>{g.totalSumUSD?fmt(g.totalSumUSD)+' $':'-'}</td>
+                          <td style={{textAlign:'center'}}><span className="tag" style={{background:'var(--s3)',color:'var(--t3)',cursor:'pointer'}}>{g.items.length} ta</span></td>
+                          <td><span className="tag" style={{background:isOrderDoc(g.docType)?'var(--bl3)':'var(--or2)',color:isOrderDoc(g.docType)?'var(--bl)':'var(--or)',fontSize:10}}>{g.docType}</span></td>
+                          <td style={{fontSize:12}}>{g.agent||'-'}</td>
+                          <td><span className="tag" style={{background:isDeliveredStatus(g.status)?'var(--gr2)':isCancelledStatus(g.status)?'var(--rd2)':'var(--s3)',color:isDeliveredStatus(g.status)?'var(--gr)':isCancelledStatus(g.status)?'var(--t4)':'var(--t3)',fontSize:10}}>{g.status}</span></td>
+                        </>
+                      )}
                     </tr>
                   ))}
               </tbody>
@@ -8601,6 +8783,7 @@ export default function App() {
   const [obzvonAllNewRows,setObzvonAllNewRows] = useState(() => S.get('aq-obzvon-all-new-rows', []));
   const [leftoverReasonSheetRows, setLeftoverReasonSheetRows] = useState([]);
   const [leftoverArchiveSheetRows, setLeftoverArchiveSheetRows] = useState([]);
+  const [leftoverEmployeeSheetRows, setLeftoverEmployeeSheetRows] = useState([]);
   const [leftoverSheetLoading, setLeftoverSheetLoading] = useState(false);
   const [leftoverSheetError, setLeftoverSheetError] = useState('');
   const [leftoverTargetDate, setLeftoverTargetDate] = useState(() => getLeftoverCompareDate(new Date()));
@@ -9082,12 +9265,14 @@ export default function App() {
     setLeftoverSheetLoading(true);
     setLeftoverSheetError('');
     try {
-      const [reasonSheet, archiveSheet] = await Promise.all([
+      const [reasonSheet, archiveSheet, employeeSheet] = await Promise.all([
         loadOne(LEFTOVER_REASON_GID, 'Qolib_ketgan_zakazlar_Arxiv', 'Qolib_ketgan_zakazlar_Arxiv'),
         loadOne(LEFTOVER_ARCHIVE_GID, 'Arxiv', 'Arxiv'),
+        loadOne(LEFTOVER_EMPLOYEES_GID, 'XODIMLAR', 'XODIMLAR').catch(() => []),
       ]);
       setLeftoverReasonSheetRows(Array.isArray(reasonSheet) ? reasonSheet : []);
       setLeftoverArchiveSheetRows(Array.isArray(archiveSheet) ? archiveSheet : []);
+      setLeftoverEmployeeSheetRows(Array.isArray(employeeSheet) ? employeeSheet : []);
     } catch (e) {
       setLeftoverSheetError(String(e?.message || e || 'Qolib ketgan zakazlar sheet xatosi'));
     } finally {
@@ -10452,7 +10637,13 @@ export default function App() {
               <>
                 {page==='dash'    && canViewPage('dash') && <Dashboard D={D}/>}
                 {page==='cust'    && canViewPage('cust') && <Customers D={D} currentUser={effectiveUser} currentAccess={currentAccess} assignmentById={D.assignmentById || {}} company={activeCompany}/>}
-                {page==='orders'  && canViewPage('orders') && <Orders D={D} rawArchiveSheetRows={leftoverArchiveSheetRows}/>}
+                {page==='orders'  && canViewPage('orders') && (
+                  <Orders
+                    D={D}
+                    rawArchiveSheetRows={leftoverArchiveSheetRows}
+                    rawEmployeeSheetRows={leftoverEmployeeSheetRows}
+                  />
+                )}
                 {page==='left_orders' && canViewPage('left_orders') && (
                   <LeftOrdersPage
                     D={D}
