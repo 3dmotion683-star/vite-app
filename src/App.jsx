@@ -1524,6 +1524,32 @@ const isValidGeoPoint = (lat, lng) => {
 const YMAPS_JS_ID = 'aq-ymaps-js';
 const YMAPS_JS_SRC = 'https://api-maps.yandex.ru/2.1/?lang=ru_RU';
 let ymapsLoadPromise = null;
+const buildMapPinSvgUri = ({ selected = false } = {}) => {
+  const top = selected ? '#4ade80' : '#38bdf8';
+  const bottom = selected ? '#16a34a' : '#0284c7';
+  const glow = selected ? 'rgba(34,197,94,.45)' : 'rgba(14,165,233,.45)';
+  const stroke = selected ? '#dcfce7' : '#dff6ff';
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${top}"/>
+      <stop offset="100%" stop-color="${bottom}"/>
+    </linearGradient>
+    <filter id="f" x="-60%" y="-60%" width="220%" height="220%">
+      <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="${glow}"/>
+    </filter>
+  </defs>
+  <ellipse cx="18" cy="39" rx="8.5" ry="3.3" fill="${glow}" opacity=".5"/>
+  <path filter="url(#f)" d="M18 2C11.4 2 6 7.4 6 14c0 9.6 10.6 20.6 11.1 21.1a1.25 1.25 0 0 0 1.8 0C19.4 34.6 30 23.6 30 14 30 7.4 24.6 2 18 2z" fill="url(#g)" stroke="${stroke}" stroke-width="2"/>
+  <circle cx="18" cy="14" r="5.3" fill="#ffffff" opacity=".92"/>
+</svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+const MAP_PIN_URI = {
+  off: buildMapPinSvgUri({ selected: false }),
+  on: buildMapPinSvgUri({ selected: true }),
+};
 const ensureYandexLoaded = () => {
   if (typeof window === 'undefined') return Promise.reject(new Error('window not available'));
   if (window.ymaps?.Map) {
@@ -1594,9 +1620,11 @@ function GeoMapPanel({ points = [], selectedId = '', onPick = () => {}, height =
             [Number(p.lat), Number(p.lng)],
             { hintContent: String(p?.label || '').trim() || 'Nuqta' },
             {
-              preset: isSel ? 'islands#greenCircleDotIcon' : 'islands#blueCircleDotIcon',
-              iconColor: isSel ? '#22c55e' : '#0ea5e9',
-              zIndex: isSel ? 600 : 400,
+              iconLayout: 'default#image',
+              iconImageHref: isSel ? MAP_PIN_URI.on : MAP_PIN_URI.off,
+              iconImageSize: [28, 36],
+              iconImageOffset: [-14, -36],
+              zIndex: isSel ? 680 : 500,
             }
           );
           marker.events.add('click', () => onPickRef.current?.(p));
