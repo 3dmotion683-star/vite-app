@@ -985,6 +985,43 @@ const parseLeftoverArchiveRows = (rawRows = []) => (
     }))
     .filter((r) => r.date || r.customerId || r.uid || r.qtyGiven || r.productGiven)
 );
+const LEFTOVER_WATER_PRODUCT_KEY = 'suv';
+const LEFTOVER_WATER_LABEL = 'Suv';
+const LEFTOVER_WATER_PRODUCT_ALIASES = new Set([
+  'murodbaxsh 18.9l',
+  'бонус murodbaxsh 18.9l',
+  'bonus murodbaxsh 18.9l',
+]);
+const LEFTOVER_ARCHIVE_IGNORED_MARKERS = ['fleyer', 'flyer', 'flayer', 'флаер', 'флайер'];
+const isLeftoverWaterProduct = (product = '') => {
+  const p = normProduct(product);
+  if (!p) return false;
+  if (LEFTOVER_WATER_PRODUCT_ALIASES.has(p)) return true;
+  if (p.includes('murodbaxsh') && p.includes('18.9')) return true;
+  if (p.includes('муродбахш') && p.includes('18.9')) return true;
+  return false;
+};
+const isLeftoverIgnoredArchiveProduct = (product = '') => {
+  const p = normProduct(product);
+  if (!p) return false;
+  return LEFTOVER_ARCHIVE_IGNORED_MARKERS.some((mark) => p.includes(mark));
+};
+const toLeftoverProductKey = (product = '', source = 'order') => {
+  const p = normProduct(product);
+  if (!p) return '';
+  if (source === 'archive' && isLeftoverIgnoredArchiveProduct(p)) return '';
+  if (isLeftoverWaterProduct(p)) return LEFTOVER_WATER_PRODUCT_KEY;
+  return p;
+};
+const toLeftoverProductLabel = (productKey = '', fallback = '') => {
+  if (productKey === LEFTOVER_WATER_PRODUCT_KEY) return LEFTOVER_WATER_LABEL;
+  return String(fallback || productKey || '').trim() || '-';
+};
+const toLeftoverDisplayProduct = (product = '') => {
+  const productKey = toLeftoverProductKey(product, 'order');
+  if (!productKey) return '';
+  return toLeftoverProductLabel(productKey, product);
+};
 const buildOrderGroupsFromRawOrders = (rawOrders = []) => {
   const groups = {};
   (rawOrders || []).forEach((o) => {
@@ -1111,23 +1148,27 @@ const buildLeftoverAnalysis = ({
     .forEach((g) => {
       const matchedArchiveRows = archiveByCustomerYesterday.get(g.mId) || [];
       const hasArchive = matchedArchiveRows.length > 0;
-      const deliveredTotal = matchedArchiveRows.reduce((s, r) => s + Math.abs(toNum(r.qtyGiven)), 0);
-      const orderedTotal = Number(g.totalQty || 0);
-      const qtyDiff = orderedTotal - deliveredTotal;
+      let deliveredTotal = 0;
       const orderedByProduct = new Map();
       const orderedLabelByProduct = new Map();
       (g.items || []).forEach((it) => {
-        const pKey = normProduct(it.product || '');
+        const pKey = toLeftoverProductKey(it.product || '', 'order');
+        if (pKey !== LEFTOVER_WATER_PRODUCT_KEY) return;
         if (!pKey) return;
         orderedByProduct.set(pKey, (orderedByProduct.get(pKey) || 0) + Math.abs(toNum(it.qty)));
-        if (!orderedLabelByProduct.has(pKey)) orderedLabelByProduct.set(pKey, String(it.product || '').trim() || '-');
+        if (!orderedLabelByProduct.has(pKey)) orderedLabelByProduct.set(pKey, toLeftoverProductLabel(pKey, String(it.product || '').trim()));
       });
+      const orderedTotal = Number(orderedByProduct.get(LEFTOVER_WATER_PRODUCT_KEY) || 0);
       const deliveredByProduct = new Map();
       matchedArchiveRows.forEach((a) => {
-        const pKey = normProduct(a.productGiven || '');
+        const pKey = toLeftoverProductKey(a.productGiven || '', 'archive');
+        if (pKey !== LEFTOVER_WATER_PRODUCT_KEY) return;
         if (!pKey) return;
-        deliveredByProduct.set(pKey, (deliveredByProduct.get(pKey) || 0) + Math.abs(toNum(a.qtyGiven)));
+        const qtyGiven = Math.abs(toNum(a.qtyGiven));
+        deliveredByProduct.set(pKey, (deliveredByProduct.get(pKey) || 0) + qtyGiven);
+        deliveredTotal += qtyGiven;
       });
+      const qtyDiff = orderedTotal - deliveredTotal;
       const productDiff = [];
       orderedByProduct.forEach((orderedQty, pKey) => {
         const deliveredQty = Number(deliveredByProduct.get(pKey) || 0);
@@ -1190,28 +1231,54 @@ const buildLeftoverAnalysis = ({
     const byDate = orderByDateCustomer.get(`${r.date}__${r.customerId}`);
     const soGroup = bySo || byUid || byDate || null;
     const archiveMatched = archiveByDateCustomer.get(`${r.date}__${r.customerId}`) || [];
-    const archiveQty = archiveMatched.reduce((s, a) => s + Math.abs(toNum(a.qtyGiven)), 0);
+    const waterItems = (soGroup?.items || []).filter((it) => toLeftoverProductKey(it.product || '', 'order') === LEFTOVER_WATER_PRODUCT_KEY);
+    const orderWaterQty = waterItems.reduce((s, it) => s + Math.abs(toNum(it.qty)), 0);
+    const orderWaterSumUZS = waterItems.reduce((s, it) => {
+      const ccy = String(it.currency || '').trim().toUpperCase() || 'UZS';
+      if (ccy === 'USD') return s;
+      return s + Math.abs(toNum(it.sum));
+    }, 0);
+    const archiveQty = archiveMatched.reduce((s, a) => {
+      const pKey = toLeftoverProductKey(a.productGiven || '', 'archive');
+      if (pKey !== LEFTOVER_WATER_PRODUCT_KEY) return s;
+      return s + Math.abs(toNum(a.qtyGiven));
+    }, 0);
     return {
       ...r,
-      qty: Number(soGroup?.totalQty || 0),
-      sumUZS: Number(soGroup?.totalSumUZS || 0),
+      qty: Number(orderWaterQty || 0),
+      sumUZS: Number(orderWaterSumUZS || 0),
       orderNote: Array.from(new Set((soGroup?.items || []).map((it) => String(it.note || '').trim()).filter(Boolean))).join(' | '),
-      product: Array.from(new Set((soGroup?.items || []).map((it) => String(it.product || '').trim()).filter(Boolean))).join(' | '),
+      product: Array.from(new Set(waterItems.map((it) => toLeftoverDisplayProduct(it.product || '')).filter(Boolean))).join(' | '),
       orderStatus: String(soGroup?.status || '').trim(),
       archiveQty,
       statusText: soGroup ? 'Zakaz topildi' : 'Zakaz topilmadi',
       soGroup,
     };
   });
+  const sortByDateDesc = (a, b) => {
+    const da = String(a?.date || '');
+    const db = String(b?.date || '');
+    if (da !== db) return db.localeCompare(da);
+    const ao = String(a?.orderId || '');
+    const bo = String(b?.orderId || '');
+    if (ao !== bo) return bo.localeCompare(ao);
+    const ai = Number(String(a?.rowId || '').replace(/\D+/g, '')) || 0;
+    const bi = Number(String(b?.rowId || '').replace(/\D+/g, '')) || 0;
+    return bi - ai;
+  };
+  const withNo = (rows = []) => rows.map((r, idx) => ({ ...r, no: idx + 1 }));
+  const sortedMissingRows = withNo([...missingRows].sort(sortByDateDesc));
+  const sortedProductGapRows = withNo([...productGapRows].sort(sortByDateDesc));
+  const sortedReasonDetailedRows = withNo([...reasonDetailedRows].sort(sortByDateDesc));
 
   return {
     compareDate,
     reasonRows,
     archiveRows,
     orderGroups,
-    missingRows,
-    productGapRows,
-    reasonDetailedRows,
+    missingRows: sortedMissingRows,
+    productGapRows: sortedProductGapRows,
+    reasonDetailedRows: sortedReasonDetailedRows,
   };
 };
 const shiftMonthKey = (monthKeyValue, delta = 0) => {
@@ -7003,6 +7070,7 @@ function LeftOrdersPage({
   const productGapRows = analysis.productGapRows || [];
 
   const leftColumns = useMemo(() => ([
+    { key:'no', label:'No', type:'number' },
     { key:'date', label:'Sana', type:'date' },
     { key:'customerId', label:'Mijoz ID', type:'text' },
     { key:'customer', label:'Mijoz', type:'text' },
@@ -7015,6 +7083,7 @@ function LeftOrdersPage({
     { key:'statusText', label:'Holat', type:'text' },
   ]), []);
   const reasonColumns = useMemo(() => ([
+    { key:'no', label:'No', type:'number' },
     { key:'date', label:'Sana', type:'date' },
     { key:'customerId', label:'Mijoz ID', type:'text' },
     { key:'customer', label:'Mijoz', type:'text' },
@@ -7029,6 +7098,7 @@ function LeftOrdersPage({
     { key:'orderStatus', label:'Status', type:'text' },
   ]), []);
   const gapColumns = useMemo(() => ([
+    { key:'no', label:'No', type:'number' },
     { key:'date', label:'Sana', type:'date' },
     { key:'customerId', label:'Mijoz ID', type:'text' },
     { key:'customer', label:'Mijoz', type:'text' },
@@ -7056,9 +7126,9 @@ function LeftOrdersPage({
       exportAoaExcel({
         fileName: `Qolib_ketgan_zakazlar_${compareDate || toIsoDate(new Date())}.xlsx`,
         sheetName: 'QolibKetganZakazlar',
-        headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Soni', 'Summa', 'Zakaz izohi', 'Sabab', 'Holat'],
-        columnTypes: ['date', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'text', 'text'],
-        rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.driver, r.qty, r.sumUZS, r.note, r.reason, r.statusText]),
+        headers: ['No', 'Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Soni', 'Summa', 'Zakaz izohi', 'Sabab', 'Holat'],
+        columnTypes: ['number', 'date', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'text', 'text'],
+        rows: filteredRows.map((r) => [r.no, r.date, r.customerId, r.customer, r.orderId, r.driver, r.qty, r.sumUZS, r.note, r.reason, r.statusText]),
       });
       return;
     }
@@ -7066,18 +7136,18 @@ function LeftOrdersPage({
       exportAoaExcel({
         fileName: `Qolib_ketgan_zakazlar_sababi_${toIsoDate(new Date())}.xlsx`,
         sheetName: 'QolibKetganSabab',
-        headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Sabab izohi', 'Mahsulot', 'Soni', 'Summa', 'Zakaz izohi', 'Arxiv soni', 'Status'],
-        columnTypes: ['date', 'text', 'text', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'number', 'text'],
-        rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.driver, r.reason, r.product, r.qty, r.sumUZS, r.orderNote, r.archiveQty, r.orderStatus || r.statusText]),
+        headers: ['No', 'Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Sabab izohi', 'Mahsulot', 'Soni', 'Summa', 'Zakaz izohi', 'Arxiv soni', 'Status'],
+        columnTypes: ['number', 'date', 'text', 'text', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'number', 'text'],
+        rows: filteredRows.map((r) => [r.no, r.date, r.customerId, r.customer, r.orderId, r.driver, r.reason, r.product, r.qty, r.sumUZS, r.orderNote, r.archiveQty, r.orderStatus || r.statusText]),
       });
       return;
     }
     exportAoaExcel({
       fileName: `Mahsulot_farqi_${compareDate || toIsoDate(new Date())}.xlsx`,
       sheetName: 'MahsulotFarqi',
-      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Zakaz soni', 'Arxiv soni', 'Farq', 'Mahsulot farqi', 'Zakaz izohi', 'Holat'],
-      columnTypes: ['date', 'text', 'text', 'text', 'text', 'number', 'number', 'number', 'text', 'text', 'text'],
-      rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.driver, r.orderedQty, r.deliveredQty, r.diffQty, r.productDiffText, r.note, r.statusText]),
+      headers: ['No', 'Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Zakaz soni', 'Arxiv soni', 'Farq', 'Mahsulot farqi', 'Zakaz izohi', 'Holat'],
+      columnTypes: ['number', 'date', 'text', 'text', 'text', 'text', 'number', 'number', 'number', 'text', 'text', 'text'],
+      rows: filteredRows.map((r) => [r.no, r.date, r.customerId, r.customer, r.orderId, r.driver, r.orderedQty, r.deliveredQty, r.diffQty, r.productDiffText, r.note, r.statusText]),
     });
   }, [tab, filteredRows, compareDate]);
 
@@ -7132,6 +7202,7 @@ function LeftOrdersPage({
             <table className="tbl">
               <thead>
                 <tr>
+                  <th>No</th>
                   <th>Sana</th>
                   <th>Mijoz ID</th>
                   <th>Mijoz</th>
@@ -7146,13 +7217,14 @@ function LeftOrdersPage({
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
-                  <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Kechagi qolib ketgan zakaz topilmadi</td></tr>
+                  <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Kechagi qolib ketgan zakaz topilmadi</td></tr>
                 ) : filteredRows.map((r, i) => (
                   <tr
                     key={`left_${i}_${r.orderId}_${r.date}`}
                     style={{background:r.reason ? 'rgba(63,185,80,.06)' : 'rgba(248,81,73,.08)', cursor:r.soGroup ? 'pointer' : 'default'}}
                     onClick={() => r.soGroup && setSelectedSO(r.soGroup)}
                   >
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || (i + 1)}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                     <td>{r.customer}</td>
@@ -7171,6 +7243,7 @@ function LeftOrdersPage({
             <table className="tbl">
               <thead>
                 <tr>
+                  <th>No</th>
                   <th>Sana</th>
                   <th>Mijoz ID</th>
                   <th>Mijoz</th>
@@ -7187,13 +7260,14 @@ function LeftOrdersPage({
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
-                  <tr><td colSpan={12} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Sabab yozuvlari topilmadi</td></tr>
+                  <tr><td colSpan={13} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Sabab yozuvlari topilmadi</td></tr>
                 ) : filteredRows.map((r, i) => (
                   <tr
                     key={`reason_${i}_${r.uid}_${r.orderId}`}
                     style={{cursor:r.soGroup ? 'pointer' : 'default'}}
                     onClick={() => r.soGroup && setSelectedSO(r.soGroup)}
                   >
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || (i + 1)}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                     <td>{r.customer || '-'}</td>
@@ -7214,6 +7288,7 @@ function LeftOrdersPage({
             <table className="tbl">
               <thead>
                 <tr>
+                  <th>No</th>
                   <th>Sana</th>
                   <th>Mijoz ID</th>
                   <th>Mijoz</th>
@@ -7229,13 +7304,14 @@ function LeftOrdersPage({
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
-                  <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Mahsulot farqi topilmadi</td></tr>
+                  <tr><td colSpan={12} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Mahsulot farqi topilmadi</td></tr>
                 ) : filteredRows.map((r, i) => (
                   <tr
                     key={`gap_${i}_${r.orderId}_${r.date}`}
                     style={{background:'rgba(255,193,7,.08)', cursor:r.soGroup ? 'pointer' : 'default'}}
                     onClick={() => r.soGroup && setSelectedSO(r.soGroup)}
                   >
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || (i + 1)}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                     <td>{r.customer || '-'}</td>
@@ -10008,7 +10084,7 @@ export default function App() {
                 {E.bell}
                 Bildirishnoma
                 {alertTotalCount > 0 && (
-                  <span style={{position:'absolute',top:-11,right:-10,minWidth:20,height:20,padding:'0 6px',borderRadius:999,background:'var(--rd)',border:'2px solid var(--s1)',color:'#fff',fontSize:10,fontWeight:800,display:'inline-flex',alignItems:'center',justifyContent:'center',zIndex:3,lineHeight:1}}>
+                  <span style={{position:'absolute',top:-9,right:-8,minWidth:22,height:22,padding:'0 7px',borderRadius:999,background:'linear-gradient(180deg, #ff6b6b 0%, #e63946 100%)',border:'2px solid #0a1322',boxShadow:'0 6px 16px rgba(230,57,70,.38)',color:'#fff',fontSize:11,fontWeight:900,display:'inline-flex',alignItems:'center',justifyContent:'center',zIndex:4,lineHeight:1,letterSpacing:'.2px'}}>
                     {alertTotalCount}
                   </span>
                 )}
