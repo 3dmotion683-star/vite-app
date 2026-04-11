@@ -951,71 +951,40 @@ const getLeftoverCompareDate = (baseDate = new Date(), rolloverHour = LEFTOVER_R
   d.setDate(d.getDate() - backDays);
   return toIsoDate(d);
 };
-const UZ_GEO_BOUNDS = { latMin: 37, latMax: 46.5, lngMin: 55, lngMax: 74.5 };
-// Bizning loyiha mijozlari Toshkent shahri/atrofi bo'yicha ishlaydi.
-// Noto'g'ri nuqtalarni xaritada ko'rsatmaslik uchun alohida "ishchi" diapazon.
-const TASHKENT_GEO_BOUNDS = { latMin: 40.8, latMax: 41.75, lngMin: 68.4, lngMax: 70.1 };
-const isLikelyUzGeoPoint = (lat, lng) => {
+const isValidLatLng = (lat, lng) => {
   const la = Number(lat);
   const ln = Number(lng);
   if (!Number.isFinite(la) || !Number.isFinite(ln)) return false;
-  return la >= UZ_GEO_BOUNDS.latMin && la <= UZ_GEO_BOUNDS.latMax && ln >= UZ_GEO_BOUNDS.lngMin && ln <= UZ_GEO_BOUNDS.lngMax;
+  if (Math.abs(la) > 90 || Math.abs(ln) > 180) return false;
+  if (Math.abs(la) < 0.00001 && Math.abs(ln) < 0.00001) return false;
+  return true;
 };
-const isLikelyTashkentGeoPoint = (lat, lng) => {
-  const la = Number(lat);
-  const ln = Number(lng);
-  if (!Number.isFinite(la) || !Number.isFinite(ln)) return false;
-  return la >= TASHKENT_GEO_BOUNDS.latMin && la <= TASHKENT_GEO_BOUNDS.latMax && ln >= TASHKENT_GEO_BOUNDS.lngMin && ln <= TASHKENT_GEO_BOUNDS.lngMax;
+const parsePairDirect = (firstRaw, secondRaw) => {
+  const lat = toNum(String(firstRaw ?? '').replace(',', '.'));
+  const lng = toNum(String(secondRaw ?? '').replace(',', '.'));
+  return isValidLatLng(lat, lng) ? { lat, lng } : { lat: 0, lng: 0 };
 };
-const normalizeGeoPair = (aRaw, bRaw, { preferUz = true, preferCity = false } = {}) => {
-  const a = toNum(String(aRaw ?? '').replace(',', '.'));
-  const b = toNum(String(bRaw ?? '').replace(',', '.'));
-  const candidates = [
-    { lat: a, lng: b },
-    { lat: b, lng: a },
-  ].filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng) && Math.abs(c.lat) <= 90 && Math.abs(c.lng) <= 180 && (Math.abs(c.lat) > 0.00001 || Math.abs(c.lng) > 0.00001));
-  if (!candidates.length) return { lat: 0, lng: 0 };
-  if (preferCity) {
-    const city = candidates.find((c) => isLikelyTashkentGeoPoint(c.lat, c.lng));
-    if (city) return city;
-  }
-  if (preferUz) {
-    const uz = candidates.find((c) => isLikelyUzGeoPoint(c.lat, c.lng));
-    return uz || { lat: 0, lng: 0 };
-  }
-  return candidates[0];
+const parseMerchantGeoFromQR = (qRaw, rRaw) => {
+  const joined = `${String(qRaw ?? '').trim()},${String(rRaw ?? '').trim()}`;
+  const pair = parsePairDirect(qRaw, rRaw);
+  return { ...pair, joined };
 };
-const parseGeoFromText = (value = '', { preferUz = true, preferCity = false, allowUzFallback = true } = {}) => {
+const parseArchiveGeoFromK = (value = '') => {
   const raw = String(value || '').trim();
   if (!raw) return { lat: 0, lng: 0 };
   let text = raw;
   try {
     text = decodeURIComponent(raw);
   } catch {}
-  const pairRe = /(-?\d{1,3}(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d{1,3}(?:[.,]\d+)?)/g;
-  const cityCandidates = [];
-  const uzCandidates = [];
-  const anyCandidates = [];
-  let m;
-  while ((m = pairRe.exec(text))) {
-    const pairCity = normalizeGeoPair(m[1], m[2], { preferUz: true, preferCity: true });
-    if (isLikelyTashkentGeoPoint(pairCity.lat, pairCity.lng)) {
-      cityCandidates.push(pairCity);
-      continue;
-    }
-    const pairUz = normalizeGeoPair(m[1], m[2], { preferUz: true, preferCity: false });
-    if (isLikelyUzGeoPoint(pairUz.lat, pairUz.lng)) {
-      uzCandidates.push(pairUz);
-      continue;
-    }
-    const pairAny = normalizeGeoPair(m[1], m[2], { preferUz: false, preferCity: false });
-    if (Math.abs(pairAny.lat) > 0.00001 || Math.abs(pairAny.lng) > 0.00001) anyCandidates.push(pairAny);
-  }
-  if (preferCity && cityCandidates.length) return cityCandidates[0];
-  if (preferCity && !allowUzFallback) return { lat: 0, lng: 0 };
-  if ((preferUz || preferCity) && uzCandidates.length) return uzCandidates[0];
-  if (preferUz || preferCity) return { lat: 0, lng: 0 };
-  return anyCandidates[0] || { lat: 0, lng: 0 };
+  const m = text.match(/(-?\d{1,3}(?:[.,]\d+)?)\s*[,;]\s*(-?\d{1,3}(?:[.,]\d+)?)/);
+  if (!m) return { lat: 0, lng: 0 };
+  const hasLngLatHint = /(?:^|[?&])(ll|pt)=/i.test(text) || /\b(?:ll|pt)\s*=/i.test(text);
+  let lat = toNum(String(hasLngLatHint ? m[2] : m[1]).replace(',', '.'));
+  let lng = toNum(String(hasLngLatHint ? m[1] : m[2]).replace(',', '.'));
+  if (isValidLatLng(lat, lng)) return { lat, lng };
+  const swapped = parsePairDirect(m[2], m[1]);
+  if (isValidLatLng(swapped.lat, swapped.lng)) return swapped;
+  return { lat: 0, lng: 0 };
 };
 const parseLeftoverReasonRows = (rawRows = []) => (
   (rawRows || [])
@@ -1037,12 +1006,7 @@ const parseLeftoverArchiveRows = (rawRows = []) => (
     .slice(1)
     .map((r, i) => {
       const location = String(r?.[10] || '').trim();
-      const geoMixed = parseGeoFromText(location, { preferCity: true, allowUzFallback: false });
-      const geoCols = normalizeGeoPair(r?.[16], r?.[17], { preferUz: true, preferCity: true });
-      const hasColsGeo = isLikelyTashkentGeoPoint(geoCols.lat, geoCols.lng);
-      const hasMixedGeo = isLikelyTashkentGeoPoint(geoMixed.lat, geoMixed.lng);
-      const lat = hasColsGeo ? geoCols.lat : hasMixedGeo ? geoMixed.lat : 0;
-      const lng = hasColsGeo ? geoCols.lng : hasMixedGeo ? geoMixed.lng : 0;
+      const geoFromK = parseArchiveGeoFromK(location);
       return {
         rowId: `arxiv_${i + 1}`,
         date: toIsoDate(r?.[0]),
@@ -1059,8 +1023,8 @@ const parseLeftoverArchiveRows = (rawRows = []) => (
         note: String(r?.[12] || '').trim(),
         driver: String(r?.[13] || '').trim(),
         uid: String(r?.[14] || '').trim(),
-        lat,
-        lng,
+        lat: geoFromK.lat,
+        lng: geoFromK.lng,
       };
     })
     .filter((r) => r.date || r.customerId || r.uid || r.qtyGiven || r.productGiven)
@@ -2087,7 +2051,7 @@ function processAll(mainData) {
       const source = String(r[25] || '').trim(); // Z ustun
       const merchNote = String(r[19] || '').trim(); // T ustun = primechaniya
       const aaValue = String(r[26] || '').trim(); // AA ustun
-      const merchantGeo = normalizeGeoPair(r[16], r[17], { preferUz: true, preferCity: true });
+      const merchantGeo = parseMerchantGeoFromQR(r[16], r[17]);
       allMerchants.push({ id, name, source, merchNote, aaTag: aaValue });
       contacts.push({
         id,
@@ -2861,7 +2825,7 @@ body,input,select,button{font-family:var(--sans)}
 .modern-date-actions{display:flex;justify-content:space-between;gap:8px;margin-top:8px}
 .card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl)}
 .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono)}
-.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px;backdrop-filter:blur(5px)}
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:5200;padding:16px;backdrop-filter:blur(5px)}
 .modal{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);width:100%;max-width:900px;max-height:94vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,.8)}
 .mhdr{padding:14px 20px;border-bottom:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--s1);z-index:1}
 .mbdy{padding:16px 20px}
@@ -3908,7 +3872,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   }, [segmentCustomers,search,sort,adv,segment,customerFilterColumns,uFilterState]);
   const mapPoints = useMemo(
     () => list
-      .filter((c) => isLikelyTashkentGeoPoint(c?.lat, c?.lng))
+      .filter((c) => isValidGeoPoint(c?.lat, c?.lng))
       .map((c) => ({
         id: String(c.id || ''),
         lat: Number(c.lat),
@@ -4126,7 +4090,6 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
                 width={620}
               />
             </div>
-            <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
             <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Xaritada: {mapPoints.length} ta</span>
           </div>
           {mapSelected && (
@@ -4320,8 +4283,8 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
       const key = `${dateKey || 'nodate'}__${cid}__${type}`;
       const driverName = resolveDriverName(r.driver);
       if (!groups.has(key)) {
-        const lat = isValidGeoPoint(r.lat, r.lng) ? Number(r.lat) : Number(c?.lat || 0);
-        const lng = isValidGeoPoint(r.lat, r.lng) ? Number(r.lng) : Number(c?.lng || 0);
+        const lat = isValidGeoPoint(r.lat, r.lng) ? Number(r.lat) : 0;
+        const lng = isValidGeoPoint(r.lat, r.lng) ? Number(r.lng) : 0;
         groups.set(key, {
           soNum: `ARX-${dateKey || 'nodate'}-${cid || 'nocid'}-${type}`,
           contName: String(r.customer || c?.name || `ID ${cid}`),
@@ -4466,14 +4429,17 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
   const mapPoints = useMemo(
     () => list
       .map((g) => {
-        const c = customerById[String(g.mId || '').trim()];
-        const gGeo = normalizeGeoPair(g.lat, g.lng, { preferUz: true, preferCity: true });
-        const cGeo = normalizeGeoPair(c?.lat, c?.lng, { preferUz: true, preferCity: true });
-        const hasOrderGeo = isLikelyTashkentGeoPoint(gGeo.lat, gGeo.lng);
-        const hasCustomerGeo = isLikelyTashkentGeoPoint(cGeo.lat, cGeo.lng);
-        const lat = hasOrderGeo ? Number(gGeo.lat) : hasCustomerGeo ? Number(cGeo.lat || 0) : 0;
-        const lng = hasOrderGeo ? Number(gGeo.lng) : hasCustomerGeo ? Number(cGeo.lng || 0) : 0;
-        if (!isLikelyTashkentGeoPoint(lat, lng)) return null;
+        let lat = 0;
+        let lng = 0;
+        if (dataMode === 'real') {
+          lat = Number(g.lat || 0);
+          lng = Number(g.lng || 0);
+        } else {
+          const c = customerById[String(g.mId || '').trim()];
+          lat = Number(c?.lat || 0);
+          lng = Number(c?.lng || 0);
+        }
+        if (!isValidGeoPoint(lat, lng)) return null;
         return {
           id: String(g.soNum || ''),
           lat,
@@ -4483,7 +4449,7 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
         };
       })
       .filter(Boolean),
-    [list, customerById]
+    [list, customerById, dataMode]
   );
 
   useEffect(() => {
@@ -4533,7 +4499,7 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
           <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
           <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
         </div>
-        <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>
+        {viewMode === 'list' && <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>}
       </div>
       {viewMode === 'list' && (
         <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
@@ -4658,7 +4624,6 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
                 width={620}
               />
             </div>
-            <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>
             <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Nuqta: {mapPoints.length} ta</span>
             <span className="tag" style={{background:'var(--s2)',color:'var(--t3)'}}>
               {dataMode === 'real' ? 'Real arxiv lokatsiyasi' : 'Mijoz lokatsiyasi'}
