@@ -146,6 +146,7 @@ const OBZVON_WEBHOOK_DEFAULT = 'https://solitary-brook-4889aquabiz-api.3dmotion6
 const OBZVON_EXPORT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyi1OP_a_5C7-TBujLuo9dDast0RLVelhQsTiO6dlN_mefi55vnTHm_ZRXpDFFTTXb7qA/exec';
 const LEFTOVER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1n73ggQbkdpKj0gPJQAhlppUHmPTzfuAXjhHPrAJHgmo/edit?gid=971866254#gid=971866254';
 const LEFTOVER_SHEET_ID = '1n73ggQbkdpKj0gPJQAhlppUHmPTzfuAXjhHPrAJHgmo';
+const LEFTOVER_QZI_GID = '1558522420'; // Q_Z_I
 const LEFTOVER_REASON_GID = '971866254'; // Qolib_ketgan_zakazlar_Arxiv
 const LEFTOVER_ARCHIVE_GID = '1642247768'; // Arxiv
 const LEFTOVER_EMPLOYEES_GID = '1637417945'; // XODIMLAR
@@ -1026,6 +1027,40 @@ const parseArchiveGeoFromK = (value = '') => {
 
   return pickBestGeoCandidate(candidates);
 };
+const splitQziTextTokens = (value = '', splitter = /[;,|/]/g) => (
+  Array.from(new Set(
+    String(value || '')
+      .split(splitter)
+      .map((x) => String(x || '').trim())
+      .filter(Boolean)
+  ))
+);
+const parseLeftoverQziRows = (rawRows = []) => (
+  (rawRows || [])
+    .slice(1)
+    .map((r, i) => ({
+      rowId: `qzi_${i + 1}`,
+      runAt: String(r?.[0] || '').trim(),
+      date: toIsoDate(r?.[1]),
+      customerId: normalizeIdKey(r?.[2]),
+      customer: String(r?.[3] || '').trim(),
+      driversText: String(r?.[4] || '').trim(),
+      drivers: splitQziTextTokens(r?.[4]),
+      orderNosText: String(r?.[5] || '').trim(),
+      orderNos: splitQziTextTokens(r?.[5]),
+      productsText: String(r?.[6] || '').trim(),
+      totalQty: Math.abs(toNum(r?.[7])),
+      totalSum: Math.abs(toNum(r?.[8])),
+      notes: String(r?.[9] || '').trim(),
+      lineCount: Math.abs(toNum(r?.[10])),
+      reason: String(r?.[11] || '').trim(),
+      recordKey: String(r?.[12] || '').trim(),
+      sendStatus: String(r?.[13] || '').trim(),
+      sentAt: String(r?.[14] || '').trim(),
+      sendResult: String(r?.[15] || '').trim(),
+    }))
+    .filter((r) => r.date || r.customerId || r.orderNos.length || r.recordKey)
+);
 const parseLeftoverReasonRows = (rawRows = []) => (
   (rawRows || [])
     .slice(1)
@@ -1169,12 +1204,14 @@ const buildOrderGroupsFromRawOrders = (rawOrders = []) => {
 };
 const buildLeftoverAnalysis = ({
   rawOrders = [],
+  rawQziRows = [],
   rawReasonRows = [],
   rawArchiveRows = [],
   targetDate = '',
   currentUser = 'Admin',
   canSeeAll = true,
   allowedCustomerIds = null,
+  includeAllQziRows = false,
 }) => {
   const compareDate = targetDate || getLeftoverCompareDate(new Date());
   const orderGroups = buildOrderGroupsFromRawOrders(rawOrders);
@@ -1199,15 +1236,31 @@ const buildLeftoverAnalysis = ({
   const scopedOrderGroups = canSeeAll
     ? orderGroups
     : orderGroups.filter((g) => scopedCustomerIds.has(String(g?.mId || '').trim()));
+  const qziRows = parseLeftoverQziRows(rawQziRows);
+  const scopedQziRows = (canSeeAll
+    ? qziRows
+    : qziRows.filter((r) => scopedCustomerIds.has(String(r?.customerId || '').trim()))
+  ).filter((r) => includeAllQziRows || !compareDate || r.date === compareDate);
 
   const orderBySoNum = new Map();
+  const orderListBySoNum = new Map();
   const orderByUid = new Map();
   const orderByDateCustomer = new Map();
+  const orderListByDateCustomer = new Map();
+  const orderListByCustomer = new Map();
   scopedOrderGroups.forEach((g) => {
     const soKey = normalizeMatchText(g.soNum);
     if (soKey && !orderBySoNum.has(soKey)) orderBySoNum.set(soKey, g);
+    if (soKey) {
+      if (!orderListBySoNum.has(soKey)) orderListBySoNum.set(soKey, []);
+      orderListBySoNum.get(soKey).push(g);
+    }
     const dcKey = `${g.orderDate}__${g.mId}`;
     if (!orderByDateCustomer.has(dcKey)) orderByDateCustomer.set(dcKey, g);
+    if (!orderListByDateCustomer.has(dcKey)) orderListByDateCustomer.set(dcKey, []);
+    orderListByDateCustomer.get(dcKey).push(g);
+    if (!orderListByCustomer.has(g.mId)) orderListByCustomer.set(g.mId, []);
+    orderListByCustomer.get(g.mId).push(g);
     (g.items || []).forEach((it) => {
       const u = normalizeMatchText(it.uniqueId);
       if (u && !orderByUid.has(u)) orderByUid.set(u, g);
@@ -1248,89 +1301,188 @@ const buildLeftoverAnalysis = ({
     archiveByCustomerYesterday.get(r.customerId).push(r);
   });
 
-  const missingRows = [];
+  let missingRows = [];
   const productGapRows = [];
-  scopedOrderGroups
-    .filter((g) => g.orderDate === compareDate)
-    .forEach((g) => {
-      const matchedArchiveRows = archiveByCustomerYesterday.get(g.mId) || [];
-      const hasArchive = matchedArchiveRows.length > 0;
-      let deliveredTotal = 0;
-      const orderedByProduct = new Map();
-      const orderedLabelByProduct = new Map();
-      (g.items || []).forEach((it) => {
-        const pKey = toLeftoverProductKey(it.product || '', 'order');
-        if (pKey !== LEFTOVER_WATER_PRODUCT_KEY) return;
-        if (!pKey) return;
-        orderedByProduct.set(pKey, (orderedByProduct.get(pKey) || 0) + Math.abs(toNum(it.qty)));
-        if (!orderedLabelByProduct.has(pKey)) orderedLabelByProduct.set(pKey, toLeftoverProductLabel(pKey, String(it.product || '').trim()));
-      });
-      const orderedTotal = Number(orderedByProduct.get(LEFTOVER_WATER_PRODUCT_KEY) || 0);
-      const deliveredByProduct = new Map();
-      matchedArchiveRows.forEach((a) => {
-        const pKey = toLeftoverProductKey(a.productGiven || '', 'archive');
-        if (pKey !== LEFTOVER_WATER_PRODUCT_KEY) return;
-        if (!pKey) return;
-        const qtyGiven = Math.abs(toNum(a.qtyGiven));
-        deliveredByProduct.set(pKey, (deliveredByProduct.get(pKey) || 0) + qtyGiven);
-        deliveredTotal += qtyGiven;
-      });
-      const qtyDiff = orderedTotal - deliveredTotal;
-      const productDiff = [];
-      orderedByProduct.forEach((orderedQty, pKey) => {
-        const deliveredQty = Number(deliveredByProduct.get(pKey) || 0);
-        if (deliveredQty + 0.0001 >= orderedQty) return;
-        productDiff.push({
-          product: orderedLabelByProduct.get(pKey) || pKey,
-          orderedQty,
-          deliveredQty,
-          diffQty: orderedQty - deliveredQty,
-        });
-      });
-      const reasonText = pickReasonText(g);
-      const noteText = Array.from(new Set((g.items || []).map((it) => String(it.note || '').trim()).filter(Boolean))).join(' | ');
+  if (scopedQziRows.length) {
+    missingRows = scopedQziRows
+      .map((r, idx) => {
+        const customerId = String(r.customerId || '').trim();
+        const matchedByKey = new Map();
+        const pushMatched = (g) => {
+          if (!g?.key) return;
+          matchedByKey.set(g.key, g);
+        };
 
-      if (!hasArchive) {
-        missingRows.push({
-          id: `left_missing_${g.soNum}_${g.mId}_${g.orderDate}`,
-          date: g.orderDate,
-          customerId: g.mId,
-          customer: g.contName,
-          orderId: g.soNum,
-          uid: (g.items || []).map((it) => String(it.uniqueId || '').trim()).filter(Boolean)[0] || '',
-          driver: g.delivPerson || '-',
-          qty: orderedTotal,
-          sumUZS: Number(g.totalSumUZS || 0),
+        (r.orderNos || []).forEach((orderNo) => {
+          const soKey = normalizeMatchText(orderNo);
+          if (!soKey) return;
+          const candidates = (orderListBySoNum.get(soKey) || [])
+            .filter((g) => !customerId || g.mId === customerId);
+          if (!candidates.length) return;
+          const sameDate = r.date
+            ? candidates.filter((g) => g.orderDate === r.date)
+            : [];
+          (sameDate.length ? sameDate : candidates).forEach(pushMatched);
+        });
+
+        if (!matchedByKey.size && customerId && r.date) {
+          (orderListByDateCustomer.get(`${r.date}__${customerId}`) || []).forEach(pushMatched);
+        }
+        if (!matchedByKey.size && customerId) {
+          (orderListByCustomer.get(customerId) || []).forEach(pushMatched);
+        }
+
+        const matchedGroups = Array.from(matchedByKey.values());
+        const mergedItems = matchedGroups.flatMap((g) => g.items || []);
+        const orderIds = Array.from(new Set([
+          ...(r.orderNos || []).map((x) => String(x || '').trim()).filter(Boolean),
+          ...matchedGroups.map((g) => String(g.soNum || '').trim()).filter(Boolean),
+        ]));
+        const drivers = Array.from(new Set([
+          ...(r.drivers || []).map((x) => String(x || '').trim()).filter(Boolean),
+          ...matchedGroups.map((g) => String(g.delivPerson || g.agent || '').trim()).filter(Boolean),
+        ]));
+        const notes = Array.from(new Set([
+          String(r.notes || '').trim(),
+          ...mergedItems.map((it) => String(it.note || '').trim()),
+        ].filter(Boolean)));
+
+        const qtyFromOrders = mergedItems.reduce((s, it) => s + Math.abs(toNum(it?.qty)), 0);
+        const sumFromOrdersUZS = matchedGroups.reduce((s, g) => s + Math.abs(toNum(g?.totalSumUZS)), 0);
+        const sumFromOrdersUSD = matchedGroups.reduce((s, g) => s + Math.abs(toNum(g?.totalSumUSD)), 0);
+        const orderIdText = orderIds.join(' | ') || '-';
+        const driverText = drivers.join(', ') || r.driversText || '-';
+        const customerText = String(r.customer || '').trim()
+          || matchedGroups[0]?.contName
+          || (customerId ? `ID ${customerId}` : '-');
+        const uid = mergedItems
+          .map((it) => String(it?.uniqueId || '').trim())
+          .find(Boolean) || '';
+        const reasonText = String(r.reason || '').trim();
+        const noteText = notes.join(' | ');
+
+        let soGroup = null;
+        if (matchedGroups.length === 1) {
+          soGroup = matchedGroups[0];
+        } else if (matchedGroups.length > 1) {
+          soGroup = {
+            key: `qzi_group_${r.recordKey || `${r.date}_${customerId}_${idx}`}`,
+            soNum: orderIdText,
+            contName: customerText,
+            mId: customerId,
+            orderDate: r.date || compareDate,
+            delivPerson: driverText,
+            agent: driverText,
+            docType: 'Заказ',
+            status: 'Q_Z_I',
+            currency: 'UZS',
+            items: mergedItems,
+            totalQty: qtyFromOrders,
+            totalSumUZS: sumFromOrdersUZS || Math.abs(toNum(r.totalSum)),
+            totalSumUSD: sumFromOrdersUSD || 0,
+          };
+        }
+
+        return {
+          id: `left_qzi_${r.recordKey || `${r.date}_${customerId}_${idx}`}`,
+          date: r.date || compareDate,
+          customerId,
+          customer: customerText,
+          orderId: orderIdText,
+          uid,
+          driver: driverText,
+          qty: qtyFromOrders > 0 ? qtyFromOrders : Math.abs(toNum(r.totalQty)),
+          sumUZS: sumFromOrdersUZS > 0 ? sumFromOrdersUZS : Math.abs(toNum(r.totalSum)),
           note: noteText,
           reason: reasonText,
-          statusText: "Arxivda mijoz ID topilmadi (zakaz bormagan)",
-          soGroup: g,
+          statusText: reasonText || "Q_Z_I ro'yxatidan",
+          soGroup,
+        };
+      })
+      .filter((r) => r.date || r.customerId || r.orderId);
+  } else {
+    scopedOrderGroups
+      .filter((g) => g.orderDate === compareDate)
+      .forEach((g) => {
+        const matchedArchiveRows = archiveByCustomerYesterday.get(g.mId) || [];
+        const hasArchive = matchedArchiveRows.length > 0;
+        let deliveredTotal = 0;
+        const orderedByProduct = new Map();
+        const orderedLabelByProduct = new Map();
+        (g.items || []).forEach((it) => {
+          const pKey = toLeftoverProductKey(it.product || '', 'order');
+          if (pKey !== LEFTOVER_WATER_PRODUCT_KEY) return;
+          if (!pKey) return;
+          orderedByProduct.set(pKey, (orderedByProduct.get(pKey) || 0) + Math.abs(toNum(it.qty)));
+          if (!orderedLabelByProduct.has(pKey)) orderedLabelByProduct.set(pKey, toLeftoverProductLabel(pKey, String(it.product || '').trim()));
         });
-        return;
-      }
+        const orderedTotal = Number(orderedByProduct.get(LEFTOVER_WATER_PRODUCT_KEY) || 0);
+        const deliveredByProduct = new Map();
+        matchedArchiveRows.forEach((a) => {
+          const pKey = toLeftoverProductKey(a.productGiven || '', 'archive');
+          if (pKey !== LEFTOVER_WATER_PRODUCT_KEY) return;
+          if (!pKey) return;
+          const qtyGiven = Math.abs(toNum(a.qtyGiven));
+          deliveredByProduct.set(pKey, (deliveredByProduct.get(pKey) || 0) + qtyGiven);
+          deliveredTotal += qtyGiven;
+        });
+        const qtyDiff = orderedTotal - deliveredTotal;
+        const productDiff = [];
+        orderedByProduct.forEach((orderedQty, pKey) => {
+          const deliveredQty = Number(deliveredByProduct.get(pKey) || 0);
+          if (deliveredQty + 0.0001 >= orderedQty) return;
+          productDiff.push({
+            product: orderedLabelByProduct.get(pKey) || pKey,
+            orderedQty,
+            deliveredQty,
+            diffQty: orderedQty - deliveredQty,
+          });
+        });
+        const reasonText = pickReasonText(g);
+        const noteText = Array.from(new Set((g.items || []).map((it) => String(it.note || '').trim()).filter(Boolean))).join(' | ');
 
-      if (productDiff.length || Math.abs(qtyDiff) > 0.0001) {
-        const productDiffText = productDiff.length
-          ? productDiff.map((x) => `${x.product}: ${fmt(x.orderedQty)} / ${fmt(x.deliveredQty)}`).join(' | ')
-          : '-';
-        productGapRows.push({
-          id: `left_gap_${g.soNum}_${g.mId}_${g.orderDate}`,
-          date: g.orderDate,
-          customerId: g.mId,
-          customer: g.contName,
-          orderId: g.soNum,
-          driver: g.delivPerson || '-',
-          orderedQty: orderedTotal,
-          deliveredQty: deliveredTotal,
-          diffQty: qtyDiff,
-          productDiffText,
-          note: noteText,
-          reason: reasonText,
-          statusText: productDiff.length ? "Mahsulot to'liq berilmagan" : 'Soni mos emas',
-          soGroup: g,
-        });
-      }
-    });
+        if (!hasArchive) {
+          missingRows.push({
+            id: `left_missing_${g.soNum}_${g.mId}_${g.orderDate}`,
+            date: g.orderDate,
+            customerId: g.mId,
+            customer: g.contName,
+            orderId: g.soNum,
+            uid: (g.items || []).map((it) => String(it.uniqueId || '').trim()).filter(Boolean)[0] || '',
+            driver: g.delivPerson || '-',
+            qty: orderedTotal,
+            sumUZS: Number(g.totalSumUZS || 0),
+            note: noteText,
+            reason: reasonText,
+            statusText: "Arxivda mijoz ID topilmadi (zakaz bormagan)",
+            soGroup: g,
+          });
+          return;
+        }
+
+        if (productDiff.length || Math.abs(qtyDiff) > 0.0001) {
+          const productDiffText = productDiff.length
+            ? productDiff.map((x) => `${x.product}: ${fmt(x.orderedQty)} / ${fmt(x.deliveredQty)}`).join(' | ')
+            : '-';
+          productGapRows.push({
+            id: `left_gap_${g.soNum}_${g.mId}_${g.orderDate}`,
+            date: g.orderDate,
+            customerId: g.mId,
+            customer: g.contName,
+            orderId: g.soNum,
+            driver: g.delivPerson || '-',
+            orderedQty: orderedTotal,
+            deliveredQty: deliveredTotal,
+            diffQty: qtyDiff,
+            productDiffText,
+            note: noteText,
+            reason: reasonText,
+            statusText: productDiff.length ? "Mahsulot to'liq berilmagan" : 'Soni mos emas',
+            soGroup: g,
+          });
+        }
+      });
+  }
 
   const reasonDetailedRows = reasonRows.map((r) => {
     const bySo = orderBySoNum.get(normalizeMatchText(r.orderId));
@@ -1379,8 +1531,10 @@ const buildLeftoverAnalysis = ({
   const sortedReasonDetailedRows = withNo([...reasonDetailedRows].sort(sortByDateDesc));
 
   return {
+    source: scopedQziRows.length ? 'qzi' : 'legacy',
     compareDate,
     reasonRows,
+    qziRows: scopedQziRows,
     archiveRows,
     orderGroups: scopedOrderGroups,
     missingRows: sortedMissingRows,
@@ -7634,6 +7788,7 @@ function LeftOrdersPage({
   company='murodbaxsh',
   currentUser='Admin',
   currentAccess=null,
+  rawQziSheetRows=[],
   rawReasonSheetRows=[],
   rawArchiveSheetRows=[],
   loading=false,
@@ -7653,17 +7808,20 @@ function LeftOrdersPage({
   );
   const analysis = useMemo(() => buildLeftoverAnalysis({
     rawOrders: D.rawOrders || [],
+    rawQziRows: rawQziSheetRows || [],
     rawReasonRows: rawReasonSheetRows || [],
     rawArchiveRows: rawArchiveSheetRows || [],
     targetDate: compareDate,
     currentUser,
     canSeeAll,
     allowedCustomerIds: canSeeAll ? null : scopedCustomerIds,
-  }), [D.rawOrders, D.customers, rawReasonSheetRows, rawArchiveSheetRows, compareDate, currentUser, canSeeAll, scopedCustomerIds]);
+    includeAllQziRows: true,
+  }), [D.rawOrders, D.customers, rawQziSheetRows, rawReasonSheetRows, rawArchiveSheetRows, compareDate, currentUser, canSeeAll, scopedCustomerIds]);
   const reasonRows = analysis.reasonRows || [];
   const missingRows = analysis.missingRows || [];
   const reasonDetailedRows = analysis.reasonDetailedRows || [];
   const productGapRows = analysis.productGapRows || [];
+  const usingQziSource = analysis.source === 'qzi';
 
   const leftColumns = useMemo(() => ([
     { key:'no', label:'No', type:'number' },
@@ -7757,7 +7915,9 @@ function LeftOrdersPage({
             <button className={`tab${tab==='gap'?' on':''}`} onClick={()=>setTab('gap')}>Mahsulot berilmagan</button>
           </div>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Kompaniya: {companyLabelByKey(company)}</span>
-          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Sana: {compareDate || '-'}</span>
+          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>
+            Sana: {usingQziSource ? "Barchasi (Q_Z_I)" : (compareDate || '-')}
+          </span>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Qolib ketgan: {missingRows.length}</span>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Mahsulot farqi: {productGapRows.length}</span>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Sabablar: {reasonRows.length}</span>
@@ -7813,7 +7973,9 @@ function LeftOrdersPage({
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
-                  <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Kechagi qolib ketgan zakaz topilmadi</td></tr>
+                  <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>
+                    {usingQziSource ? "Q_Z_I listida yozuv topilmadi" : 'Kechagi qolib ketgan zakaz topilmadi'}
+                  </td></tr>
                 ) : filteredRows.map((r, i) => (
                   <tr
                     key={`left_${i}_${r.orderId}_${r.date}`}
@@ -8899,6 +9061,7 @@ export default function App() {
   const [obzvonRecords,setObzvonRecords] = useState(() => S.get('aq-obzvon-records', []));
   const [obzvonAllRows,setObzvonAllRows] = useState(() => S.get('aq-obzvon-all-rows', []));
   const [obzvonAllNewRows,setObzvonAllNewRows] = useState(() => S.get('aq-obzvon-all-new-rows', []));
+  const [leftoverQziSheetRows, setLeftoverQziSheetRows] = useState([]);
   const [leftoverReasonSheetRows, setLeftoverReasonSheetRows] = useState([]);
   const [leftoverArchiveSheetRows, setLeftoverArchiveSheetRows] = useState([]);
   const [leftoverEmployeeSheetRows, setLeftoverEmployeeSheetRows] = useState([]);
@@ -9383,11 +9546,13 @@ export default function App() {
     setLeftoverSheetLoading(true);
     setLeftoverSheetError('');
     try {
-      const [reasonSheet, archiveSheet, employeeSheet] = await Promise.all([
+      const [qziSheet, reasonSheet, archiveSheet, employeeSheet] = await Promise.all([
+        loadOne(LEFTOVER_QZI_GID, 'Q_Z_I', 'Q_Z_I').catch(() => []),
         loadOne(LEFTOVER_REASON_GID, 'Qolib_ketgan_zakazlar_Arxiv', 'Qolib_ketgan_zakazlar_Arxiv'),
         loadOne(LEFTOVER_ARCHIVE_GID, 'Arxiv', 'Arxiv'),
         loadOne(LEFTOVER_EMPLOYEES_GID, 'XODIMLAR', 'XODIMLAR').catch(() => []),
       ]);
+      setLeftoverQziSheetRows(Array.isArray(qziSheet) ? qziSheet : []);
       setLeftoverReasonSheetRows(Array.isArray(reasonSheet) ? reasonSheet : []);
       setLeftoverArchiveSheetRows(Array.isArray(archiveSheet) ? archiveSheet : []);
       setLeftoverEmployeeSheetRows(Array.isArray(employeeSheet) ? employeeSheet : []);
@@ -10024,13 +10189,15 @@ export default function App() {
   const visibleNav = NAV.filter((n) => canViewPage(n.id));
   const leftoverAlertAnalysis = useMemo(() => buildLeftoverAnalysis({
     rawOrders: D.rawOrders || [],
+    rawQziRows: leftoverQziSheetRows || [],
     rawReasonRows: leftoverReasonSheetRows || [],
     rawArchiveRows: leftoverArchiveSheetRows || [],
     targetDate: leftoverTargetDate,
     currentUser: effectiveUser,
     canSeeAll: (currentAccess?.scope || 'all') === 'all',
     allowedCustomerIds: (currentAccess?.scope || 'all') === 'all' ? null : companyCustomerIds,
-  }), [D.rawOrders, leftoverReasonSheetRows, leftoverArchiveSheetRows, leftoverTargetDate, effectiveUser, currentAccess, companyCustomerIds]);
+    includeAllQziRows: false,
+  }), [D.rawOrders, leftoverQziSheetRows, leftoverReasonSheetRows, leftoverArchiveSheetRows, leftoverTargetDate, effectiveUser, currentAccess, companyCustomerIds]);
   const companyLeftMissingRows = leftoverAlertAnalysis.missingRows || [];
   const companyLeftProductGapRows = leftoverAlertAnalysis.productGapRows || [];
   const pageMeta = NAV.find((n)=>n.id===page) || { id:'settings', icon:E.settings, label:'Nastroyka' };
@@ -10768,6 +10935,7 @@ export default function App() {
                     company={activeCompany}
                     currentUser={effectiveUser}
                     currentAccess={currentAccess}
+                    rawQziSheetRows={leftoverQziSheetRows}
                     rawReasonSheetRows={leftoverReasonSheetRows}
                     rawArchiveSheetRows={leftoverArchiveSheetRows}
                     loading={leftoverSheetLoading}
