@@ -1092,11 +1092,15 @@ const buildLeftoverAnalysis = ({
       });
   const archiveRows = parseLeftoverArchiveRows(rawArchiveRows);
   const orderGroups = buildOrderGroupsFromRawOrders(rawOrders);
+  const currentUserNorm = normalizeMatchText(currentUser);
+  const scopedOrderGroups = canSeeAll
+    ? orderGroups
+    : orderGroups.filter((g) => normalizeMatchText(g.delivPerson || g.agent || '') === currentUserNorm);
 
   const orderBySoNum = new Map();
   const orderByUid = new Map();
   const orderByDateCustomer = new Map();
-  orderGroups.forEach((g) => {
+  scopedOrderGroups.forEach((g) => {
     const soKey = normalizeMatchText(g.soNum);
     if (soKey && !orderBySoNum.has(soKey)) orderBySoNum.set(soKey, g);
     const dcKey = `${g.orderDate}__${g.mId}`;
@@ -1143,7 +1147,7 @@ const buildLeftoverAnalysis = ({
 
   const missingRows = [];
   const productGapRows = [];
-  orderGroups
+  scopedOrderGroups
     .filter((g) => g.orderDate === compareDate)
     .forEach((g) => {
       const matchedArchiveRows = archiveByCustomerYesterday.get(g.mId) || [];
@@ -1275,7 +1279,7 @@ const buildLeftoverAnalysis = ({
     compareDate,
     reasonRows,
     archiveRows,
-    orderGroups,
+    orderGroups: scopedOrderGroups,
     missingRows: sortedMissingRows,
     productGapRows: sortedProductGapRows,
     reasonDetailedRows: sortedReasonDetailedRows,
@@ -2797,6 +2801,8 @@ function normalizeAccessConfig(user, cfg) {
     normalized.visible.obzvon_new_delete = true;
     normalized.visible.obzvon_new_publish = true;
   }
+  // "Qolib ketgan zakazlar" bo'limi barcha foydalanuvchilar uchun doim ochiq.
+  normalized.visible.left_orders = true;
   return normalized;
 }
 
