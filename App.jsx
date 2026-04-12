@@ -8517,7 +8517,7 @@ function Reports({
         )}
 
         <div className="card" style={{overflow:'hidden',minHeight:0,flex:1,height:'calc(100vh - 132px)'}}>
-          <div style={{overflowX:'auto',overflowY:'auto',height:'100%',scrollbarGutter:'stable both-edges'}}>
+          <div style={{overflowX:'scroll',overflowY:'auto',height:'100%',scrollbarGutter:'stable both-edges'}}>
             {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' ? (
               <table className="tbl" style={{minWidth:1120}}>
                 <thead>
@@ -8529,7 +8529,7 @@ function Reports({
                     <th style={{textAlign:'right'}}>Zakaz suv soni</th>
                     <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
                     <th style={{textAlign:'right'}}>Farq</th>
-                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)',boxShadow:'-1px 0 0 var(--b1)',minWidth:180}}>Holat</th>
+                    <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Holat</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8546,7 +8546,7 @@ function Reports({
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
-                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',position:'sticky',right:0,zIndex:2,background:r.status === 'OK' ? 'var(--s1)' : 'linear-gradient(0deg, rgba(248,81,73,.08), rgba(248,81,73,.08)), var(--s1)',boxShadow:'-1px 0 0 var(--b1)',minWidth:180,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
+                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',background:r.status === 'OK' ? 'var(--s1)' : 'rgba(248,81,73,.08)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
                         </tr>
                       ))}
                       {nazoratView === 'all' && (
@@ -8578,7 +8578,7 @@ function Reports({
                     <th style={{textAlign:'right'}}>Summa UZS</th>
                     <th>Dostavchik</th>
                     <th>Zakazlar</th>
-                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)',boxShadow:'-1px 0 0 var(--b1)',minWidth:180}}>Holat</th>
+                    <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Holat</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8595,7 +8595,7 @@ function Reports({
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
                       <td style={{maxWidth:190}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.driversText || '-'}</span></td>
                       <td style={{maxWidth:230}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.docsText || '-'}</span></td>
-                      <td style={{fontSize:11,color:r.docsCount > 1 ? 'var(--rd)' : 'var(--gr)',position:'sticky',right:0,zIndex:2,background:r.docsCount > 1 ? 'linear-gradient(0deg, rgba(248,81,73,.08), rgba(248,81,73,.08)), var(--s1)' : 'var(--s1)',boxShadow:'-1px 0 0 var(--b1)',minWidth:180,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
+                      <td style={{fontSize:11,color:r.docsCount > 1 ? 'var(--rd)' : 'var(--gr)',background:r.docsCount > 1 ? 'rgba(248,81,73,.08)' : 'var(--s1)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -8613,7 +8613,7 @@ function Reports({
                     <th>Dostavchik</th>
                     <th>Sklad</th>
                     <th>Izoh</th>
-                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)',boxShadow:'-1px 0 0 var(--b1)',minWidth:180}}>Status</th>
+                    <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8630,7 +8630,7 @@ function Reports({
                       <td>{r.driver}</td>
                       <td>{r.warehouse || '-'}</td>
                       <td style={{maxWidth:260}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
-                      <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)',position:'sticky',right:0,zIndex:2,background:r.hasOrder ? 'var(--s1)' : 'linear-gradient(0deg, rgba(248,81,73,.08), rgba(248,81,73,.08)), var(--s1)',boxShadow:'-1px 0 0 var(--b1)',minWidth:180,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
+                      <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)',background:r.hasOrder ? 'var(--s1)' : 'rgba(248,81,73,.08)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -8645,9 +8645,7 @@ function Reports({
                         key={`nh_${c.key}`}
                         style={
                           c.key === 'status'
-                            ? (nazoratSection === 'cash'
-                                ? { minWidth:210, whiteSpace:'nowrap' }
-                                : { position:'sticky', right:0, zIndex:4, background:'var(--s1)', boxShadow:'-1px 0 0 var(--b1)', minWidth:180, maxWidth:220 })
+                            ? { width:220, minWidth:220, maxWidth:220, whiteSpace:'nowrap' }
                             : (c.type === 'number' ? { textAlign: 'right' } : undefined)
                         }
                       >
@@ -8682,18 +8680,12 @@ function Reports({
                             baseStyle.fontSize = 11;
                             baseStyle.color = isWarn ? 'var(--rd)' : 'var(--gr)';
                             baseStyle.background = isWarn ? 'rgba(248,81,73,.08)' : undefined;
-                            baseStyle.minWidth = nazoratSection === 'cash' ? 210 : 180;
-                            baseStyle.maxWidth = nazoratSection === 'cash' ? 260 : 220;
+                            baseStyle.width = 220;
+                            baseStyle.minWidth = 220;
+                            baseStyle.maxWidth = 220;
                             baseStyle.whiteSpace = 'nowrap';
                             baseStyle.overflow = 'hidden';
                             baseStyle.textOverflow = 'ellipsis';
-                            if (nazoratSection !== 'cash') {
-                              baseStyle.position = 'sticky';
-                              baseStyle.right = 0;
-                              baseStyle.zIndex = 2;
-                              baseStyle.background = isWarn ? 'linear-gradient(0deg, rgba(248,81,73,.08), rgba(248,81,73,.08)), var(--s1)' : 'var(--s1)';
-                              baseStyle.boxShadow = '-1px 0 0 var(--b1)';
-                            }
                           }
                           if (c.key === 'diffQty') {
                             baseStyle.color = Math.abs(Number(rawVal || 0)) > 0.0001 ? 'var(--rd)' : 'var(--gr)';
