@@ -8417,11 +8417,37 @@ function Reports({
       <div style={{display:'grid',gap:6,minHeight:0,flex:1}}>
         <div style={{display:'grid',gap:6}}>
           <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
-              <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
-              <button className={`tab${nazoratSection==='returns'?' on':''}`} onClick={()=>setNazoratSection('returns')}>Vozvrat nazorati</button>
-              <button className={`tab${nazoratSection==='gap'?' on':''}`} onClick={()=>setNazoratSection('gap')}>Zakaz farqi</button>
-              <button className={`tab${nazoratSection==='cash'?' on':''}`} onClick={()=>setNazoratSection('cash')}>Pul nazorati</button>
+            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',minWidth:0,flex:'1 1 auto'}}>
+              <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
+                <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
+                <button className={`tab${nazoratSection==='returns'?' on':''}`} onClick={()=>setNazoratSection('returns')}>Vozvrat nazorati</button>
+                <button className={`tab${nazoratSection==='gap'?' on':''}`} onClick={()=>setNazoratSection('gap')}>Zakaz farqi</button>
+                <button className={`tab${nazoratSection==='cash'?' on':''}`} onClick={()=>setNazoratSection('cash')}>Pul nazorati</button>
+              </div>
+              {nazoratSection === 'orders' && (
+                <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
+                  <button className={`tab${nazoratOrderSection==='transfer'?' on':''}`} onClick={()=>setNazoratOrderSection('transfer')}>Permesheniya nazorati</button>
+                  <button className={`tab${nazoratOrderSection==='duplicates'?' on':''}`} onClick={()=>setNazoratOrderSection('duplicates')}>Dublikat zakazlar</button>
+                </div>
+              )}
+              {nazoratSection === 'returns' && (
+                <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
+                  <button className={`tab${nazoratReturnSection==='return_order'?' on':''}`} onClick={()=>setNazoratReturnSection('return_order')}>Vozvrat & Zakaz</button>
+                  <button className={`tab${nazoratReturnSection==='return_return'?' on':''}`} onClick={()=>setNazoratReturnSection('return_return')}>Vozvrat & Vozvrat</button>
+                </div>
+              )}
+              {nazoratSection === 'gap' && (
+                <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
+                  <button className={`tab${nazoratGapSection==='customer'?' on':''}`} onClick={()=>setNazoratGapSection('customer')}>Mijoz hatosi</button>
+                  <button className={`tab${nazoratGapSection==='product'?' on':''}`} onClick={()=>setNazoratGapSection('product')}>Mahsulot hatosi</button>
+                  <button className={`tab${nazoratGapSection==='qty'?' on':''}`} onClick={()=>setNazoratGapSection('qty')}>Son hatosi</button>
+                </div>
+              )}
+              {nazoratSection === 'cash' && (
+                <div className="tabs" style={{display:'inline-flex'}}>
+                  <button className={`tab${nazoratCashSection==='payment'?' on':''}`} onClick={()=>setNazoratCashSection('payment')}>Kirim nazorati</button>
+                </div>
+              )}
             </div>
             <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',justifyContent:'flex-end'}}>
               <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>
@@ -8453,41 +8479,15 @@ function Reports({
               </div>
             </div>
           </div>
-          <div style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            {nazoratSection === 'orders' && (
+          {nazoratSection === 'returns' && nazoratReturnSection === 'return_return' && (
+            <div style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',flexWrap:'wrap',width:'100%'}}>
               <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
-                <button className={`tab${nazoratOrderSection==='transfer'?' on':''}`} onClick={()=>setNazoratOrderSection('transfer')}>Permesheniya nazorati</button>
-                <button className={`tab${nazoratOrderSection==='duplicates'?' on':''}`} onClick={()=>setNazoratOrderSection('duplicates')}>Dublikat zakazlar</button>
+                <button className={`tab${nazoratReturnDiffSection==='customer'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('customer')}>Mijoz hatosi</button>
+                <button className={`tab${nazoratReturnDiffSection==='product'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('product')}>Mahsulot hatosi</button>
+                <button className={`tab${nazoratReturnDiffSection==='qty'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('qty')}>Son hatosi</button>
               </div>
-            )}
-            {nazoratSection === 'returns' && (
-              <>
-                <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
-                  <button className={`tab${nazoratReturnSection==='return_order'?' on':''}`} onClick={()=>setNazoratReturnSection('return_order')}>Vozvrat & Zakaz</button>
-                  <button className={`tab${nazoratReturnSection==='return_return'?' on':''}`} onClick={()=>setNazoratReturnSection('return_return')}>Vozvrat & Vozvrat</button>
-                </div>
-                {nazoratReturnSection === 'return_return' && (
-                  <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
-                    <button className={`tab${nazoratReturnDiffSection==='customer'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('customer')}>Mijoz hatosi</button>
-                    <button className={`tab${nazoratReturnDiffSection==='product'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('product')}>Mahsulot hatosi</button>
-                    <button className={`tab${nazoratReturnDiffSection==='qty'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('qty')}>Son hatosi</button>
-                  </div>
-                )}
-              </>
-            )}
-            {nazoratSection === 'gap' && (
-              <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
-                <button className={`tab${nazoratGapSection==='customer'?' on':''}`} onClick={()=>setNazoratGapSection('customer')}>Mijoz hatosi</button>
-                <button className={`tab${nazoratGapSection==='product'?' on':''}`} onClick={()=>setNazoratGapSection('product')}>Mahsulot hatosi</button>
-                <button className={`tab${nazoratGapSection==='qty'?' on':''}`} onClick={()=>setNazoratGapSection('qty')}>Son hatosi</button>
-              </div>
-            )}
-            {nazoratSection === 'cash' && (
-              <div className="tabs" style={{display:'inline-flex'}}>
-                <button className={`tab${nazoratCashSection==='payment'?' on':''}`} onClick={()=>setNazoratCashSection('payment')}>Kirim nazorati</button>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' && (
@@ -8519,9 +8519,9 @@ function Reports({
         )}
 
         <div className="card" style={{overflow:'hidden',minHeight:0,flex:1,height:'calc(100vh - 132px)'}}>
-          <div style={{overflow:'auto',height:'100%'}}>
+          <div style={{overflowX:'scroll',overflowY:'auto',height:'100%',scrollbarGutter:'stable both-edges'}}>
             {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' ? (
-              <table className="tbl">
+              <table className="tbl" style={{minWidth:1120}}>
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8531,7 +8531,7 @@ function Reports({
                     <th style={{textAlign:'right'}}>Zakaz suv soni</th>
                     <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
                     <th style={{textAlign:'right'}}>Farq</th>
-                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)'}}>Holat</th>
+                    <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Holat</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8548,7 +8548,7 @@ function Reports({
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
-                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',position:'sticky',right:0,zIndex:2,background:r.status === 'OK' ? 'var(--s1)' : 'rgba(248,81,73,.08)'}}>{r.status}</td>
+                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',background:r.status === 'OK' ? 'var(--s1)' : 'rgba(248,81,73,.08)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
                         </tr>
                       ))}
                       {nazoratView === 'all' && (
@@ -8568,7 +8568,7 @@ function Reports({
                 </tbody>
               </table>
             ) : nazoratSection === 'orders' ? (
-              <table className="tbl">
+              <table className="tbl" style={{minWidth:1300}}>
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8580,7 +8580,7 @@ function Reports({
                     <th style={{textAlign:'right'}}>Summa UZS</th>
                     <th>Dostavchik</th>
                     <th>Zakazlar</th>
-                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)'}}>Holat</th>
+                    <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Holat</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8597,13 +8597,13 @@ function Reports({
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
                       <td style={{maxWidth:190}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.driversText || '-'}</span></td>
                       <td style={{maxWidth:230}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.docsText || '-'}</span></td>
-                      <td style={{fontSize:11,color:r.docsCount > 1 ? 'var(--rd)' : 'var(--gr)',position:'sticky',right:0,zIndex:2,background:r.docsCount > 1 ? 'rgba(248,81,73,.08)' : 'var(--s1)'}}>{r.status}</td>
+                      <td style={{fontSize:11,color:r.docsCount > 1 ? 'var(--rd)' : 'var(--gr)',background:r.docsCount > 1 ? 'rgba(248,81,73,.08)' : 'var(--s1)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : nazoratSection === 'returns' && nazoratReturnSection === 'return_order' ? (
-              <table className="tbl">
+              <table className="tbl" style={{minWidth:1380}}>
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8615,7 +8615,7 @@ function Reports({
                     <th>Dostavchik</th>
                     <th>Sklad</th>
                     <th>Izoh</th>
-                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)'}}>Status</th>
+                    <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8632,13 +8632,22 @@ function Reports({
                       <td>{r.driver}</td>
                       <td>{r.warehouse || '-'}</td>
                       <td style={{maxWidth:260}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
-                      <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)',position:'sticky',right:0,zIndex:2,background:r.hasOrder ? 'var(--s1)' : 'rgba(248,81,73,.08)'}}>{r.status}</td>
+                      <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)',background:r.hasOrder ? 'var(--s1)' : 'rgba(248,81,73,.08)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <table className="tbl">
+              <table
+                className="tbl"
+                style={{
+                  width:'max-content',
+                  minWidth: nazoratSection === 'cash'
+                    ? 2500
+                    : Math.max(1600, 240 + activeNazoratColumns.length * 160),
+                  tableLayout:'fixed',
+                }}
+              >
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8647,8 +8656,16 @@ function Reports({
                         key={`nh_${c.key}`}
                         style={
                           c.key === 'status'
-                            ? { position:'sticky', right:0, zIndex:4, background:'var(--s1)' }
-                            : (c.type === 'number' ? { textAlign: 'right' } : undefined)
+                            ? { width:260, minWidth:260, maxWidth:260, whiteSpace:'nowrap' }
+                            : (
+                              c.type === 'number'
+                                ? { textAlign:'right', width:130, minWidth:130, maxWidth:130 }
+                                : (c.type === 'date'
+                                    ? { width:110, minWidth:110, maxWidth:110 }
+                                : (c.key === 'customer'
+                                    ? { width:160, minWidth:160, maxWidth:160 }
+                                    : { width:180, minWidth:180, maxWidth:180 }))
+                            )
                         }
                       >
                         {c.label}
@@ -8674,17 +8691,40 @@ function Reports({
                           if (c.type === 'number') {
                             baseStyle.textAlign = 'right';
                             baseStyle.fontFamily = 'var(--mono)';
+                            baseStyle.width = 130;
+                            baseStyle.minWidth = 130;
+                            baseStyle.maxWidth = 130;
+                            baseStyle.whiteSpace = 'nowrap';
+                            baseStyle.overflow = 'hidden';
+                            baseStyle.textOverflow = 'ellipsis';
                           } else if (c.type === 'date') {
                             baseStyle.fontFamily = 'var(--mono)';
                             baseStyle.fontSize = 11;
+                            baseStyle.width = 110;
+                            baseStyle.minWidth = 110;
+                            baseStyle.maxWidth = 110;
+                            baseStyle.whiteSpace = 'nowrap';
+                            baseStyle.overflow = 'hidden';
+                            baseStyle.textOverflow = 'ellipsis';
+                          } else {
+                            const textColWidth = c.key === 'customer' ? 160 : 180;
+                            baseStyle.width = textColWidth;
+                            baseStyle.minWidth = textColWidth;
+                            baseStyle.maxWidth = textColWidth;
+                            baseStyle.whiteSpace = 'nowrap';
+                            baseStyle.overflow = 'hidden';
+                            baseStyle.textOverflow = 'ellipsis';
                           }
                           if (c.key === 'status') {
                             baseStyle.fontSize = 11;
                             baseStyle.color = isWarn ? 'var(--rd)' : 'var(--gr)';
-                            baseStyle.position = 'sticky';
-                            baseStyle.right = 0;
-                            baseStyle.zIndex = 2;
-                            baseStyle.background = isWarn ? 'rgba(248,81,73,.08)' : 'var(--s1)';
+                            baseStyle.background = isWarn ? 'rgba(248,81,73,.08)' : undefined;
+                            baseStyle.width = 260;
+                            baseStyle.minWidth = 260;
+                            baseStyle.maxWidth = 260;
+                            baseStyle.whiteSpace = 'nowrap';
+                            baseStyle.overflow = 'hidden';
+                            baseStyle.textOverflow = 'ellipsis';
                           }
                           if (c.key === 'diffQty') {
                             baseStyle.color = Math.abs(Number(rawVal || 0)) > 0.0001 ? 'var(--rd)' : 'var(--gr)';
