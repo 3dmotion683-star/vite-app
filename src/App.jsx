@@ -1554,6 +1554,7 @@ const sortByDateDescCustomerAsc = (a, b) => {
   return ia.localeCompare(ib, 'ru');
 };
 const CONTROL_COMPARE_START_DATE = '2026-03-02';
+const CONTROL_COMPARE_START_DATE_LABEL = '02.03.2026';
 const CONTROL_PRODUCT_MURODBAXSH_KEY = 'murodbaxsh 18.9l';
 const CONTROL_IGNORED_PRODUCT_MARKERS = [
   'kapsula olish kerak',
@@ -1598,9 +1599,12 @@ const buildBasketArchiveDifference = ({
   archiveRows = [],
   mode = 'order', // 'order' | 'return'
   startDate = CONTROL_COMPARE_START_DATE,
+  endDate = '',
   canSeeAll = true,
   currentUserNorm = '',
   activeCustomerIds = null,
+  resolveDriverName = (v) => String(v || '').trim() || '-',
+  shouldSkipDriver = () => false,
 }) => {
   const useReturnMode = mode === 'return';
   const allowedCustomerIds = activeCustomerIds instanceof Set ? activeCustomerIds : null;
@@ -1641,9 +1645,11 @@ const buildBasketArchiveDifference = ({
     const customerId = normalizeIdKey(o?.mId);
     if (!date || !customerId) return;
     if (startDate && date < startDate) return;
+    if (endDate && date > endDate) return;
     if (allowedCustomerIds && allowedCustomerIds.size && !allowedCustomerIds.has(customerId)) return;
 
-    const driver = String(o?.delivPerson || o?.agent || '').trim() || '-';
+    const driver = resolveDriverName(o?.delivPerson || o?.agent || '');
+    if (shouldSkipDriver(driver, o)) return;
     if (!canSeeAll && String(driver || '').trim().toLowerCase() !== String(currentUserNorm || '').trim().toLowerCase()) return;
 
     const key = `${date}__${customerId}`;
@@ -1678,10 +1684,12 @@ const buildBasketArchiveDifference = ({
     const customerId = normalizeIdKey(r?.customerId);
     if (!date || !customerId) return;
     if (startDate && date < startDate) return;
+    if (endDate && date > endDate) return;
     if (allowedCustomerIds && allowedCustomerIds.size && !allowedCustomerIds.has(customerId)) return;
     if (!canSeeAll && scopedCustomerIds.size && !scopedCustomerIds.has(customerId)) return;
 
-    const driver = String(r?.driver || '').trim() || '-';
+    const driver = resolveDriverName(r?.driver || '');
+    if (shouldSkipDriver(driver, r)) return;
     if (!canSeeAll && driver && driver !== '-' && String(driver || '').trim().toLowerCase() !== String(currentUserNorm || '').trim().toLowerCase()) return;
 
     const key = `${date}__${customerId}`;
@@ -2149,6 +2157,25 @@ const isMainWarehouseLabel = (v) => {
     s.includes('asosiysklad')
   );
 };
+const isVirtualWarehouseLabel = (v) => {
+  const s = normalizeWarehouseKey(v).replace(/\s+/g, '');
+  if (!s) return false;
+  return (
+    s.includes('virtual') ||
+    s.includes('vertual') ||
+    s.includes('виртуал')
+  );
+};
+const isVirtualDriverLabel = (v) => {
+  const s = normalizeMatchText(v).replace(/\s+/g, '');
+  if (!s) return false;
+  return (
+    s.includes('virtual') ||
+    s.includes('vertual') ||
+    s.includes('виртуал')
+  );
+};
+const normalizeCashboxKey = (v) => normalizeWarehouseKey(v).replace(/\s+/g, ' ').trim();
 const textHasAny = (text, needles = []) =>
   needles.some((n) => text === n || text.includes(n));
 const pickFirstBy = (candidates = [], predicate) => {
@@ -2194,6 +2221,27 @@ const isPaymentToCounterparty = (v) => {
     (t.includes('оплата') && t.includes('контрагент') && !isPaymentFromCounterparty(v)) ||
     (t.includes('oplata') && t.includes('kontragent') && t.includes(' to '))
   );
+};
+const detectPaymentMode = (...vals) => {
+  const t = normalizeMatchText(vals.filter(Boolean).join(' '));
+  if (!t) return '';
+  if (
+    t.includes('karta') ||
+    t.includes('карта') ||
+    t.includes('card') ||
+    t.includes('terminal')
+  ) {
+    return 'card';
+  }
+  if (
+    t.includes('naqt') ||
+    t.includes('нал') ||
+    t.includes('cash') ||
+    t.includes('налич')
+  ) {
+    return 'cash';
+  }
+  return '';
 };
 const isLikelyDocType = (v) => {
   const s = String(v || '').trim();
@@ -4416,33 +4464,35 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
       )}
       {viewMode === 'list' && (
         <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',position:'relative',zIndex:10}}>
-          <div className="sb" style={{flex:'0 1 360px',minWidth:180}}>
+          <div className="sb" style={{flex:'1 1 560px',minWidth:240,maxWidth:'none'}}>
             <span style={{color:'var(--t3)'}}>{E.find}</span>
             <input placeholder="Ism, telefon, ID bo'yicha..." value={search} onChange={(e)=>setS(e.target.value)}/>
           </div>
-          <div className="tabs" style={{display:'inline-flex'}}>
-            <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
-            <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <div className="tabs" style={{display:'inline-flex'}}>
+              <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
+              <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
+            </div>
+            <div style={{position:'relative'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                </svg>
+                Filtr ({universalFilterCount})
+              </button>
+              <UniversalFilterPanel
+                open={uFilterOpen}
+                title="Mijozlar filtri"
+                columns={customerFilterColumns}
+                rows={segmentCustomers}
+                state={uFilterState}
+                setState={setUFilterState}
+                onClose={()=>setUFilterOpen(false)}
+                width={620}
+              />
+            </div>
+            <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
           </div>
-          <div style={{position:'relative'}}>
-            <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-              </svg>
-              Filtr ({universalFilterCount})
-            </button>
-            <UniversalFilterPanel
-              open={uFilterOpen}
-              title="Mijozlar filtri"
-              columns={customerFilterColumns}
-              rows={segmentCustomers}
-              state={uFilterState}
-              setState={setUFilterState}
-              onClose={()=>setUFilterOpen(false)}
-              width={620}
-            />
-          </div>
-          <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
 
           {showAdv && (
               <div className="card" style={{position:'absolute',top:40,left:0,right:'auto',zIndex:50,width:'min(520px, calc(100vw - 24px))',padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)',overflow:'hidden'}}>
@@ -4554,7 +4604,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
             height="100%"
           />
           <div className="aq-map-toolbar">
-            <div className="sb" style={{flex:'1 1 320px',minWidth:220,maxWidth:420}}>
+            <div className="sb" style={{flex:'1 1 560px',minWidth:240,maxWidth:'none'}}>
               <span style={{color:'var(--t3)'}}>{E.find}</span>
               <input placeholder="Ism, telefon, ID bo'yicha..." value={search} onChange={(e)=>setS(e.target.value)}/>
             </div>
@@ -4580,6 +4630,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
                 width={620}
               />
             </div>
+            <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
             <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Xaritada: {mapPoints.length} ta</span>
           </div>
           {mapSelected && (
@@ -4991,17 +5042,16 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
             <button key={t} className={`tab${fType===t?' on':''}`} onClick={()=>setT(t)}>{l}</button>
           ))}
         </div>
-        <div className="tabs" style={{display:'inline-flex'}}>
-          <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
-          <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
-        </div>
-        {viewMode === 'list' && <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>}
       </div>
       {viewMode === 'list' && (
         <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-          <div className="sb" style={{flex:'0 1 420px',minWidth:220}}>
+          <div className="sb" style={{flex:'1 1 560px',minWidth:240,maxWidth:'none'}}>
             <span style={{color:'var(--t3)'}}>Qidiruv</span>
             <input placeholder="Mijoz, zakaz no..." value={search} onChange={(e)=>setS(e.target.value)} />
+          </div>
+          <div className="tabs" style={{display:'inline-flex'}}>
+            <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
+            <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
           </div>
           <div style={{position:'relative'}}>
             <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
@@ -5021,6 +5071,7 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
               width={620}
             />
           </div>
+          <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>
         </div>
       )}
 
@@ -5098,9 +5149,13 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
       ) : (
         <div className="card aq-map-wrap" style={{padding:8,flex:1,minHeight:0,display:'flex'}}>
           <div className="aq-map-toolbar">
-            <div className="sb" style={{flex:'1 1 360px',minWidth:220,maxWidth:520}}>
+            <div className="sb" style={{flex:'1 1 560px',minWidth:240,maxWidth:'none'}}>
               <span style={{color:'var(--t3)'}}>Qidiruv</span>
               <input placeholder="Mijoz, zakaz no..." value={search} onChange={(e)=>setS(e.target.value)} />
+            </div>
+            <div className="tabs" style={{display:'inline-flex'}}>
+              <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
+              <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
             </div>
             <div style={{position:'relative'}}>
               <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
@@ -5120,6 +5175,7 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
                 width={620}
               />
             </div>
+            <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>
             <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Nuqta: {mapPoints.length} ta</span>
             {!hasExplicitDateFilter && (
               <span className="tag" style={{background:'var(--bl2)',color:'var(--bl)'}}>Bugungi sana</span>
@@ -7242,6 +7298,7 @@ function Reports({
   planOffDays=[],
   obzvonNewRows=[],
   rawArchiveSheetRows=[],
+  rawEmployeeSheetRows=[],
   mode='reports',
 }) {
   const { rawOrders=[], warehouseTransfers=[] } = D;
@@ -7252,6 +7309,49 @@ function Reports({
   const currentUserNorm = String(currentUser || '').trim().toLowerCase();
   const showReport = mode !== 'nazorat';
   const showNazorat = mode !== 'reports';
+  const controlEndDate = getYesterdayIsoDate();
+  const employeeRows = useMemo(
+    () => parseLeftoverEmployeesRows(rawEmployeeSheetRows || []),
+    [rawEmployeeSheetRows]
+  );
+  const employeeNameById = useMemo(() => {
+    const m = {};
+    (employeeRows || []).forEach((r) => {
+      const id = normId(r.id);
+      if (id && r.name && !m[id]) m[id] = r.name;
+    });
+    return m;
+  }, [employeeRows]);
+  const employeeNameByEmail = useMemo(() => {
+    const m = {};
+    (employeeRows || []).forEach((r) => {
+      const email = String(r.email || '').trim().toLowerCase();
+      if (email && r.name && !m[email]) m[email] = r.name;
+    });
+    return m;
+  }, [employeeRows]);
+  const resolveNazoratDriverName = useCallback((rawDriver) => {
+    const raw = String(rawDriver || '').trim();
+    if (!raw) return '-';
+    const id = normId(raw);
+    if (id && employeeNameById[id]) return employeeNameById[id];
+    const email = raw.toLowerCase();
+    if (email && employeeNameByEmail[email]) return employeeNameByEmail[email];
+    const pair = raw.match(/^(\d+)\s*[,;]\s*(.+)$/);
+    if (pair) {
+      const byId = employeeNameById[normId(pair[1])];
+      if (byId) return byId;
+      const second = String(pair[2] || '').trim();
+      if (second) return second;
+    }
+    return raw;
+  }, [employeeNameByEmail, employeeNameById]);
+  const controlDateRangeLabel = useMemo(
+    () => `${CONTROL_COMPARE_START_DATE_LABEL} dan kechagi sanagacha (${fmtD(controlEndDate)})`,
+    [controlEndDate]
+  );
+  const isVirtualControlDriver = useCallback((v) => isVirtualDriverLabel(v), []);
+  const isVirtualControlWarehouse = useCallback((v) => isVirtualWarehouseLabel(v), []);
   const activeControlCustomerIds = useMemo(() => {
     return new Set(
       (D.customers || [])
@@ -7406,15 +7506,68 @@ function Reports({
     () => `aq-driver-warehouse-map-${normalizeCompanyKey(company)}`,
     [company]
   );
+  const cashStorageKey = useMemo(
+    () => `aq-driver-cash-map-${normalizeCompanyKey(company)}`,
+    [company]
+  );
+  const cardCashStorageKey = useMemo(
+    () => `aq-driver-card-cash-map-${normalizeCompanyKey(company)}`,
+    [company]
+  );
   const [driverWarehouseMap, setDriverWarehouseMap] = useState(() => S.get(mapStorageKey, {}));
+  const [driverCashMap, setDriverCashMap] = useState(() => S.get(cashStorageKey, {}));
+  const [driverCardCashMap, setDriverCardCashMap] = useState(() => S.get(cardCashStorageKey, {}));
   useEffect(() => {
     setDriverWarehouseMap(S.get(mapStorageKey, {}));
   }, [mapStorageKey]);
+  useEffect(() => {
+    setDriverCashMap(S.get(cashStorageKey, {}));
+  }, [cashStorageKey]);
+  useEffect(() => {
+    setDriverCardCashMap(S.get(cardCashStorageKey, {}));
+  }, [cardCashStorageKey]);
+  const resolvedDriverWarehouseMap = useMemo(() => {
+    const out = {};
+    Object.entries(driverWarehouseMap || {}).forEach(([driver, warehouse]) => {
+      const dRaw = String(driver || '').trim();
+      const dResolved = resolveNazoratDriverName(dRaw);
+      const val = String(warehouse || '').trim();
+      if (!dRaw || !val) return;
+      out[dRaw] = val;
+      if (dResolved && !out[dResolved]) out[dResolved] = val;
+    });
+    return out;
+  }, [driverWarehouseMap, resolveNazoratDriverName]);
+  const resolvedDriverCashMap = useMemo(() => {
+    const out = {};
+    Object.entries(driverCashMap || {}).forEach(([driver, cashbox]) => {
+      const dRaw = String(driver || '').trim();
+      const dResolved = resolveNazoratDriverName(dRaw);
+      const val = String(cashbox || '').trim();
+      if (!dRaw || !val) return;
+      out[dRaw] = val;
+      if (dResolved && !out[dResolved]) out[dResolved] = val;
+    });
+    return out;
+  }, [driverCashMap, resolveNazoratDriverName]);
+  const resolvedDriverCardCashMap = useMemo(() => {
+    const out = {};
+    Object.entries(driverCardCashMap || {}).forEach(([driver, cashbox]) => {
+      const dRaw = String(driver || '').trim();
+      const dResolved = resolveNazoratDriverName(dRaw);
+      const val = String(cashbox || '').trim();
+      if (!dRaw || !val) return;
+      out[dRaw] = val;
+      if (dResolved && !out[dResolved]) out[dResolved] = val;
+    });
+    return out;
+  }, [driverCardCashMap, resolveNazoratDriverName]);
   const [nazoratSection, setNazoratSection] = useState('orders');
   const [nazoratOrderSection, setNazoratOrderSection] = useState('transfer');
   const [nazoratReturnSection, setNazoratReturnSection] = useState('return_order');
   const [nazoratReturnDiffSection, setNazoratReturnDiffSection] = useState('customer');
   const [nazoratGapSection, setNazoratGapSection] = useState('customer');
+  const [nazoratCashSection, setNazoratCashSection] = useState('payment');
   const [nazoratView, setNazoratView] = useState('errors');
   const [nazoratFilterOpen, setNazoratFilterOpen] = useState(false);
   const [nazoratFilterState, setNazoratFilterState] = useState({});
@@ -7422,6 +7575,7 @@ function Reports({
     if (nazoratSection !== 'orders') setNazoratOrderSection('transfer');
     if (nazoratSection !== 'returns') setNazoratReturnSection('return_order');
     if (nazoratSection !== 'gap') setNazoratGapSection('customer');
+    if (nazoratSection !== 'cash') setNazoratCashSection('payment');
   }, [nazoratSection]);
   useEffect(() => {
     if (nazoratReturnSection !== 'return_return') setNazoratReturnDiffSection('customer');
@@ -7433,30 +7587,35 @@ function Reports({
       if (!isOrderDoc(o.docType)) return false;
       if (isCancelledStatus(o.status)) return false;
       if (!isMainWarehouseLabel(o.warehouse)) return false;
+      if (isVirtualControlWarehouse(o.warehouse)) return false;
       const dateKey = toIsoDate(o.orderDate);
       if (!dateKey) return false;
       if (dateKey < CONTROL_COMPARE_START_DATE) return false;
-      const driver = String(o.delivPerson || o.agent || '').trim();
+      if (controlEndDate && dateKey > controlEndDate) return false;
+      const driver = resolveNazoratDriverName(o.delivPerson || o.agent || '');
+      if (isVirtualControlDriver(driver)) return false;
       if (!driver) return false;
       return true;
     }).map((o) => ({
       date: toIsoDate(o.orderDate),
-      driver: String(o.delivPerson || o.agent || '').trim(),
+      driver: resolveNazoratDriverName(o.delivPerson || o.agent || ''),
       qty: Math.abs(toNum(o.qty)),
     }));
     if (!canSeeAllNazorat) {
       rows = rows.filter((r) => String(r.driver || '').trim().toLowerCase() === currentUserNorm);
     }
     return rows;
-  }, [rawOrders, canSeeAllNazorat, currentUserNorm]);
+  }, [rawOrders, canSeeAllNazorat, currentUserNorm, controlEndDate, resolveNazoratDriverName, isVirtualControlDriver, isVirtualControlWarehouse]);
 
   const transferRows = useMemo(() => {
     return (warehouseTransfers || []).filter((r) => {
       if (!isWaterProduct(r.product)) return false;
       if (!isMainWarehouseLabel(r.toWarehouse)) return false;
+      if (isVirtualControlWarehouse(r.toWarehouse) || isVirtualControlWarehouse(r.fromWarehouse)) return false;
       const d = toIsoDate(r.moveDate);
       if (!d) return false;
       if (d < CONTROL_COMPARE_START_DATE) return false;
+      if (controlEndDate && d > controlEndDate) return false;
       const from = String(r.fromWarehouse || '').trim();
       if (!from) return false;
       return true;
@@ -7465,7 +7624,7 @@ function Reports({
       fromWarehouse: String(r.fromWarehouse || '').trim(),
       qty: Math.abs(toNum(r.qty)),
     }));
-  }, [warehouseTransfers]);
+  }, [warehouseTransfers, controlEndDate, isVirtualControlWarehouse]);
 
   const { orderQtyByDriverDate, orderDatesByDriver } = useMemo(() => {
     const qtyMap = new Map();
@@ -7496,17 +7655,21 @@ function Reports({
   const allDrivers = useMemo(() => {
     const set = new Set([
       ...Array.from(orderDatesByDriver.keys()),
-      ...Object.keys(driverWarehouseMap || {}),
+      ...Object.keys(resolvedDriverWarehouseMap || {}),
     ]);
-    let rows = Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b, 'ru'));
+    let rows = Array.from(set)
+      .filter((x) => x && !isVirtualControlDriver(x))
+      .sort((a, b) => a.localeCompare(b, 'ru'));
     if (!canSeeAllNazorat) rows = rows.filter((x) => String(x || '').trim().toLowerCase() === currentUserNorm);
     return rows;
-  }, [orderDatesByDriver, driverWarehouseMap, canSeeAllNazorat, currentUserNorm]);
+  }, [orderDatesByDriver, resolvedDriverWarehouseMap, canSeeAllNazorat, currentUserNorm, isVirtualControlDriver]);
 
   const dailyControlRows = useMemo(() => {
     const out = [];
     allDrivers.forEach((driver) => {
-      const warehouse = String(driverWarehouseMap?.[driver] || '').trim();
+      if (isVirtualControlDriver(driver)) return;
+      const warehouse = String(resolvedDriverWarehouseMap?.[driver] || '').trim();
+      if (isVirtualControlWarehouse(warehouse)) return;
       const warehouseKey = normalizeWarehouseKey(warehouse);
       const orderDates = orderDatesByDriver.get(driver) || new Set();
       const transferDates = warehouseKey ? (transferDatesByWarehouse.get(warehouseKey) || new Set()) : new Set();
@@ -7528,7 +7691,7 @@ function Reports({
       });
     });
     return out.sort((a, b) => (a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date)));
-  }, [allDrivers, driverWarehouseMap, orderDatesByDriver, transferDatesByWarehouse, orderQtyByDriverDate, transferQtyByWarehouseDate]);
+  }, [allDrivers, resolvedDriverWarehouseMap, orderDatesByDriver, transferDatesByWarehouse, orderQtyByDriverDate, transferQtyByWarehouseDate, isVirtualControlDriver, isVirtualControlWarehouse]);
 
   const orderControlRows = useMemo(
     () => dailyControlRows.map((r) => ({
@@ -7548,11 +7711,14 @@ function Reports({
       if (!isOrderDoc(o.docType)) return;
       if (isCancelledStatus(o.status)) return;
       if (!isMainWarehouseLabel(o.warehouse)) return;
+      if (isVirtualControlWarehouse(o.warehouse)) return;
       const date = toIsoDate(o.orderDate);
       const customerId = String(o.mId || '').trim();
       if (!date || !customerId) return;
       if (date < CONTROL_COMPARE_START_DATE) return;
-      const driver = String(o.delivPerson || o.agent || '').trim() || '-';
+      if (controlEndDate && date > controlEndDate) return;
+      const driver = resolveNazoratDriverName(o.delivPerson || o.agent || '');
+      if (isVirtualControlDriver(driver)) return;
       if (!canSeeAllNazorat && String(driver).trim().toLowerCase() !== currentUserNorm) return;
       const orderId = String(o.soNum || '').trim();
       if (!orderId) return;
@@ -7606,7 +7772,7 @@ function Reports({
         status: Array.from(new Set(r.docs)).length > 1 ? 'Dublikat' : 'OK',
       }))
       .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
-  }, [rawOrders, canSeeAllNazorat, currentUserNorm]);
+  }, [rawOrders, canSeeAllNazorat, currentUserNorm, controlEndDate, resolveNazoratDriverName, isVirtualControlDriver, isVirtualControlWarehouse]);
   const duplicateMismatchRows = useMemo(
     () => duplicateOrderRows.filter((r) => r.docsCount > 1),
     [duplicateOrderRows]
@@ -7618,11 +7784,14 @@ function Reports({
       const date = toIsoDate(o.orderDate);
       if (!date) return false;
       if (date < CONTROL_COMPARE_START_DATE) return false;
+      if (controlEndDate && date > controlEndDate) return false;
       const customerId = String(o.mId || '').trim();
       if (!customerId) return false;
       if (!activeControlCustomerIds.has(customerId)) return false;
+      if (isVirtualControlWarehouse(o.warehouse)) return false;
+      const person = resolveNazoratDriverName(o.delivPerson || o.agent || '');
+      if (isVirtualControlDriver(person)) return false;
       if (!canSeeAllNazorat) {
-        const person = String(o.delivPerson || o.agent || '').trim();
         if (String(person || '').trim().toLowerCase() !== currentUserNorm) return false;
       }
       return true;
@@ -7644,7 +7813,7 @@ function Reports({
           customer: String(o.contName || '').trim() || `ID ${customerId}`,
           returnNo: String(o.soNum || '').trim(),
           qty: Math.abs(toNum(o.qty)),
-          driver: String(o.delivPerson || o.agent || '').trim() || '-',
+          driver: resolveNazoratDriverName(o.delivPerson || o.agent || ''),
           warehouse: String(o.warehouse || '').trim() || '-',
           note: String(o.note || '').trim() || String(o.cat || '').trim() || '-',
           hasOrder,
@@ -7652,31 +7821,198 @@ function Reports({
         };
       })
       .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
-  }, [rawOrders, activeControlCustomerIds, canSeeAllNazorat, currentUserNorm]);
+  }, [rawOrders, activeControlCustomerIds, canSeeAllNazorat, currentUserNorm, controlEndDate, resolveNazoratDriverName, isVirtualControlDriver]);
   const returnMismatchRows = useMemo(
     () => returnControlRows.filter((r) => !r.hasOrder),
     [returnControlRows]
   );
   const parsedArchiveRows = useMemo(
-    () => parseLeftoverArchiveRows(rawArchiveSheetRows || []),
-    [rawArchiveSheetRows]
+    () => (parseLeftoverArchiveRows(rawArchiveSheetRows || []) || []).map((r) => ({
+      ...r,
+      driver: resolveNazoratDriverName(r?.driver || ''),
+    })),
+    [rawArchiveSheetRows, resolveNazoratDriverName]
   );
   const orderArchiveDiff = useMemo(() => buildBasketArchiveDifference({
     rawOrders,
     archiveRows: parsedArchiveRows,
     mode: 'order',
+    startDate: CONTROL_COMPARE_START_DATE,
+    endDate: controlEndDate,
     canSeeAll: canSeeAllNazorat,
     currentUserNorm,
     activeCustomerIds: activeControlCustomerIds,
-  }), [rawOrders, parsedArchiveRows, canSeeAllNazorat, currentUserNorm, activeControlCustomerIds]);
+    resolveDriverName: resolveNazoratDriverName,
+    shouldSkipDriver: (driver, row) => isVirtualControlDriver(driver) || isVirtualControlWarehouse(row?.warehouse),
+  }), [rawOrders, parsedArchiveRows, canSeeAllNazorat, currentUserNorm, activeControlCustomerIds, controlEndDate, resolveNazoratDriverName, isVirtualControlDriver, isVirtualControlWarehouse]);
   const returnArchiveDiff = useMemo(() => buildBasketArchiveDifference({
     rawOrders,
     archiveRows: parsedArchiveRows,
     mode: 'return',
+    startDate: CONTROL_COMPARE_START_DATE,
+    endDate: controlEndDate,
     canSeeAll: canSeeAllNazorat,
     currentUserNorm,
     activeCustomerIds: activeControlCustomerIds,
-  }), [rawOrders, parsedArchiveRows, canSeeAllNazorat, currentUserNorm, activeControlCustomerIds]);
+    resolveDriverName: resolveNazoratDriverName,
+    shouldSkipDriver: (driver, row) => isVirtualControlDriver(driver) || isVirtualControlWarehouse(row?.warehouse),
+  }), [rawOrders, parsedArchiveRows, canSeeAllNazorat, currentUserNorm, activeControlCustomerIds, controlEndDate, resolveNazoratDriverName, isVirtualControlDriver, isVirtualControlWarehouse]);
+  const pickExpectedCashbox = useCallback((driverName, payMode) => {
+    const driver = String(driverName || '').trim();
+    if (!driver) return '';
+    if (payMode === 'card') return String(resolvedDriverCardCashMap?.[driver] || '').trim();
+    return String(resolvedDriverCashMap?.[driver] || '').trim();
+  }, [resolvedDriverCardCashMap, resolvedDriverCashMap]);
+  const nazoratCashRowsAll = useMemo(() => {
+    const archiveMap = new Map();
+    const systemMap = new Map();
+    const dateInRange = (dateKey) => {
+      if (!dateKey) return false;
+      if (dateKey < CONTROL_COMPARE_START_DATE) return false;
+      if (controlEndDate && dateKey > controlEndDate) return false;
+      return true;
+    };
+    const upsert = (store, key, base) => {
+      if (!store.has(key)) {
+        store.set(key, {
+          date: String(base?.date || ''),
+          customerId: String(base?.customerId || ''),
+          customer: String(base?.customer || '').trim() || `ID ${String(base?.customerId || '').trim()}`,
+          driver: String(base?.driver || '-').trim() || '-',
+          payMode: String(base?.payMode || ''),
+          expectedCashbox: String(base?.expectedCashbox || '').trim(),
+          archiveAmount: 0,
+          systemAmount: 0,
+          systemWrongCashboxAmount: 0,
+          systemCashboxes: new Set(),
+          status: 'OK',
+        });
+      }
+      return store.get(key);
+    };
+
+    (parsedArchiveRows || []).forEach((r) => {
+      const date = toIsoDate(r?.date);
+      const customerId = normalizeIdKey(r?.customerId);
+      const amount = Math.abs(toNum(r?.payAmount));
+      if (!dateInRange(date) || !customerId || amount <= 0.0001) return;
+      if (!activeControlCustomerIds.has(customerId)) return;
+      const payMode = detectPaymentMode(r?.payType);
+      if (!payMode) return;
+      const driver = resolveNazoratDriverName(r?.driver || '');
+      if (isVirtualControlDriver(driver)) return;
+      if (!canSeeAllNazorat && String(driver || '').trim().toLowerCase() !== currentUserNorm) return;
+      const expectedCashbox = pickExpectedCashbox(driver, payMode);
+      const key = `${date}__${customerId}__${driver}__${payMode}__${normalizeCashboxKey(expectedCashbox)}`;
+      const row = upsert(archiveMap, key, {
+        date,
+        customerId,
+        customer: r?.customer,
+        driver,
+        payMode,
+        expectedCashbox,
+      });
+      row.archiveAmount += amount;
+    });
+
+    const systemCashRows = D?.rawCash || D?.cashbox || [];
+    (systemCashRows || []).forEach((r) => {
+      if (!isPaymentFromCounterparty(r?.opType)) return;
+      const date = toIsoDate(r?.sana);
+      const customerId = normalizeIdKey(r?.mId);
+      const amount = Math.abs(toNum(r?.amount));
+      if (!dateInRange(date) || !customerId || amount <= 0.0001) return;
+      if (!activeControlCustomerIds.has(customerId)) return;
+
+      const driver = resolveNazoratDriverName(r?.operator || '');
+      if (isVirtualControlDriver(driver)) return;
+      if (!canSeeAllNazorat && String(driver || '').trim().toLowerCase() !== currentUserNorm) return;
+
+      const cashbox = String(r?.kassa || '').trim();
+      let payMode = detectPaymentMode(r?.opType, r?.note, cashbox);
+      if (!payMode) {
+        const byCard = normalizeCashboxKey(pickExpectedCashbox(driver, 'card'));
+        const kKey = normalizeCashboxKey(cashbox);
+        payMode = (kKey && byCard && kKey === byCard) ? 'card' : 'cash';
+      }
+      const expectedCashbox = pickExpectedCashbox(driver, payMode);
+      const key = `${date}__${customerId}__${driver}__${payMode}__${normalizeCashboxKey(expectedCashbox)}`;
+      const row = upsert(systemMap, key, {
+        date,
+        customerId,
+        customer: r?.contName,
+        driver,
+        payMode,
+        expectedCashbox,
+      });
+      const expectedKey = normalizeCashboxKey(expectedCashbox);
+      const actualKey = normalizeCashboxKey(cashbox);
+      row.systemCashboxes.add(cashbox || '-');
+      if (expectedKey && actualKey && expectedKey !== actualKey) {
+        row.systemWrongCashboxAmount += amount;
+      } else if (expectedKey && !actualKey) {
+        row.systemWrongCashboxAmount += amount;
+      } else {
+        row.systemAmount += amount;
+      }
+    });
+
+    const keys = new Set([...archiveMap.keys(), ...systemMap.keys()]);
+    return Array.from(keys).map((key, idx) => {
+      const a = archiveMap.get(key);
+      const s = systemMap.get(key);
+      const base = a || s || {};
+      const archiveAmount = Number(a?.archiveAmount || 0);
+      const systemAmount = Number(s?.systemAmount || 0);
+      const systemWrongCashboxAmount = Number(s?.systemWrongCashboxAmount || 0);
+      const expectedCashbox = String(base.expectedCashbox || '').trim();
+      const diff = archiveAmount - systemAmount;
+      let status = 'OK';
+      if (!expectedCashbox) {
+        status = 'Kassa biriktirilmagan';
+      } else if (archiveAmount > 0.0001 && systemAmount <= 0.0001 && systemWrongCashboxAmount > 0.0001) {
+        status = 'Kassa mos emas';
+      } else if (archiveAmount > 0.0001 && systemAmount <= 0.0001) {
+        status = 'Sistemada pul topilmadi';
+      } else if (archiveAmount <= 0.0001 && (systemAmount + systemWrongCashboxAmount) > 0.0001) {
+        status = 'Arxivda pul topilmadi';
+      } else if (Math.abs(diff) > 0.0001) {
+        status = 'Summa mos emas';
+      } else if (systemWrongCashboxAmount > 0.0001) {
+        status = 'Kassa mos emas';
+      }
+      return {
+        id: `cash_ctrl_${idx + 1}_${base.date || ''}_${base.customerId || ''}`,
+        date: String(base.date || ''),
+        customerId: String(base.customerId || ''),
+        customer: String(base.customer || '').trim() || `ID ${String(base.customerId || '').trim()}`,
+        driver: String(base.driver || '-').trim() || '-',
+        payType: String(base.payMode || '') === 'card' ? 'Karta' : 'Naqt',
+        expectedCashbox: expectedCashbox || '-',
+        systemCashbox: s ? Array.from(s.systemCashboxes || []).filter(Boolean).join(', ') || '-' : '-',
+        archiveAmount,
+        systemAmount: systemAmount + systemWrongCashboxAmount,
+        matchedSystemAmount: systemAmount,
+        wrongCashboxAmount: systemWrongCashboxAmount,
+        diff,
+        status,
+      };
+    }).sort(sortByDateDescCustomerAsc);
+  }, [
+    parsedArchiveRows,
+    D,
+    activeControlCustomerIds,
+    canSeeAllNazorat,
+    currentUserNorm,
+    controlEndDate,
+    resolveNazoratDriverName,
+    isVirtualControlDriver,
+    pickExpectedCashbox,
+  ]);
+  const nazoratCashRowsErrors = useMemo(
+    () => nazoratCashRowsAll.filter((r) => r.status !== 'OK'),
+    [nazoratCashRowsAll]
+  );
   const pickDiffRowsByCategory = useCallback((diffData, categoryKey, viewKey = 'errors') => {
     const key = String(categoryKey || 'customer');
     if (key === 'product') {
@@ -7784,6 +8120,20 @@ function Reports({
     { key:'qtyDiffText', label:'Son farqi', type:'text' },
     { key:'status', label:'Holat', type:'text' },
   ]), []);
+  const nazoratCashColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'payType', label:"To'lov turi", type:'text' },
+    { key:'expectedCashbox', label:'Biriktirilgan kassa', type:'text' },
+    { key:'systemCashbox', label:'Sistem kassasi', type:'text' },
+    { key:'archiveAmount', label:'Arxiv summa', type:'number' },
+    { key:'matchedSystemAmount', label:'Sistem summa', type:'number' },
+    { key:'wrongCashboxAmount', label:'Boshqa kassa summa', type:'number' },
+    { key:'diff', label:'Farq', type:'number' },
+    { key:'status', label:'Holat', type:'text' },
+  ]), []);
   const activeNazoratColumns = useMemo(() => {
     if (nazoratSection === 'orders') {
       return nazoratOrderSection === 'duplicates' ? nazoratOrderDuplicateColumns : nazoratOrderColumns;
@@ -7794,6 +8144,7 @@ function Reports({
       if (nazoratReturnDiffSection === 'qty') return nazoratReturnDiffQtyColumns;
       return nazoratReturnDiffCustomerColumns;
     }
+    if (nazoratSection === 'cash') return nazoratCashColumns;
     if (nazoratGapSection === 'product') return nazoratDiffProductColumns;
     if (nazoratGapSection === 'qty') return nazoratDiffQtyColumns;
     return nazoratDiffCustomerColumns;
@@ -7809,6 +8160,7 @@ function Reports({
     nazoratReturnDiffCustomerColumns,
     nazoratReturnDiffProductColumns,
     nazoratReturnDiffQtyColumns,
+    nazoratCashColumns,
     nazoratDiffCustomerColumns,
     nazoratDiffProductColumns,
     nazoratDiffQtyColumns,
@@ -7821,6 +8173,9 @@ function Reports({
     if (nazoratSection === 'returns') {
       if (nazoratReturnSection === 'return_order') return nazoratView === 'errors' ? returnMismatchRows : returnControlRows;
       return pickDiffRowsByCategory(returnArchiveDiff, nazoratReturnDiffSection, nazoratView);
+    }
+    if (nazoratSection === 'cash') {
+      return nazoratView === 'errors' ? nazoratCashRowsErrors : nazoratCashRowsAll;
     }
     return pickDiffRowsByCategory(orderArchiveDiff, nazoratGapSection, nazoratView);
   }, [
@@ -7836,6 +8191,8 @@ function Reports({
     duplicateOrderRows,
     returnMismatchRows,
     returnControlRows,
+    nazoratCashRowsAll,
+    nazoratCashRowsErrors,
     orderArchiveDiff,
     returnArchiveDiff,
     pickDiffRowsByCategory,
@@ -7884,6 +8241,9 @@ function Reports({
         return { fileName: `Vozvrat_vozvrat_son_hatolari_${todayIso}.xlsx`, sheetName: 'VozvratVozvratSon' };
       }
       return { fileName: `Vozvrat_vozvrat_mijoz_hatolari_${todayIso}.xlsx`, sheetName: 'VozvratVozvratMijoz' };
+    }
+    if (nazoratSection === 'cash') {
+      return { fileName: `Pul_nazorati_${todayIso}.xlsx`, sheetName: 'PulNazorati' };
     }
     if (nazoratGapSection === 'product') {
       return { fileName: `Zakaz_farqi_mahsulot_hatolari_${todayIso}.xlsx`, sheetName: 'ZakazFarqiMahsulot' };
@@ -8014,42 +8374,7 @@ function Reports({
 
       {showNazorat && (
       <div style={{display:'grid',gap:6,minHeight:0,flex:1}}>
-        <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          <div style={{display:'grid',gap:6}}>
-            <div className="tabs" style={{display:'inline-flex'}}>
-              <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
-              <button className={`tab${nazoratSection==='returns'?' on':''}`} onClick={()=>setNazoratSection('returns')}>Vozvrat nazorati</button>
-              <button className={`tab${nazoratSection==='gap'?' on':''}`} onClick={()=>setNazoratSection('gap')}>Zakaz farqi</button>
-            </div>
-            {nazoratSection === 'orders' && (
-              <div className="tabs" style={{display:'inline-flex',width:'fit-content'}}>
-                <button className={`tab${nazoratOrderSection==='transfer'?' on':''}`} onClick={()=>setNazoratOrderSection('transfer')}>Permesheniya nazorati</button>
-                <button className={`tab${nazoratOrderSection==='duplicates'?' on':''}`} onClick={()=>setNazoratOrderSection('duplicates')}>Dublikat zakazlar</button>
-              </div>
-            )}
-            {nazoratSection === 'returns' && (
-              <div style={{display:'grid',gap:6}}>
-                <div className="tabs" style={{display:'inline-flex',width:'fit-content'}}>
-                  <button className={`tab${nazoratReturnSection==='return_order'?' on':''}`} onClick={()=>setNazoratReturnSection('return_order')}>Vozvrat & Zakaz</button>
-                  <button className={`tab${nazoratReturnSection==='return_return'?' on':''}`} onClick={()=>setNazoratReturnSection('return_return')}>Vozvrat & Vozvrat</button>
-                </div>
-                {nazoratReturnSection === 'return_return' && (
-                  <div className="tabs" style={{display:'inline-flex',width:'fit-content'}}>
-                    <button className={`tab${nazoratReturnDiffSection==='customer'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('customer')}>Mijoz hatosi</button>
-                    <button className={`tab${nazoratReturnDiffSection==='product'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('product')}>Mahsulot hatosi</button>
-                    <button className={`tab${nazoratReturnDiffSection==='qty'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('qty')}>Son hatosi</button>
-                  </div>
-                )}
-              </div>
-            )}
-            {nazoratSection === 'gap' && (
-              <div className="tabs" style={{display:'inline-flex',width:'fit-content'}}>
-                <button className={`tab${nazoratGapSection==='customer'?' on':''}`} onClick={()=>setNazoratGapSection('customer')}>Mijoz hatosi</button>
-                <button className={`tab${nazoratGapSection==='product'?' on':''}`} onClick={()=>setNazoratGapSection('product')}>Mahsulot hatosi</button>
-                <button className={`tab${nazoratGapSection==='qty'?' on':''}`} onClick={()=>setNazoratGapSection('qty')}>Son hatosi</button>
-              </div>
-            )}
-          </div>
+        <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'flex-start',flexWrap:'wrap'}}>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>
             <div style={{position:'relative'}}>
@@ -8065,7 +8390,7 @@ function Reports({
                   ? (nazoratOrderSection === 'duplicates' ? 'Dublikat zakazlar filtri' : 'Zakaz nazorati filtri')
                   : (nazoratSection === 'returns'
                     ? (nazoratReturnSection === 'return_order' ? 'Vozvrat & Zakaz filtri' : 'Vozvrat & Vozvrat filtri')
-                    : 'Zakaz farqi filtri')}
+                    : (nazoratSection === 'cash' ? "Pul nazorati filtri" : 'Zakaz farqi filtri'))}
                 columns={activeNazoratColumns}
                 rows={activeNazoratBaseRows}
                 state={nazoratFilterState}
@@ -8079,28 +8404,74 @@ function Reports({
               <button className={`tab${nazoratView==='all'?' on':''}`} onClick={()=>setNazoratView('all')}>Barchasi</button>
             </div>
           </div>
+          <div style={{display:'grid',gap:6,justifyItems:'end'}}>
+            <div className="tabs" style={{display:'inline-flex',justifySelf:'end',flexWrap:'wrap'}}>
+              <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
+              <button className={`tab${nazoratSection==='returns'?' on':''}`} onClick={()=>setNazoratSection('returns')}>Vozvrat nazorati</button>
+              <button className={`tab${nazoratSection==='gap'?' on':''}`} onClick={()=>setNazoratSection('gap')}>Zakaz farqi</button>
+              <button className={`tab${nazoratSection==='cash'?' on':''}`} onClick={()=>setNazoratSection('cash')}>Pul nazorati</button>
+            </div>
+            {nazoratSection === 'orders' && (
+              <div className="tabs" style={{display:'inline-flex',justifySelf:'end',flexWrap:'wrap'}}>
+                <button className={`tab${nazoratOrderSection==='transfer'?' on':''}`} onClick={()=>setNazoratOrderSection('transfer')}>Permesheniya nazorati</button>
+                <button className={`tab${nazoratOrderSection==='duplicates'?' on':''}`} onClick={()=>setNazoratOrderSection('duplicates')}>Dublikat zakazlar</button>
+              </div>
+            )}
+            {nazoratSection === 'returns' && (
+              <div style={{display:'grid',gap:6,justifyItems:'end'}}>
+                <div className="tabs" style={{display:'inline-flex',justifySelf:'end',flexWrap:'wrap'}}>
+                  <button className={`tab${nazoratReturnSection==='return_order'?' on':''}`} onClick={()=>setNazoratReturnSection('return_order')}>Vozvrat & Zakaz</button>
+                  <button className={`tab${nazoratReturnSection==='return_return'?' on':''}`} onClick={()=>setNazoratReturnSection('return_return')}>Vozvrat & Vozvrat</button>
+                </div>
+                {nazoratReturnSection === 'return_return' && (
+                  <div className="tabs" style={{display:'inline-flex',justifySelf:'end',flexWrap:'wrap'}}>
+                    <button className={`tab${nazoratReturnDiffSection==='customer'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('customer')}>Mijoz hatosi</button>
+                    <button className={`tab${nazoratReturnDiffSection==='product'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('product')}>Mahsulot hatosi</button>
+                    <button className={`tab${nazoratReturnDiffSection==='qty'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('qty')}>Son hatosi</button>
+                  </div>
+                )}
+              </div>
+            )}
+            {nazoratSection === 'gap' && (
+              <div className="tabs" style={{display:'inline-flex',justifySelf:'end',flexWrap:'wrap'}}>
+                <button className={`tab${nazoratGapSection==='customer'?' on':''}`} onClick={()=>setNazoratGapSection('customer')}>Mijoz hatosi</button>
+                <button className={`tab${nazoratGapSection==='product'?' on':''}`} onClick={()=>setNazoratGapSection('product')}>Mahsulot hatosi</button>
+                <button className={`tab${nazoratGapSection==='qty'?' on':''}`} onClick={()=>setNazoratGapSection('qty')}>Son hatosi</button>
+              </div>
+            )}
+            {nazoratSection === 'cash' && (
+              <div className="tabs" style={{display:'inline-flex',justifySelf:'end'}}>
+                <button className={`tab${nazoratCashSection==='payment'?' on':''}`} onClick={()=>setNazoratCashSection('payment')}>Kirim nazorati</button>
+              </div>
+            )}
+          </div>
         </div>
 
         {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' && (
           <div style={{fontSize:11,color:'var(--t3)'}}>
-            Faqat "Основной склад"dan urilgan zakazlar hisobga olinadi. Dostavchik-sklad biriktirish: Nastroyka &gt; Biriktirish bo'limida.
+            Chegara: {controlDateRangeLabel}. Faqat "Основной склад"dan urilgan zakazlar hisobga olinadi. "Vertual" dostavchik/ombor nazoratga kirmaydi. Dostavchik-sklad biriktirish: Nastroyka &gt; Biriktirish bo'limida.
           </div>
         )}
         {nazoratSection === 'orders' && nazoratOrderSection === 'duplicates' && (
           <div style={{fontSize:11,color:'var(--t3)'}}>
-            Shu sana va shu mijoz uchun zakaz ID (soNum) 2 xil yoki undan ko'p bo'lsa dublikat deb ko'rsatiladi.
+            Chegara: {controlDateRangeLabel}. Shu sana va shu mijoz uchun zakaz ID (soNum) 2 xil yoki undan ko'p bo'lsa dublikat deb ko'rsatiladi.
           </div>
         )}
         {nazoratSection === 'returns' && (
           <div style={{fontSize:11,color:'var(--t3)'}}>
             {nazoratReturnSection === 'return_order'
-              ? `Vozvrat & Zakaz: shu sana va shu mijoz bo'yicha zakaz bo'lsa "Zakazi bor", bo'lmasa "Zakazi yo'q".`
-              : "Vozvrat & Vozvrat: item_basket vozvratlari arxivdagi qaytgan mahsulot bilan sana+mijoz bo'yicha solishtiriladi."}
+              ? `Chegara: ${controlDateRangeLabel}. Vozvrat & Zakaz: shu sana va shu mijoz bo'yicha zakaz bo'lsa "Zakazi bor", bo'lmasa "Zakazi yo'q".`
+              : `Chegara: ${controlDateRangeLabel}. Vozvrat & Vozvrat: item_basket vozvratlari arxivdagi qaytgan mahsulot bilan sana+mijoz bo'yicha solishtiriladi.`}
           </div>
         )}
         {nazoratSection === 'gap' && (
           <div style={{fontSize:11,color:'var(--t3)'}}>
-            Zakaz farqi: item_basket zakazlari arxivdagi berilgan mahsulot bilan sana+mijoz bo'yicha solishtiriladi.
+            Chegara: {controlDateRangeLabel}. Zakaz farqi: item_basket zakazlari arxivdagi berilgan mahsulot bilan sana+mijoz bo'yicha solishtiriladi.
+          </div>
+        )}
+        {nazoratSection === 'cash' && (
+          <div style={{fontSize:11,color:'var(--t3)'}}>
+            Chegara: {controlDateRangeLabel}. Arxivdagi naqt/karta to'lovlar Dostavchik uchun Nastroyka &gt; Biriktirishdagi kassa bilan solishtiriladi.
           </div>
         )}
 
@@ -8924,13 +9295,35 @@ function SettingsPanel({
     () => `aq-driver-warehouse-map-${normalizeCompanyKey(company)}`,
     [company]
   );
+  const bindingCashStorageKey = useMemo(
+    () => `aq-driver-cash-map-${normalizeCompanyKey(company)}`,
+    [company]
+  );
+  const bindingCardCashStorageKey = useMemo(
+    () => `aq-driver-card-cash-map-${normalizeCompanyKey(company)}`,
+    [company]
+  );
   const [driverWarehouseMap, setDriverWarehouseMap] = useState(() => S.get(bindingStorageKey, {}));
+  const [driverCashMap, setDriverCashMap] = useState(() => S.get(bindingCashStorageKey, {}));
+  const [driverCardCashMap, setDriverCardCashMap] = useState(() => S.get(bindingCardCashStorageKey, {}));
   useEffect(() => {
     setDriverWarehouseMap(S.get(bindingStorageKey, {}));
   }, [bindingStorageKey]);
   useEffect(() => {
+    setDriverCashMap(S.get(bindingCashStorageKey, {}));
+  }, [bindingCashStorageKey]);
+  useEffect(() => {
+    setDriverCardCashMap(S.get(bindingCardCashStorageKey, {}));
+  }, [bindingCardCashStorageKey]);
+  useEffect(() => {
     S.set(bindingStorageKey, driverWarehouseMap || {});
   }, [bindingStorageKey, driverWarehouseMap]);
+  useEffect(() => {
+    S.set(bindingCashStorageKey, driverCashMap || {});
+  }, [bindingCashStorageKey, driverCashMap]);
+  useEffect(() => {
+    S.set(bindingCardCashStorageKey, driverCardCashMap || {});
+  }, [bindingCardCashStorageKey, driverCardCashMap]);
   useEffect(() => {
     if (users.includes(sel)) return;
     setSel(users[0] || 'Admin');
@@ -8941,14 +9334,16 @@ function SettingsPanel({
       isOrderDoc(o.docType) &&
       !isCancelledStatus(o.status)
     ).map((o) => String(o.delivPerson || o.agent || '').trim()).filter(Boolean);
-    const uniq = Array.from(new Set(src)).sort((a, b) => a.localeCompare(b, 'ru'));
+    const uniq = Array.from(new Set(src))
+      .filter((d) => !isVirtualDriverLabel(d))
+      .sort((a, b) => a.localeCompare(b, 'ru'));
     if (isAdminSession) return uniq;
     return uniq.filter((d) => d === currentUser);
   }, [D, isAdminSession, currentUser]);
   const bindingWarehouses = useMemo(() => {
     const allTransfers = Array.isArray(D?.warehouseTransfers) ? D.warehouseTransfers : [];
     const strict = allTransfers
-      .filter((r) => isWaterProduct(r.product) && isMainWarehouseLabel(r.toWarehouse))
+      .filter((r) => isWaterProduct(r.product) && isMainWarehouseLabel(r.toWarehouse) && !isVirtualWarehouseLabel(r.fromWarehouse) && !isVirtualWarehouseLabel(r.toWarehouse))
       .map((r) => String(r.fromWarehouse || '').trim())
       .filter(Boolean);
     const strictUnique = Array.from(new Set(strict)).sort((a, b) => a.localeCompare(b, 'ru'));
@@ -8956,8 +9351,15 @@ function SettingsPanel({
 
     const fallback = allTransfers
       .map((r) => String(r.fromWarehouse || '').trim())
-      .filter(Boolean);
+      .filter((w) => w && !isVirtualWarehouseLabel(w));
     return Array.from(new Set(fallback)).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [D]);
+  const bindingCashboxes = useMemo(() => {
+    const allCash = Array.isArray(D?.cashbox) ? D.cashbox : [];
+    const list = allCash
+      .map((r) => String(r?.kassa || '').trim())
+      .filter(Boolean);
+    return Array.from(new Set(list)).sort((a, b) => a.localeCompare(b, 'ru'));
   }, [D]);
   const canEditBinding = !!isAdminSession;
   const allowedSettingsTabs = useMemo(() => {
@@ -9132,9 +9534,9 @@ function SettingsPanel({
 
       {tab==='binding' && (
         <div className="card" style={{padding:14}}>
-          <div style={{fontWeight:700,marginBottom:8}}>Dostavchik va sklad biriktirish</div>
+          <div style={{fontWeight:700,marginBottom:8}}>Dostavchik biriktirish</div>
           <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
-            Kompaniya: <strong style={{color:'var(--t1)'}}>{companyLabelByKey(company)}</strong>. Bu sozlama Nazorat bo'limi solishtiruvida ishlatiladi.
+            Kompaniya: <strong style={{color:'var(--t1)'}}>{companyLabelByKey(company)}</strong>. Bu sozlama Nazorat bo'limidagi sklad va pul solishtiruvida ishlatiladi.
           </div>
           <div style={{overflow:'auto',maxHeight:'56vh'}}>
             <table className="tbl">
@@ -9142,11 +9544,13 @@ function SettingsPanel({
                 <tr>
                   <th>Dostavchik</th>
                   <th>Sklad</th>
+                  <th>Naqt kassa</th>
+                  <th>Karta kassa</th>
                 </tr>
               </thead>
               <tbody>
                 {bindingDrivers.length === 0 ? (
-                  <tr><td colSpan={2} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Dostavchik topilmadi</td></tr>
+                  <tr><td colSpan={4} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Dostavchik topilmadi</td></tr>
                 ) : bindingDrivers.map((driver) => (
                   <tr key={driver}>
                     <td style={{fontWeight:600}}>{driver}</td>
@@ -9163,6 +9567,36 @@ function SettingsPanel({
                       >
                         <option value="">Sklad tanlanmagan</option>
                         {bindingWarehouses.map((w) => <option key={w} value={w}>{w}</option>)}
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        className="select"
+                        style={{minWidth:220}}
+                        value={String(driverCashMap?.[driver] || '')}
+                        disabled={!canEditBinding}
+                        onChange={(e) => {
+                          const val = String(e.target.value || '').trim();
+                          setDriverCashMap((prev) => ({ ...(prev || {}), [driver]: val }));
+                        }}
+                      >
+                        <option value="">Naqt uchun kassa tanlanmagan</option>
+                        {bindingCashboxes.map((k) => <option key={`cash_${k}`} value={k}>{k}</option>)}
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        className="select"
+                        style={{minWidth:220}}
+                        value={String(driverCardCashMap?.[driver] || '')}
+                        disabled={!canEditBinding}
+                        onChange={(e) => {
+                          const val = String(e.target.value || '').trim();
+                          setDriverCardCashMap((prev) => ({ ...(prev || {}), [driver]: val }));
+                        }}
+                      >
+                        <option value="">Karta uchun kassa tanlanmagan</option>
+                        {bindingCashboxes.map((k) => <option key={`card_${k}`} value={k}>{k}</option>)}
                       </select>
                     </td>
                   </tr>
@@ -11485,6 +11919,7 @@ export default function App() {
                     planOffDays={planOffDays}
                     obzvonNewRows={companyObzvonAllNewRows}
                     rawArchiveSheetRows={leftoverArchiveSheetRows}
+                    rawEmployeeSheetRows={leftoverEmployeeSheetRows}
                     mode="reports"
                   />
                 )}
@@ -11500,6 +11935,7 @@ export default function App() {
                     planOffDays={planOffDays}
                     obzvonNewRows={companyObzvonAllNewRows}
                     rawArchiveSheetRows={leftoverArchiveSheetRows}
+                    rawEmployeeSheetRows={leftoverEmployeeSheetRows}
                     mode="nazorat"
                   />
                 )}
