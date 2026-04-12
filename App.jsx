@@ -8645,7 +8645,9 @@ function Reports({
                         key={`nh_${c.key}`}
                         style={
                           c.key === 'status'
-                            ? { position:'sticky', right:0, zIndex:4, background:'var(--s1)', boxShadow:'-1px 0 0 var(--b1)', minWidth:180, maxWidth:220 }
+                            ? (nazoratSection === 'cash'
+                                ? { minWidth:210, whiteSpace:'nowrap' }
+                                : { position:'sticky', right:0, zIndex:4, background:'var(--s1)', boxShadow:'-1px 0 0 var(--b1)', minWidth:180, maxWidth:220 })
                             : (c.type === 'number' ? { textAlign: 'right' } : undefined)
                         }
                       >
@@ -8679,16 +8681,19 @@ function Reports({
                           if (c.key === 'status') {
                             baseStyle.fontSize = 11;
                             baseStyle.color = isWarn ? 'var(--rd)' : 'var(--gr)';
-                            baseStyle.position = 'sticky';
-                            baseStyle.right = 0;
-                            baseStyle.zIndex = 2;
-                            baseStyle.background = isWarn ? 'linear-gradient(0deg, rgba(248,81,73,.08), rgba(248,81,73,.08)), var(--s1)' : 'var(--s1)';
-                            baseStyle.boxShadow = '-1px 0 0 var(--b1)';
-                            baseStyle.minWidth = 180;
-                            baseStyle.maxWidth = 220;
+                            baseStyle.background = isWarn ? 'rgba(248,81,73,.08)' : undefined;
+                            baseStyle.minWidth = nazoratSection === 'cash' ? 210 : 180;
+                            baseStyle.maxWidth = nazoratSection === 'cash' ? 260 : 220;
                             baseStyle.whiteSpace = 'nowrap';
                             baseStyle.overflow = 'hidden';
                             baseStyle.textOverflow = 'ellipsis';
+                            if (nazoratSection !== 'cash') {
+                              baseStyle.position = 'sticky';
+                              baseStyle.right = 0;
+                              baseStyle.zIndex = 2;
+                              baseStyle.background = isWarn ? 'linear-gradient(0deg, rgba(248,81,73,.08), rgba(248,81,73,.08)), var(--s1)' : 'var(--s1)';
+                              baseStyle.boxShadow = '-1px 0 0 var(--b1)';
+                            }
                           }
                           if (c.key === 'diffQty') {
                             baseStyle.color = Math.abs(Number(rawVal || 0)) > 0.0001 ? 'var(--rd)' : 'var(--gr)';
