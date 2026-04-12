@@ -179,6 +179,7 @@ const E = {
   doc: '\u{1F4C4}',
   report: '\u{1F4CA}',
   plan: '\u{1F4C5}',
+  test: '\u{1F9EA}',
   bell: '\u{1F514}',
   water: '\u{1F4A7}',
   uzs: '\u{1F4B4}',
@@ -3488,7 +3489,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3497,7 +3498,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3506,7 +3507,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'all',
     role: 'admin',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
     ui: { theme:'dark' },
     company: { canSwitch:true, default:'murodbaxsh' },
   },
@@ -8524,7 +8525,7 @@ function Reports({
               <table className="tbl" style={{width:'max(100%, 1120px)',minWidth:1120,tableLayout:'fixed'}}>
                 <thead>
                   <tr>
-                    <th>No</th>
+                    <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
                     <th>Sana</th>
                     <th>Dostavchik</th>
                     <th>Sklad</th>
@@ -8541,7 +8542,7 @@ function Reports({
                     <>
                       {nazoratFilteredRows.map((r, i) => (
                         <tr key={`nord_${i}_${r.driver}_${r.date}`} style={r.status === 'OK' ? undefined : {background:'rgba(248,81,73,.07)'}}>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
                           <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                           <td>{r.driver}</td>
                           <td>{r.warehouse}</td>
@@ -8571,7 +8572,7 @@ function Reports({
               <table className="tbl" style={{width:'max(100%, 1300px)',minWidth:1300,tableLayout:'fixed'}}>
                 <thead>
                   <tr>
-                    <th>No</th>
+                    <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
                     <th>Sana</th>
                     <th>Mijoz ID</th>
                     <th>Mijoz</th>
@@ -8588,7 +8589,7 @@ function Reports({
                     <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Dublikat topilmadi' : "Ma'lumot topilmadi"}</td></tr>
                   ) : nazoratFilteredRows.map((r, i) => (
                     <tr key={`ndup_${i}_${r.customerId}_${r.date}`} style={r.docsCount > 1 ? {background:'rgba(248,81,73,.08)'} : undefined}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                       <td>{r.customer}</td>
@@ -8606,7 +8607,7 @@ function Reports({
               <table className="tbl" style={{width:'max(100%, 1380px)',minWidth:1380,tableLayout:'fixed'}}>
                 <thead>
                   <tr>
-                    <th>No</th>
+                    <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
                     <th>Sana</th>
                     <th>Mijoz ID</th>
                     <th>Mijoz</th>
@@ -8623,7 +8624,7 @@ function Reports({
                     <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
                   ) : nazoratFilteredRows.map((r, i) => (
                     <tr key={`nret_${i}_${r.customerId}_${r.date}`} style={r.hasOrder ? undefined : {background:'rgba(248,81,73,.08)'}}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                       <td>{r.customer}</td>
@@ -8652,7 +8653,7 @@ function Reports({
               >
                 <thead>
                   <tr>
-                    <th>No</th>
+                    <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
                     {activeNazoratColumns.map((c) => (
                       <th
                         key={`nh_${c.key}`}
@@ -8664,8 +8665,8 @@ function Reports({
                                 ? { textAlign:'right', width:130, minWidth:130, maxWidth:130 }
                                 : (c.type === 'date'
                                     ? { width:110, minWidth:110, maxWidth:110 }
-                                : (c.key === 'customer'
-                                    ? { width:160, minWidth:160, maxWidth:160 }
+                                    : (c.key === 'customer'
+                                    ? { width:260, minWidth:260, maxWidth:260 }
                                     : { width:180, minWidth:180, maxWidth:180 }))
                             )
                         }
@@ -8686,7 +8687,7 @@ function Reports({
                     const isWarn = String(r?.status || '').trim().toUpperCase() !== 'OK';
                     return (
                       <tr key={`ngen_${i}_${r.customerId || ''}_${r.date || ''}`} style={isWarn ? {background:'rgba(248,81,73,.08)'} : undefined}>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
                         {activeNazoratColumns.map((c) => {
                           const rawVal = r?.[c.key];
                           const baseStyle = {};
@@ -8709,7 +8710,7 @@ function Reports({
                             baseStyle.overflow = 'hidden';
                             baseStyle.textOverflow = 'ellipsis';
                           } else {
-                            const textColWidth = c.key === 'customer' ? 160 : 180;
+                            const textColWidth = c.key === 'customer' ? 260 : 180;
                             baseStyle.width = textColWidth;
                             baseStyle.minWidth = textColWidth;
                             baseStyle.maxWidth = textColWidth;
@@ -9353,6 +9354,336 @@ function PlanPage({
   );
 }
 
+function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murodbaxsh' }) {
+  const todayIso = useMemo(() => toIsoDate(new Date()), []);
+  const yesterdayIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return toIsoDate(d);
+  }, []);
+  const monthNow = useMemo(() => monthKey(new Date()) || '', []);
+  const last30StartIso = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return toIsoDate(d);
+  }, []);
+  const customersById = useMemo(() => {
+    const m = new Map();
+    (D?.customers || []).forEach((c) => {
+      const id = String(c?.id || '').trim();
+      if (!id) return;
+      m.set(id, c);
+    });
+    return m;
+  }, [D?.customers]);
+  const waterOrderRows = useMemo(
+    () => (D?.rawOrders || []).filter((o) =>
+      isWaterProduct(o?.product) &&
+      isOrderDoc(o?.docType) &&
+      !isCancelledStatus(o?.status) &&
+      isMainWarehouseLabel(o?.warehouse)
+    ),
+    [D?.rawOrders]
+  );
+  const waterDeliveredRows = useMemo(
+    () => waterOrderRows.filter((o) => isDeliveredStatus(o?.status)),
+    [waterOrderRows]
+  );
+  const sumQty = useCallback((rows = []) => rows.reduce((s, r) => s + Math.abs(toNum(r?.qty)), 0), []);
+  const sumUzs = useCallback((rows = []) => rows.reduce((s, r) => {
+    const cur = String(r?.currency || '').toUpperCase();
+    if (cur === 'USD') return s;
+    return s + Math.abs(toNum(r?.sum));
+  }, 0), []);
+  const todayEnteredRows = useMemo(
+    () => waterOrderRows.filter((o) => toIsoDate(o?.orderDate) === todayIso),
+    [waterOrderRows, todayIso]
+  );
+  const todayDeliveredRows = useMemo(
+    () => waterDeliveredRows.filter((o) => toIsoDate(o?.orderDate) === todayIso),
+    [waterDeliveredRows, todayIso]
+  );
+  const yesterdayDeliveredRows = useMemo(
+    () => waterDeliveredRows.filter((o) => toIsoDate(o?.orderDate) === yesterdayIso),
+    [waterDeliveredRows, yesterdayIso]
+  );
+  const monthDeliveredRows = useMemo(
+    () => waterDeliveredRows.filter((o) => monthKey(o?.orderDate) === monthNow),
+    [waterDeliveredRows, monthNow]
+  );
+  const monthEnteredRows = useMemo(
+    () => waterOrderRows.filter((o) => monthKey(o?.orderDate) === monthNow),
+    [waterOrderRows, monthNow]
+  );
+  const monthPlanWater = useMemo(() => {
+    const rows = normalizePlanRows(planRows || []);
+    const row = rows.find((r) => r?.month === monthNow);
+    return Math.max(0, Number(row?.waterPlan || 0));
+  }, [planRows, monthNow]);
+  const monthDeliveredQty = useMemo(() => sumQty(monthDeliveredRows), [monthDeliveredRows, sumQty]);
+  const monthEnteredQty = useMemo(() => sumQty(monthEnteredRows), [monthEnteredRows, sumQty]);
+  const planPercent = monthPlanWater > 0 ? Math.min(999, (monthDeliveredQty / monthPlanWater) * 100) : 0;
+  const now = useMemo(() => new Date(), []);
+  const daysInMonth = useMemo(() => new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(), [now]);
+  const dayOfMonth = now.getDate();
+  const remainingDays = Math.max(0, daysInMonth - dayOfMonth);
+  const avgDailyDelivered = dayOfMonth > 0 ? (monthDeliveredQty / dayOfMonth) : 0;
+  const forecastMonthQty = Math.round(monthDeliveredQty + avgDailyDelivered * remainingDays);
+  const forecastPlanGap = Math.round(monthPlanWater - forecastMonthQty);
+  const activeCustomers30 = useMemo(() => {
+    const set = new Set();
+    monthDeliveredRows
+      .concat(waterDeliveredRows.filter((o) => {
+        const d = toIsoDate(o?.orderDate);
+        return d && d >= last30StartIso;
+      }))
+      .forEach((o) => {
+        const id = String(o?.mId || '').trim();
+        if (id) set.add(id);
+      });
+    return set;
+  }, [monthDeliveredRows, waterDeliveredRows, last30StartIso]);
+  const repeatRate30 = useMemo(() => {
+    const byCustomer = new Map();
+    waterDeliveredRows.forEach((o) => {
+      const d = toIsoDate(o?.orderDate);
+      if (!d || d < last30StartIso) return;
+      const id = String(o?.mId || '').trim();
+      if (!id) return;
+      const so = String(o?.soNum || '').trim();
+      if (!so) return;
+      if (!byCustomer.has(id)) byCustomer.set(id, new Set());
+      byCustomer.get(id).add(so);
+    });
+    const active = Array.from(byCustomer.values()).filter((s) => s.size > 0).length;
+    if (!active) return 0;
+    const repeat = Array.from(byCustomer.values()).filter((s) => s.size >= 2).length;
+    return (repeat / active) * 100;
+  }, [waterDeliveredRows, last30StartIso]);
+  const staleCustomers = useMemo(() => (
+    (D?.customers || []).filter((c) =>
+      !isExcludedZCategory(c?.source) &&
+      !isNameInactiveByPrefix(c?.name || '') &&
+      Number(c?.daysAgo ?? 999) > 21
+    )
+  ), [D?.customers]);
+  const debtCustomerCount = useMemo(() => (
+    (D?.debtorsByBalance || []).filter((c) => !isExcludedZCategory(c?.source)).length
+  ), [D?.debtorsByBalance]);
+  const operatorRows = useMemo(() => {
+    const byDriver = new Map();
+    monthDeliveredRows.forEach((o) => {
+      const driver = String(o?.delivPerson || o?.agent || '-').trim() || '-';
+      const so = String(o?.soNum || '').trim();
+      const cid = String(o?.mId || '').trim();
+      if (!byDriver.has(driver)) {
+        byDriver.set(driver, {
+          driver,
+          qty: 0,
+          sumUZS: 0,
+          orders: new Set(),
+          customers: new Set(),
+        });
+      }
+      const row = byDriver.get(driver);
+      row.qty += Math.abs(toNum(o?.qty));
+      if (String(o?.currency || '').toUpperCase() !== 'USD') row.sumUZS += Math.abs(toNum(o?.sum));
+      if (so) row.orders.add(so);
+      if (cid) row.customers.add(cid);
+    });
+    return Array.from(byDriver.values())
+      .map((r) => ({
+        driver: r.driver,
+        qty: r.qty,
+        sumUZS: r.sumUZS,
+        orderCount: r.orders.size,
+        customerCount: r.customers.size,
+        avgPerOrder: r.orders.size ? (r.qty / r.orders.size) : 0,
+      }))
+      .sort((a, b) => b.qty - a.qty);
+  }, [monthDeliveredRows]);
+  const districtRows = useMemo(() => {
+    const byDistrict = new Map();
+    monthDeliveredRows.forEach((o) => {
+      const cid = String(o?.mId || '').trim();
+      const c = customersById.get(cid);
+      const district = String(c?.district || "Noma'lum").trim() || "Noma'lum";
+      if (!byDistrict.has(district)) byDistrict.set(district, { district, qty: 0, customers: new Set() });
+      const row = byDistrict.get(district);
+      row.qty += Math.abs(toNum(o?.qty));
+      if (cid) row.customers.add(cid);
+    });
+    return Array.from(byDistrict.values())
+      .map((r) => ({ district: r.district, qty: r.qty, customers: r.customers.size }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 12);
+  }, [monthDeliveredRows, customersById]);
+  const productRows = useMemo(() => {
+    const byProduct = new Map();
+    monthDeliveredRows.forEach((o) => {
+      const p = String(o?.product || "Noma'lum mahsulot").trim() || "Noma'lum mahsulot";
+      byProduct.set(p, (byProduct.get(p) || 0) + Math.abs(toNum(o?.qty)));
+    });
+    return Array.from(byProduct.entries())
+      .map(([product, qty]) => ({ product, qty }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 12);
+  }, [monthDeliveredRows]);
+  const recommendations = useMemo(() => {
+    const out = [];
+    if (monthPlanWater > 0 && forecastPlanGap > 0) {
+      out.push(`Oy planidan taxminan ${fmt(forecastPlanGap)} ta kam qolish riski bor. Qolgan ${remainingDays} kun uchun kunlik tempni oshirish kerak.`);
+    }
+    if (repeatRate30 < 35) {
+      out.push(`Qayta buyurtma ulushi past (${repeatRate30.toFixed(1)}%). Obzvon va takroriy mijoz kampaniyasini kuchaytirish tavsiya.`);
+    }
+    if (staleCustomers.length > 0) {
+      out.push(`${fmt(staleCustomers.length)} ta mijoz 21 kundan beri buyurtma bermagan. Aktivatsiya ro'yxatini alohida ishlash kerak.`);
+    }
+    if (debtCustomerCount > 0) {
+      out.push(`${fmt(debtCustomerCount)} ta qarzdor mijoz bor. Yetkazishdan oldin to'lov intizomi nazoratini kuchaytiring.`);
+    }
+    if (!out.length) out.push('Asosiy ko‘rsatkichlar yaxshi. Hozirgi tempni saqlab, operatorlar orasida eng yaxshi amaliyotni ulashing.');
+    return out;
+  }, [monthPlanWater, forecastPlanGap, remainingDays, repeatRate30, staleCustomers.length, debtCustomerCount]);
+
+  return (
+    <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
+      <div className="card" style={{padding:12,display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+        <div>
+          <div style={{fontWeight:800,fontSize:15}}>Test Analitika (Beta)</div>
+          <div style={{fontSize:12,color:'var(--t3)',marginTop:4}}>
+            Kompaniya: {companyLabelByKey(company)} | Foydalanuvchi: {currentUser}
+          </div>
+        </div>
+        <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Oy: {monthNow || '-'}</span>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(150px,1fr))',gap:10}}>
+        <Stat title="Bugun (kiritilgan)" value={`${fmt(sumQty(todayEnteredRows))} ta`} sub={`${fmt(sumUzs(todayEnteredRows))} so'm`} c="var(--bl)" />
+        <Stat title="Bugun (yetkazilgan)" value={`${fmt(sumQty(todayDeliveredRows))} ta`} sub={`${fmt(sumUzs(todayDeliveredRows))} so'm`} c="var(--gr)" />
+        <Stat title="Kecha (yetkazilgan)" value={`${fmt(sumQty(yesterdayDeliveredRows))} ta`} sub={`${fmt(sumUzs(yesterdayDeliveredRows))} so'm`} c="var(--yl)" />
+        <Stat title="Oy fakt (yetkazilgan)" value={`${fmt(monthDeliveredQty)} ta`} sub={`Kiritilgan: ${fmt(monthEnteredQty)} ta`} c="var(--bl)" />
+        <Stat title="Oy plan bajarilishi" value={`${planPercent.toFixed(1)} %`} sub={`Plan: ${fmt(monthPlanWater)} ta`} c={planPercent >= 100 ? 'var(--gr)' : 'var(--or)'} />
+        <Stat title="Oy prognoz" value={`${fmt(forecastMonthQty)} ta`} sub={forecastPlanGap > 0 ? `Plan yetmaydi: ${fmt(forecastPlanGap)} ta` : 'Plan yopiladi'} c={forecastPlanGap > 0 ? 'var(--rd)' : 'var(--gr)'} />
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:10,minHeight:0}}>
+        <div className="card" style={{padding:0,overflow:'hidden',minHeight:0}}>
+          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Operator Samaradorligi (oy)</div>
+          <div style={{overflow:'auto',maxHeight:'34vh'}}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                  <th>Operator</th>
+                  <th style={{textAlign:'right'}}>Suv (ta)</th>
+                  <th style={{textAlign:'right'}}>Zakaz</th>
+                  <th style={{textAlign:'right'}}>Mijoz</th>
+                  <th style={{textAlign:'right'}}>1 zakazga</th>
+                  <th style={{textAlign:'right'}}>Summa</th>
+                </tr>
+              </thead>
+              <tbody>
+                {operatorRows.length === 0 ? (
+                  <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
+                ) : operatorRows.map((r, i) => (
+                  <tr key={`t_op_${r.driver}_${i}`}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
+                    <td>{r.driver}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.qty)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.orderCount)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.customerCount)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{r.avgPerOrder.toFixed(1)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={{display:'grid',gap:10,minHeight:0}}>
+          <div className="card" style={{padding:12}}>
+            <div style={{fontWeight:700,marginBottom:8}}>Asosiy Signallar</div>
+            <div style={{display:'grid',gap:6,fontSize:12,color:'var(--t2)'}}>
+              <div>30 kun aktiv mijoz: <strong style={{color:'var(--t1)'}}>{fmt(activeCustomers30.size)}</strong></div>
+              <div>Repeat rate (30 kun): <strong style={{color:repeatRate30 >= 40 ? 'var(--gr)' : 'var(--or)'}}>{repeatRate30.toFixed(1)}%</strong></div>
+              <div>21+ kun jim mijoz: <strong style={{color:staleCustomers.length ? 'var(--rd)' : 'var(--gr)'}}>{fmt(staleCustomers.length)}</strong></div>
+              <div>Qarzdor mijozlar: <strong style={{color:debtCustomerCount ? 'var(--rd)' : 'var(--gr)'}}>{fmt(debtCustomerCount)}</strong></div>
+            </div>
+          </div>
+          <div className="card" style={{padding:12}}>
+            <div style={{fontWeight:700,marginBottom:8}}>Tavsiyalar</div>
+            <div style={{display:'grid',gap:8}}>
+              {recommendations.map((msg, i) => (
+                <div key={`rec_${i}`} style={{fontSize:12,color:'var(--t2)',background:'var(--s2)',border:'1px solid var(--b2)',borderRadius:8,padding:'8px 10px'}}>
+                  {i + 1}. {msg}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,minHeight:0}}>
+        <div className="card" style={{padding:0,overflow:'hidden'}}>
+          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Rayon Kesimi (oy, top)</div>
+          <div style={{overflow:'auto',maxHeight:'28vh'}}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                  <th>Rayon</th>
+                  <th style={{textAlign:'right'}}>Suv (ta)</th>
+                  <th style={{textAlign:'right'}}>Mijoz</th>
+                </tr>
+              </thead>
+              <tbody>
+                {districtRows.length === 0 ? (
+                  <tr><td colSpan={4} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
+                ) : districtRows.map((r, i) => (
+                  <tr key={`t_dist_${r.district}_${i}`}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
+                    <td>{r.district}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.qty)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.customers)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="card" style={{padding:0,overflow:'hidden'}}>
+          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Mahsulot Kesimi (oy, top)</div>
+          <div style={{overflow:'auto',maxHeight:'28vh'}}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                  <th>Mahsulot</th>
+                  <th style={{textAlign:'right'}}>Suv (ta)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {productRows.length === 0 ? (
+                  <tr><td colSpan={3} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
+                ) : productRows.map((r, i) => (
+                  <tr key={`t_prod_${r.product}_${i}`}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
+                    <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.product}</span></td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.qty)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SettingsPanel({
   users, setUsers, access, setAccess, currentUser, setCurrentUser,
   webhookUrl, setWebhookUrl, userCreds, setUserCreds, onSwitchUser, isAdminSession=false, viewerAccess=null,
@@ -9366,7 +9697,7 @@ function SettingsPanel({
   const [editLogin, setEditLogin] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const pages = ['dash','cust','orders','left_orders','kassa','obzvon','doljniki','nazorat','reports','plan','refresh','settings'];
+  const pages = ['dash','cust','orders','left_orders','kassa','obzvon','doljniki','nazorat','reports','plan','test','refresh','settings'];
   const settingsSections = [
     { key:'settings_staff', label:"Hodimlar ruhsatlari" },
     { key:'settings_app', label:'Ilova sozlamalari' },
@@ -9603,6 +9934,7 @@ function SettingsPanel({
     },
     { key: 'reports', label: 'Hisobotlar', fallback: true, children: [] },
     { key: 'plan', label: 'Plan', fallback: true, children: [] },
+    { key: 'test', label: 'Test', fallback: true, children: [] },
     { key: 'refresh', label: 'Yangilash', fallback: true, children: [] },
     {
       key: 'settings',
@@ -10083,6 +10415,7 @@ const NAV = [
   { id:'nazorat', label:'Nazorat',    icon:E.report },
   { id:'reports', label:'Hisobotlar', icon:E.report },
   { id:'plan',    label:'Plan',       icon:E.plan },
+  { id:'test',    label:'Test',       icon:E.test },
 ];
 
 export default function App() {
@@ -12047,6 +12380,14 @@ export default function App() {
                     setPlanRows={setPlanRows}
                     planOffDays={planOffDays}
                     setPlanOffDays={setPlanOffDays}
+                  />
+                )}
+                {page==='test' && canViewPage('test') && (
+                  <TestLabPage
+                    D={D}
+                    planRows={planRows}
+                    currentUser={effectiveUser}
+                    company={activeCompany}
                   />
                 )}
                 {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} D={D} company={activeCompany} />}
