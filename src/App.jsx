@@ -1542,6 +1542,246 @@ const buildLeftoverAnalysis = ({
     reasonDetailedRows: sortedReasonDetailedRows,
   };
 };
+const sortByDateDescCustomerAsc = (a, b) => {
+  const da = String(a?.date || '');
+  const db = String(b?.date || '');
+  if (da !== db) return db.localeCompare(da);
+  const ca = String(a?.customer || '');
+  const cb = String(b?.customer || '');
+  if (ca !== cb) return ca.localeCompare(cb, 'ru');
+  const ia = String(a?.customerId || '');
+  const ib = String(b?.customerId || '');
+  return ia.localeCompare(ib, 'ru');
+};
+const makeBucketProductsText = (productQty = new Map(), productLabel = new Map()) => {
+  if (!(productQty instanceof Map) || productQty.size === 0) return '-';
+  const entries = Array.from(productQty.entries())
+    .filter(([, qty]) => Number(qty || 0) > 0.0001)
+    .map(([pKey, qty]) => ({
+      key: pKey,
+      qty: Number(qty || 0),
+      label: toLeftoverProductLabel(pKey, productLabel.get(pKey) || pKey),
+    }))
+    .sort((a, b) => b.qty - a.qty || a.label.localeCompare(b.label, 'ru'));
+  if (!entries.length) return '-';
+  return entries.map((x) => `${x.label}: ${fmt(x.qty)}`).join(' | ');
+};
+const buildBasketArchiveDifference = ({
+  rawOrders = [],
+  archiveRows = [],
+  mode = 'order', // 'order' | 'return'
+  canSeeAll = true,
+  currentUserNorm = '',
+  activeCustomerIds = null,
+}) => {
+  const useReturnMode = mode === 'return';
+  const allowedCustomerIds = activeCustomerIds instanceof Set ? activeCustomerIds : null;
+  const basket = new Map();
+  const archive = new Map();
+  const scopedCustomerIds = new Set();
+  const addProduct = (bucket, productKey, productLabel, qty = 0) => {
+    if (!bucket || !productKey) return;
+    const q = Math.abs(toNum(qty));
+    if (q <= 0.0001) return;
+    bucket.productQty.set(productKey, (bucket.productQty.get(productKey) || 0) + q);
+    if (!bucket.productLabel.has(productKey)) {
+      bucket.productLabel.set(productKey, toLeftoverProductLabel(productKey, productLabel || productKey));
+    }
+  };
+  const ensureBucket = (map, key, base = {}) => {
+    if (!map.has(key)) {
+      map.set(key, {
+        date: String(base.date || ''),
+        customerId: String(base.customerId || ''),
+        customer: String(base.customer || '').trim(),
+        orderIds: new Set(),
+        drivers: new Set(),
+        notes: new Set(),
+        productQty: new Map(),
+        productLabel: new Map(),
+        totalQty: 0,
+        totalSumUZS: 0,
+      });
+    }
+    return map.get(key);
+  };
+
+  (rawOrders || []).forEach((o) => {
+    if (useReturnMode ? !isReturnDoc(o?.docType) : !isOrderDoc(o?.docType)) return;
+    if (isCancelledStatus(o?.status)) return;
+    const date = toIsoDate(o?.orderDate);
+    const customerId = normalizeIdKey(o?.mId);
+    if (!date || !customerId) return;
+    if (allowedCustomerIds && allowedCustomerIds.size && !allowedCustomerIds.has(customerId)) return;
+
+    const driver = String(o?.delivPerson || o?.agent || '').trim() || '-';
+    if (!canSeeAll && String(driver || '').trim().toLowerCase() !== String(currentUserNorm || '').trim().toLowerCase()) return;
+
+    const key = `${date}__${customerId}`;
+    scopedCustomerIds.add(customerId);
+    const b = ensureBucket(basket, key, {
+      date,
+      customerId,
+      customer: String(o?.contName || '').trim() || `ID ${customerId}`,
+    });
+    if (!b.customer) b.customer = String(o?.contName || '').trim() || `ID ${customerId}`;
+
+    const orderNo = String(o?.soNum || '').trim();
+    if (orderNo) b.orderIds.add(orderNo);
+    if (driver) b.drivers.add(driver);
+    const note = String(o?.note || '').trim();
+    if (note) b.notes.add(note);
+
+    const product = String(o?.product || '').trim();
+    const productKey = toLeftoverProductKey(product, 'order');
+    addProduct(b, productKey, product, o?.qty);
+
+    const qtyAbs = Math.abs(toNum(o?.qty));
+    const sumAbs = Math.abs(toNum(o?.sum));
+    b.totalQty += qtyAbs;
+    if (String(o?.currency || '').trim().toUpperCase() !== 'USD') b.totalSumUZS += sumAbs;
+  });
+
+  (archiveRows || []).forEach((r) => {
+    const date = toIsoDate(r?.date);
+    const customerId = normalizeIdKey(r?.customerId);
+    if (!date || !customerId) return;
+    if (allowedCustomerIds && allowedCustomerIds.size && !allowedCustomerIds.has(customerId)) return;
+    if (!canSeeAll && scopedCustomerIds.size && !scopedCustomerIds.has(customerId)) return;
+
+    const driver = String(r?.driver || '').trim() || '-';
+    if (!canSeeAll && driver && driver !== '-' && String(driver || '').trim().toLowerCase() !== String(currentUserNorm || '').trim().toLowerCase()) return;
+
+    const key = `${date}__${customerId}`;
+    const a = ensureBucket(archive, key, {
+      date,
+      customerId,
+      customer: String(r?.customer || '').trim() || `ID ${customerId}`,
+    });
+    if (!a.customer) a.customer = String(r?.customer || '').trim() || `ID ${customerId}`;
+    if (driver) a.drivers.add(driver);
+
+    const product = useReturnMode ? String(r?.productTaken || '').trim() : String(r?.productGiven || '').trim();
+    const qty = useReturnMode ? Math.abs(toNum(r?.qtyTaken)) : Math.abs(toNum(r?.qtyGiven));
+    const productKey = toLeftoverProductKey(product, 'archive');
+    addProduct(a, productKey, product, qty);
+    if (qty > 0.0001) a.totalQty += qty;
+  });
+
+  const allKeys = new Set([...basket.keys(), ...archive.keys()]);
+  const masterRows = Array.from(allKeys).map((key, idx) => {
+    const b = basket.get(key) || null;
+    const a = archive.get(key) || null;
+    const [date = '', customerId = ''] = String(key || '').split('__');
+
+    const customer = String(b?.customer || a?.customer || '').trim() || (customerId ? `ID ${customerId}` : '-');
+    const orderId = Array.from(b?.orderIds || []).filter(Boolean).join(', ') || '-';
+    const driver = Array.from(new Set([...(b?.drivers || []), ...(a?.drivers || [])])).filter(Boolean).join(', ') || '-';
+    const note = Array.from(b?.notes || []).filter(Boolean).join(' | ');
+
+    const systemQty = Number(b?.totalQty || 0);
+    const archiveQty = Number(a?.totalQty || 0);
+    const diffQty = systemQty - archiveQty;
+    const systemProductsText = makeBucketProductsText(b?.productQty, b?.productLabel);
+    const archiveProductsText = makeBucketProductsText(a?.productQty, a?.productLabel);
+
+    const result = {
+      id: `${useReturnMode ? 'ret' : 'ord'}_cmp_${date}_${customerId}_${idx + 1}`,
+      date,
+      customerId,
+      customer,
+      orderId,
+      driver,
+      note,
+      systemQty,
+      archiveQty,
+      diffQty,
+      systemProductsText,
+      archiveProductsText,
+      productDiffText: '-',
+      qtyDiffText: '-',
+      status: 'OK',
+      mismatchType: 'ok',
+      hasSystem: !!b,
+      hasArchive: !!a,
+      hasProductMismatch: false,
+      hasQtyMismatch: false,
+    };
+
+    if (!b || !a) {
+      result.mismatchType = 'customer';
+      result.status = !a ? "Arxivda mijoz topilmadi" : 'Sistemada mijoz topilmadi';
+      return result;
+    }
+
+    const bKeys = new Set(Array.from(b.productQty.keys()));
+    const aKeys = new Set(Array.from(a.productQty.keys()));
+    const missingInArchive = Array.from(bKeys).filter((k) => !aKeys.has(k));
+    const extraInArchive = Array.from(aKeys).filter((k) => !bKeys.has(k));
+    if (missingInArchive.length || extraInArchive.length) {
+      const parts = [];
+      if (missingInArchive.length) {
+        parts.push(`Arxivda yo'q: ${missingInArchive.map((k) => toLeftoverProductLabel(k, b.productLabel.get(k))).join(', ')}`);
+      }
+      if (extraInArchive.length) {
+        parts.push(`Sistemada yo'q: ${extraInArchive.map((k) => toLeftoverProductLabel(k, a.productLabel.get(k))).join(', ')}`);
+      }
+      result.mismatchType = 'product';
+      result.hasProductMismatch = true;
+      result.status = 'Mahsulot hatosi';
+      result.productDiffText = parts.join(' | ') || '-';
+      return result;
+    }
+
+    const qtyParts = [];
+    Array.from(bKeys).forEach((pKey) => {
+      const bQty = Number(b.productQty.get(pKey) || 0);
+      const aQty = Number(a.productQty.get(pKey) || 0);
+      if (Math.abs(bQty - aQty) <= 0.0001) return;
+      qtyParts.push(`${toLeftoverProductLabel(pKey, b.productLabel.get(pKey) || a.productLabel.get(pKey) || pKey)}: ${fmt(bQty)} / ${fmt(aQty)}`);
+    });
+    if (qtyParts.length) {
+      result.mismatchType = 'qty';
+      result.hasQtyMismatch = true;
+      result.status = 'Son hatosi';
+      result.qtyDiffText = qtyParts.join(' | ');
+    }
+
+    return result;
+  }).sort(sortByDateDescCustomerAsc);
+
+  const customerRowsAll = masterRows.map((r) => ({
+    ...r,
+    status: r.mismatchType === 'customer' ? r.status : 'OK',
+  }));
+  const customerRowsErrors = customerRowsAll.filter((r) => r.mismatchType === 'customer');
+
+  const productRowsAll = masterRows
+    .filter((r) => r.hasSystem && r.hasArchive)
+    .map((r) => ({
+      ...r,
+      status: r.mismatchType === 'product' ? 'Mahsulot hatosi' : 'OK',
+    }));
+  const productRowsErrors = productRowsAll.filter((r) => r.mismatchType === 'product');
+
+  const qtyRowsAll = masterRows
+    .filter((r) => r.hasSystem && r.hasArchive && !r.hasProductMismatch)
+    .map((r) => ({
+      ...r,
+      status: r.mismatchType === 'qty' ? 'Son hatosi' : 'OK',
+    }));
+  const qtyRowsErrors = qtyRowsAll.filter((r) => r.mismatchType === 'qty');
+
+  return {
+    masterRows,
+    customerRowsAll,
+    customerRowsErrors,
+    productRowsAll,
+    productRowsErrors,
+    qtyRowsAll,
+    qtyRowsErrors,
+  };
+};
 const shiftMonthKey = (monthKeyValue, delta = 0) => {
   const m = String(monthKeyValue || '').match(/^(\d{4})-(\d{2})$/);
   const base = m ? new Date(Number(m[1]), Number(m[2]) - 1 + Number(delta || 0), 1) : new Date();
@@ -6965,6 +7205,7 @@ function Reports({
   planRows=[],
   planOffDays=[],
   obzvonNewRows=[],
+  rawArchiveSheetRows=[],
   mode='reports',
 }) {
   const { rawOrders=[], warehouseTransfers=[] } = D;
@@ -7131,12 +7372,20 @@ function Reports({
   }, [mapStorageKey]);
   const [nazoratSection, setNazoratSection] = useState('orders');
   const [nazoratOrderSection, setNazoratOrderSection] = useState('transfer');
+  const [nazoratReturnSection, setNazoratReturnSection] = useState('return_order');
+  const [nazoratReturnDiffSection, setNazoratReturnDiffSection] = useState('customer');
+  const [nazoratGapSection, setNazoratGapSection] = useState('customer');
   const [nazoratView, setNazoratView] = useState('errors');
   const [nazoratFilterOpen, setNazoratFilterOpen] = useState(false);
   const [nazoratFilterState, setNazoratFilterState] = useState({});
   useEffect(() => {
     if (nazoratSection !== 'orders') setNazoratOrderSection('transfer');
+    if (nazoratSection !== 'returns') setNazoratReturnSection('return_order');
+    if (nazoratSection !== 'gap') setNazoratGapSection('customer');
   }, [nazoratSection]);
+  useEffect(() => {
+    if (nazoratReturnSection !== 'return_return') setNazoratReturnDiffSection('customer');
+  }, [nazoratReturnSection]);
 
   const controlOrderRows = useMemo(() => {
     let rows = (rawOrders || []).filter((o) => {
@@ -7364,6 +7613,36 @@ function Reports({
     () => returnControlRows.filter((r) => !r.hasOrder),
     [returnControlRows]
   );
+  const parsedArchiveRows = useMemo(
+    () => parseLeftoverArchiveRows(rawArchiveSheetRows || []),
+    [rawArchiveSheetRows]
+  );
+  const orderArchiveDiff = useMemo(() => buildBasketArchiveDifference({
+    rawOrders,
+    archiveRows: parsedArchiveRows,
+    mode: 'order',
+    canSeeAll: canSeeAllNazorat,
+    currentUserNorm,
+    activeCustomerIds: activeControlCustomerIds,
+  }), [rawOrders, parsedArchiveRows, canSeeAllNazorat, currentUserNorm, activeControlCustomerIds]);
+  const returnArchiveDiff = useMemo(() => buildBasketArchiveDifference({
+    rawOrders,
+    archiveRows: parsedArchiveRows,
+    mode: 'return',
+    canSeeAll: canSeeAllNazorat,
+    currentUserNorm,
+    activeCustomerIds: activeControlCustomerIds,
+  }), [rawOrders, parsedArchiveRows, canSeeAllNazorat, currentUserNorm, activeControlCustomerIds]);
+  const pickDiffRowsByCategory = useCallback((diffData, categoryKey, viewKey = 'errors') => {
+    const key = String(categoryKey || 'customer');
+    if (key === 'product') {
+      return viewKey === 'all' ? (diffData?.productRowsAll || []) : (diffData?.productRowsErrors || []);
+    }
+    if (key === 'qty') {
+      return viewKey === 'all' ? (diffData?.qtyRowsAll || []) : (diffData?.qtyRowsErrors || []);
+    }
+    return viewKey === 'all' ? (diffData?.customerRowsAll || []) : (diffData?.customerRowsErrors || []);
+  }, []);
   const nazoratOrderColumns = useMemo(() => ([
     { key:'date', label:'Sana', type:'date' },
     { key:'driver', label:'Dostavchik', type:'text' },
@@ -7395,16 +7674,128 @@ function Reports({
     { key:'note', label:'Izoh', type:'text' },
     { key:'status', label:'Status', type:'text' },
   ]), []);
-  const activeNazoratColumns = nazoratSection === 'orders'
-    ? (nazoratOrderSection === 'duplicates' ? nazoratOrderDuplicateColumns : nazoratOrderColumns)
-    : nazoratReturnColumns;
+  const nazoratDiffCustomerColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'orderId', label:'Zakaz ID', type:'text' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'systemQty', label:'Sistem soni', type:'number' },
+    { key:'archiveQty', label:'Arxiv soni', type:'number' },
+    { key:'status', label:'Holat', type:'text' },
+  ]), []);
+  const nazoratDiffProductColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'orderId', label:'Zakaz ID', type:'text' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'systemProductsText', label:'Sistem mahsulot', type:'text' },
+    { key:'archiveProductsText', label:'Arxiv mahsulot', type:'text' },
+    { key:'productDiffText', label:'Farq', type:'text' },
+    { key:'status', label:'Holat', type:'text' },
+  ]), []);
+  const nazoratDiffQtyColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'orderId', label:'Zakaz ID', type:'text' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'systemQty', label:'Sistem soni', type:'number' },
+    { key:'archiveQty', label:'Arxiv soni', type:'number' },
+    { key:'diffQty', label:'Farq', type:'number' },
+    { key:'qtyDiffText', label:'Son farqi', type:'text' },
+    { key:'status', label:'Holat', type:'text' },
+  ]), []);
+  const nazoratReturnDiffCustomerColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'orderId', label:'Vozvrat ID', type:'text' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'systemQty', label:'Sistem soni', type:'number' },
+    { key:'archiveQty', label:'Arxiv soni', type:'number' },
+    { key:'status', label:'Holat', type:'text' },
+  ]), []);
+  const nazoratReturnDiffProductColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'orderId', label:'Vozvrat ID', type:'text' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'systemProductsText', label:'Sistem mahsulot', type:'text' },
+    { key:'archiveProductsText', label:'Arxiv mahsulot', type:'text' },
+    { key:'productDiffText', label:'Farq', type:'text' },
+    { key:'status', label:'Holat', type:'text' },
+  ]), []);
+  const nazoratReturnDiffQtyColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'customerId', label:'Mijoz ID', type:'text' },
+    { key:'customer', label:'Mijoz', type:'text' },
+    { key:'orderId', label:'Vozvrat ID', type:'text' },
+    { key:'driver', label:'Dostavchik', type:'text' },
+    { key:'systemQty', label:'Sistem soni', type:'number' },
+    { key:'archiveQty', label:'Arxiv soni', type:'number' },
+    { key:'diffQty', label:'Farq', type:'number' },
+    { key:'qtyDiffText', label:'Son farqi', type:'text' },
+    { key:'status', label:'Holat', type:'text' },
+  ]), []);
+  const activeNazoratColumns = useMemo(() => {
+    if (nazoratSection === 'orders') {
+      return nazoratOrderSection === 'duplicates' ? nazoratOrderDuplicateColumns : nazoratOrderColumns;
+    }
+    if (nazoratSection === 'returns') {
+      if (nazoratReturnSection === 'return_order') return nazoratReturnColumns;
+      if (nazoratReturnDiffSection === 'product') return nazoratReturnDiffProductColumns;
+      if (nazoratReturnDiffSection === 'qty') return nazoratReturnDiffQtyColumns;
+      return nazoratReturnDiffCustomerColumns;
+    }
+    if (nazoratGapSection === 'product') return nazoratDiffProductColumns;
+    if (nazoratGapSection === 'qty') return nazoratDiffQtyColumns;
+    return nazoratDiffCustomerColumns;
+  }, [
+    nazoratSection,
+    nazoratOrderSection,
+    nazoratReturnSection,
+    nazoratReturnDiffSection,
+    nazoratGapSection,
+    nazoratOrderColumns,
+    nazoratOrderDuplicateColumns,
+    nazoratReturnColumns,
+    nazoratReturnDiffCustomerColumns,
+    nazoratReturnDiffProductColumns,
+    nazoratReturnDiffQtyColumns,
+    nazoratDiffCustomerColumns,
+    nazoratDiffProductColumns,
+    nazoratDiffQtyColumns,
+  ]);
   const activeNazoratBaseRows = useMemo(() => {
     if (nazoratSection === 'orders') {
       if (nazoratOrderSection === 'duplicates') return nazoratView === 'errors' ? duplicateMismatchRows : duplicateOrderRows;
       return nazoratView === 'errors' ? orderMismatchRows : orderControlRows;
     }
-    return nazoratView === 'errors' ? returnMismatchRows : returnControlRows;
-  }, [nazoratSection, nazoratOrderSection, nazoratView, orderMismatchRows, orderControlRows, duplicateMismatchRows, duplicateOrderRows, returnMismatchRows, returnControlRows]);
+    if (nazoratSection === 'returns') {
+      if (nazoratReturnSection === 'return_order') return nazoratView === 'errors' ? returnMismatchRows : returnControlRows;
+      return pickDiffRowsByCategory(returnArchiveDiff, nazoratReturnDiffSection, nazoratView);
+    }
+    return pickDiffRowsByCategory(orderArchiveDiff, nazoratGapSection, nazoratView);
+  }, [
+    nazoratSection,
+    nazoratOrderSection,
+    nazoratReturnSection,
+    nazoratReturnDiffSection,
+    nazoratGapSection,
+    nazoratView,
+    orderMismatchRows,
+    orderControlRows,
+    duplicateMismatchRows,
+    duplicateOrderRows,
+    returnMismatchRows,
+    returnControlRows,
+    orderArchiveDiff,
+    returnArchiveDiff,
+    pickDiffRowsByCategory,
+  ]);
   useEffect(() => {
     setNazoratFilterState((prev) => ensureUniversalFilterState(activeNazoratColumns, prev));
   }, [activeNazoratColumns]);
@@ -7431,61 +7822,41 @@ function Reports({
     });
   };
 
-  const exportNazorat = () => {
+  const nazoratExportMeta = useMemo(() => {
     if (nazoratSection === 'orders') {
       if (nazoratOrderSection === 'duplicates') {
-        exportAoaExcel({
-          fileName: `Dublikat_zakazlar_${todayIso}.xlsx`,
-          sheetName: 'Dublikat_zakazlar',
-          headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakazlar soni', 'Suv soni', 'Summa UZS', 'Dostavchik', 'Zakazlar', 'Holat'],
-          columnTypes: ['date', 'text', 'text', 'number', 'number', 'number', 'text', 'text', 'text'],
-          rows: nazoratFilteredRows.map((r) => [
-            r.date,
-            r.customerId,
-            r.customer,
-            r.docsCount,
-            r.qty,
-            r.sumUZS,
-            r.driversText,
-            r.docsText,
-            r.status,
-          ]),
-        });
-        return;
+        return { fileName: `Dublikat_zakazlar_${todayIso}.xlsx`, sheetName: 'Dublikat_zakazlar' };
       }
-      exportAoaExcel({
-        fileName: `Zakaz_nazorati_${todayIso}.xlsx`,
-        sheetName: 'Zakaz_nazorati',
-        headers: ['Sana', 'Dostavchik', 'Sklad', 'Zakaz suv soni', 'Permesheniya (obshiyga)', 'Farq', 'Holat'],
-        columnTypes: ['date', 'text', 'text', 'number', 'number', 'number', 'text'],
-        rows: nazoratFilteredRows.map((r) => [
-          r.date,
-          r.driver,
-          r.warehouse,
-          r.orderQty,
-          r.transferQty,
-          r.diff,
-          r.status,
-        ]),
-      });
-      return;
+      return { fileName: `Zakaz_nazorati_${todayIso}.xlsx`, sheetName: 'Zakaz_nazorati' };
     }
+    if (nazoratSection === 'returns') {
+      if (nazoratReturnSection === 'return_order') {
+        return { fileName: `Vozvrat_nazorati_${todayIso}.xlsx`, sheetName: 'Vozvrat_nazorati' };
+      }
+      if (nazoratReturnDiffSection === 'product') {
+        return { fileName: `Vozvrat_vozvrat_mahsulot_hatolari_${todayIso}.xlsx`, sheetName: 'VozvratVozvratMahsulot' };
+      }
+      if (nazoratReturnDiffSection === 'qty') {
+        return { fileName: `Vozvrat_vozvrat_son_hatolari_${todayIso}.xlsx`, sheetName: 'VozvratVozvratSon' };
+      }
+      return { fileName: `Vozvrat_vozvrat_mijoz_hatolari_${todayIso}.xlsx`, sheetName: 'VozvratVozvratMijoz' };
+    }
+    if (nazoratGapSection === 'product') {
+      return { fileName: `Zakaz_farqi_mahsulot_hatolari_${todayIso}.xlsx`, sheetName: 'ZakazFarqiMahsulot' };
+    }
+    if (nazoratGapSection === 'qty') {
+      return { fileName: `Zakaz_farqi_son_hatolari_${todayIso}.xlsx`, sheetName: 'ZakazFarqiSon' };
+    }
+    return { fileName: `Zakaz_farqi_mijoz_hatolari_${todayIso}.xlsx`, sheetName: 'ZakazFarqiMijoz' };
+  }, [nazoratSection, nazoratOrderSection, nazoratReturnSection, nazoratReturnDiffSection, nazoratGapSection, todayIso]);
+
+  const exportNazorat = () => {
     exportAoaExcel({
-      fileName: `Vozvrat_nazorati_${todayIso}.xlsx`,
-      sheetName: 'Vozvrat_nazorati',
-      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Vozvrat zakaz', 'Vozvrat suv soni', 'Dostavchik', 'Sklad', 'Izoh', 'Status'],
-      columnTypes: ['date', 'text', 'text', 'text', 'number', 'text', 'text', 'text', 'text'],
-      rows: nazoratFilteredRows.map((r) => [
-        r.date,
-        r.customerId,
-        r.customer,
-        r.returnNo,
-        r.qty,
-        r.driver,
-        r.warehouse,
-        r.note,
-        r.status,
-      ]),
+      fileName: nazoratExportMeta.fileName,
+      sheetName: nazoratExportMeta.sheetName,
+      headers: ['No', ...activeNazoratColumns.map((c) => c.label)],
+      columnTypes: ['number', ...activeNazoratColumns.map((c) => c.type || 'text')],
+      rows: nazoratFilteredRows.map((r, i) => [i + 1, ...activeNazoratColumns.map((c) => r?.[c.key] ?? '')]),
     });
   };
 
@@ -7603,11 +7974,34 @@ function Reports({
             <div className="tabs" style={{display:'inline-flex'}}>
               <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
               <button className={`tab${nazoratSection==='returns'?' on':''}`} onClick={()=>setNazoratSection('returns')}>Vozvrat nazorati</button>
+              <button className={`tab${nazoratSection==='gap'?' on':''}`} onClick={()=>setNazoratSection('gap')}>Zakaz farqi</button>
             </div>
             {nazoratSection === 'orders' && (
               <div className="tabs" style={{display:'inline-flex',width:'fit-content'}}>
                 <button className={`tab${nazoratOrderSection==='transfer'?' on':''}`} onClick={()=>setNazoratOrderSection('transfer')}>Permesheniya nazorati</button>
                 <button className={`tab${nazoratOrderSection==='duplicates'?' on':''}`} onClick={()=>setNazoratOrderSection('duplicates')}>Dublikat zakazlar</button>
+              </div>
+            )}
+            {nazoratSection === 'returns' && (
+              <div style={{display:'grid',gap:6}}>
+                <div className="tabs" style={{display:'inline-flex',width:'fit-content'}}>
+                  <button className={`tab${nazoratReturnSection==='return_order'?' on':''}`} onClick={()=>setNazoratReturnSection('return_order')}>Vozvrat & Zakaz</button>
+                  <button className={`tab${nazoratReturnSection==='return_return'?' on':''}`} onClick={()=>setNazoratReturnSection('return_return')}>Vozvrat & Vozvrat</button>
+                </div>
+                {nazoratReturnSection === 'return_return' && (
+                  <div className="tabs" style={{display:'inline-flex',width:'fit-content'}}>
+                    <button className={`tab${nazoratReturnDiffSection==='customer'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('customer')}>Mijoz hatosi</button>
+                    <button className={`tab${nazoratReturnDiffSection==='product'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('product')}>Mahsulot hatosi</button>
+                    <button className={`tab${nazoratReturnDiffSection==='qty'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('qty')}>Son hatosi</button>
+                  </div>
+                )}
+              </div>
+            )}
+            {nazoratSection === 'gap' && (
+              <div className="tabs" style={{display:'inline-flex',width:'fit-content'}}>
+                <button className={`tab${nazoratGapSection==='customer'?' on':''}`} onClick={()=>setNazoratGapSection('customer')}>Mijoz hatosi</button>
+                <button className={`tab${nazoratGapSection==='product'?' on':''}`} onClick={()=>setNazoratGapSection('product')}>Mahsulot hatosi</button>
+                <button className={`tab${nazoratGapSection==='qty'?' on':''}`} onClick={()=>setNazoratGapSection('qty')}>Son hatosi</button>
               </div>
             )}
           </div>
@@ -7623,7 +8017,9 @@ function Reports({
                 open={nazoratFilterOpen}
                 title={nazoratSection === 'orders'
                   ? (nazoratOrderSection === 'duplicates' ? 'Dublikat zakazlar filtri' : 'Zakaz nazorati filtri')
-                  : 'Vozvrat nazorati filtri'}
+                  : (nazoratSection === 'returns'
+                    ? (nazoratReturnSection === 'return_order' ? 'Vozvrat & Zakaz filtri' : 'Vozvrat & Vozvrat filtri')
+                    : 'Zakaz farqi filtri')}
                 columns={activeNazoratColumns}
                 rows={activeNazoratBaseRows}
                 state={nazoratFilterState}
@@ -7651,7 +8047,14 @@ function Reports({
         )}
         {nazoratSection === 'returns' && (
           <div style={{fontSize:11,color:'var(--t3)'}}>
-            Vozvrat tekshiruvi: shu sana va shu mijoz bo'yicha zakaz bo'lsa "Zakazi bor", bo'lmasa "Zakazi yo'q".
+            {nazoratReturnSection === 'return_order'
+              ? `Vozvrat & Zakaz: shu sana va shu mijoz bo'yicha zakaz bo'lsa "Zakazi bor", bo'lmasa "Zakazi yo'q".`
+              : "Vozvrat & Vozvrat: item_basket vozvratlari arxivdagi qaytgan mahsulot bilan sana+mijoz bo'yicha solishtiriladi."}
+          </div>
+        )}
+        {nazoratSection === 'gap' && (
+          <div style={{fontSize:11,color:'var(--t3)'}}>
+            Zakaz farqi: item_basket zakazlari arxivdagi berilgan mahsulot bilan sana+mijoz bo'yicha solishtiriladi.
           </div>
         )}
 
@@ -7739,7 +8142,7 @@ function Reports({
                   ))}
                 </tbody>
               </table>
-            ) : (
+            ) : nazoratSection === 'returns' && nazoratReturnSection === 'return_order' ? (
               <table className="tbl">
                 <thead>
                   <tr>
@@ -7772,6 +8175,57 @@ function Reports({
                       <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            ) : (
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>No</th>
+                    {activeNazoratColumns.map((c) => (
+                      <th key={`nh_${c.key}`} style={c.type === 'number' ? { textAlign: 'right' } : undefined}>{c.label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {nazoratFilteredRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={activeNazoratColumns.length + 1} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>
+                        {nazoratView === 'errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}
+                      </td>
+                    </tr>
+                  ) : nazoratFilteredRows.map((r, i) => {
+                    const isWarn = String(r?.status || '').trim().toUpperCase() !== 'OK';
+                    return (
+                      <tr key={`ngen_${i}_${r.customerId || ''}_${r.date || ''}`} style={isWarn ? {background:'rgba(248,81,73,.08)'} : undefined}>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
+                        {activeNazoratColumns.map((c) => {
+                          const rawVal = r?.[c.key];
+                          const baseStyle = {};
+                          if (c.type === 'number') {
+                            baseStyle.textAlign = 'right';
+                            baseStyle.fontFamily = 'var(--mono)';
+                          } else if (c.type === 'date') {
+                            baseStyle.fontFamily = 'var(--mono)';
+                            baseStyle.fontSize = 11;
+                          }
+                          if (c.key === 'status') {
+                            baseStyle.fontSize = 11;
+                            baseStyle.color = isWarn ? 'var(--rd)' : 'var(--gr)';
+                          }
+                          if (c.key === 'diffQty') {
+                            baseStyle.color = Math.abs(Number(rawVal || 0)) > 0.0001 ? 'var(--rd)' : 'var(--gr)';
+                          }
+                          const value = c.type === 'number' ? fmt(rawVal || 0) : (String(rawVal ?? '').trim() || '-');
+                          return (
+                            <td key={`nc_${i}_${c.key}`} style={baseStyle}>
+                              {value}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}
@@ -7912,14 +8366,12 @@ function LeftOrdersPage({
           <div className="tabs" style={{display:'inline-flex'}}>
             <button className={`tab${tab==='left'?' on':''}`} onClick={()=>setTab('left')}>Qolib ketgan zakazlar</button>
             <button className={`tab${tab==='reason'?' on':''}`} onClick={()=>setTab('reason')}>Qolib ketgan zakazlar sababi</button>
-            <button className={`tab${tab==='gap'?' on':''}`} onClick={()=>setTab('gap')}>Mahsulot berilmagan</button>
           </div>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Kompaniya: {companyLabelByKey(company)}</span>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>
             Sana: {usingQziSource ? "Barchasi (Q_Z_I)" : (compareDate || '-')}
           </span>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Qolib ketgan: {missingRows.length}</span>
-          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Mahsulot farqi: {productGapRows.length}</span>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Sabablar: {reasonRows.length}</span>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -7933,7 +8385,7 @@ function LeftOrdersPage({
             </button>
             <UniversalFilterPanel
               open={filterOpen}
-              title={tab === 'left' ? 'Qolib ketgan zakazlar filtri' : tab === 'reason' ? 'Qolib ketgan zakazlar sababi filtri' : 'Mahsulot berilmagan filtri'}
+              title={tab === 'left' ? 'Qolib ketgan zakazlar filtri' : tab === 'reason' ? 'Qolib ketgan zakazlar sababi filtri' : 'Zakaz farqi filtri'}
               columns={activeColumns}
               rows={activeBaseRows}
               state={filterState}
@@ -10986,6 +11438,7 @@ export default function App() {
                     planRows={planRows}
                     planOffDays={planOffDays}
                     obzvonNewRows={companyObzvonAllNewRows}
+                    rawArchiveSheetRows={leftoverArchiveSheetRows}
                     mode="reports"
                   />
                 )}
@@ -11000,6 +11453,7 @@ export default function App() {
                     planRows={planRows}
                     planOffDays={planOffDays}
                     obzvonNewRows={companyObzvonAllNewRows}
+                    rawArchiveSheetRows={leftoverArchiveSheetRows}
                     mode="nazorat"
                   />
                 )}
