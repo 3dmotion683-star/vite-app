@@ -1553,23 +1553,51 @@ const sortByDateDescCustomerAsc = (a, b) => {
   const ib = String(b?.customerId || '');
   return ia.localeCompare(ib, 'ru');
 };
-const makeBucketProductsText = (productQty = new Map(), productLabel = new Map()) => {
+const CONTROL_COMPARE_START_DATE = '2026-03-02';
+const CONTROL_PRODUCT_MURODBAXSH_KEY = 'murodbaxsh 18.9l';
+const CONTROL_IGNORED_PRODUCT_MARKERS = [
+  'kapsula olish kerak',
+  'pul olish kerak',
+  'flyer',
+  'fleyer',
+  'flayer',
+  'flayr',
+  'флаер',
+  'флайер',
+];
+const normalizeControlProductKey = (product = '') => {
+  const p = normProduct(product);
+  if (!p) return '';
+  if (CONTROL_IGNORED_PRODUCT_MARKERS.some((mark) => p.includes(mark))) return '';
+  if (p === 'bonus murodbaxsh 18.9l' || p === 'бонус murodbaxsh 18.9l' || p === CONTROL_PRODUCT_MURODBAXSH_KEY) {
+    return CONTROL_PRODUCT_MURODBAXSH_KEY;
+  }
+  return p;
+};
+const controlProductLabelByKey = (productKey = '', fallback = '') => {
+  if (productKey === CONTROL_PRODUCT_MURODBAXSH_KEY) return 'Murodbaxsh 18.9L';
+  return String(fallback || productKey || '').trim() || '-';
+};
+const makeBucketProductsText = (productQty = new Map(), productLabel = new Map(), withQty = true) => {
   if (!(productQty instanceof Map) || productQty.size === 0) return '-';
   const entries = Array.from(productQty.entries())
     .filter(([, qty]) => Number(qty || 0) > 0.0001)
     .map(([pKey, qty]) => ({
       key: pKey,
       qty: Number(qty || 0),
-      label: toLeftoverProductLabel(pKey, productLabel.get(pKey) || pKey),
+      label: controlProductLabelByKey(pKey, productLabel.get(pKey) || pKey),
     }))
     .sort((a, b) => b.qty - a.qty || a.label.localeCompare(b.label, 'ru'));
   if (!entries.length) return '-';
-  return entries.map((x) => `${x.label}: ${fmt(x.qty)}`).join(' | ');
+  return withQty
+    ? entries.map((x) => `${x.label}: ${fmt(x.qty)}`).join(' | ')
+    : entries.map((x) => x.label).join(' | ');
 };
 const buildBasketArchiveDifference = ({
   rawOrders = [],
   archiveRows = [],
   mode = 'order', // 'order' | 'return'
+  startDate = CONTROL_COMPARE_START_DATE,
   canSeeAll = true,
   currentUserNorm = '',
   activeCustomerIds = null,
@@ -1612,6 +1640,7 @@ const buildBasketArchiveDifference = ({
     const date = toIsoDate(o?.orderDate);
     const customerId = normalizeIdKey(o?.mId);
     if (!date || !customerId) return;
+    if (startDate && date < startDate) return;
     if (allowedCustomerIds && allowedCustomerIds.size && !allowedCustomerIds.has(customerId)) return;
 
     const driver = String(o?.delivPerson || o?.agent || '').trim() || '-';
@@ -1633,19 +1662,22 @@ const buildBasketArchiveDifference = ({
     if (note) b.notes.add(note);
 
     const product = String(o?.product || '').trim();
-    const productKey = toLeftoverProductKey(product, 'order');
+    const productKey = normalizeControlProductKey(product);
     addProduct(b, productKey, product, o?.qty);
 
-    const qtyAbs = Math.abs(toNum(o?.qty));
-    const sumAbs = Math.abs(toNum(o?.sum));
-    b.totalQty += qtyAbs;
-    if (String(o?.currency || '').trim().toUpperCase() !== 'USD') b.totalSumUZS += sumAbs;
+    if (productKey) {
+      const qtyAbs = Math.abs(toNum(o?.qty));
+      const sumAbs = Math.abs(toNum(o?.sum));
+      b.totalQty += qtyAbs;
+      if (String(o?.currency || '').trim().toUpperCase() !== 'USD') b.totalSumUZS += sumAbs;
+    }
   });
 
   (archiveRows || []).forEach((r) => {
     const date = toIsoDate(r?.date);
     const customerId = normalizeIdKey(r?.customerId);
     if (!date || !customerId) return;
+    if (startDate && date < startDate) return;
     if (allowedCustomerIds && allowedCustomerIds.size && !allowedCustomerIds.has(customerId)) return;
     if (!canSeeAll && scopedCustomerIds.size && !scopedCustomerIds.has(customerId)) return;
 
@@ -1663,9 +1695,9 @@ const buildBasketArchiveDifference = ({
 
     const product = useReturnMode ? String(r?.productTaken || '').trim() : String(r?.productGiven || '').trim();
     const qty = useReturnMode ? Math.abs(toNum(r?.qtyTaken)) : Math.abs(toNum(r?.qtyGiven));
-    const productKey = toLeftoverProductKey(product, 'archive');
+    const productKey = normalizeControlProductKey(product);
     addProduct(a, productKey, product, qty);
-    if (qty > 0.0001) a.totalQty += qty;
+    if (productKey && qty > 0.0001) a.totalQty += qty;
   });
 
   const allKeys = new Set([...basket.keys(), ...archive.keys()]);
@@ -1684,6 +1716,8 @@ const buildBasketArchiveDifference = ({
     const diffQty = systemQty - archiveQty;
     const systemProductsText = makeBucketProductsText(b?.productQty, b?.productLabel);
     const archiveProductsText = makeBucketProductsText(a?.productQty, a?.productLabel);
+    const systemProductNamesText = makeBucketProductsText(b?.productQty, b?.productLabel, false);
+    const archiveProductNamesText = makeBucketProductsText(a?.productQty, a?.productLabel, false);
 
     const result = {
       id: `${useReturnMode ? 'ret' : 'ord'}_cmp_${date}_${customerId}_${idx + 1}`,
@@ -1698,6 +1732,8 @@ const buildBasketArchiveDifference = ({
       diffQty,
       systemProductsText,
       archiveProductsText,
+      systemProductNamesText,
+      archiveProductNamesText,
       productDiffText: '-',
       qtyDiffText: '-',
       status: 'OK',
@@ -1721,10 +1757,10 @@ const buildBasketArchiveDifference = ({
     if (missingInArchive.length || extraInArchive.length) {
       const parts = [];
       if (missingInArchive.length) {
-        parts.push(`Arxivda yo'q: ${missingInArchive.map((k) => toLeftoverProductLabel(k, b.productLabel.get(k))).join(', ')}`);
+        parts.push(`Arxivda yo'q: ${missingInArchive.map((k) => controlProductLabelByKey(k, b.productLabel.get(k))).join(', ')}`);
       }
       if (extraInArchive.length) {
-        parts.push(`Sistemada yo'q: ${extraInArchive.map((k) => toLeftoverProductLabel(k, a.productLabel.get(k))).join(', ')}`);
+        parts.push(`Sistemada yo'q: ${extraInArchive.map((k) => controlProductLabelByKey(k, a.productLabel.get(k))).join(', ')}`);
       }
       result.mismatchType = 'product';
       result.hasProductMismatch = true;
@@ -1738,7 +1774,7 @@ const buildBasketArchiveDifference = ({
       const bQty = Number(b.productQty.get(pKey) || 0);
       const aQty = Number(a.productQty.get(pKey) || 0);
       if (Math.abs(bQty - aQty) <= 0.0001) return;
-      qtyParts.push(`${toLeftoverProductLabel(pKey, b.productLabel.get(pKey) || a.productLabel.get(pKey) || pKey)}: ${fmt(bQty)} / ${fmt(aQty)}`);
+      qtyParts.push(`${controlProductLabelByKey(pKey, b.productLabel.get(pKey) || a.productLabel.get(pKey) || pKey)}: ${fmt(bQty)} / ${fmt(aQty)}`);
     });
     if (qtyParts.length) {
       result.mismatchType = 'qty';
@@ -7219,7 +7255,11 @@ function Reports({
   const activeControlCustomerIds = useMemo(() => {
     return new Set(
       (D.customers || [])
-        .filter((c) => !isExcludedZCategory(c?.source) && !isNameInactiveByPrefix(c?.name || ''))
+        .filter((c) => (
+          isMurodbaxshCustomer(c) &&
+          !isExcludedZCategory(c?.source) &&
+          !isNameInactiveByPrefix(c?.name || '')
+        ))
         .map((c) => String(c?.id || '').trim())
         .filter(Boolean)
     );
@@ -7395,6 +7435,7 @@ function Reports({
       if (!isMainWarehouseLabel(o.warehouse)) return false;
       const dateKey = toIsoDate(o.orderDate);
       if (!dateKey) return false;
+      if (dateKey < CONTROL_COMPARE_START_DATE) return false;
       const driver = String(o.delivPerson || o.agent || '').trim();
       if (!driver) return false;
       return true;
@@ -7415,6 +7456,7 @@ function Reports({
       if (!isMainWarehouseLabel(r.toWarehouse)) return false;
       const d = toIsoDate(r.moveDate);
       if (!d) return false;
+      if (d < CONTROL_COMPARE_START_DATE) return false;
       const from = String(r.fromWarehouse || '').trim();
       if (!from) return false;
       return true;
@@ -7509,6 +7551,7 @@ function Reports({
       const date = toIsoDate(o.orderDate);
       const customerId = String(o.mId || '').trim();
       if (!date || !customerId) return;
+      if (date < CONTROL_COMPARE_START_DATE) return;
       const driver = String(o.delivPerson || o.agent || '').trim() || '-';
       if (!canSeeAllNazorat && String(driver).trim().toLowerCase() !== currentUserNorm) return;
       const orderId = String(o.soNum || '').trim();
@@ -7574,6 +7617,7 @@ function Reports({
       if (isCancelledStatus(o.status)) return false;
       const date = toIsoDate(o.orderDate);
       if (!date) return false;
+      if (date < CONTROL_COMPARE_START_DATE) return false;
       const customerId = String(o.mId || '').trim();
       if (!customerId) return false;
       if (!activeControlCustomerIds.has(customerId)) return false;
@@ -7690,8 +7734,8 @@ function Reports({
     { key:'customer', label:'Mijoz', type:'text' },
     { key:'orderId', label:'Zakaz ID', type:'text' },
     { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'systemProductsText', label:'Sistem mahsulot', type:'text' },
-    { key:'archiveProductsText', label:'Arxiv mahsulot', type:'text' },
+    { key:'systemProductNamesText', label:'Sistem mahsulot', type:'text' },
+    { key:'archiveProductNamesText', label:'Arxiv mahsulot', type:'text' },
     { key:'productDiffText', label:'Farq', type:'text' },
     { key:'status', label:'Holat', type:'text' },
   ]), []);
@@ -7723,8 +7767,8 @@ function Reports({
     { key:'customer', label:'Mijoz', type:'text' },
     { key:'orderId', label:'Vozvrat ID', type:'text' },
     { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'systemProductsText', label:'Sistem mahsulot', type:'text' },
-    { key:'archiveProductsText', label:'Arxiv mahsulot', type:'text' },
+    { key:'systemProductNamesText', label:'Sistem mahsulot', type:'text' },
+    { key:'archiveProductNamesText', label:'Arxiv mahsulot', type:'text' },
     { key:'productDiffText', label:'Farq', type:'text' },
     { key:'status', label:'Holat', type:'text' },
   ]), []);
@@ -7861,11 +7905,12 @@ function Reports({
   };
 
   return (
-    <div className="ani" style={{display:'flex',flexDirection:'column',gap:showNazorat ? 10 : 14, minHeight:showNazorat ? '100%' : 0}}>
-      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
-        {showReport && <button className="btn btn-gr btn-sm" onClick={exportReports}>Hisobot Excel</button>}
-        {showNazorat && <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>}
-      </div>
+    <div className="ani" style={{display:'flex',flexDirection:'column',gap:showNazorat ? 6 : 14, minHeight:showNazorat ? '100%' : 0}}>
+      {showReport && (
+        <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
+          <button className="btn btn-gr btn-sm" onClick={exportReports}>Hisobot Excel</button>
+        </div>
+      )}
       {showReport && (
       <div className="g4">
         <StatCard
@@ -7968,7 +8013,7 @@ function Reports({
       )}
 
       {showNazorat && (
-      <div style={{display:'grid',gap:8,minHeight:0,flex:1}}>
+      <div style={{display:'grid',gap:6,minHeight:0,flex:1}}>
         <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap'}}>
           <div style={{display:'grid',gap:6}}>
             <div className="tabs" style={{display:'inline-flex'}}>
@@ -8006,6 +8051,7 @@ function Reports({
             )}
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>
             <div style={{position:'relative'}}>
               <button className="btn btn-gh btn-sm" onClick={()=>setNazoratFilterOpen((v)=>!v)}>
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -8058,7 +8104,7 @@ function Reports({
           </div>
         )}
 
-        <div className="card" style={{overflow:'hidden',minHeight:0,flex:1,height:'calc(100vh - 176px)'}}>
+        <div className="card" style={{overflow:'hidden',minHeight:0,flex:1,height:'calc(100vh - 132px)'}}>
           <div style={{overflow:'auto',height:'100%'}}>
             {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' ? (
               <table className="tbl">
