@@ -8636,7 +8636,15 @@ function Reports({
                 </tbody>
               </table>
             ) : (
-              <table className="tbl" style={{minWidth:Math.max(1200, 180 + activeNazoratColumns.length * 140)}}>
+              <table
+                className="tbl"
+                style={{
+                  minWidth: nazoratSection === 'cash'
+                    ? 2400
+                    : Math.max(1500, 220 + activeNazoratColumns.length * 150),
+                  tableLayout:'fixed',
+                }}
+              >
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8645,8 +8653,14 @@ function Reports({
                         key={`nh_${c.key}`}
                         style={
                           c.key === 'status'
-                            ? { width:220, minWidth:220, maxWidth:220, whiteSpace:'nowrap' }
-                            : (c.type === 'number' ? { textAlign: 'right' } : undefined)
+                            ? { width:260, minWidth:260, maxWidth:260, whiteSpace:'nowrap' }
+                            : (
+                              c.type === 'number'
+                                ? { textAlign:'right', width:130, minWidth:130, maxWidth:130 }
+                                : (c.type === 'date'
+                                    ? { width:110, minWidth:110, maxWidth:110 }
+                                    : { width:190, minWidth:190, maxWidth:190 })
+                            )
                         }
                       >
                         {c.label}
@@ -8672,17 +8686,36 @@ function Reports({
                           if (c.type === 'number') {
                             baseStyle.textAlign = 'right';
                             baseStyle.fontFamily = 'var(--mono)';
+                            baseStyle.width = 130;
+                            baseStyle.minWidth = 130;
+                            baseStyle.maxWidth = 130;
+                            baseStyle.whiteSpace = 'nowrap';
+                            baseStyle.overflow = 'hidden';
+                            baseStyle.textOverflow = 'ellipsis';
                           } else if (c.type === 'date') {
                             baseStyle.fontFamily = 'var(--mono)';
                             baseStyle.fontSize = 11;
+                            baseStyle.width = 110;
+                            baseStyle.minWidth = 110;
+                            baseStyle.maxWidth = 110;
+                            baseStyle.whiteSpace = 'nowrap';
+                            baseStyle.overflow = 'hidden';
+                            baseStyle.textOverflow = 'ellipsis';
+                          } else {
+                            baseStyle.width = 190;
+                            baseStyle.minWidth = 190;
+                            baseStyle.maxWidth = 190;
+                            baseStyle.whiteSpace = 'nowrap';
+                            baseStyle.overflow = 'hidden';
+                            baseStyle.textOverflow = 'ellipsis';
                           }
                           if (c.key === 'status') {
                             baseStyle.fontSize = 11;
                             baseStyle.color = isWarn ? 'var(--rd)' : 'var(--gr)';
                             baseStyle.background = isWarn ? 'rgba(248,81,73,.08)' : undefined;
-                            baseStyle.width = 220;
-                            baseStyle.minWidth = 220;
-                            baseStyle.maxWidth = 220;
+                            baseStyle.width = 260;
+                            baseStyle.minWidth = 260;
+                            baseStyle.maxWidth = 260;
                             baseStyle.whiteSpace = 'nowrap';
                             baseStyle.overflow = 'hidden';
                             baseStyle.textOverflow = 'ellipsis';
