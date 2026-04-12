@@ -8453,7 +8453,7 @@ function Reports({
               </div>
             </div>
           </div>
-          <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',width:'100%'}}>
             <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
               {nazoratSection === 'orders' && (
                 <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
@@ -8480,15 +8480,15 @@ function Reports({
                 </div>
               )}
             </div>
-            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',justifyContent:'flex-end'}}>
-              {nazoratSection === 'returns' && nazoratReturnSection === 'return_return' && (
+            {nazoratSection === 'returns' && nazoratReturnSection === 'return_return' && (
+              <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginLeft:'auto'}}>
                 <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
                   <button className={`tab${nazoratReturnDiffSection==='customer'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('customer')}>Mijoz hatosi</button>
                   <button className={`tab${nazoratReturnDiffSection==='product'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('product')}>Mahsulot hatosi</button>
                   <button className={`tab${nazoratReturnDiffSection==='qty'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('qty')}>Son hatosi</button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -8521,9 +8521,9 @@ function Reports({
         )}
 
         <div className="card" style={{overflow:'hidden',minHeight:0,flex:1,height:'calc(100vh - 132px)'}}>
-          <div style={{overflow:'auto',height:'100%'}}>
+          <div style={{overflowX:'auto',overflowY:'auto',height:'100%',scrollbarGutter:'stable both-edges'}}>
             {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' ? (
-              <table className="tbl">
+              <table className="tbl" style={{minWidth:1120}}>
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8533,7 +8533,7 @@ function Reports({
                     <th style={{textAlign:'right'}}>Zakaz suv soni</th>
                     <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
                     <th style={{textAlign:'right'}}>Farq</th>
-                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)'}}>Holat</th>
+                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)',minWidth:180}}>Holat</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8550,7 +8550,7 @@ function Reports({
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
-                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',position:'sticky',right:0,zIndex:2,background:r.status === 'OK' ? 'var(--s1)' : 'rgba(248,81,73,.08)'}}>{r.status}</td>
+                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',position:'sticky',right:0,zIndex:2,background:r.status === 'OK' ? 'var(--s1)' : 'rgba(248,81,73,.08)',minWidth:180,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
                         </tr>
                       ))}
                       {nazoratView === 'all' && (
@@ -8570,7 +8570,7 @@ function Reports({
                 </tbody>
               </table>
             ) : nazoratSection === 'orders' ? (
-              <table className="tbl">
+              <table className="tbl" style={{minWidth:1300}}>
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8582,7 +8582,7 @@ function Reports({
                     <th style={{textAlign:'right'}}>Summa UZS</th>
                     <th>Dostavchik</th>
                     <th>Zakazlar</th>
-                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)'}}>Holat</th>
+                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)',minWidth:180}}>Holat</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8599,13 +8599,13 @@ function Reports({
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
                       <td style={{maxWidth:190}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.driversText || '-'}</span></td>
                       <td style={{maxWidth:230}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.docsText || '-'}</span></td>
-                      <td style={{fontSize:11,color:r.docsCount > 1 ? 'var(--rd)' : 'var(--gr)',position:'sticky',right:0,zIndex:2,background:r.docsCount > 1 ? 'rgba(248,81,73,.08)' : 'var(--s1)'}}>{r.status}</td>
+                      <td style={{fontSize:11,color:r.docsCount > 1 ? 'var(--rd)' : 'var(--gr)',position:'sticky',right:0,zIndex:2,background:r.docsCount > 1 ? 'rgba(248,81,73,.08)' : 'var(--s1)',minWidth:180,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : nazoratSection === 'returns' && nazoratReturnSection === 'return_order' ? (
-              <table className="tbl">
+              <table className="tbl" style={{minWidth:1380}}>
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8617,7 +8617,7 @@ function Reports({
                     <th>Dostavchik</th>
                     <th>Sklad</th>
                     <th>Izoh</th>
-                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)'}}>Status</th>
+                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)',minWidth:180}}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8634,13 +8634,13 @@ function Reports({
                       <td>{r.driver}</td>
                       <td>{r.warehouse || '-'}</td>
                       <td style={{maxWidth:260}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
-                      <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)',position:'sticky',right:0,zIndex:2,background:r.hasOrder ? 'var(--s1)' : 'rgba(248,81,73,.08)'}}>{r.status}</td>
+                      <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)',position:'sticky',right:0,zIndex:2,background:r.hasOrder ? 'var(--s1)' : 'rgba(248,81,73,.08)',minWidth:180,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
-              <table className="tbl">
+              <table className="tbl" style={{minWidth:Math.max(1200, 180 + activeNazoratColumns.length * 140)}}>
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8649,7 +8649,7 @@ function Reports({
                         key={`nh_${c.key}`}
                         style={
                           c.key === 'status'
-                            ? { position:'sticky', right:0, zIndex:4, background:'var(--s1)' }
+                            ? { position:'sticky', right:0, zIndex:4, background:'var(--s1)', minWidth:180, maxWidth:220 }
                             : (c.type === 'number' ? { textAlign: 'right' } : undefined)
                         }
                       >
@@ -8687,6 +8687,11 @@ function Reports({
                             baseStyle.right = 0;
                             baseStyle.zIndex = 2;
                             baseStyle.background = isWarn ? 'rgba(248,81,73,.08)' : 'var(--s1)';
+                            baseStyle.minWidth = 180;
+                            baseStyle.maxWidth = 220;
+                            baseStyle.whiteSpace = 'nowrap';
+                            baseStyle.overflow = 'hidden';
+                            baseStyle.textOverflow = 'ellipsis';
                           }
                           if (c.key === 'diffQty') {
                             baseStyle.color = Math.abs(Number(rawVal || 0)) > 0.0001 ? 'var(--rd)' : 'var(--gr)';
