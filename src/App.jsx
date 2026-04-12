@@ -9560,12 +9560,12 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(150px,1fr))',gap:10}}>
-        <Stat title="Bugun (kiritilgan)" value={`${fmt(sumQty(todayEnteredRows))} ta`} sub={`${fmt(sumUzs(todayEnteredRows))} so'm`} c="var(--bl)" />
-        <Stat title="Bugun (yetkazilgan)" value={`${fmt(sumQty(todayDeliveredRows))} ta`} sub={`${fmt(sumUzs(todayDeliveredRows))} so'm`} c="var(--gr)" />
-        <Stat title="Kecha (yetkazilgan)" value={`${fmt(sumQty(yesterdayDeliveredRows))} ta`} sub={`${fmt(sumUzs(yesterdayDeliveredRows))} so'm`} c="var(--yl)" />
-        <Stat title="Oy fakt (yetkazilgan)" value={`${fmt(monthDeliveredQty)} ta`} sub={`Kiritilgan: ${fmt(monthEnteredQty)} ta`} c="var(--bl)" />
-        <Stat title="Oy plan bajarilishi" value={`${planPercent.toFixed(1)} %`} sub={`Plan: ${fmt(monthPlanWater)} ta`} c={planPercent >= 100 ? 'var(--gr)' : 'var(--or)'} />
-        <Stat title="Oy prognoz" value={`${fmt(forecastMonthQty)} ta`} sub={forecastPlanGap > 0 ? `Plan yetmaydi: ${fmt(forecastPlanGap)} ta` : 'Plan yopiladi'} c={forecastPlanGap > 0 ? 'var(--rd)' : 'var(--gr)'} />
+        <StatCard l="Bugun (kiritilgan)" v={`${fmt(sumQty(todayEnteredRows))} ta`} s={`${fmt(sumUzs(todayEnteredRows))} so'm`} c="var(--bl)" />
+        <StatCard l="Bugun (yetkazilgan)" v={`${fmt(sumQty(todayDeliveredRows))} ta`} s={`${fmt(sumUzs(todayDeliveredRows))} so'm`} c="var(--gr)" />
+        <StatCard l="Kecha (yetkazilgan)" v={`${fmt(sumQty(yesterdayDeliveredRows))} ta`} s={`${fmt(sumUzs(yesterdayDeliveredRows))} so'm`} c="var(--yl)" />
+        <StatCard l="Oy fakt (yetkazilgan)" v={`${fmt(monthDeliveredQty)} ta`} s={`Kiritilgan: ${fmt(monthEnteredQty)} ta`} c="var(--bl)" />
+        <StatCard l="Oy plan bajarilishi" v={`${planPercent.toFixed(1)} %`} s={`Plan: ${fmt(monthPlanWater)} ta`} c={planPercent >= 100 ? 'var(--gr)' : 'var(--or)'} />
+        <StatCard l="Oy prognoz" v={`${fmt(forecastMonthQty)} ta`} s={forecastPlanGap > 0 ? `Plan yetmaydi: ${fmt(forecastPlanGap)} ta` : 'Plan yopiladi'} c={forecastPlanGap > 0 ? 'var(--rd)' : 'var(--gr)'} />
       </div>
 
       <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:10,minHeight:0}}>
