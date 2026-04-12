@@ -7562,6 +7562,37 @@ function Reports({
     });
     return out;
   }, [driverCardCashMap, resolveNazoratDriverName]);
+  const normalizeDriverLookupKey = useCallback(
+    (v) => normalizeMatchText(v).replace(/[^a-z0-9а-я]/gi, ''),
+    []
+  );
+  const lookupByDriverName = useCallback((sourceMap = {}, driverName = '') => {
+    const driver = String(driverName || '').trim();
+    if (!driver) return '';
+    const direct = String(sourceMap?.[driver] || '').trim();
+    if (direct) return direct;
+
+    const driverNorm = normalizeDriverLookupKey(driver);
+    if (!driverNorm) return '';
+
+    const entries = Object.entries(sourceMap || {});
+    for (const [k, v] of entries) {
+      const kn = normalizeDriverLookupKey(k);
+      if (kn && kn === driverNorm && String(v || '').trim()) return String(v || '').trim();
+    }
+    for (const [k, v] of entries) {
+      const kn = normalizeDriverLookupKey(k);
+      if (!kn || !String(v || '').trim()) continue;
+      if (driverNorm.includes(kn) || kn.includes(driverNorm)) return String(v || '').trim();
+    }
+
+    const afterComma = driver.split(/[;,]/).map((x) => String(x || '').trim()).filter(Boolean).pop() || '';
+    if (afterComma && afterComma !== driver) {
+      const fromComma = String(sourceMap?.[afterComma] || '').trim();
+      if (fromComma) return fromComma;
+    }
+    return '';
+  }, [normalizeDriverLookupKey]);
   const [nazoratSection, setNazoratSection] = useState('orders');
   const [nazoratOrderSection, setNazoratOrderSection] = useState('transfer');
   const [nazoratReturnSection, setNazoratReturnSection] = useState('return_order');
@@ -7860,9 +7891,19 @@ function Reports({
   const pickExpectedCashbox = useCallback((driverName, payMode) => {
     const driver = String(driverName || '').trim();
     if (!driver) return '';
-    if (payMode === 'card') return String(resolvedDriverCardCashMap?.[driver] || '').trim();
-    return String(resolvedDriverCashMap?.[driver] || '').trim();
-  }, [resolvedDriverCardCashMap, resolvedDriverCashMap]);
+    if (payMode === 'card') {
+      return (
+        lookupByDriverName(resolvedDriverCardCashMap, driver) ||
+        lookupByDriverName(resolvedDriverCashMap, driver) ||
+        ''
+      );
+    }
+    return (
+      lookupByDriverName(resolvedDriverCashMap, driver) ||
+      lookupByDriverName(resolvedDriverCardCashMap, driver) ||
+      ''
+    );
+  }, [lookupByDriverName, resolvedDriverCardCashMap, resolvedDriverCashMap]);
   const nazoratCashRowsAll = useMemo(() => {
     const archiveMap = new Map();
     const systemMap = new Map();
@@ -8374,73 +8415,75 @@ function Reports({
 
       {showNazorat && (
       <div style={{display:'grid',gap:6,minHeight:0,flex:1}}>
-        <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'flex-start',flexWrap:'wrap'}}>
-          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>
-            <div style={{position:'relative'}}>
-              <button className="btn btn-gh btn-sm" onClick={()=>setNazoratFilterOpen((v)=>!v)}>
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-                </svg>
-                Filtr ({nazoratFilterCount})
-              </button>
-              <UniversalFilterPanel
-                open={nazoratFilterOpen}
-                title={nazoratSection === 'orders'
-                  ? (nazoratOrderSection === 'duplicates' ? 'Dublikat zakazlar filtri' : 'Zakaz nazorati filtri')
-                  : (nazoratSection === 'returns'
-                    ? (nazoratReturnSection === 'return_order' ? 'Vozvrat & Zakaz filtri' : 'Vozvrat & Vozvrat filtri')
-                    : (nazoratSection === 'cash' ? "Pul nazorati filtri" : 'Zakaz farqi filtri'))}
-                columns={activeNazoratColumns}
-                rows={activeNazoratBaseRows}
-                state={nazoratFilterState}
-                setState={setNazoratFilterState}
-                onClose={()=>setNazoratFilterOpen(false)}
-                width={620}
-              />
-            </div>
-            <div className="tabs" style={{display:'inline-flex'}}>
-              <button className={`tab${nazoratView==='errors'?' on':''}`} onClick={()=>setNazoratView('errors')}>Hatolilar</button>
-              <button className={`tab${nazoratView==='all'?' on':''}`} onClick={()=>setNazoratView('all')}>Barchasi</button>
-            </div>
-          </div>
-          <div style={{display:'grid',gap:6,justifyItems:'end'}}>
-            <div className="tabs" style={{display:'inline-flex',justifySelf:'end',flexWrap:'wrap'}}>
+        <div style={{display:'grid',gap:6}}>
+          <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
               <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
               <button className={`tab${nazoratSection==='returns'?' on':''}`} onClick={()=>setNazoratSection('returns')}>Vozvrat nazorati</button>
               <button className={`tab${nazoratSection==='gap'?' on':''}`} onClick={()=>setNazoratSection('gap')}>Zakaz farqi</button>
               <button className={`tab${nazoratSection==='cash'?' on':''}`} onClick={()=>setNazoratSection('cash')}>Pul nazorati</button>
             </div>
+            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',justifyContent:'flex-end'}}>
+              <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>
+              <div style={{position:'relative'}}>
+                <button className="btn btn-gh btn-sm" onClick={()=>setNazoratFilterOpen((v)=>!v)}>
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                  </svg>
+                  Filtr ({nazoratFilterCount})
+                </button>
+                <UniversalFilterPanel
+                  open={nazoratFilterOpen}
+                  title={nazoratSection === 'orders'
+                    ? (nazoratOrderSection === 'duplicates' ? 'Dublikat zakazlar filtri' : 'Zakaz nazorati filtri')
+                    : (nazoratSection === 'returns'
+                      ? (nazoratReturnSection === 'return_order' ? 'Vozvrat & Zakaz filtri' : 'Vozvrat & Vozvrat filtri')
+                      : (nazoratSection === 'cash' ? "Pul nazorati filtri" : 'Zakaz farqi filtri'))}
+                  columns={activeNazoratColumns}
+                  rows={activeNazoratBaseRows}
+                  state={nazoratFilterState}
+                  setState={setNazoratFilterState}
+                  onClose={()=>setNazoratFilterOpen(false)}
+                  width={620}
+                />
+              </div>
+              <div className="tabs" style={{display:'inline-flex'}}>
+                <button className={`tab${nazoratView==='errors'?' on':''}`} onClick={()=>setNazoratView('errors')}>Hatolilar</button>
+                <button className={`tab${nazoratView==='all'?' on':''}`} onClick={()=>setNazoratView('all')}>Barchasi</button>
+              </div>
+            </div>
+          </div>
+          <div style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             {nazoratSection === 'orders' && (
-              <div className="tabs" style={{display:'inline-flex',justifySelf:'end',flexWrap:'wrap'}}>
+              <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
                 <button className={`tab${nazoratOrderSection==='transfer'?' on':''}`} onClick={()=>setNazoratOrderSection('transfer')}>Permesheniya nazorati</button>
                 <button className={`tab${nazoratOrderSection==='duplicates'?' on':''}`} onClick={()=>setNazoratOrderSection('duplicates')}>Dublikat zakazlar</button>
               </div>
             )}
             {nazoratSection === 'returns' && (
-              <div style={{display:'grid',gap:6,justifyItems:'end'}}>
-                <div className="tabs" style={{display:'inline-flex',justifySelf:'end',flexWrap:'wrap'}}>
+              <>
+                <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
                   <button className={`tab${nazoratReturnSection==='return_order'?' on':''}`} onClick={()=>setNazoratReturnSection('return_order')}>Vozvrat & Zakaz</button>
                   <button className={`tab${nazoratReturnSection==='return_return'?' on':''}`} onClick={()=>setNazoratReturnSection('return_return')}>Vozvrat & Vozvrat</button>
                 </div>
                 {nazoratReturnSection === 'return_return' && (
-                  <div className="tabs" style={{display:'inline-flex',justifySelf:'end',flexWrap:'wrap'}}>
+                  <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
                     <button className={`tab${nazoratReturnDiffSection==='customer'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('customer')}>Mijoz hatosi</button>
                     <button className={`tab${nazoratReturnDiffSection==='product'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('product')}>Mahsulot hatosi</button>
                     <button className={`tab${nazoratReturnDiffSection==='qty'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('qty')}>Son hatosi</button>
                   </div>
                 )}
-              </div>
+              </>
             )}
             {nazoratSection === 'gap' && (
-              <div className="tabs" style={{display:'inline-flex',justifySelf:'end',flexWrap:'wrap'}}>
+              <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
                 <button className={`tab${nazoratGapSection==='customer'?' on':''}`} onClick={()=>setNazoratGapSection('customer')}>Mijoz hatosi</button>
                 <button className={`tab${nazoratGapSection==='product'?' on':''}`} onClick={()=>setNazoratGapSection('product')}>Mahsulot hatosi</button>
                 <button className={`tab${nazoratGapSection==='qty'?' on':''}`} onClick={()=>setNazoratGapSection('qty')}>Son hatosi</button>
               </div>
             )}
             {nazoratSection === 'cash' && (
-              <div className="tabs" style={{display:'inline-flex',justifySelf:'end'}}>
+              <div className="tabs" style={{display:'inline-flex'}}>
                 <button className={`tab${nazoratCashSection==='payment'?' on':''}`} onClick={()=>setNazoratCashSection('payment')}>Kirim nazorati</button>
               </div>
             )}
@@ -8488,7 +8531,7 @@ function Reports({
                     <th style={{textAlign:'right'}}>Zakaz suv soni</th>
                     <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
                     <th style={{textAlign:'right'}}>Farq</th>
-                    <th>Holat</th>
+                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)'}}>Holat</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8505,7 +8548,7 @@ function Reports({
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
-                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
+                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',position:'sticky',right:0,zIndex:2,background:r.status === 'OK' ? 'var(--s1)' : 'rgba(248,81,73,.08)'}}>{r.status}</td>
                         </tr>
                       ))}
                       {nazoratView === 'all' && (
@@ -8537,7 +8580,7 @@ function Reports({
                     <th style={{textAlign:'right'}}>Summa UZS</th>
                     <th>Dostavchik</th>
                     <th>Zakazlar</th>
-                    <th>Holat</th>
+                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)'}}>Holat</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8554,7 +8597,7 @@ function Reports({
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
                       <td style={{maxWidth:190}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.driversText || '-'}</span></td>
                       <td style={{maxWidth:230}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.docsText || '-'}</span></td>
-                      <td style={{fontSize:11,color:r.docsCount > 1 ? 'var(--rd)' : 'var(--gr)'}}>{r.status}</td>
+                      <td style={{fontSize:11,color:r.docsCount > 1 ? 'var(--rd)' : 'var(--gr)',position:'sticky',right:0,zIndex:2,background:r.docsCount > 1 ? 'rgba(248,81,73,.08)' : 'var(--s1)'}}>{r.status}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -8572,7 +8615,7 @@ function Reports({
                     <th>Dostavchik</th>
                     <th>Sklad</th>
                     <th>Izoh</th>
-                    <th>Status</th>
+                    <th style={{position:'sticky',right:0,zIndex:4,background:'var(--s1)'}}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -8589,7 +8632,7 @@ function Reports({
                       <td>{r.driver}</td>
                       <td>{r.warehouse || '-'}</td>
                       <td style={{maxWidth:260}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
-                      <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
+                      <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)',position:'sticky',right:0,zIndex:2,background:r.hasOrder ? 'var(--s1)' : 'rgba(248,81,73,.08)'}}>{r.status}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -8600,7 +8643,16 @@ function Reports({
                   <tr>
                     <th>No</th>
                     {activeNazoratColumns.map((c) => (
-                      <th key={`nh_${c.key}`} style={c.type === 'number' ? { textAlign: 'right' } : undefined}>{c.label}</th>
+                      <th
+                        key={`nh_${c.key}`}
+                        style={
+                          c.key === 'status'
+                            ? { position:'sticky', right:0, zIndex:4, background:'var(--s1)' }
+                            : (c.type === 'number' ? { textAlign: 'right' } : undefined)
+                        }
+                      >
+                        {c.label}
+                      </th>
                     ))}
                   </tr>
                 </thead>
@@ -8629,6 +8681,10 @@ function Reports({
                           if (c.key === 'status') {
                             baseStyle.fontSize = 11;
                             baseStyle.color = isWarn ? 'var(--rd)' : 'var(--gr)';
+                            baseStyle.position = 'sticky';
+                            baseStyle.right = 0;
+                            baseStyle.zIndex = 2;
+                            baseStyle.background = isWarn ? 'rgba(248,81,73,.08)' : 'var(--s1)';
                           }
                           if (c.key === 'diffQty') {
                             baseStyle.color = Math.abs(Number(rawVal || 0)) > 0.0001 ? 'var(--rd)' : 'var(--gr)';
@@ -11821,7 +11877,7 @@ export default function App() {
             </div>
           </div>
 
-          <div data-filter-boundary="1" style={{flex:1,overflow:'auto',padding:page==='nazorat'?8:12,display:'flex',flexDirection:'column'}}>
+          <div data-filter-boundary="1" style={{flex:1,overflow:page==='nazorat'?'hidden':'auto',padding:page==='nazorat'?8:12,display:'flex',flexDirection:'column'}}>
             {!data && page!=='doljniki' ? (
               <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <div style={{textAlign:'center',maxWidth:440}}>
