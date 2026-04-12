@@ -8521,7 +8521,7 @@ function Reports({
         <div className="card" style={{overflow:'hidden',minHeight:0,flex:1,height:'calc(100vh - 132px)'}}>
           <div style={{overflowX:'scroll',overflowY:'auto',height:'100%',scrollbarGutter:'stable both-edges'}}>
             {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' ? (
-              <table className="tbl" style={{minWidth:1120}}>
+              <table className="tbl" style={{width:'max(100%, 1120px)',minWidth:1120,tableLayout:'fixed'}}>
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8568,7 +8568,7 @@ function Reports({
                 </tbody>
               </table>
             ) : nazoratSection === 'orders' ? (
-              <table className="tbl" style={{minWidth:1300}}>
+              <table className="tbl" style={{width:'max(100%, 1300px)',minWidth:1300,tableLayout:'fixed'}}>
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8603,7 +8603,7 @@ function Reports({
                 </tbody>
               </table>
             ) : nazoratSection === 'returns' && nazoratReturnSection === 'return_order' ? (
-              <table className="tbl" style={{minWidth:1380}}>
+              <table className="tbl" style={{width:'max(100%, 1380px)',minWidth:1380,tableLayout:'fixed'}}>
                 <thead>
                   <tr>
                     <th>No</th>
@@ -8641,7 +8641,9 @@ function Reports({
               <table
                 className="tbl"
                 style={{
-                  width:'max-content',
+                  width: nazoratSection === 'cash'
+                    ? 'max(100%, 2500px)'
+                    : `max(100%, ${Math.max(1600, 240 + activeNazoratColumns.length * 160)}px)`,
                   minWidth: nazoratSection === 'cash'
                     ? 2500
                     : Math.max(1600, 240 + activeNazoratColumns.length * 160),
