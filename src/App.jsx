@@ -150,6 +150,10 @@ const LEFTOVER_QZI_GID = '1558522420'; // Q_Z_I
 const LEFTOVER_REASON_GID = '971866254'; // Qolib_ketgan_zakazlar_Arxiv
 const LEFTOVER_ARCHIVE_GID = '1642247768'; // Arxiv
 const LEFTOVER_EMPLOYEES_GID = '1637417945'; // XODIMLAR
+const BLOGGER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1f-rWiPP4uHpA4prtFEs-hYU20yyAV73bYtAIEciKs8Y/edit?gid=1712204630#gid=1712204630';
+const BLOGGER_SHEET_ID = '1f-rWiPP4uHpA4prtFEs-hYU20yyAV73bYtAIEciKs8Y';
+const BLOGGER_SHEET_GID = '1712204630';
+const BLOGGER_SHEET_NAME = 'Blogerlar';
 
 /* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў HELPERS Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const fmt  = (n) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
@@ -9354,7 +9358,134 @@ function PlanPage({
   );
 }
 
+const isBonusWaterProduct = (product) => {
+  const p = normProduct(product);
+  if (!p) return false;
+  if (!isWaterProduct(p)) return false;
+  return p.includes('bonus') || p.includes('бонус');
+};
+const normalizeNickToken = (v) =>
+  normalizeMatchText(String(v || '').replace(/@/g, ''))
+    .replace(/\s+/g, '')
+    .trim();
+const monthKeyFromLooseText = (v) => {
+  const s = String(v || '').trim();
+  const m = s.match(/(20\d{2})[.\-/](\d{1,2})/);
+  if (!m) return '';
+  const mm = String(Math.max(1, Math.min(12, Number(m[2]) || 1))).padStart(2, '0');
+  return `${m[1]}-${mm}`;
+};
+const formatMonthShort = (mk) => {
+  const m = String(mk || '').match(/^(\d{4})-(\d{2})$/);
+  return m ? `${m[2]}.${m[1]}` : (mk || '-');
+};
+const parseBloggerSheetRows = (rows = []) => {
+  if (!Array.isArray(rows) || rows.length < 2) return { items: [], months: [] };
+
+  const headerRowIndex = rows.findIndex((r = []) => {
+    const row = Array.isArray(r) ? r : [];
+    return row.some((cell) => {
+      const t = normText(cell);
+      return t.includes('insta') || t.includes('nik') || t === 'isim' || t.includes('status');
+    });
+  });
+  if (headerRowIndex < 0) return { items: [], months: [] };
+
+  const topRow = rows[headerRowIndex - 1] || [];
+  const headerRow = rows[headerRowIndex] || [];
+  const colCount = rows.reduce(
+    (mx, r) => Math.max(mx, Array.isArray(r) ? r.length : 0),
+    Math.max(topRow.length, headerRow.length)
+  );
+
+  const hNorm = Array.from({ length: colCount }, (_, i) => normText(headerRow[i]));
+  const tNorm = Array.from({ length: colCount }, (_, i) => normText(topRow[i]));
+  const findCol = (patterns = []) => {
+    const checks = patterns.map((p) => normText(p));
+    for (let i = 0; i < colCount; i += 1) {
+      const h = hNorm[i] || '';
+      const t = tNorm[i] || '';
+      if (checks.some((p) => h.includes(p) || t.includes(p))) return i;
+    }
+    return -1;
+  };
+
+  const colName = findCol(['isim', 'ism']);
+  const colNick = findCol(['insta', 'nik']);
+  const colPhone = findCol(['tel', 'telefon']);
+  const colStatus = findCol(['status']);
+  const colContractTerm = findCol(['dagavor', 'dogovor', 'kelishuv']);
+  const colContractDate = findCol(['dagavor data', 'dogovor data', 'kelishuv sana', 'data']);
+  const colPlanWater = findCol(['oylik suv', 'suv istemol', 'water plan']);
+  const colPlanStory = findCol(['oylik istora', 'oylik historia', 'story']);
+  const colPlanReel = findCol(['oylik rils', 'oylik reels', 'reels', 'rils']);
+
+  const monthByCol = Array(colCount).fill('');
+  let activeMonth = '';
+  for (let i = 0; i < colCount; i += 1) {
+    const monthMark = monthKeyFromLooseText(topRow[i]) || monthKeyFromLooseText(headerRow[i]);
+    if (monthMark) activeMonth = monthMark;
+    monthByCol[i] = activeMonth;
+  }
+
+  const metricByCol = Array(colCount).fill('');
+  for (let i = 0; i < colCount; i += 1) {
+    const marker = `${tNorm[i] || ''} ${hNorm[i] || ''}`.trim();
+    if (!marker) continue;
+    if (marker.includes('istor') || marker.includes('story')) metricByCol[i] = 'story';
+    else if (marker.includes('ril') || marker.includes('reel')) metricByCol[i] = 'reel';
+    else if ((marker.includes('kelgan') && marker.includes('mijoz')) || marker.includes('mijoz son')) metricByCol[i] = 'customers';
+    else if ((marker.includes('suv') || marker.includes('water')) && !marker.includes('oylik')) metricByCol[i] = 'water';
+  }
+
+  const pick = (row, idx) => (idx >= 0 ? row?.[idx] : '');
+  const months = new Set();
+  const items = [];
+
+  rows.slice(headerRowIndex + 1).forEach((r) => {
+    const row = Array.isArray(r) ? r : [];
+    const name = String(pick(row, colName) || '').trim();
+    const nickRaw = String(pick(row, colNick) || '').trim();
+    if (!name && !nickRaw) return;
+
+    const monthly = {};
+    for (let i = 0; i < colCount; i += 1) {
+      const mk = monthByCol[i];
+      const metric = metricByCol[i];
+      if (!mk || !metric) continue;
+      const raw = row[i];
+      if (raw == null || String(raw).trim() === '') continue;
+      const value = toNum(raw);
+      if (!monthly[mk]) monthly[mk] = { story: 0, reel: 0, customers: 0, water: 0 };
+      monthly[mk][metric] += value;
+      months.add(mk);
+    }
+
+    items.push({
+      name: name || '-',
+      nick: nickRaw,
+      nickNorm: normalizeNickToken(nickRaw),
+      phone: String(pick(row, colPhone) || '').trim(),
+      status: String(pick(row, colStatus) || '').trim(),
+      contractTerm: String(pick(row, colContractTerm) || '').trim(),
+      contractDate: toIsoDate(pick(row, colContractDate)),
+      planWater: Math.max(0, toNum(pick(row, colPlanWater))),
+      planStory: Math.max(0, toNum(pick(row, colPlanStory))),
+      planReel: Math.max(0, toNum(pick(row, colPlanReel))),
+      monthly,
+    });
+  });
+
+  return {
+    items,
+    months: Array.from(months).sort((a, b) => a.localeCompare(b)),
+  };
+};
+
 function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murodbaxsh' }) {
+  const [bloggerSheetRows, setBloggerSheetRows] = useState([]);
+  const [bloggerLoading, setBloggerLoading] = useState(false);
+  const [bloggerError, setBloggerError] = useState('');
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
   const yesterdayIso = useMemo(() => {
     const d = new Date();
@@ -9362,6 +9493,34 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
     return toIsoDate(d);
   }, []);
   const monthNow = useMemo(() => monthKey(new Date()) || '', []);
+  useEffect(() => {
+    let dead = false;
+    (async () => {
+      setBloggerLoading(true);
+      setBloggerError('');
+      try {
+        let rows = [];
+        try {
+          rows = await fetchSheetCsvByName(BLOGGER_SHEET_ID, BLOGGER_SHEET_NAME, 'Blogerlar');
+        } catch (eByName) {
+          try {
+            rows = await fetchSheetCsv(BLOGGER_SHEET_ID, BLOGGER_SHEET_GID, 'Blogerlar');
+          } catch (eByGid) {
+            rows = await fetchSheetOpenSheet(BLOGGER_SHEET_ID, BLOGGER_SHEET_NAME, 'Blogerlar');
+          }
+        }
+        if (!dead) setBloggerSheetRows(Array.isArray(rows) ? rows : []);
+      } catch (e) {
+        if (!dead) {
+          setBloggerSheetRows([]);
+          setBloggerError(String(e?.message || e || "Blogerlar varaqi yuklanmadi"));
+        }
+      } finally {
+        if (!dead) setBloggerLoading(false);
+      }
+    })();
+    return () => { dead = true; };
+  }, []);
   const last30StartIso = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -9388,6 +9547,17 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
   const waterDeliveredRows = useMemo(
     () => waterOrderRows.filter((o) => isDeliveredStatus(o?.status)),
     [waterOrderRows]
+  );
+  const bloggerParsed = useMemo(() => parseBloggerSheetRows(bloggerSheetRows), [bloggerSheetRows]);
+  const bloggerRows = bloggerParsed.items || [];
+  const bloggerMonths = bloggerParsed.months || [];
+  const bloggerLatestMonth = useMemo(
+    () => (bloggerMonths.length ? bloggerMonths[bloggerMonths.length - 1] : (monthNow || '')),
+    [bloggerMonths, monthNow]
+  );
+  const bonusDeliveredRows = useMemo(
+    () => waterDeliveredRows.filter((o) => isBonusWaterProduct(o?.product)),
+    [waterDeliveredRows]
   );
   const sumQty = useCallback((rows = []) => rows.reduce((s, r) => s + Math.abs(toNum(r?.qty)), 0), []);
   const sumUzs = useCallback((rows = []) => rows.reduce((s, r) => {
@@ -9460,16 +9630,38 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
     const repeat = Array.from(byCustomer.values()).filter((s) => s.size >= 2).length;
     return (repeat / active) * 100;
   }, [waterDeliveredRows, last30StartIso]);
-  const staleCustomers = useMemo(() => (
+  const nonDebtActiveCustomers = useMemo(() => (
     (D?.customers || []).filter((c) =>
       !isExcludedZCategory(c?.source) &&
       !isNameInactiveByPrefix(c?.name || '') &&
-      Number(c?.daysAgo ?? 999) > 21
+      !!c?.hasOrders &&
+      !c?.isDebtor
     )
   ), [D?.customers]);
-  const debtCustomerCount = useMemo(() => (
-    (D?.debtorsByBalance || []).filter((c) => !isExcludedZCategory(c?.source)).length
+  const nonDebtActiveIds = useMemo(() => {
+    const s = new Set();
+    nonDebtActiveCustomers.forEach((c) => {
+      const id = String(c?.id || '').trim();
+      if (id) s.add(id);
+    });
+    return s;
+  }, [nonDebtActiveCustomers]);
+  const staleCustomers = useMemo(() => (
+    nonDebtActiveCustomers
+      .filter((c) => Number(c?.daysAgo ?? 999) > 30)
+      .sort((a, b) => Number(b?.daysAgo || 0) - Number(a?.daysAgo || 0))
+  ), [nonDebtActiveCustomers]);
+  const freshCustomers = useMemo(() => (
+    nonDebtActiveCustomers
+      .filter((c) => Number(c?.daysAgo ?? 999) <= 30)
+      .sort((a, b) => Number(a?.daysAgo ?? 999) - Number(b?.daysAgo ?? 999))
+  ), [nonDebtActiveCustomers]);
+  const debtCustomers = useMemo(() => (
+    (D?.debtorsByBalance || [])
+      .filter((c) => !isExcludedZCategory(c?.source))
+      .sort((a, b) => Math.abs(toNum(b?.balanceUZS)) - Math.abs(toNum(a?.balanceUZS)))
   ), [D?.debtorsByBalance]);
+  const debtCustomerCount = debtCustomers.length;
   const operatorRows = useMemo(() => {
     const byDriver = new Map();
     monthDeliveredRows.forEach((o) => {
@@ -9529,6 +9721,162 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
       .sort((a, b) => b.qty - a.qty)
       .slice(0, 12);
   }, [monthDeliveredRows]);
+  const bloggerNameByNick = useMemo(() => {
+    const m = new Map();
+    bloggerRows.forEach((r) => {
+      const key = normalizeNickToken(r?.nickNorm || r?.nick);
+      if (!key) return;
+      if (!m.has(key)) m.set(key, String(r?.name || r?.nick || key));
+    });
+    return m;
+  }, [bloggerRows]);
+  const bloggerMapping = useMemo(() => {
+    const nickList = Array.from(bloggerNameByNick.keys());
+    const customerNickMap = new Map();
+    const customersByNick = new Map();
+    nickList.forEach((n) => customersByNick.set(n, new Set()));
+
+    (D?.customers || []).forEach((c) => {
+      const cid = String(c?.id || '').trim();
+      if (!cid) return;
+      const hay = normalizeNickToken(`${c?.source || ''} ${c?.merchantNote || ''} ${c?.name || ''}`);
+      if (!hay) return;
+      const found = nickList.find((nick) => nick && hay.includes(nick));
+      if (!found) return;
+      customerNickMap.set(cid, found);
+      if (!customersByNick.has(found)) customersByNick.set(found, new Set());
+      customersByNick.get(found).add(cid);
+    });
+    return { customerNickMap, customersByNick };
+  }, [D?.customers, bloggerNameByNick]);
+  const bloggerCustomerIds = useMemo(
+    () => new Set(Array.from(bloggerMapping.customerNickMap.keys())),
+    [bloggerMapping]
+  );
+  const firstDeliveredMonthByCustomer = useMemo(() => {
+    const m = new Map();
+    waterDeliveredRows.forEach((o) => {
+      const cid = String(o?.mId || '').trim();
+      const mk = monthKey(o?.orderDate);
+      if (!cid || !mk) return;
+      const prev = m.get(cid);
+      if (!prev || mk < prev) m.set(cid, mk);
+    });
+    return m;
+  }, [waterDeliveredRows]);
+  const bonusByMonth = useMemo(() => {
+    const by = new Map();
+    bonusDeliveredRows.forEach((o) => {
+      const mk = monthKey(o?.orderDate);
+      if (!mk) return;
+      const cid = String(o?.mId || '').trim();
+      const qty = Math.abs(toNum(o?.qty));
+      if (!qty) return;
+      if (!by.has(mk)) by.set(mk, { month: mk, total: 0, active: 0, blogger: 0 });
+      const row = by.get(mk);
+      row.total += qty;
+      if (cid && nonDebtActiveIds.has(cid)) row.active += qty;
+      if (cid && bloggerCustomerIds.has(cid)) row.blogger += qty;
+    });
+    return by;
+  }, [bonusDeliveredRows, nonDebtActiveIds, bloggerCustomerIds]);
+  const bonusMonthRows = useMemo(() => {
+    const fallbackMonth = monthNow || monthKey(new Date()) || '';
+    const baseMonth = fallbackMonth || (Array.from(bonusByMonth.keys()).sort((a, b) => a.localeCompare(b)).pop() || '');
+    if (!baseMonth) return [];
+    const out = [];
+    for (let i = 5; i >= 0; i -= 1) {
+      const mk = shiftMonthKey(baseMonth, -i);
+      out.push(bonusByMonth.get(mk) || { month: mk, total: 0, active: 0, blogger: 0 });
+    }
+    return out;
+  }, [bonusByMonth, monthNow]);
+  const bonusSummary = useMemo(() => {
+    let total = 0;
+    let active = 0;
+    let blogger = 0;
+    bonusDeliveredRows.forEach((o) => {
+      const cid = String(o?.mId || '').trim();
+      const qty = Math.abs(toNum(o?.qty));
+      if (!qty) return;
+      total += qty;
+      if (cid && nonDebtActiveIds.has(cid)) active += qty;
+      if (cid && bloggerCustomerIds.has(cid)) blogger += qty;
+    });
+    return { total, active, blogger };
+  }, [bonusDeliveredRows, nonDebtActiveIds, bloggerCustomerIds]);
+  const bloggerAgreementRows = useMemo(() => {
+    const isWorking = (status) => {
+      const s = normText(status);
+      if (!s) return true;
+      return !(
+        s.includes('ishlamadi') ||
+        s.includes('tugadi') ||
+        s.includes("to'xta") ||
+        s.includes('toxta') ||
+        s.includes('stop')
+      );
+    };
+    return bloggerRows.map((r) => {
+      const mk = bloggerLatestMonth;
+      const monthFact = (mk && r?.monthly?.[mk]) ? r.monthly[mk] : {};
+      const storyFact = Math.max(0, toNum(monthFact?.story));
+      const reelFact = Math.max(0, toNum(monthFact?.reel));
+      const customerFact = Math.max(0, toNum(monthFact?.customers));
+      const planStory = Math.max(0, toNum(r?.planStory));
+      const planReel = Math.max(0, toNum(r?.planReel));
+      const storyOk = planStory <= 0 || storyFact >= planStory;
+      const reelOk = planReel <= 0 || reelFact >= planReel;
+      const isActiveDeal = isWorking(r?.status);
+      const onTrack = isActiveDeal ? (storyOk && reelOk) : true;
+      const nickNorm = normalizeNickToken(r?.nickNorm || r?.nick);
+      const linkedSet = bloggerMapping.customersByNick.get(nickNorm) || new Set();
+      return {
+        ...r,
+        nickNorm,
+        storyFact,
+        reelFact,
+        customerFact,
+        planStory,
+        planReel,
+        linkedCustomerCount: linkedSet.size,
+        isActiveDeal,
+        onTrack,
+      };
+    }).sort((a, b) => {
+      if (Number(a.onTrack) !== Number(b.onTrack)) return Number(a.onTrack) - Number(b.onTrack);
+      return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
+    });
+  }, [bloggerRows, bloggerLatestMonth, bloggerMapping]);
+  const bloggerAgreementSummary = useMemo(() => {
+    const active = bloggerAgreementRows.filter((r) => r.isActiveDeal);
+    const onTrack = active.filter((r) => r.onTrack).length;
+    return {
+      total: bloggerAgreementRows.length,
+      active: active.length,
+      onTrack,
+      risk: Math.max(0, active.length - onTrack),
+    };
+  }, [bloggerAgreementRows]);
+  const bloggerGrowthRows = useMemo(() => {
+    const by = new Map();
+    bloggerMapping.customerNickMap.forEach((nick, cid) => {
+      const mk = firstDeliveredMonthByCustomer.get(cid);
+      if (!mk) return;
+      const key = `${mk}|${nick}`;
+      by.set(key, (by.get(key) || 0) + 1);
+    });
+    return Array.from(by.entries())
+      .map(([key, count]) => {
+        const [month, nick] = key.split('|');
+        return { month, nick, name: bloggerNameByNick.get(nick) || nick || '-', count };
+      })
+      .sort((a, b) => {
+        if (a.month !== b.month) return String(b.month).localeCompare(String(a.month));
+        return Number(b.count) - Number(a.count);
+      })
+      .slice(0, 24);
+  }, [bloggerMapping, firstDeliveredMonthByCustomer, bloggerNameByNick]);
   const recommendations = useMemo(() => {
     const out = [];
     if (monthPlanWater > 0 && forecastPlanGap > 0) {
@@ -9538,7 +9886,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
       out.push(`Qayta buyurtma ulushi past (${repeatRate30.toFixed(1)}%). Obzvon va takroriy mijoz kampaniyasini kuchaytirish tavsiya.`);
     }
     if (staleCustomers.length > 0) {
-      out.push(`${fmt(staleCustomers.length)} ta mijoz 21 kundan beri buyurtma bermagan. Aktivatsiya ro'yxatini alohida ishlash kerak.`);
+      out.push(`${fmt(staleCustomers.length)} ta qarzsiz mijoz 1 oydan beri buyurtma bermagan. Aktivatsiya ro'yxatini alohida ishlash kerak.`);
     }
     if (debtCustomerCount > 0) {
       out.push(`${fmt(debtCustomerCount)} ta qarzdor mijoz bor. Yetkazishdan oldin to'lov intizomi nazoratini kuchaytiring.`);
@@ -9609,8 +9957,36 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
             <div style={{display:'grid',gap:6,fontSize:12,color:'var(--t2)'}}>
               <div>30 kun aktiv mijoz: <strong style={{color:'var(--t1)'}}>{fmt(activeCustomers30.size)}</strong></div>
               <div>Repeat rate (30 kun): <strong style={{color:repeatRate30 >= 40 ? 'var(--gr)' : 'var(--or)'}}>{repeatRate30.toFixed(1)}%</strong></div>
-              <div>21+ kun jim mijoz: <strong style={{color:staleCustomers.length ? 'var(--rd)' : 'var(--gr)'}}>{fmt(staleCustomers.length)}</strong></div>
+              <div>1 oydan ko'p jim (qarzsiz): <strong style={{color:staleCustomers.length ? 'var(--rd)' : 'var(--gr)'}}>{fmt(staleCustomers.length)}</strong></div>
               <div>Qarzdor mijozlar: <strong style={{color:debtCustomerCount ? 'var(--rd)' : 'var(--gr)'}}>{fmt(debtCustomerCount)}</strong></div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
+              <div style={{background:'var(--s2)',border:'1px solid var(--b2)',borderRadius:8,padding:8}}>
+                <div style={{fontSize:12,fontWeight:700,marginBottom:6}}>Aktiv (qarzsiz)</div>
+                <div style={{display:'grid',gap:4,maxHeight:'15vh',overflow:'auto'}}>
+                  {freshCustomers.length === 0 ? (
+                    <div style={{fontSize:11,color:'var(--t3)'}}>Ro'yxat bo'sh</div>
+                  ) : freshCustomers.slice(0, 10).map((c) => (
+                    <div key={`test_fresh_${c.id}`} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,fontSize:11}}>
+                      <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</span>
+                      <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{Number(c.daysAgo || 0)}k</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{background:'var(--s2)',border:'1px solid var(--b2)',borderRadius:8,padding:8}}>
+                <div style={{fontSize:12,fontWeight:700,marginBottom:6}}>1 oy+ olmaganlar</div>
+                <div style={{display:'grid',gap:4,maxHeight:'15vh',overflow:'auto'}}>
+                  {staleCustomers.length === 0 ? (
+                    <div style={{fontSize:11,color:'var(--t3)'}}>Yo'q</div>
+                  ) : staleCustomers.slice(0, 10).map((c) => (
+                    <div key={`test_stale_${c.id}`} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,fontSize:11}}>
+                      <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</span>
+                      <span className="tag" style={{background:'var(--rd2)',color:'var(--rd)'}}>{Number(c.daysAgo || 0)}k</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
           <div className="card" style={{padding:12}}>
@@ -9621,6 +9997,14 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
                   {i + 1}. {msg}
                 </div>
               ))}
+            </div>
+          </div>
+          <div className="card" style={{padding:12}}>
+            <div style={{fontWeight:700,marginBottom:8}}>Bonus Suv (umumiy)</div>
+            <div style={{display:'grid',gap:6,fontSize:12,color:'var(--t2)'}}>
+              <div>Jami bonus suv: <strong style={{color:'var(--bl)'}}>{fmt(bonusSummary.total)} ta</strong></div>
+              <div>Aktiv mijozlarga bonus: <strong style={{color:'var(--gr)'}}>{fmt(bonusSummary.active)} ta</strong></div>
+              <div>Bloger kategoriya bonusi: <strong style={{color:'var(--yl)'}}>{fmt(bonusSummary.blogger)} ta</strong></div>
             </div>
           </div>
         </div>
@@ -9678,6 +10062,125 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,minHeight:0}}>
+        <div className="card" style={{padding:0,overflow:'hidden'}}>
+          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Bonus suv (oylar kesimi)</div>
+          <div style={{overflow:'auto',maxHeight:'30vh'}}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                  <th>Oy</th>
+                  <th style={{textAlign:'right'}}>Jami bonus</th>
+                  <th style={{textAlign:'right'}}>Aktiv</th>
+                  <th style={{textAlign:'right'}}>Bloger</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bonusMonthRows.length === 0 ? (
+                  <tr><td colSpan={5} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
+                ) : bonusMonthRows.map((r, i) => (
+                  <tr key={`bonus_m_${r.month}`}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
+                    <td style={{fontFamily:'var(--mono)'}}>{formatMonthShort(r.month)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.total)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.active)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.blogger)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="card" style={{padding:0,overflow:'hidden'}}>
+          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Bloger bo'yicha qo'shilgan mijozlar (oylar)</div>
+          <div style={{overflow:'auto',maxHeight:'30vh'}}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                  <th>Oy</th>
+                  <th>Bloger</th>
+                  <th style={{textAlign:'right'}}>Mijoz soni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bloggerGrowthRows.length === 0 ? (
+                  <tr><td colSpan={4} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
+                ) : bloggerGrowthRows.map((r, i) => (
+                  <tr key={`blog_growth_${r.month}_${r.nick}_${i}`}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
+                    <td style={{fontFamily:'var(--mono)'}}>{formatMonthShort(r.month)}</td>
+                    <td>{r.name}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.count)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{padding:0,overflow:'hidden'}}>
+        <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+          <div style={{fontWeight:700}}>Blogerlar: Kelishuvlar nazorati</div>
+          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+            <span className="tag">Sheet: {BLOGGER_SHEET_NAME}</span>
+            <span className="tag">Oy: {formatMonthShort(bloggerLatestMonth)}</span>
+            <a className="btn btn-gh btn-sm" href={BLOGGER_SHEET_URL} target="_blank" rel="noreferrer">Ochish</a>
+          </div>
+        </div>
+        <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',display:'flex',gap:8,flexWrap:'wrap'}}>
+          <span className="tag">Jami: <strong style={{color:'var(--t1)'}}>{fmt(bloggerAgreementSummary.total)}</strong></span>
+          <span className="tag">Aktiv kelishuv: <strong style={{color:'var(--bl)'}}>{fmt(bloggerAgreementSummary.active)}</strong></span>
+          <span className="tag">Kelishuvda: <strong style={{color:'var(--gr)'}}>{fmt(bloggerAgreementSummary.onTrack)}</strong></span>
+          <span className="tag">Riskda: <strong style={{color:'var(--rd)'}}>{fmt(bloggerAgreementSummary.risk)}</strong></span>
+          <span className="tag">Biriktirilgan mijoz: <strong style={{color:'var(--yl)'}}>{fmt(bloggerCustomerIds.size)}</strong></span>
+        </div>
+        <div style={{overflow:'auto',maxHeight:'34vh'}}>
+          {bloggerLoading ? (
+            <div style={{padding:16,color:'var(--t3)',fontSize:12}}>Blogerlar varaqi yuklanmoqda...</div>
+          ) : bloggerError ? (
+            <div style={{padding:16,color:'var(--rd)',fontSize:12}}>{bloggerError}</div>
+          ) : (
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                  <th>Bloger</th>
+                  <th>Insta nik</th>
+                  <th>Status</th>
+                  <th style={{textAlign:'right'}}>Reja S/R</th>
+                  <th style={{textAlign:'right'}}>Fakt S/R</th>
+                  <th style={{textAlign:'right'}}>Kelgan mijoz</th>
+                  <th style={{textAlign:'right'}}>Biriktirilgan</th>
+                  <th>Holat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bloggerAgreementRows.length === 0 ? (
+                  <tr><td colSpan={9} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Blogerlar varag'idan ma'lumot topilmadi</td></tr>
+                ) : bloggerAgreementRows.map((r, i) => (
+                  <tr key={`blogger_agree_${r.nickNorm || r.name}_${i}`}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
+                    <td>{r.name}</td>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.nick || '-'}</td>
+                    <td>{r.status || '-'}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}/{fmt(r.planReel)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.storyFact)}/{fmt(r.reelFact)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.customerFact)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.linkedCustomerCount)}</td>
+                    <td style={{color:r.onTrack ? 'var(--gr)' : 'var(--rd)'}}>
+                      {r.isActiveDeal ? (r.onTrack ? "Kelishuvda" : "Kelishuvdan ortda") : "Faol emas"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
