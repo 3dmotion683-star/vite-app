@@ -10934,9 +10934,34 @@ const NAV = [
   { id:'plan',    label:'Plan',       icon:E.plan },
   { id:'test',    label:'Test',       icon:E.test },
 ];
+const APP_PAGE_IDS = new Set([...NAV.map((n) => n.id), 'settings']);
+const normalizeAppPageId = (v) => {
+  const id = String(v || '').trim();
+  return APP_PAGE_IDS.has(id) ? id : '';
+};
+const readPageFromUrl = () => {
+  if (typeof window === 'undefined') return '';
+  try {
+    const u = new URL(window.location.href || '');
+    const fromSearch = u.searchParams.get('page') || '';
+    const hashRaw = String(u.hash || '').replace(/^#/, '');
+    let fromHash = '';
+    if (hashRaw) {
+      if (hashRaw.includes('=')) {
+        const hp = new URLSearchParams(hashRaw.startsWith('?') ? hashRaw.slice(1) : hashRaw);
+        fromHash = hp.get('page') || '';
+      } else {
+        fromHash = hashRaw;
+      }
+    }
+    return normalizeAppPageId(fromHash || fromSearch || '');
+  } catch {
+    return '';
+  }
+};
 
 export default function App() {
-  const [page,setPage]     = useState('dash');
+  const [page,setPage]     = useState(() => readPageFromUrl() || 'dash');
   const [data,setData]     = useState(null);
   const [obzvonRecords,setObzvonRecords] = useState(() => S.get('aq-obzvon-records', []));
   const [obzvonAllRows,setObzvonAllRows] = useState(() => S.get('aq-obzvon-all-rows', []));
@@ -10988,6 +11013,51 @@ export default function App() {
   const obzvonAllNewRowsRef = useRef(obzvonAllNewRows || []);
   const pendingObzvonNewRowsRef = useRef([]);
   const obzvonExportBusyRef = useRef(false);
+  const buildPageUrl = useCallback((targetPage) => {
+    const nextPage = normalizeAppPageId(targetPage);
+    if (!nextPage || typeof window === 'undefined') return '';
+    try {
+      const u = new URL(window.location.href || '');
+      u.hash = `page=${encodeURIComponent(nextPage)}`;
+      return u.toString();
+    } catch {
+      return '';
+    }
+  }, []);
+  const openPageInNewTab = useCallback((targetPage) => {
+    const nextUrl = buildPageUrl(targetPage);
+    if (!nextUrl || typeof window === 'undefined') return;
+    window.open(nextUrl, '_blank', 'noopener,noreferrer');
+  }, [buildPageUrl]);
+  const switchPageByClick = useCallback((targetPage, e = null) => {
+    const nextPage = normalizeAppPageId(targetPage);
+    if (!nextPage) return;
+    const openNewTab = !!(e && (e.button === 1 || e.ctrlKey || e.metaKey));
+    if (openNewTab) {
+      e.preventDefault?.();
+      e.stopPropagation?.();
+      openPageInNewTab(nextPage);
+      return;
+    }
+    setPage(nextPage);
+  }, [openPageInNewTab]);
+  useEffect(() => {
+    const nextUrl = buildPageUrl(page);
+    if (!nextUrl || typeof window === 'undefined') return;
+    if (window.location.href !== nextUrl) {
+      window.history.replaceState(null, '', nextUrl);
+    }
+  }, [page, buildPageUrl]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onHashChange = () => {
+      const fromUrl = readPageFromUrl();
+      if (!fromUrl) return;
+      setPage((prev) => (prev === fromUrl ? prev : fromUrl));
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
   const buildDefaultCreds = useCallback((baseUsers) => {
     const m = {};
     (baseUsers || []).forEach((u) => { m[u] = u; });
@@ -12689,7 +12759,14 @@ export default function App() {
             {visibleNav.map((n) => {
               const bc = n.badge==='o'?obzvonCnt:n.badge==='d'?debtorCnt:n.badge==='dz'?doljnikiCnt:0;
               return (
-                <div key={n.id} className={`nav-i${page===n.id?' on':''}`} onClick={()=>setPage(n.id)}>
+                <div
+                  key={n.id}
+                  className={`nav-i${page===n.id?' on':''}`}
+                  onClick={(e)=>switchPageByClick(n.id, e)}
+                  onAuxClick={(e)=>{ if (e.button === 1) switchPageByClick(n.id, e); }}
+                  onMouseDown={(e)=>{ if (e.button === 1) e.preventDefault(); }}
+                  title="Ochish | Ctrl+bosish yoki g'ildirakcha bosish: yangi oynada"
+                >
                   <span style={{fontSize:17,flexShrink:0}}>{n.icon}</span>
                   {side && <span style={{flex:1,whiteSpace:'nowrap'}}>{n.label}</span>}
                   {side&&bc>0 && (
@@ -12709,12 +12786,17 @@ export default function App() {
                 {side && <span>Yangilash</span>}
               </div>
             )}
-            {(currentAccess.visible?.settings ?? true) && (
-              <div className="nav-i" onClick={()=>setPage('settings')}>
-                <span style={{fontSize:17,flexShrink:0}}>{E.settings}</span>
-                {side && <span>Nastroyka</span>}
-              </div>
-            )}
+              {(currentAccess.visible?.settings ?? true) && (
+                <div
+                  className="nav-i"
+                  onClick={(e)=>switchPageByClick('settings', e)}
+                  onAuxClick={(e)=>{ if (e.button === 1) switchPageByClick('settings', e); }}
+                  onMouseDown={(e)=>{ if (e.button === 1) e.preventDefault(); }}
+                >
+                  <span style={{fontSize:17,flexShrink:0}}>{E.settings}</span>
+                  {side && <span>Nastroyka</span>}
+                </div>
+              )}
           </div>
         </div>
 
