@@ -184,6 +184,7 @@ const E = {
   report: '\u{1F4CA}',
   plan: '\u{1F4C5}',
   test: '\u{1F9EA}',
+  blogger: '\u{1F4E3}',
   bell: '\u{1F514}',
   water: '\u{1F4A7}',
   uzs: '\u{1F4B4}',
@@ -675,7 +676,7 @@ const isNameExcludedForActiveStats = (name) => {
 const isNameInactiveByPrefix = (name) => {
   const n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
   if (!n) return false;
-  return /^(я|ya|ря|рї)\s+(tugatildi|eski)\b/.test(n);
+  return /^(я|рї)/.test(n);
 };
 const isNearlyZero = (v) => Math.abs(Number(v || 0)) < 0.0001;
 const hasTagWord = (text, key) => {
@@ -2001,16 +2002,27 @@ const ensureYandexLoaded = () => {
   if (ymapsLoadPromise) return ymapsLoadPromise;
   ymapsLoadPromise = new Promise((resolve, reject) => {
     try {
+      const fail = (err) => {
+        ymapsLoadPromise = null;
+        reject(err instanceof Error ? err : new Error(String(err || 'Yandex Maps xatosi')));
+      };
       const complete = () => {
-        if (!window.ymaps?.Map) {
-          reject(new Error('Yandex Maps global topilmadi'));
-          return;
-        }
-        window.ymaps.ready(() => resolve(window.ymaps));
+        const waitUntilReady = (attempt = 0) => {
+          if (window.ymaps?.Map) {
+            window.ymaps.ready(() => resolve(window.ymaps));
+            return;
+          }
+          if (attempt >= 100) {
+            fail(new Error('Yandex Maps global topilmadi'));
+            return;
+          }
+          setTimeout(() => waitUntilReady(attempt + 1), 50);
+        };
+        waitUntilReady(0);
       };
       const existing = document.getElementById(YMAPS_JS_ID);
       if (existing) {
-        if (existing.getAttribute('data-loaded') === '1') complete();
+        if (existing.getAttribute('data-loaded') === '1' || window.ymaps?.Map) complete();
         else existing.addEventListener('load', complete, { once: true });
         return;
       }
@@ -2022,9 +2034,10 @@ const ensureYandexLoaded = () => {
         script.setAttribute('data-loaded', '1');
         complete();
       };
-      script.onerror = () => reject(new Error('Yandex Maps script yuklanmadi'));
+      script.onerror = () => fail(new Error('Yandex Maps script yuklanmadi'));
       document.head.appendChild(script);
     } catch (e) {
+      ymapsLoadPromise = null;
       reject(e);
     }
   });
@@ -3493,7 +3506,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3502,7 +3515,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3511,7 +3524,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'all',
     role: 'admin',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
     ui: { theme:'dark' },
     company: { canSwitch:true, default:'murodbaxsh' },
   },
@@ -4346,7 +4359,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
       return activeBase.filter((c) => ownIds.has(c.id));
     }
     if (segment === 'inactive') {
-      return nonAhmadteaNonZ.filter((c) => isNameInactiveByPrefix(c.name));
+      return nonAhmadtea.filter((c) => isNameInactiveByPrefix(c.name));
     }
     if (segment === 'other_customers') {
       return nonAhmadtea.filter((c) => isExcludedZCategory(c.source) && !isNameInactiveByPrefix(c.name));
@@ -5262,21 +5275,33 @@ function Kassa({ D }) {
     (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c.district || ''; });
     return m;
   }, [customers]);
-  const now = new Date();
-  const curMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const pays   = cashbox.filter((c)=>isPaymentFromCounterparty(c.opType));
-  const spends = cashbox.filter((c)=>isPaymentToCounterparty(c.opType));
-  const paysMonth = pays.filter((c)=>monthKey(c.sana)===curMonthKey);
-  const spendsMonth = spends.filter((c)=>monthKey(c.sana)===curMonthKey);
-  const cashMonth = cashbox.filter((c)=>monthKey(c.sana)===curMonthKey);
-  const totalIn  = paysMonth.reduce((s,c)=>s+c.amount,0);
-  const totalOut = spendsMonth.reduce((s,c)=>s+c.amount,0);
-  const base = fType==='in'?pays:fType==='out'?spends:cashbox;
+  const isExcludedKassaForStats = (kassaName) => {
+    const key = normalizeCashboxKey(kassaName).replace(/\s+/g, '');
+    if (!key) return false;
+    return (
+      key.includes('перекидкасум') ||
+      key.includes('perekidkasum') ||
+      key.includes('uoskassa')
+    );
+  };
+  const isHiddenKassaRow = (kassaName) => normalizeCashboxKey(kassaName).replace(/\s+/g, '').includes('uoskassa');
+
+  const cashboxForStats = cashbox.filter((c) => !isExcludedKassaForStats(c?.kassa));
+  const cashboxForList = cashbox.filter((c) => !isHiddenKassaRow(c?.kassa));
+
+  const pays = cashboxForStats.filter((c)=>isPaymentFromCounterparty(c.opType));
+  const spends = cashboxForStats.filter((c)=>isPaymentToCounterparty(c.opType));
+  const totalIn  = pays.reduce((s,c)=>s+c.amount,0);
+  const totalOut = spends.reduce((s,c)=>s+c.amount,0);
+
+  const baseIn = cashboxForList.filter((c)=>isPaymentFromCounterparty(c.opType));
+  const baseOut = cashboxForList.filter((c)=>isPaymentToCounterparty(c.opType));
+  const base = fType==='in' ? baseIn : fType==='out' ? baseOut : cashboxForList;
   const options = useMemo(() => ({
-    operators: [...new Set(cashbox.map((x)=>x.operator).filter(Boolean))].sort(),
-    opTypes: [...new Set(cashbox.map((x)=>x.opType).filter(Boolean))].sort(),
-    kassas: [...new Set(cashbox.map((x)=>x.kassa).filter(Boolean))].sort(),
-  }), [cashbox]);
+    operators: [...new Set(cashboxForList.map((x)=>x.operator).filter(Boolean))].sort(),
+    opTypes: [...new Set(cashboxForList.map((x)=>x.opType).filter(Boolean))].sort(),
+    kassas: [...new Set(cashboxForList.map((x)=>x.kassa).filter(Boolean))].sort(),
+  }), [cashboxForList]);
   const toggleIn = (setter, val) => setter((prev) => prev.includes(val) ? prev.filter((x)=>x!==val) : [...prev, val]);
   const kassaFilterColumns = useMemo(() => ([
     { key:'sana', label:'Sana', type:'date' },
@@ -5366,10 +5391,10 @@ function Kassa({ D }) {
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
       <div className="g4">
-        <StatCard l={`KIRIM (${curMonthKey})`}  v={fmt(totalIn)+" so'm"}  s={paysMonth.length+' ta operatsiya'}   c="var(--gr)"/>
-        <StatCard l={`CHIQIM (${curMonthKey})`} v={fmt(totalOut)+" so'm"} s={spendsMonth.length+' ta operatsiya'} c="var(--rd)"/>
-        <StatCard l="SALDO (OYLIK)" v={fmt(totalIn-totalOut)+" so'm"} s="joriy oy: kirim minus chiqim" c={totalIn-totalOut>=0?'var(--gr)':'var(--rd)'}/>
-        <StatCard l="OYLIK OPR."   v={cashMonth.length+' ta'}  s="joriy oy yozuvlari" c="var(--bl)"/>
+        <StatCard l="KIRIM (UMUMIY)"  v={fmt(totalIn)+" so'm"}  s={pays.length+' ta operatsiya'}   c="var(--gr)"/>
+        <StatCard l="CHIQIM (UMUMIY)" v={fmt(totalOut)+" so'm"} s={spends.length+' ta operatsiya'} c="var(--rd)"/>
+        <StatCard l="SALDO (UMUMIY)" v={fmt(totalIn-totalOut)+" so'm"} s="barcha vaqt: kirim minus chiqim" c={totalIn-totalOut>=0?'var(--gr)':'var(--rd)'}/>
+        <StatCard l="JAMI OPR."   v={cashboxForStats.length+' ta'}  s={'"Перекидка Сум" va "uos kassa"siz'} c="var(--bl)"/>
       </div>
       <div style={{display:'flex',gap:8,alignItems:'center'}}>
         <div className="sb" style={{flex:1}}>
@@ -5436,7 +5461,7 @@ function Kassa({ D }) {
             </div>
           )}
         </div>
-        <button className="btn btn-gr btn-sm" onClick={exportKassa}>{E.excel} Excel</button>
+        <button className="btn btn-gr btn-sm" onClick={exportKassa}>Excel</button>
         <div style={{display:'flex',gap:6}}>
           <KassaFilterBtn active={fType==='all'} label="Barchasi" onClick={()=>setT('all')}/>
           <KassaFilterBtn active={fType==='in'}  label="Kirimlar"  color="var(--gr)" dot onClick={()=>setT('in')}/>
@@ -7403,15 +7428,16 @@ function Reports({
   );
 
   const monthWaterOrders = useMemo(() => {
-    return (rawOrders || []).filter((o) =>
-      isWaterProduct(o.product) &&
-      isOrderDoc(o.docType) &&
-      isDeliveredStatus(o.status) &&
-      monthKey(o.orderDate) === currentMonth
-    );
+    return (rawOrders || []).filter((o) => {
+      if (monthKey(o?.orderDate) !== currentMonth) return false;
+      if (isVirtualWarehouseLabel(o?.warehouse)) return false;
+      if (normText(o?.status) === 'отменено') return false;
+      const cat = normalizeMatchText(o?.cat).replace(/\s+/g, ' ').trim();
+      return cat === normalizeMatchText('Вода');
+    });
   }, [rawOrders, currentMonth]);
-  const monthWaterQty = monthWaterOrders.reduce((s,o)=>s + Math.abs(o.qty || 0), 0);
-  const monthWaterSum = monthWaterOrders.reduce((s,o)=>s + (o.currency === 'USD' ? 0 : (o.sum || 0)), 0);
+  const monthWaterQty = monthWaterOrders.reduce((s,o)=>s + toNum(o?.qty), 0);
+  const monthWaterSum = monthWaterOrders.reduce((s,o)=>s + (String(o?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(o?.sum)), 0);
 
   const todayDate = useMemo(() => {
     const d = toDate(todayIso);
@@ -8608,18 +8634,18 @@ function Reports({
                 </tbody>
               </table>
             ) : nazoratSection === 'returns' && nazoratReturnSection === 'return_order' ? (
-              <table className="tbl" style={{width:'max(100%, 1380px)',minWidth:1380,tableLayout:'fixed'}}>
+              <table className="tbl" style={{width:'max(100%, 1520px)',minWidth:1520,tableLayout:'fixed'}}>
                 <thead>
                   <tr>
                     <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
-                    <th>Sana</th>
-                    <th>Mijoz ID</th>
-                    <th>Mijoz</th>
-                    <th>Vozvrat zakaz</th>
-                    <th style={{textAlign:'right'}}>Vozvrat suv soni</th>
-                    <th>Dostavchik</th>
-                    <th>Sklad</th>
-                    <th>Izoh</th>
+                    <th style={{width:110,minWidth:110,maxWidth:110}}>Sana</th>
+                    <th style={{width:110,minWidth:110,maxWidth:110}}>Mijoz ID</th>
+                    <th style={{width:320,minWidth:320,maxWidth:320}}>Mijoz</th>
+                    <th style={{width:220,minWidth:220,maxWidth:220}}>Vozvrat zakaz</th>
+                    <th style={{textAlign:'right',width:130,minWidth:130,maxWidth:130}}>Vozvrat suv soni</th>
+                    <th style={{width:150,minWidth:150,maxWidth:150}}>Dostavchik</th>
+                    <th style={{width:170,minWidth:170,maxWidth:170}}>Sklad</th>
+                    <th style={{width:220,minWidth:220,maxWidth:220}}>Izoh</th>
                     <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Status</th>
                   </tr>
                 </thead>
@@ -8631,12 +8657,12 @@ function Reports({
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
-                      <td>{r.customer}</td>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.returnNo || '-'}</td>
+                      <td style={{maxWidth:320}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || '-'}</span></td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,maxWidth:220}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.returnNo || '-'}</span></td>
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--or)'}}>{fmt(r.qty)}</td>
-                      <td>{r.driver}</td>
-                      <td>{r.warehouse || '-'}</td>
-                      <td style={{maxWidth:260}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
+                      <td style={{maxWidth:150}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.driver || '-'}</span></td>
+                      <td style={{maxWidth:170}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.warehouse || '-'}</span></td>
+                      <td style={{maxWidth:220}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
                       <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)',background:r.hasOrder ? 'var(--s1)' : 'rgba(248,81,73,.08)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
                     </tr>
                   ))}
@@ -9482,10 +9508,12 @@ const parseBloggerSheetRows = (rows = []) => {
   };
 };
 
-function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murodbaxsh' }) {
+function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murodbaxsh', mode = 'test' }) {
   const [bloggerSheetRows, setBloggerSheetRows] = useState([]);
   const [bloggerLoading, setBloggerLoading] = useState(false);
   const [bloggerError, setBloggerError] = useState('');
+  const showBloggerAnalytics = mode === 'bloggers';
+  const showCoreAnalytics = !showBloggerAnalytics;
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
   const yesterdayIso = useMemo(() => {
     const d = new Date();
@@ -9494,6 +9522,12 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
   }, []);
   const monthNow = useMemo(() => monthKey(new Date()) || '', []);
   useEffect(() => {
+    if (!showBloggerAnalytics) {
+      setBloggerSheetRows([]);
+      setBloggerLoading(false);
+      setBloggerError('');
+      return undefined;
+    }
     let dead = false;
     (async () => {
       setBloggerLoading(true);
@@ -9520,7 +9554,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
       }
     })();
     return () => { dead = true; };
-  }, []);
+  }, [showBloggerAnalytics]);
   const last30StartIso = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -9899,7 +9933,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
     <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
       <div className="card" style={{padding:12,display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
         <div>
-          <div style={{fontWeight:800,fontSize:15}}>Test Analitika (Beta)</div>
+          <div style={{fontWeight:800,fontSize:15}}>{showBloggerAnalytics ? 'Blogerlar Analitikasi' : 'Test Analitika (Beta)'}</div>
           <div style={{fontSize:12,color:'var(--t3)',marginTop:4}}>
             Kompaniya: {companyLabelByKey(company)} | Foydalanuvchi: {currentUser}
           </div>
@@ -9907,6 +9941,8 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
         <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Oy: {monthNow || '-'}</span>
       </div>
 
+      {showCoreAnalytics && (
+      <>
       <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(150px,1fr))',gap:10}}>
         <StatCard l="Bugun (kiritilgan)" v={`${fmt(sumQty(todayEnteredRows))} ta`} s={`${fmt(sumUzs(todayEnteredRows))} so'm`} c="var(--bl)" />
         <StatCard l="Bugun (yetkazilgan)" v={`${fmt(sumQty(todayDeliveredRows))} ta`} s={`${fmt(sumUzs(todayDeliveredRows))} so'm`} c="var(--gr)" />
@@ -10004,7 +10040,6 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
             <div style={{display:'grid',gap:6,fontSize:12,color:'var(--t2)'}}>
               <div>Jami bonus suv: <strong style={{color:'var(--bl)'}}>{fmt(bonusSummary.total)} ta</strong></div>
               <div>Aktiv mijozlarga bonus: <strong style={{color:'var(--gr)'}}>{fmt(bonusSummary.active)} ta</strong></div>
-              <div>Bloger kategoriya bonusi: <strong style={{color:'var(--yl)'}}>{fmt(bonusSummary.blogger)} ta</strong></div>
             </div>
           </div>
         </div>
@@ -10064,7 +10099,11 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
           </div>
         </div>
       </div>
+      </>
+      )}
 
+      {showBloggerAnalytics && (
+      <>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,minHeight:0}}>
         <div className="card" style={{padding:0,overflow:'hidden'}}>
           <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Bonus suv (oylar kesimi)</div>
@@ -10183,6 +10222,8 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
           )}
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
@@ -10200,7 +10241,7 @@ function SettingsPanel({
   const [editLogin, setEditLogin] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const pages = ['dash','cust','orders','left_orders','kassa','obzvon','doljniki','nazorat','reports','plan','test','refresh','settings'];
+  const pages = ['dash','cust','orders','left_orders','kassa','obzvon','doljniki','nazorat','reports','plan','test','bloggers','refresh','settings'];
   const settingsSections = [
     { key:'settings_staff', label:"Hodimlar ruhsatlari" },
     { key:'settings_app', label:'Ilova sozlamalari' },
@@ -10933,6 +10974,7 @@ const NAV = [
   { id:'reports', label:'Hisobotlar', icon:E.report },
   { id:'plan',    label:'Plan',       icon:E.plan },
   { id:'test',    label:'Test',       icon:E.test },
+  { id:'bloggers',label:'Blogerlar',  icon:E.blogger },
 ];
 const APP_PAGE_IDS = new Set([...NAV.map((n) => n.id), 'settings']);
 const normalizeAppPageId = (v) => {
@@ -12997,6 +13039,16 @@ export default function App() {
                     planRows={planRows}
                     currentUser={effectiveUser}
                     company={activeCompany}
+                    mode="test"
+                  />
+                )}
+                {page==='bloggers' && canViewPage('bloggers') && (
+                  <TestLabPage
+                    D={D}
+                    planRows={planRows}
+                    currentUser={effectiveUser}
+                    company={activeCompany}
+                    mode="bloggers"
                   />
                 )}
                 {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} D={D} company={activeCompany} />}
