@@ -10850,7 +10850,7 @@ function SettingsPanel({
   );
 }
 
-function LoginScreen({ users=[], onLogin, onResetCreds }) {
+function LoginScreen({ users=[], onLogin, onResetCreds, loading=false }) {
   const [user, setUser] = useState(users[0] || 'Admin');
   const [pass, setPass] = useState('');
   const [err, setErr] = useState('');
@@ -10860,6 +10860,7 @@ function LoginScreen({ users=[], onLogin, onResetCreds }) {
   }, [users, user]);
 
   const submit = () => {
+    if (loading) return;
     const ok = onLogin?.(user, pass);
     if (!ok) {
       setErr('Login yoki parol xato');
@@ -10881,9 +10882,20 @@ function LoginScreen({ users=[], onLogin, onResetCreds }) {
         <div className="mbdy" style={{display:'flex',flexDirection:'column',gap:10}}>
           <div>
             <div style={{fontSize:11,color:'var(--t3)',marginBottom:5}}>Foydalanuvchi</div>
-            <select className="select" style={{width:'100%'}} value={user} onChange={(e)=>setUser(e.target.value)}>
+            <select
+              className="select"
+              style={{width:'100%'}}
+              value={user}
+              onChange={(e)=>setUser(e.target.value)}
+              disabled={loading}
+            >
               {users.map((u)=><option key={u} value={u}>{u}</option>)}
             </select>
+            {loading && (
+              <div style={{fontSize:11,color:'var(--bl)',marginTop:5}}>
+                Loginlar yangilanmoqda...
+              </div>
+            )}
           </div>
           <div>
             <div style={{fontSize:11,color:'var(--t3)',marginBottom:5}}>Parol</div>
@@ -10900,7 +10912,9 @@ function LoginScreen({ users=[], onLogin, onResetCreds }) {
             </div>
           </div>
           {err && <div style={{fontSize:12,color:'var(--rd)'}}>{err}</div>}
-          <button className="btn btn-bl" onClick={submit} style={{justifyContent:'center'}}>Kirish</button>
+          <button className="btn btn-bl" onClick={submit} style={{justifyContent:'center'}} disabled={loading}>
+            {loading ? 'Yuklanmoqda...' : 'Kirish'}
+          </button>
         </div>
       </div>
     </div>
@@ -11694,6 +11708,11 @@ export default function App() {
     });
     if (changed) setObzvonRecords(next);
   }, [obzvonRecords]);
+  useEffect(() => {
+    if (isLoggedIn) return;
+    if (remoteAccessLoaded) return;
+    loadRemoteAccessConfig();
+  }, [isLoggedIn, remoteAccessLoaded, loadRemoteAccessConfig]);
   useEffect(() => {
     if (!isLoggedIn) return;
     setRemoteAccessLoaded(false);
@@ -12642,7 +12661,12 @@ export default function App() {
     return (
       <>
         <style>{CSS}</style>
-        <LoginScreen users={users} onLogin={authenticate} onResetCreds={resetLoginCreds} />
+        <LoginScreen
+          users={users}
+          onLogin={authenticate}
+          onResetCreds={resetLoginCreds}
+          loading={!remoteAccessLoaded}
+        />
       </>
     );
   }
