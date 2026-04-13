@@ -831,6 +831,41 @@ function toDate(v) {
   const d = new Date(s);
   return isNaN(d) ? null : d;
 }
+const parseDateTimeLoose = (v) => {
+  const s = String(v || '').trim();
+  if (!s) return null;
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) {
+    return new Date(
+      Number(m[1]),
+      Number(m[2]) - 1,
+      Number(m[3]),
+      Number(m[4] || 0),
+      Number(m[5] || 0),
+      Number(m[6] || 0),
+    );
+  }
+  m = s.match(/^(\d{2})[./](\d{2})[./](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) {
+    return new Date(
+      Number(m[3]),
+      Number(m[2]) - 1,
+      Number(m[1]),
+      Number(m[4] || 0),
+      Number(m[5] || 0),
+      Number(m[6] || 0),
+    );
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+};
+const extractClockText = (v) => {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  const m = s.match(/(\d{1,2}):(\d{2})/);
+  if (!m) return '';
+  return `${String(m[1]).padStart(2, '0')}:${m[2]}`;
+};
 const fmtD = (v) => { const d = toDate(v); return d ? d.toLocaleDateString('ru-RU') : '-'; };
 const daysAgo = (v) => {
   const d = toDate(v); if (!d) return null;
@@ -2553,7 +2588,7 @@ function parseGsCsv(text) {
     }).filter((r) => r.some((v) => v));
   }
 }
-async function fetchSheetCsv(sheetId, gid, label) {
+async function fetchSheetCsv(sheetId, gid, label, timeoutMs = 12000) {
   const sources = [
     buildGsUrl(sheetId, gid),
     `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`,
@@ -2566,7 +2601,7 @@ async function fetchSheetCsv(sheetId, gid, label) {
   ]);
   for (const u of urls) {
     try {
-      const r = await fetch(u, { signal: AbortSignal.timeout(12000) });
+      const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
       if (!r.ok) continue;
       const text = await r.text();
       if (text.trim().startsWith('<')) continue;
@@ -2577,7 +2612,7 @@ async function fetchSheetCsv(sheetId, gid, label) {
   }
   throw new Error(`"${label}" varaqi yuklanmadi. GID: ${gid}`);
 }
-async function fetchSheetCsvByName(sheetId, sheetName, label) {
+async function fetchSheetCsvByName(sheetId, sheetName, label, timeoutMs = 12000) {
   const sources = [
     buildGsUrlByName(sheetId, sheetName),
     `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`,
@@ -2589,7 +2624,7 @@ async function fetchSheetCsvByName(sheetId, sheetName, label) {
   ]);
   for (const u of urls) {
     try {
-      const r = await fetch(u, { signal: AbortSignal.timeout(12000) });
+      const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
       if (!r.ok) continue;
       const text = await r.text();
       if (text.trim().startsWith('<')) continue;
@@ -2600,7 +2635,7 @@ async function fetchSheetCsvByName(sheetId, sheetName, label) {
   }
   throw new Error(`"${label}" varaqi yuklanmadi. Sheet: ${sheetName}`);
 }
-async function fetchSheetOpenSheet(sheetId, sheetName, label) {
+async function fetchSheetOpenSheet(sheetId, sheetName, label, timeoutMs = 12000) {
   const base = `https://opensheet.elk.sh/${sheetId}/${encodeURIComponent(sheetName)}`;
   const urls = [
     base,
@@ -2609,7 +2644,7 @@ async function fetchSheetOpenSheet(sheetId, sheetName, label) {
   ];
   for (const u of urls) {
     try {
-      const r = await fetch(u, { signal: AbortSignal.timeout(12000) });
+      const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
       if (!r.ok) continue;
       const js = await r.json();
       if (!Array.isArray(js) || js.length === 0) continue;
@@ -4865,6 +4900,7 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
   const [mapSelected, setMapSelected] = useState(null);
   const [customerDet, setCustomerDet] = useState(null);
   const [mapTrackOpen, setMapTrackOpen] = useState(false);
+  const [mapTrackDriver, setMapTrackDriver] = useState('');
   const [mapTrackFocusKey, setMapTrackFocusKey] = useState('');
 
   const districtById = useMemo(() => {
@@ -5156,39 +5192,105 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
     if (!mapSelected) return;
     const ok = mapList.some((g) => String(g.soNum || '') === String(mapSelected.soNum || ''));
     if (!ok) setMapSelected(null);
-  }, [mapList, mapSelected]);
+    else if (dataMode === 'real') {
+      const d = String(mapSelected.delivPerson || '').trim();
+      if (d) setMapTrackDriver((prev) => prev || d);
+    }
+  }, [mapList, mapSelected, dataMode]);
+  const mapTrackDrivers = useMemo(() => {
+    if (dataMode !== 'real') return [];
+    return Array.from(
+      new Set(
+        mapList
+          .map((g) => String(g?.delivPerson || '-').trim() || '-')
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b, 'ru'));
+  }, [dataMode, mapList]);
   useEffect(() => {
-    if (!mapSelected) {
-      setMapTrackFocusKey('');
+    if (dataMode !== 'real') {
+      setMapTrackDriver('');
       return;
     }
-    const points = Array.isArray(mapSelected.tracePoints) ? mapSelected.tracePoints : [];
-    if (!points.length) {
-      setMapTrackFocusKey('');
+    if (!mapTrackDrivers.length) {
+      setMapTrackDriver('');
       return;
     }
-    const firstKey = String(points[0]?.key || '').trim();
-    if (firstKey) setMapTrackFocusKey((prev) => prev || firstKey);
-  }, [mapSelected]);
+    if (!mapTrackDriver || !mapTrackDrivers.includes(mapTrackDriver)) {
+      setMapTrackDriver(mapTrackDrivers[0]);
+    }
+  }, [dataMode, mapTrackDrivers, mapTrackDriver]);
   const mapTrackRows = useMemo(() => {
-    if (dataMode !== 'real' || !mapSelected) return [];
-    const arr = Array.isArray(mapSelected.tracePoints) ? mapSelected.tracePoints : [];
-    return arr
-      .filter((x) => isValidGeoPoint(x?.lat, x?.lng) || String(x?.enteredAt || '').trim() || String(x?.note || '').trim())
-      .sort((a, b) => {
-        const da = toDate(a.enteredAt || a.date);
-        const db = toDate(b.enteredAt || b.date);
-        if (da && db) return db - da;
-        return String(b.enteredAt || '').localeCompare(String(a.enteredAt || ''));
+    if (dataMode !== 'real') return [];
+    const selectedDriver = String(mapTrackDriver || '').trim();
+    const out = [];
+    mapList.forEach((g) => {
+      const driver = String(g?.delivPerson || '-').trim() || '-';
+      if (selectedDriver && driver !== selectedDriver) return;
+      const traces = Array.isArray(g?.tracePoints) && g.tracePoints.length
+        ? g.tracePoints
+        : [{
+            key: `${g.soNum || ''}__fallback`,
+            enteredAt: g.orderDate || '',
+            date: g.orderDate || '',
+            lat: g.lat,
+            lng: g.lng,
+          }];
+      traces.forEach((tp, i) => {
+        const lat = isValidGeoPoint(tp?.lat, tp?.lng) ? Number(tp.lat) : Number(g?.lat || 0);
+        const lng = isValidGeoPoint(tp?.lat, tp?.lng) ? Number(tp.lng) : Number(g?.lng || 0);
+        const enteredAt = String(tp?.enteredAt || '').trim();
+        const date = String(tp?.date || g?.orderDate || '').trim();
+        const clock = extractClockText(enteredAt || date);
+        out.push({
+          key: `${String(g?.soNum || '')}__${String(tp?.key || i)}`,
+          driver,
+          customer: String(g?.contName || '').trim() || '-',
+          customerId: String(g?.mId || '').trim() || '',
+          enteredAt: enteredAt || date,
+          date,
+          clock,
+          lat,
+          lng,
+          row: { ...g, lat, lng },
+        });
       });
-  }, [dataMode, mapSelected]);
+    });
+    return out.sort((a, b) => {
+      const ta = parseDateTimeLoose(a.enteredAt || a.date)?.getTime() || 0;
+      const tb = parseDateTimeLoose(b.enteredAt || b.date)?.getTime() || 0;
+      if (ta !== tb) return ta - tb; // ertalabdan kechgacha
+      return String(a.customer || '').localeCompare(String(b.customer || ''), 'ru');
+    });
+  }, [dataMode, mapList, mapTrackDriver]);
+  useEffect(() => {
+    if (!mapTrackRows.length) {
+      setMapTrackFocusKey('');
+      return;
+    }
+    const firstKey = String(mapTrackRows[0]?.key || '').trim();
+    if (!firstKey) return;
+    setMapTrackFocusKey((prev) => {
+      if (!prev) return firstKey;
+      const has = mapTrackRows.some((x) => String(x?.key || '').trim() === String(prev).trim());
+      return has ? prev : firstKey;
+    });
+  }, [mapTrackRows]);
   const mapTrackFocused = useMemo(
     () => mapTrackRows.find((x) => String(x.key || '').trim() === String(mapTrackFocusKey || '').trim()) || null,
     [mapTrackRows, mapTrackFocusKey]
   );
   useEffect(() => {
+    if (!mapTrackFocused?.row) return;
+    setMapSelected((prev) => {
+      if (prev && String(prev.soNum || '') === String(mapTrackFocused.row.soNum || '')) return prev;
+      return mapTrackFocused.row;
+    });
+  }, [mapTrackFocused]);
+  useEffect(() => {
     if (dataMode === 'real') return;
     setMapTrackOpen(false);
+    setMapTrackDriver('');
     setMapTrackFocusKey('');
   }, [dataMode]);
 
@@ -5380,7 +5482,7 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
                 focusPoint={mapTrackFocused ? {
                   lat: mapTrackFocused.lat,
                   lng: mapTrackFocused.lng,
-                  label: `${fmtD(mapTrackFocused.enteredAt || mapTrackFocused.date)} | ${mapTrackFocused.kind || ''}`,
+                  label: `${mapTrackFocused.clock ? `${mapTrackFocused.clock} | ` : ''}${mapTrackFocused.customer || 'Mijoz'}`,
                 } : null}
                 height="100%"
               />
@@ -5422,10 +5524,18 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
                 </button>
                 <div className={`card aq-map-track-drawer ${mapTrackOpen ? 'open' : 'closed'}`}>
                   <div style={{padding:'8px 8px 0',fontSize:12,fontWeight:700}}>Treking (vaqt bo'yicha)</div>
+                  <div style={{padding:'8px',display:'grid',gap:6,borderBottom:'1px solid var(--b2)'}}>
+                    <div style={{fontSize:11,color:'var(--t3)'}}>Dostavchik</div>
+                    <select className="select" value={mapTrackDriver} onChange={(e)=>setMapTrackDriver(e.target.value)}>
+                      {mapTrackDrivers.length === 0 ? (
+                        <option value="">-</option>
+                      ) : mapTrackDrivers.map((d) => (
+                        <option key={`trk_drv_${d}`} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div style={{padding:'8px',display:'grid',gap:6,overflow:'auto',maxHeight:'100%'}}>
-                    {!mapSelected ? (
-                      <div style={{fontSize:11,color:'var(--t3)'}}>Avval xaritada mijozni tanlang.</div>
-                    ) : mapTrackRows.length === 0 ? (
+                    {mapTrackRows.length === 0 ? (
                       <div style={{fontSize:11,color:'var(--t3)'}}>Treking ma'lumoti topilmadi.</div>
                     ) : mapTrackRows.map((tp, i) => {
                       const active = String(tp.key || '') === String(mapTrackFocusKey || '');
@@ -5445,9 +5555,12 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
                             padding:'7px 8px',
                           }}
                         >
-                          <div style={{fontSize:11,fontWeight:700}}>{fmtD(tp.enteredAt || tp.date)} {String(tp.enteredAt || '').trim() ? `| ${String(tp.enteredAt).slice(11,16)}` : ''}</div>
-                          <div style={{fontSize:11,opacity:.95}}>{tp.kind}: {tp.product} ({fmt(tp.qty)} ta)</div>
-                          {tp.note ? <div style={{fontSize:10,opacity:.8,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{tp.note}</div> : null}
+                          <div style={{fontSize:11,fontWeight:700}}>
+                            {fmtD(tp.enteredAt || tp.date)} {tp.clock ? `| ${tp.clock}` : ''}
+                          </div>
+                          <div style={{fontSize:11,opacity:.95,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                            {tp.customer || '-'}
+                          </div>
                         </button>
                       );
                     })}
@@ -9689,6 +9802,7 @@ const parseBloggerMonthLabel = (...vals) => {
   }
   return '';
 };
+const BLOGGER_CACHE_KEY = 'aq-blogger-sheet-cache-v2';
 const parseBloggerSheetRows = (rows = []) => {
   if (!Array.isArray(rows) || rows.length < 3) return { items: [], months: [] };
   const top0 = Array.isArray(rows[0]) ? rows[0] : [];
@@ -9773,26 +9887,33 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
       setBloggerError('');
       return undefined;
     }
+    const cached = S.get(BLOGGER_CACHE_KEY, null);
+    if (Array.isArray(cached?.rows) && cached.rows.length > 2) {
+      setBloggerSheetRows(cached.rows);
+    }
     let dead = false;
     (async () => {
       setBloggerLoading(true);
       setBloggerError('');
       try {
-        let rows = [];
-        try {
-          rows = await fetchSheetCsvByName(BLOGGER_SHEET_ID, BLOGGER_SHEET_NAME, 'Blogerlar');
-        } catch (eByName) {
-          try {
-            rows = await fetchSheetCsv(BLOGGER_SHEET_ID, BLOGGER_SHEET_GID, 'Blogerlar');
-          } catch (eByGid) {
-            rows = await fetchSheetOpenSheet(BLOGGER_SHEET_ID, BLOGGER_SHEET_NAME, 'Blogerlar');
+        const rows = await Promise.any([
+          fetchSheetCsvByName(BLOGGER_SHEET_ID, BLOGGER_SHEET_NAME, 'Blogerlar', 3500),
+          fetchSheetCsv(BLOGGER_SHEET_ID, BLOGGER_SHEET_GID, 'Blogerlar', 3500),
+          fetchSheetOpenSheet(BLOGGER_SHEET_ID, BLOGGER_SHEET_NAME, 'Blogerlar', 4500),
+        ]);
+        if (!dead) {
+          const safeRows = Array.isArray(rows) ? rows : [];
+          setBloggerSheetRows(safeRows);
+          if (safeRows.length > 2) {
+            S.set(BLOGGER_CACHE_KEY, { rows: safeRows, ts: Date.now() });
           }
         }
-        if (!dead) setBloggerSheetRows(Array.isArray(rows) ? rows : []);
       } catch (e) {
         if (!dead) {
-          setBloggerSheetRows([]);
-          setBloggerError(String(e?.message || e || "Blogerlar varaqi yuklanmadi"));
+          if (!Array.isArray(cached?.rows) || cached.rows.length < 3) {
+            setBloggerSheetRows([]);
+            setBloggerError(String(e?.message || e || "Blogerlar varaqi yuklanmadi"));
+          }
         }
       } finally {
         if (!dead) setBloggerLoading(false);
@@ -10205,6 +10326,16 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
       })
       .slice(0, 24);
   }, [bloggerMapping, firstDeliveredMonthByCustomer, bloggerNameByNick]);
+  const bloggerCustomerCountByMonthNick = useMemo(() => {
+    const m = new Map();
+    bloggerGrowthRows.forEach((r) => {
+      const mk = String(r?.month || '').trim();
+      const nick = normalizeNickToken(r?.nick || '');
+      if (!mk || !nick) return;
+      m.set(`${mk}|${nick}`, Number(r?.count || 0));
+    });
+    return m;
+  }, [bloggerGrowthRows]);
   const bloggerArchiveRows = useMemo(() => {
     const out = [];
     bloggerAgreementRows.forEach((r) => {
@@ -10215,6 +10346,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
         const planStory = Math.max(0, toNum(r?.planStory));
         const planReel = Math.max(0, toNum(r?.planReel));
         const onTrack = (planStory <= 0 || storyFact >= planStory) && (planReel <= 0 || reelFact >= planReel);
+        const monthCustomers = Number(bloggerCustomerCountByMonthNick.get(`${mk}|${normalizeNickToken(r?.nickNorm || r?.nick)}`) || 0);
         out.push({
           month: mk,
           name: r.name,
@@ -10225,17 +10357,19 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
           planReel,
           storyFact,
           reelFact,
-          linkedCustomerCount: r.linkedCustomerCount,
+          linkedCustomerCount: monthCustomers,
           onTrack,
         });
       });
     });
     return out.sort((a, b) => (a.month === b.month ? String(a.name || '').localeCompare(String(b.name || ''), 'ru') : String(b.month || '').localeCompare(String(a.month || ''))));
-  }, [bloggerAgreementRows]);
+  }, [bloggerAgreementRows, bloggerCustomerCountByMonthNick]);
   const bloggerCurrentFilterColumns = useMemo(() => ([
     { key:'name', label:'Bloger', type:'text' },
     { key:'nick', label:'Insta nik', type:'text' },
     { key:'status', label:'Status', type:'text' },
+    { key:'contractTerm', label:'Kelishuv', type:'text' },
+    { key:'contractDate', label:'Kelishuv sana', type:'date' },
     { key:'planStory', label:'Reja storis', type:'number' },
     { key:'planReel', label:'Reja rils', type:'number' },
     { key:'storyFact', label:'Joylangan storis', type:'number' },
@@ -10252,6 +10386,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
     { key:'planReel', label:'Reja rils', type:'number' },
     { key:'storyFact', label:'Joylangan storis', type:'number' },
     { key:'reelFact', label:'Joylangan rils', type:'number' },
+    { key:'linkedCustomerCount', label:'Kelgan mijoz', type:'number' },
     { key:'onTrack', label:'Holat', type:'text', getValue:(r)=>r.onTrack?'Kelishuvda':'Ortda' },
   ]), []);
   const bloggerActiveFilterColumns = bloggerSection === 'archive' ? bloggerArchiveFilterColumns : bloggerCurrentFilterColumns;
@@ -10287,13 +10422,13 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
       fileName: `Blogerlar_${isArchive ? 'Arxiv' : 'Asosiy'}_${new Date().toISOString().slice(0,10)}.xlsx`,
       sheetName: isArchive ? 'BlogerlarArxiv' : 'BlogerlarAsosiy',
       headers: isArchive
-        ? ['Oy', 'Bloger', 'Insta nik', 'Status', 'Reja storis', 'Reja rils', 'Joylangan storis', 'Joylangan rils', 'Holat']
+        ? ['Oy', 'Bloger', 'Insta nik', 'Status', 'Reja storis', 'Reja rils', 'Joylangan storis', 'Joylangan rils', 'Kelgan mijoz', 'Holat']
         : ['Bloger', 'Insta nik', 'Status', 'Reja storis', 'Reja rils', 'Joylangan storis', 'Joylangan rils', 'Biriktirilgan mijoz', 'Holat'],
       columnTypes: isArchive
-        ? ['text', 'text', 'text', 'text', 'number', 'number', 'number', 'number', 'text']
+        ? ['text', 'text', 'text', 'text', 'number', 'number', 'number', 'number', 'number', 'text']
         : ['text', 'text', 'text', 'number', 'number', 'number', 'number', 'number', 'text'],
       rows: isArchive
-        ? rows.map((r) => [formatMonthShort(r.month), r.name, r.nick || '-', r.status || '-', r.planStory, r.planReel, r.storyFact, r.reelFact, r.onTrack ? 'Kelishuvda' : 'Ortda'])
+        ? rows.map((r) => [formatMonthShort(r.month), r.name, r.nick || '-', r.status || '-', r.planStory, r.planReel, r.storyFact, r.reelFact, r.linkedCustomerCount || 0, r.onTrack ? 'Kelishuvda' : 'Ortda'])
         : rows.map((r) => [r.name, r.nick || '-', r.status || '-', r.planStory, r.planReel, r.storyFact, r.reelFact, r.linkedCustomerCount || 0, r.onTrack ? 'Kelishuvda' : 'Ortda']),
     });
   }, [bloggerSection, bloggerVisibleRows]);
@@ -10381,8 +10516,8 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
             <button className={`tab${bloggerWorkMode==='all'?' on':''}`} onClick={()=>setBloggerWorkMode('all')}>Barchasi</button>
           </div>
         </div>
-        <div className="card" style={{padding:0,overflow:'hidden'}}>
-          <div style={{overflow:'auto',maxHeight:'58vh'}}>
+        <div className="card" style={{padding:0,overflow:'hidden',flex:1,minHeight:0}}>
+          <div style={{overflow:'auto',maxHeight:'100%'}}>
             {bloggerLoading ? (
               <div style={{padding:16,color:'var(--t3)',fontSize:12}}>Blogerlar varaqi yuklanmoqda...</div>
             ) : bloggerError ? (
@@ -10401,6 +10536,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
                       <th style={{textAlign:'right'}}>Reja rils</th>
                       <th style={{textAlign:'right'}}>Joylangan storis</th>
                       <th style={{textAlign:'right'}}>Joylangan rils</th>
+                      <th style={{textAlign:'right'}}>Kelgan mijoz</th>
                       <th>Holat</th>
                     </tr>
                   ) : (
@@ -10409,6 +10545,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
                       <th>Bloger</th>
                       <th>Insta nik</th>
                       <th>Status</th>
+                      <th>Kelishuv</th>
                       <th style={{textAlign:'right'}}>Reja storis</th>
                       <th style={{textAlign:'right'}}>Reja rils</th>
                       <th style={{textAlign:'right'}}>Joylangan storis</th>
@@ -10420,7 +10557,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
                 </thead>
                 <tbody>
                   {bloggerVisibleRows.length === 0 ? (
-                    <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr>
+                    <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr>
                   ) : bloggerVisibleRows.map((r, i) => (
                     bloggerSection === 'archive' ? (
                       <tr key={`blogger_ar_${r.month}_${r.nick || r.name}_${i}`}>
@@ -10433,6 +10570,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
                         <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planReel)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.storyFact)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--pu)'}}>{fmt(r.reelFact)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.linkedCustomerCount || 0)}</td>
                         <td style={{color:r.onTrack ? 'var(--gr)' : 'var(--rd)'}}>{r.onTrack ? 'Kelishuvda' : 'Ortda'}</td>
                       </tr>
                     ) : (
@@ -10441,6 +10579,9 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
                         <td>{r.name}</td>
                         <td style={{fontFamily:'var(--mono)'}}>{r.nick || '-'}</td>
                         <td>{r.status || '-'}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>
+                          {r.contractTerm || '-'}{r.contractDate ? ` | ${fmtD(r.contractDate)}` : ''}
+                        </td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planReel)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.storyFact)}</td>
@@ -10453,39 +10594,6 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
                 </tbody>
               </table>
             )}
-          </div>
-        </div>
-        <div className="card" style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Arxiv: Oylar bo'yicha umumiy bajarilish</div>
-          <div style={{overflow:'auto',maxHeight:'22vh'}}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Oy</th>
-                  <th style={{textAlign:'right'}}>Ishlidi bloger</th>
-                  <th style={{textAlign:'right'}}>Reja storis</th>
-                  <th style={{textAlign:'right'}}>Joylangan storis</th>
-                  <th style={{textAlign:'right'}}>Reja rils</th>
-                  <th style={{textAlign:'right'}}>Joylangan rils</th>
-                  <th>Holat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bloggerMonthExecutionRows.length === 0 ? (
-                  <tr><td colSpan={7} style={{textAlign:'center',padding:16,color:'var(--t3)'}}>Arxiv ma'lumot topilmadi</td></tr>
-                ) : bloggerMonthExecutionRows.map((r, i) => (
-                  <tr key={`bmx_${r.month}_${i}`}>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{formatMonthShort(r.month)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.activeCount)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.factStory)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planReel)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--pu)'}}>{fmt(r.factReel)}</td>
-                    <td style={{color:r.status==='Kelishuvda'?'var(--gr)':'var(--rd)'}}>{r.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>
