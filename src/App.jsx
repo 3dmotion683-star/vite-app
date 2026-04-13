@@ -4113,8 +4113,23 @@ function Dashboard({ D }) {
   const { customers, cashbox, rawOrders, debtorsByBalance=[] } = D;
   const now = new Date();
   const curMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const wDel = (rawOrders||[]).filter((o) => isWaterProduct(o.product) && isOrderDoc(o.docType) && isDeliveredStatus(o.status));
-  const wDelThisMonth = wDel.filter((o) => monthKey(o.orderDate)===curMonthKey);
+  const waterSalesRows = (rawOrders || []).filter((o) => isMonthlyWaterSalesRow(o));
+  const wDelThisMonth = waterSalesRows.filter((o) => monthKey(o.orderDate)===curMonthKey);
+  const wDelThisMonthStats = useMemo(() => {
+    let soldQty = 0;
+    let returnedQty = 0;
+    let netQty = 0;
+    let netSum = 0;
+    (wDelThisMonth || []).forEach((o) => {
+      const q = toNum(o?.qty);
+      const s = String(o?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(o?.sum);
+      if (q >= 0) soldQty += q;
+      else returnedQty += Math.abs(q);
+      netQty += q;
+      netSum += s;
+    });
+    return { soldQty, returnedQty, netQty, netSum };
+  }, [wDelThisMonth]);
   const pays = (cashbox||[]).filter((c) => isPaymentFromCounterparty(c.opType));
   const debtors = debtorsByBalance.length ? debtorsByBalance : customers.filter((c) => c.balanceUZS < 0);
   const stale2m = customers
@@ -4122,8 +4137,8 @@ function Dashboard({ D }) {
     .sort((a,b) => (b.daysAgo || 0) - (a.daysAgo || 0));
 
   const monthOptions = useMemo(
-    () => [...new Set(wDel.map((o) => monthKey(o.orderDate)).filter(Boolean))].sort(),
-    [wDel]
+    () => [...new Set(waterSalesRows.map((o) => monthKey(o.orderDate)).filter(Boolean))].sort(),
+    [waterSalesRows]
   );
   const [agentMonth, setAgentMonth] = useState(curMonthKey);
   const [rayonMonth, setRayonMonth] = useState(curMonthKey);
@@ -4148,41 +4163,42 @@ function Dashboard({ D }) {
   }, [pays]);
   const byMonth = useMemo(() => {
     const m = {};
-    wDel.forEach((o) => {
+    waterSalesRows.forEach((o) => {
       const k = monthKey(o.orderDate); if (!k) return;
       if (!m[k]) m[k]={key:k,qty:0,sumUZS:0};
-      m[k].qty+=Math.abs(o.qty);
-      if (o.currency !== 'USD') m[k].sumUZS += o.sum;
+      m[k].qty += toNum(o?.qty);
+      if (String(o?.currency || '').toUpperCase() !== 'USD') m[k].sumUZS += toNum(o?.sum);
     });
     return Object.values(m).sort((a,b)=>a.key.localeCompare(b.key)).slice(-12);
-  }, [wDel]);
+  }, [waterSalesRows]);
   const byDist = useMemo(() => {
-    const source = rayonMonth === 'all' ? wDel : wDel.filter((o) => monthKey(o.orderDate) === rayonMonth);
+    const source = rayonMonth === 'all' ? waterSalesRows : waterSalesRows.filter((o) => monthKey(o.orderDate) === rayonMonth);
     const m = {};
     source.forEach((o) => {
       const c = customers.find((x)=>x.id===o.mId);
       const d = c?.district || "Noma'lum";
       if (!m[d]) m[d] = { name:d, qty:0, sum:0, custs:new Set() };
-      m[d].qty += Math.abs(o.qty || 0);
-      m[d].sum += (o.currency==='USD' ? 0 : (o.sum || 0));
+      m[d].qty += toNum(o?.qty);
+      m[d].sum += (String(o?.currency || '').toUpperCase()==='USD' ? 0 : toNum(o?.sum));
       if (o.mId) m[d].custs.add(o.mId);
     });
     return Object.values(m)
       .map((x)=>({ ...x, custs:x.custs.size }))
       .sort((a,b)=>b.sum-a.sum);
-  }, [wDel, customers, rayonMonth]);
+  }, [waterSalesRows, customers, rayonMonth]);
   const agents = useMemo(() => {
     const source = agentMonth === 'all'
-      ? wDel
-      : wDel.filter((o) => monthKey(o.orderDate) === agentMonth);
+      ? waterSalesRows
+      : waterSalesRows.filter((o) => monthKey(o.orderDate) === agentMonth);
     const m = {};
     source.forEach((o) => {
       const a=o.agent||'-';
       if (!m[a]) m[a]={name:a,qty:0,sum:0};
-      m[a].qty+=Math.abs(o.qty); m[a].sum+=o.sum;
+      m[a].qty += toNum(o?.qty);
+      m[a].sum += (String(o?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(o?.sum));
     });
     return Object.values(m).sort((a,b)=>b.sum-a.sum).slice(0,7);
-  }, [wDel, agentMonth]);
+  }, [waterSalesRows, agentMonth]);
 
   const debtSum = debtors.reduce((s, c) => s + Math.abs(c.balanceUZS || 0), 0);
   const COLORS = ['#58a6ff','#3fb950','#f85149','#d29922','#bc8cff','#f0883e','#79c0ff','#56d364','#ffa657'];
@@ -4195,9 +4211,9 @@ function Dashboard({ D }) {
         <StatCard l="JAMI IDISH" v={customers.reduce((s,c)=>s+c.tara,0)+' ta'} s="barcha mijozlarda" c="var(--pu)"/>
         <StatCard l="2 OY OLMAGAN" v={stale2m.length+' ta'} s="aktiv mijozlar ichidan" c="var(--yl)"/>
         <StatCard
-          l={`SUV (${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()})`}
-          v={fmt(wDelThisMonth.reduce((s,o)=>s+Math.abs(o.qty),0))+' ta'}
-          s={fmt(wDelThisMonth.reduce((s,o)=>s+o.sum,0))+" so'm"} c="var(--gr)"/>
+          l={`Oylik sotilgan suv (${curMonthKey})`}
+          v={fmt(wDelThisMonthStats.netQty)+' ta'}
+          s={`Zakaz: ${fmt(wDelThisMonthStats.soldQty)}  |  Vozvrat: -${fmt(wDelThisMonthStats.returnedQty)}  |  Netto: ${fmt(wDelThisMonthStats.netSum)} so'm`} c="var(--gr)"/>
       </div>
 
       <div className="g2">
@@ -4277,7 +4293,7 @@ function Dashboard({ D }) {
                 </div>
               </div>
               <div style={{height:4,background:'var(--s3)',borderRadius:2}}>
-                <div style={{height:'100%',width:`${(d.sum/(byDist[0]?.sum||1))*100}%`,background:COLORS[i%COLORS.length],borderRadius:2,transition:'width .5s'}}/>
+                <div style={{height:'100%',width:`${(Math.abs(d.sum)/(Math.max(1,...byDist.map((x)=>Math.abs(x.sum||0)))))*100}%`,background:COLORS[i%COLORS.length],borderRadius:2,transition:'width .5s'}}/>
               </div>
             </div>
           ))}
@@ -7451,8 +7467,23 @@ function Reports({
   const monthWaterOrders = useMemo(() => {
     return (rawOrders || []).filter((o) => isMonthlyWaterSalesRow(o, currentMonth));
   }, [rawOrders, currentMonth]);
-  const monthWaterQty = monthWaterOrders.reduce((s,o)=>s + toNum(o?.qty), 0);
-  const monthWaterSum = monthWaterOrders.reduce((s,o)=>s + (String(o?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(o?.sum)), 0);
+  const monthWaterStats = useMemo(() => {
+    let soldQty = 0;
+    let returnedQty = 0;
+    let netQty = 0;
+    let netSum = 0;
+    (monthWaterOrders || []).forEach((o) => {
+      const q = toNum(o?.qty);
+      const s = String(o?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(o?.sum);
+      if (q >= 0) soldQty += q;
+      else returnedQty += Math.abs(q);
+      netQty += q;
+      netSum += s;
+    });
+    return { soldQty, returnedQty, netQty, netSum };
+  }, [monthWaterOrders]);
+  const monthWaterQty = monthWaterStats.netQty;
+  const monthWaterSum = monthWaterStats.netSum;
 
   const todayDate = useMemo(() => {
     const d = toDate(todayIso);
@@ -8392,9 +8423,9 @@ function Reports({
       {showReport && (
       <div className="g4">
         <StatCard
-          l={`SUV (${currentMonth})  |  ${companyLabelByKey(company)}`}
+          l={`Oylik sotilgan suv (${currentMonth})  |  ${companyLabelByKey(company)}`}
           v={`${fmt(monthWaterQty)} ta`}
-          s={`${fmt(monthWaterSum)} so'm`}
+          s={`Zakaz: ${fmt(monthWaterStats.soldQty)}  |  Vozvrat: -${fmt(monthWaterStats.returnedQty)}  |  Netto: ${fmt(monthWaterSum)} so'm`}
           c="var(--bl)"
         />
         <StatCard
