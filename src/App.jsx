@@ -7925,11 +7925,10 @@ function Reports({
     const driver = String(driverName || '').trim();
     if (!driver) return '';
     if (payMode === 'card') {
-      return (
-        lookupByDriverName(resolvedDriverCardCashMap, driver) ||
-        lookupByDriverName(resolvedDriverCashMap, driver) ||
-        ''
-      );
+      return lookupByDriverName(resolvedDriverCardCashMap, driver) || '';
+    }
+    if (payMode === 'cash') {
+      return lookupByDriverName(resolvedDriverCashMap, driver) || '';
     }
     return (
       lookupByDriverName(resolvedDriverCashMap, driver) ||
@@ -7946,23 +7945,43 @@ function Reports({
       if (controlEndDate && dateKey > controlEndDate) return false;
       return true;
     };
-    const upsert = (store, key, base) => {
-      if (!store.has(key)) {
-        store.set(key, {
-          date: String(base?.date || ''),
-          customerId: String(base?.customerId || ''),
+    const makeKey = (date, customerId, driver, payMode) => (
+      `${String(date || '').trim()}__${String(customerId || '').trim()}__${String(driver || '-').trim() || '-'}__${String(payMode || '').trim()}`
+    );
+
+    const upsertArchive = (key, base) => {
+      if (!archiveMap.has(key)) {
+        archiveMap.set(key, {
+          key,
+          date: String(base?.date || '').trim(),
+          customerId: String(base?.customerId || '').trim(),
           customer: String(base?.customer || '').trim() || `ID ${String(base?.customerId || '').trim()}`,
           driver: String(base?.driver || '-').trim() || '-',
-          payMode: String(base?.payMode || ''),
+          payMode: String(base?.payMode || '').trim(),
           expectedCashbox: String(base?.expectedCashbox || '').trim(),
           archiveAmount: 0,
-          systemAmount: 0,
-          systemWrongCashboxAmount: 0,
-          systemCashboxes: new Set(),
-          status: 'OK',
         });
       }
-      return store.get(key);
+      return archiveMap.get(key);
+    };
+    const upsertSystem = (key, base) => {
+      if (!systemMap.has(key)) {
+        systemMap.set(key, {
+          key,
+          date: String(base?.date || '').trim(),
+          customerId: String(base?.customerId || '').trim(),
+          customer: String(base?.customer || '').trim() || `ID ${String(base?.customerId || '').trim()}`,
+          driver: String(base?.driver || '-').trim() || '-',
+          payMode: String(base?.payMode || '').trim(),
+          expectedCashbox: String(base?.expectedCashbox || '').trim(),
+          totalAmount: 0,
+          matchedAmount: 0,
+          wrongCashboxAmount: 0,
+          noCashboxAmount: 0,
+          cashboxes: new Set(),
+        });
+      }
+      return systemMap.get(key);
     };
 
     (parsedArchiveRows || []).forEach((r) => {
@@ -7971,14 +7990,17 @@ function Reports({
       const amount = Math.abs(toNum(r?.payAmount));
       if (!dateInRange(date) || !customerId || amount <= 0.0001) return;
       if (!activeControlCustomerIds.has(customerId)) return;
+
       const payMode = detectPaymentMode(r?.payType);
-      if (!payMode) return;
+      if (payMode !== 'cash' && payMode !== 'card') return;
+
       const driver = resolveNazoratDriverName(r?.driver || '');
       if (isVirtualControlDriver(driver)) return;
       if (!canSeeAllNazorat && String(driver || '').trim().toLowerCase() !== currentUserNorm) return;
+
       const expectedCashbox = pickExpectedCashbox(driver, payMode);
-      const key = `${date}__${customerId}__${payMode}`;
-      const row = upsert(archiveMap, key, {
+      const key = makeKey(date, customerId, driver, payMode);
+      const row = upsertArchive(key, {
         date,
         customerId,
         customer: r?.customer,
@@ -7986,7 +8008,6 @@ function Reports({
         payMode,
         expectedCashbox,
       });
-      if ((!row.driver || row.driver === '-') && driver && driver !== '-') row.driver = driver;
       const cName = String(r?.customer || '').trim();
       if (cName && (!row.customer || row.customer.startsWith('ID '))) row.customer = cName;
       if (!row.expectedCashbox && expectedCashbox) row.expectedCashbox = expectedCashbox;
@@ -8007,18 +8028,19 @@ function Reports({
       if (!canSeeAllNazorat && String(driver || '').trim().toLowerCase() !== currentUserNorm) return;
 
       const cashbox = String(r?.kassa || '').trim();
-      let payMode = detectPaymentMode(r?.opType, r?.note, cashbox);
-      if (!payMode) {
-        const byCard = normalizeCashboxKey(pickExpectedCashbox(driver, 'card'));
-        const kKey = normalizeCashboxKey(cashbox);
-        payMode = (kKey && byCard && kKey === byCard) ? 'card' : 'cash';
-      }
+      const actualKey = normalizeCashboxKey(cashbox);
+      const expectedCashKey = normalizeCashboxKey(pickExpectedCashbox(driver, 'cash'));
+      const expectedCardKey = normalizeCashboxKey(pickExpectedCashbox(driver, 'card'));
+      let payMode = '';
+      if (actualKey && expectedCardKey && actualKey === expectedCardKey) payMode = 'card';
+      else if (actualKey && expectedCashKey && actualKey === expectedCashKey) payMode = 'cash';
+      else payMode = detectPaymentMode(r?.opType, r?.note, cashbox);
+      if (payMode !== 'cash' && payMode !== 'card') return;
+
       const expectedCashbox = pickExpectedCashbox(driver, payMode);
-      const key = `${date}__${customerId}__${payMode}`;
-      // Karta nazorati bir tomonlama: arxivda karta bo'lsa tekshiriladi.
-      // Sistemadagi boshqa (arxivda yo'q) karta kirimlari bu nazoratga ta'sir qilmaydi.
-      if (payMode === 'card' && !archiveMap.has(key)) return;
-      const row = upsert(systemMap, key, {
+      const expectedKey = normalizeCashboxKey(expectedCashbox);
+      const key = makeKey(date, customerId, driver, payMode);
+      const row = upsertSystem(key, {
         date,
         customerId,
         customer: r?.contName,
@@ -8026,66 +8048,56 @@ function Reports({
         payMode,
         expectedCashbox,
       });
-      if ((!row.driver || row.driver === '-') && driver && driver !== '-') row.driver = driver;
       const cName = String(r?.contName || '').trim();
       if (cName && (!row.customer || row.customer.startsWith('ID '))) row.customer = cName;
       if (!row.expectedCashbox && expectedCashbox) row.expectedCashbox = expectedCashbox;
-      const expectedKey = normalizeCashboxKey(expectedCashbox);
-      const actualKey = normalizeCashboxKey(cashbox);
-      row.systemCashboxes.add(cashbox || '-');
-      if (payMode === 'card') {
-        // Karta to'lovida asosiy tekshiruv: shu sana+mijoz uchun karta to'lov borligi.
-        row.systemAmount += amount;
+      row.totalAmount += amount;
+      row.cashboxes.add(cashbox || '-');
+      if (!actualKey) {
+        row.noCashboxAmount += amount;
+      } else if (expectedKey && actualKey === expectedKey) {
+        row.matchedAmount += amount;
+      } else if (expectedKey) {
+        row.wrongCashboxAmount += amount;
       } else {
-        if (expectedKey && actualKey && expectedKey !== actualKey) {
-          row.systemWrongCashboxAmount += amount;
-        } else if (expectedKey && !actualKey) {
-          row.systemWrongCashboxAmount += amount;
-        } else {
-          row.systemAmount += amount;
-        }
+        // Biriktirilmagan holatda sistem summa ko'rinsin.
+        row.matchedAmount += amount;
       }
     });
 
-    const keys = new Set([...archiveMap.keys(), ...systemMap.keys()]);
-    return Array.from(keys).map((key, idx) => {
-      const a = archiveMap.get(key);
-      const s = systemMap.get(key);
-      const base = a || s || {};
-      const archiveAmount = Number(a?.archiveAmount || 0);
-      const systemAmount = Number(s?.systemAmount || 0);
-      const systemWrongCashboxAmount = Number(s?.systemWrongCashboxAmount || 0);
-      const inferredSystemCashbox = s ? (Array.from(s.systemCashboxes || []).find((x) => String(x || '').trim() && String(x || '').trim() !== '-') || '') : '';
-      const expectedCashbox = String(base.expectedCashbox || inferredSystemCashbox || '').trim();
-      const diff = archiveAmount - systemAmount;
-      const isCardPay = String(base.payMode || '') === 'card';
+    return Array.from(archiveMap.values()).map((a, idx) => {
+      const s = systemMap.get(a.key);
+      const archiveAmount = Number(a.archiveAmount || 0);
+      const matchedAmount = Number(s?.matchedAmount || 0);
+      const wrongCashboxAmount = Number(s?.wrongCashboxAmount || 0);
+      const systemAmount = Number(s?.totalAmount || 0);
+      const expectedCashbox = String(a.expectedCashbox || s?.expectedCashbox || '').trim();
+      const diff = archiveAmount - matchedAmount;
+
       let status = 'OK';
-      if (archiveAmount > 0.0001 && systemAmount <= 0.0001 && systemWrongCashboxAmount > 0.0001) {
+      if (!expectedCashbox) {
+        status = 'Kassa biriktirilmagan';
+      } else if (matchedAmount <= 0.0001 && (wrongCashboxAmount > 0.0001 || Number(s?.noCashboxAmount || 0) > 0.0001)) {
         status = 'Kassa mos emas';
-      } else if (archiveAmount > 0.0001 && systemAmount <= 0.0001) {
+      } else if (matchedAmount <= 0.0001) {
         status = 'Sistemada pul topilmadi';
-      } else if (archiveAmount <= 0.0001 && (systemAmount + systemWrongCashboxAmount) > 0.0001) {
-        status = 'Arxivda pul topilmadi';
       } else if (Math.abs(diff) > 0.0001) {
         status = 'Summa mos emas';
-      } else if (systemWrongCashboxAmount > 0.0001) {
-        status = 'Kassa mos emas';
-      } else if (!isCardPay && !expectedCashbox) {
-        status = 'Kassa biriktirilmagan';
       }
+
       return {
-        id: `cash_ctrl_${idx + 1}_${base.date || ''}_${base.customerId || ''}`,
-        date: String(base.date || ''),
-        customerId: String(base.customerId || ''),
-        customer: String(base.customer || '').trim() || `ID ${String(base.customerId || '').trim()}`,
-        driver: String(base.driver || '-').trim() || '-',
-        payType: String(base.payMode || '') === 'card' ? 'Karta' : 'Naqt',
+        id: `cash_ctrl_${idx + 1}_${a.date || ''}_${a.customerId || ''}`,
+        date: String(a.date || ''),
+        customerId: String(a.customerId || ''),
+        customer: String(a.customer || '').trim() || `ID ${String(a.customerId || '').trim()}`,
+        driver: String(a.driver || '-').trim() || '-',
+        payType: String(a.payMode || '') === 'card' ? 'Karta' : 'Naqt',
         expectedCashbox: expectedCashbox || '-',
-        systemCashbox: s ? Array.from(s.systemCashboxes || []).filter(Boolean).join(', ') || '-' : '-',
+        systemCashbox: s ? Array.from(s.cashboxes || []).filter(Boolean).join(', ') || '-' : '-',
         archiveAmount,
-        systemAmount: systemAmount + systemWrongCashboxAmount,
-        matchedSystemAmount: systemAmount,
-        wrongCashboxAmount: systemWrongCashboxAmount,
+        systemAmount,
+        matchedSystemAmount: matchedAmount,
+        wrongCashboxAmount,
         diff,
         status,
       };
