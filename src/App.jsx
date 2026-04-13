@@ -726,7 +726,17 @@ const normalizeStoredCompanyKey = (v) => {
   return s ? normalizeCompanyKey(s) : '';
 };
 const companyLabelByKey = (v) => (normalizeCompanyKey(v) === 'ahmadtea' ? 'Ahmadtea' : 'Murodbaxsh');
-const normalizeIdKey = (v) => String(v ?? '').trim();
+const normalizeIdKey = (v) => {
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  const compact = s.replace(/\s+/g, '');
+  if (/^\d+$/.test(compact)) return compact;
+  const mFloat = compact.match(/^(\d+)[.,]0+$/);
+  if (mFloat) return mFloat[1];
+  const seq = compact.match(/(\d{3,})/);
+  if (seq) return seq[1];
+  return compact;
+};
 const normalizeUserKey = (v) => String(v ?? '').trim().toLowerCase();
 const filterDataByCustomerIds = (baseData, idSetInput) => {
   const source = baseData || {};
@@ -2263,6 +2273,15 @@ const detectPaymentMode = (...vals) => {
   }
   return '';
 };
+const isMonthlyWaterSalesRow = (row, targetMonth = '') => {
+  if (!row) return false;
+  const mk = monthKey(row?.orderDate);
+  if (targetMonth && mk !== targetMonth) return false;
+  if (isVirtualWarehouseLabel(row?.warehouse)) return false;
+  if (normalizeMatchText(row?.status).includes('отменено')) return false;
+  const cat = normalizeMatchText(row?.cat).replace(/\s+/g, ' ').trim();
+  return cat === normalizeMatchText('Вода');
+};
 const isLikelyDocType = (v) => {
   const s = String(v || '').trim();
   if (!s) return false;
@@ -2702,7 +2721,7 @@ function processAll(mainData) {
       const uniqueId = String(r[17] || r[18] || '').trim();
       const agent = pickFirstBy([r[21], r[20], r[18]], (v) => String(v || '').trim().length > 0);
       const delivPerson = pickFirstBy([r[23], r[24], r[22]], (v) => String(v || '').trim().length > 0); // X
-      const orderDate = pickFirstBy([r[24], r[22], r[23], r[21], r[20]], (v) => !!toDate(v)); // Y -> W fallback
+      const orderDate = pickFirstBy([r[22], r[24], r[23], r[21], r[20]], (v) => !!toDate(v)); // W -> Y fallback
       const warehouse = pickFirstBy([r[19], r[20], r[18], r[16], r[25]], (v) => isLikelyWarehouseName(v));
       const mId = normId(pickFirstBy([r[29], r[30], r[28], r[27]], (v) => String(v || '').trim().length > 0));
       const note = pickFirstBy(
@@ -7430,13 +7449,7 @@ function Reports({
   );
 
   const monthWaterOrders = useMemo(() => {
-    return (rawOrders || []).filter((o) => {
-      if (monthKey(o?.orderDate) !== currentMonth) return false;
-      if (isVirtualWarehouseLabel(o?.warehouse)) return false;
-      if (normalizeMatchText(o?.status).includes('отменено')) return false;
-      const cat = normalizeMatchText(o?.cat).replace(/\s+/g, ' ').trim();
-      return cat === normalizeMatchText('Вода');
-    });
+    return (rawOrders || []).filter((o) => isMonthlyWaterSalesRow(o, currentMonth));
   }, [rawOrders, currentMonth]);
   const monthWaterQty = monthWaterOrders.reduce((s,o)=>s + toNum(o?.qty), 0);
   const monthWaterSum = monthWaterOrders.reduce((s,o)=>s + (String(o?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(o?.sum)), 0);
@@ -7453,16 +7466,15 @@ function Reports({
     return new Date(y, m, 0);
   }, [currentMonth, todayDate]);
   const soldUntilTodayQty = useMemo(() => {
-    return (rawOrders || []).filter((o) => {
-      if (!isWaterProduct(o.product)) return false;
-      if (!isOrderDoc(o.docType)) return false;
-      if (isCancelledStatus(o.status)) return false;
-      if (monthKey(o.orderDate) !== currentMonth) return false;
-      const od = toDate(o.orderDate);
-      if (!od) return false;
-      od.setHours(0, 0, 0, 0);
-      return od <= todayDate;
-    }).reduce((s, o) => s + Math.abs(o.qty || 0), 0);
+    return (rawOrders || [])
+      .filter((o) => {
+        if (!isMonthlyWaterSalesRow(o, currentMonth)) return false;
+        const od = toDate(o.orderDate);
+        if (!od) return false;
+        od.setHours(0, 0, 0, 0);
+        return od <= todayDate;
+      })
+      .reduce((s, o) => s + toNum(o?.qty), 0);
   }, [rawOrders, currentMonth, todayDate]);
   const remainingMonthPlanQty = Math.max(0, Number(selectedPlan.waterPlan || 0) - soldUntilTodayQty);
   const tomorrowDate = useMemo(() => {
@@ -7924,17 +7936,31 @@ function Reports({
   const pickExpectedCashbox = useCallback((driverName, payMode) => {
     const driver = String(driverName || '').trim();
     if (!driver) return '';
+    const candidates = Array.from(new Set([
+      driver,
+      ...driver.split(/[;,/]/g).map((x) => String(x || '').trim()).filter(Boolean),
+    ]));
+    const lookupCash = () => {
+      for (const name of candidates) {
+        const v = lookupByDriverName(resolvedDriverCashMap, name);
+        if (v) return v;
+      }
+      return '';
+    };
+    const lookupCard = () => {
+      for (const name of candidates) {
+        const v = lookupByDriverName(resolvedDriverCardCashMap, name);
+        if (v) return v;
+      }
+      return '';
+    };
     if (payMode === 'card') {
-      return lookupByDriverName(resolvedDriverCardCashMap, driver) || '';
+      return lookupCard();
     }
     if (payMode === 'cash') {
-      return lookupByDriverName(resolvedDriverCashMap, driver) || '';
+      return lookupCash();
     }
-    return (
-      lookupByDriverName(resolvedDriverCashMap, driver) ||
-      lookupByDriverName(resolvedDriverCardCashMap, driver) ||
-      ''
-    );
+    return lookupCash() || lookupCard() || '';
   }, [lookupByDriverName, resolvedDriverCardCashMap, resolvedDriverCashMap]);
   const nazoratCashRowsAll = useMemo(() => {
     const archiveMap = new Map();
@@ -7945,8 +7971,11 @@ function Reports({
       if (controlEndDate && dateKey > controlEndDate) return false;
       return true;
     };
-    const makeKey = (date, customerId, driver, payMode) => (
+    const makeArchiveKey = (date, customerId, driver, payMode) => (
       `${String(date || '').trim()}__${String(customerId || '').trim()}__${String(driver || '-').trim() || '-'}__${String(payMode || '').trim()}`
+    );
+    const makeSystemKey = (date, customerId, payMode) => (
+      `${String(date || '').trim()}__${String(customerId || '').trim()}__${String(payMode || '').trim()}`
     );
 
     const upsertArchive = (key, base) => {
@@ -7971,14 +8000,10 @@ function Reports({
           date: String(base?.date || '').trim(),
           customerId: String(base?.customerId || '').trim(),
           customer: String(base?.customer || '').trim() || `ID ${String(base?.customerId || '').trim()}`,
-          driver: String(base?.driver || '-').trim() || '-',
           payMode: String(base?.payMode || '').trim(),
-          expectedCashbox: String(base?.expectedCashbox || '').trim(),
           totalAmount: 0,
-          matchedAmount: 0,
-          wrongCashboxAmount: 0,
-          noCashboxAmount: 0,
-          cashboxes: new Set(),
+          cashboxAmounts: new Map(),
+          cashboxNames: new Set(),
         });
       }
       return systemMap.get(key);
@@ -7999,7 +8024,7 @@ function Reports({
       if (!canSeeAllNazorat && String(driver || '').trim().toLowerCase() !== currentUserNorm) return;
 
       const expectedCashbox = pickExpectedCashbox(driver, payMode);
-      const key = makeKey(date, customerId, driver, payMode);
+      const key = makeArchiveKey(date, customerId, driver, payMode);
       const row = upsertArchive(key, {
         date,
         customerId,
@@ -8028,56 +8053,45 @@ function Reports({
       if (!canSeeAllNazorat && String(driver || '').trim().toLowerCase() !== currentUserNorm) return;
 
       const cashbox = String(r?.kassa || '').trim();
-      const actualKey = normalizeCashboxKey(cashbox);
-      const expectedCashKey = normalizeCashboxKey(pickExpectedCashbox(driver, 'cash'));
-      const expectedCardKey = normalizeCashboxKey(pickExpectedCashbox(driver, 'card'));
-      let payMode = '';
-      if (actualKey && expectedCardKey && actualKey === expectedCardKey) payMode = 'card';
-      else if (actualKey && expectedCashKey && actualKey === expectedCashKey) payMode = 'cash';
-      else payMode = detectPaymentMode(r?.opType, r?.note, cashbox);
+      let payMode = detectPaymentMode(r?.opType, r?.note, cashbox);
+      if (!payMode) {
+        const k = normalizeMatchText(cashbox);
+        if (k.includes('karta') || k.includes('карта') || k.includes('card') || k.includes('terminal')) payMode = 'card';
+        else payMode = 'cash';
+      }
       if (payMode !== 'cash' && payMode !== 'card') return;
 
-      const expectedCashbox = pickExpectedCashbox(driver, payMode);
-      const expectedKey = normalizeCashboxKey(expectedCashbox);
-      const key = makeKey(date, customerId, driver, payMode);
+      const key = makeSystemKey(date, customerId, payMode);
       const row = upsertSystem(key, {
         date,
         customerId,
         customer: r?.contName,
-        driver,
         payMode,
-        expectedCashbox,
       });
       const cName = String(r?.contName || '').trim();
       if (cName && (!row.customer || row.customer.startsWith('ID '))) row.customer = cName;
-      if (!row.expectedCashbox && expectedCashbox) row.expectedCashbox = expectedCashbox;
       row.totalAmount += amount;
-      row.cashboxes.add(cashbox || '-');
-      if (!actualKey) {
-        row.noCashboxAmount += amount;
-      } else if (expectedKey && actualKey === expectedKey) {
-        row.matchedAmount += amount;
-      } else if (expectedKey) {
-        row.wrongCashboxAmount += amount;
-      } else {
-        // Biriktirilmagan holatda sistem summa ko'rinsin.
-        row.matchedAmount += amount;
-      }
+      const cashboxKey = normalizeCashboxKey(cashbox) || '-';
+      row.cashboxAmounts.set(cashboxKey, (row.cashboxAmounts.get(cashboxKey) || 0) + amount);
+      row.cashboxNames.add(cashbox || '-');
     });
 
     return Array.from(archiveMap.values()).map((a, idx) => {
-      const s = systemMap.get(a.key);
+      const s = systemMap.get(makeSystemKey(a.date, a.customerId, a.payMode));
       const archiveAmount = Number(a.archiveAmount || 0);
-      const matchedAmount = Number(s?.matchedAmount || 0);
-      const wrongCashboxAmount = Number(s?.wrongCashboxAmount || 0);
       const systemAmount = Number(s?.totalAmount || 0);
-      const expectedCashbox = String(a.expectedCashbox || s?.expectedCashbox || '').trim();
+      const expectedCashbox = String(a.expectedCashbox || '').trim();
+      const expectedKey = normalizeCashboxKey(expectedCashbox);
+      const matchedAmount = expectedKey
+        ? Number(s?.cashboxAmounts?.get(expectedKey) || 0)
+        : 0;
+      const wrongCashboxAmount = Math.max(0, systemAmount - matchedAmount);
       const diff = archiveAmount - matchedAmount;
 
       let status = 'OK';
       if (!expectedCashbox) {
         status = 'Kassa biriktirilmagan';
-      } else if (matchedAmount <= 0.0001 && (wrongCashboxAmount > 0.0001 || Number(s?.noCashboxAmount || 0) > 0.0001)) {
+      } else if (matchedAmount <= 0.0001 && systemAmount > 0.0001) {
         status = 'Kassa mos emas';
       } else if (matchedAmount <= 0.0001) {
         status = 'Sistemada pul topilmadi';
@@ -8093,7 +8107,7 @@ function Reports({
         driver: String(a.driver || '-').trim() || '-',
         payType: String(a.payMode || '') === 'card' ? 'Karta' : 'Naqt',
         expectedCashbox: expectedCashbox || '-',
-        systemCashbox: s ? Array.from(s.cashboxes || []).filter(Boolean).join(', ') || '-' : '-',
+        systemCashbox: s ? Array.from(s.cashboxNames || []).filter(Boolean).join(', ') || '-' : '-',
         archiveAmount,
         systemAmount,
         matchedSystemAmount: matchedAmount,
@@ -9603,10 +9617,8 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
   }, [D?.customers]);
   const waterOrderRows = useMemo(
     () => (D?.rawOrders || []).filter((o) =>
-      isWaterProduct(o?.product) &&
       isOrderDoc(o?.docType) &&
-      !isCancelledStatus(o?.status) &&
-      isMainWarehouseLabel(o?.warehouse)
+      isMonthlyWaterSalesRow(o)
     ),
     [D?.rawOrders]
   );
@@ -10010,6 +10022,85 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
     if (!out.length) out.push('Asosiy ko‘rsatkichlar yaxshi. Hozirgi tempni saqlab, operatorlar orasida eng yaxshi amaliyotni ulashing.');
     return out;
   }, [monthPlanWater, forecastPlanGap, remainingDays, repeatRate30, staleCustomers.length, debtCustomerCount]);
+
+  if (showCoreAnalytics) {
+    return (
+      <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
+        <div className="card" style={{padding:12}}>
+          <div style={{fontWeight:700,marginBottom:8}}>Tavsiyalar</div>
+          <div style={{display:'grid',gap:8}}>
+            {recommendations.map((msg, i) => (
+              <div key={`rec_only_${i}`} style={{fontSize:12,color:'var(--t2)',background:'var(--s2)',border:'1px solid var(--b2)',borderRadius:8,padding:'8px 10px'}}>
+                {i + 1}. {msg}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (showBloggerAnalytics) {
+    return (
+      <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
+        <div className="card" style={{padding:0,overflow:'hidden'}}>
+          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+            <div style={{fontWeight:700}}>Blogerlar nazorati</div>
+            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+              <span className="tag">Oy: {formatMonthShort(bloggerLatestMonth)}</span>
+              <span className="tag">Jami: <strong style={{color:'var(--t1)'}}>{fmt(bloggerAgreementSummary.total)}</strong></span>
+              <span className="tag">Aktiv: <strong style={{color:'var(--bl)'}}>{fmt(bloggerAgreementSummary.active)}</strong></span>
+              <a className="btn btn-gh btn-sm" href={BLOGGER_SHEET_URL} target="_blank" rel="noreferrer">Sheet</a>
+            </div>
+          </div>
+          <div style={{overflow:'auto',maxHeight:'72vh'}}>
+            {bloggerLoading ? (
+              <div style={{padding:16,color:'var(--t3)',fontSize:12}}>Blogerlar varaqi yuklanmoqda...</div>
+            ) : bloggerError ? (
+              <div style={{padding:16,color:'var(--rd)',fontSize:12}}>{bloggerError}</div>
+            ) : (
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                    <th>Bloger</th>
+                    <th>Insta nik</th>
+                    <th>Status</th>
+                    <th style={{textAlign:'right'}}>Reja S/R</th>
+                    <th style={{textAlign:'right'}}>Fakt S/R</th>
+                    <th style={{textAlign:'right'}}>Kelgan mijoz</th>
+                    <th style={{textAlign:'right'}}>Suv (oy)</th>
+                    <th style={{textAlign:'right'}}>Biriktirilgan</th>
+                    <th>Holat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bloggerAgreementRows.length === 0 ? (
+                    <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Blogerlar ma'lumoti topilmadi</td></tr>
+                  ) : bloggerAgreementRows.map((r, i) => (
+                    <tr key={`blogger_single_${r.nickNorm || r.name}_${i}`}>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
+                      <td>{r.name}</td>
+                      <td style={{fontFamily:'var(--mono)'}}>{r.nick || '-'}</td>
+                      <td>{r.status || '-'}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}/{fmt(r.planReel)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.storyFact)}/{fmt(r.reelFact)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.customerFact)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.waterFact)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.linkedCustomerCount)}</td>
+                      <td style={{color:r.onTrack ? 'var(--gr)' : 'var(--rd)'}}>
+                        {r.isActiveDeal ? (r.onTrack ? "Kelishuvda" : "Kelishuvdan ortda") : "Faol emas"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
