@@ -21,20 +21,33 @@ const EXCLUDED_Z_CATEGORIES = [
   'uos',
   'rasxod',
   'rasxodnik',
+  'расход',
+  'расходник',
   'postavshik',
+  'поставщик',
   'personal',
+  'персонал',
   'dolg',
+  'долг',
   'vip',
   'kuler',
+  'кулер',
   'ofis',
+  'офис',
+  'ahmad choy',
+  'ahmad tea',
 ];
 const isAllowedAA = (v) => {
   const s = String(v || '').trim().toLowerCase();
   return s === '' || s.includes(ALLOWED_AA_KEYWORD);
 };
 const isExcludedZCategory = (v) => {
-  const s = String(v || '').trim().toLowerCase();
-  return EXCLUDED_Z_CATEGORIES.some((k) => s === k);
+  const s = normalizeMatchText(v).replace(/\s+/g, ' ').trim();
+  if (!s) return false;
+  return EXCLUDED_Z_CATEGORIES.some((k) => {
+    const key = normalizeMatchText(k).replace(/\s+/g, ' ').trim();
+    return key && (s === key || s.includes(key) || key.includes(s));
+  });
 };
 const normCurrency = (v) => {
   const s = String(v || '').trim().toUpperCase();
@@ -2024,7 +2037,7 @@ const ensureYandexLoaded = () => {
             window.ymaps.ready(() => resolve(window.ymaps));
             return;
           }
-          if (attempt >= 100) {
+          if (attempt >= 400) {
             fail(new Error('Yandex Maps global topilmadi'));
             return;
           }
@@ -2035,7 +2048,10 @@ const ensureYandexLoaded = () => {
       const existing = document.getElementById(YMAPS_JS_ID);
       if (existing) {
         if (existing.getAttribute('data-loaded') === '1' || window.ymaps?.Map) complete();
-        else existing.addEventListener('load', complete, { once: true });
+        else {
+          existing.addEventListener('load', complete, { once: true });
+          setTimeout(complete, 120);
+        }
         return;
       }
       const script = document.createElement('script');
@@ -2055,7 +2071,7 @@ const ensureYandexLoaded = () => {
   });
   return ymapsLoadPromise;
 };
-function GeoMapPanel({ points = [], selectedId = '', onPick = () => {}, height = 420 }) {
+function GeoMapPanel({ points = [], selectedId = '', onPick = () => {}, height = 420, focusPoint = null }) {
   const hostRef = useRef(null);
   const mapRef = useRef(null);
   const onPickRef = useRef(onPick);
@@ -2099,7 +2115,24 @@ function GeoMapPanel({ points = [], selectedId = '', onPick = () => {}, height =
           map.geoObjects.add(marker);
         });
 
-        if (!valid.length) {
+        const fp = (focusPoint && isValidGeoPoint(focusPoint?.lat, focusPoint?.lng))
+          ? { lat: Number(focusPoint.lat), lng: Number(focusPoint.lng), label: String(focusPoint.label || '').trim() || 'Tanlangan nuqta' }
+          : null;
+        if (fp) {
+          const marker = new ymaps.Placemark(
+            [fp.lat, fp.lng],
+            { hintContent: fp.label },
+            {
+              iconLayout: 'default#image',
+              iconImageHref: MAP_PIN_URI.on,
+              iconImageSize: [32, 42],
+              iconImageOffset: [-16, -42],
+              zIndex: 1200,
+            }
+          );
+          map.geoObjects.add(marker);
+          map.setCenter([fp.lat, fp.lng], 15, { duration: 0 });
+        } else if (!valid.length) {
           map.setCenter([41.311081, 69.240562], 11, { duration: 0 });
         } else if (valid.length === 1) {
           map.setCenter([Number(valid[0].lat), Number(valid[0].lng)], 14, { duration: 0 });
@@ -2123,7 +2156,7 @@ function GeoMapPanel({ points = [], selectedId = '', onPick = () => {}, height =
         setErr(String(e?.message || e || 'Xarita yuklanmadi'));
       });
     return () => { cancelled = true; };
-  }, [points, selectedId]);
+  }, [points, selectedId, focusPoint]);
 
   useEffect(() => () => {
     if (mapRef.current) {
@@ -2272,6 +2305,41 @@ const detectPaymentMode = (...vals) => {
     return 'cash';
   }
   return '';
+};
+const isCustomerToCustomerTransfer = (...vals) => {
+  const t = normalizeMatchText(vals.filter(Boolean).join(' '));
+  if (!t) return false;
+  const checks = [
+    'мijozdan mijozga',
+    'mijozdan mijozga',
+    'между клиентами',
+    'клиент клиент',
+    'klient klient',
+    'customer to customer',
+    'perevod',
+    'перевод',
+    'perekidka',
+    'перекидка',
+    'perebroska',
+    'переброска',
+  ];
+  return checks.some((x) => t.includes(x));
+};
+const pickBestOrderDate = (...vals) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const futureLimit = new Date(today);
+  futureLimit.setDate(futureLimit.getDate() + 3);
+  const candidates = vals
+    .map((v) => ({ raw: String(v || '').trim(), d: toDate(v) }))
+    .filter((x) => x.raw && x.d)
+    .filter((x) => x.d <= futureLimit);
+  if (!candidates.length) {
+    const fallback = vals.find((v) => toDate(v));
+    return String(fallback || '').trim();
+  }
+  candidates.sort((a, b) => b.d - a.d);
+  return candidates[0].raw;
 };
 const isMonthlyWaterSalesRow = (row, targetMonth = '') => {
   if (!row) return false;
@@ -2721,7 +2789,7 @@ function processAll(mainData) {
       const uniqueId = String(r[17] || r[18] || '').trim();
       const agent = pickFirstBy([r[21], r[20], r[18]], (v) => String(v || '').trim().length > 0);
       const delivPerson = pickFirstBy([r[23], r[24], r[22]], (v) => String(v || '').trim().length > 0); // X
-      const orderDate = pickFirstBy([r[22], r[24], r[23], r[21], r[20]], (v) => !!toDate(v)); // W -> Y fallback
+      const orderDate = pickBestOrderDate(r[22], r[24], r[23], r[21], r[20]); // W -> Y fallback (future-shift himoya)
       const warehouse = pickFirstBy([r[19], r[20], r[18], r[16], r[25]], (v) => isLikelyWarehouseName(v));
       const mId = normId(pickFirstBy([r[29], r[30], r[28], r[27]], (v) => String(v || '').trim().length > 0));
       const note = pickFirstBy(
@@ -3527,7 +3595,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3536,7 +3604,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3545,7 +3613,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'all',
     role: 'admin',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
     ui: { theme:'dark' },
     company: { canSwitch:true, default:'murodbaxsh' },
   },
@@ -4374,7 +4442,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     [customers]
   );
   const nonAhmadteaNonZ = useMemo(
-    () => nonAhmadtea.filter((c) => !isExcludedZCategory(c.source)),
+    () => nonAhmadtea.filter((c) => !isExcludedZCategory(c.source) && !isExcludedMerchant(c.source || '')),
     [nonAhmadtea]
   );
   const activeBase = useMemo(
@@ -4399,7 +4467,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
       return nonAhmadtea.filter((c) => isNameInactiveByPrefix(c.name));
     }
     if (segment === 'other_customers') {
-      return nonAhmadtea.filter((c) => isExcludedZCategory(c.source) && !isNameInactiveByPrefix(c.name));
+      return nonAhmadtea.filter((c) => isExcludedZCategory(c.source));
     }
     // Hamma mijozlar: public.view_merchants dagi hamma mijoz.
     return customers;
@@ -4790,6 +4858,8 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
   const [selectedSO, setSelectedSO] = useState(null);
   const [mapSelected, setMapSelected] = useState(null);
   const [customerDet, setCustomerDet] = useState(null);
+  const [mapTrackOpen, setMapTrackOpen] = useState(false);
+  const [mapTrackFocusKey, setMapTrackFocusKey] = useState('');
 
   const districtById = useMemo(() => {
     const m = {};
@@ -4894,6 +4964,7 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
           location: String(r.location || '').trim(),
           lat,
           lng,
+          tracePoints: [],
           _enteredAt: String(r.enteredAt || '').trim(),
         });
       }
@@ -4919,6 +4990,18 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
         g.delivPerson = driverName || '-';
         g.agent = driverName || '-';
       }
+      g.tracePoints.push({
+        key: `${String(r.uid || '').trim()}__${type}__${lineQty}__${String(r.enteredAt || '').trim()}`,
+        enteredAt: String(r.enteredAt || '').trim(),
+        date: dateKey || '',
+        lat: isValidGeoPoint(r.lat, r.lng) ? Number(r.lat) : 0,
+        lng: isValidGeoPoint(r.lat, r.lng) ? Number(r.lng) : 0,
+        product: String(product || '-').trim() || '-',
+        qty: lineQty,
+        payAmount: pay,
+        note: String(r.note || '').trim(),
+        kind: type === 'return' ? 'Vozvrat' : 'Zakaz',
+      });
     };
     rows.forEach((r) => {
       const qtyGiven = Math.abs(toNum(r.qtyGiven));
@@ -4934,8 +5017,17 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
         return String(b.orderDate || '').localeCompare(String(a.orderDate || ''));
       })
       .map((g) => {
+        const tracePoints = Array.isArray(g.tracePoints) ? g.tracePoints.slice().sort((a, b) => {
+          const da = toDate(a.enteredAt || a.date);
+          const db = toDate(b.enteredAt || b.date);
+          if (da && db) return db - da;
+          return String(b.enteredAt || '').localeCompare(String(a.enteredAt || ''));
+        }) : [];
         const { _enteredAt, ...row } = g;
-        return row;
+        return {
+          ...row,
+          tracePoints,
+        };
       });
   }, [rawArchiveSheetRows, customerById, resolveDriverName]);
 
@@ -5059,6 +5151,40 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
     const ok = mapList.some((g) => String(g.soNum || '') === String(mapSelected.soNum || ''));
     if (!ok) setMapSelected(null);
   }, [mapList, mapSelected]);
+  useEffect(() => {
+    if (!mapSelected) {
+      setMapTrackFocusKey('');
+      return;
+    }
+    const points = Array.isArray(mapSelected.tracePoints) ? mapSelected.tracePoints : [];
+    if (!points.length) {
+      setMapTrackFocusKey('');
+      return;
+    }
+    const firstKey = String(points[0]?.key || '').trim();
+    if (firstKey) setMapTrackFocusKey((prev) => prev || firstKey);
+  }, [mapSelected]);
+  const mapTrackRows = useMemo(() => {
+    if (dataMode !== 'real' || !mapSelected) return [];
+    const arr = Array.isArray(mapSelected.tracePoints) ? mapSelected.tracePoints : [];
+    return arr
+      .filter((x) => isValidGeoPoint(x?.lat, x?.lng) || String(x?.enteredAt || '').trim() || String(x?.note || '').trim())
+      .sort((a, b) => {
+        const da = toDate(a.enteredAt || a.date);
+        const db = toDate(b.enteredAt || b.date);
+        if (da && db) return db - da;
+        return String(b.enteredAt || '').localeCompare(String(a.enteredAt || ''));
+      });
+  }, [dataMode, mapSelected]);
+  const mapTrackFocused = useMemo(
+    () => mapTrackRows.find((x) => String(x.key || '').trim() === String(mapTrackFocusKey || '').trim()) || null,
+    [mapTrackRows, mapTrackFocusKey]
+  );
+  useEffect(() => {
+    if (dataMode === 'real') return;
+    setMapTrackOpen(false);
+    setMapTrackFocusKey('');
+  }, [dataMode]);
 
   const exportOrders = () => {
     exportAoaExcel({
@@ -5239,37 +5365,91 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
               {dataMode === 'real' ? 'Real arxiv lokatsiyasi' : 'Mijoz lokatsiyasi'}
             </span>
           </div>
-          <GeoMapPanel
-            points={mapPoints}
-            selectedId={mapSelected?.soNum || ''}
-            onPick={(p) => setMapSelected(p?.row || null)}
-            height="100%"
-          />
-          {mapSelected && (
-            <div className="aq-map-popup">
-              <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}>
-                <div style={{minWidth:260}}>
-                  <div style={{fontWeight:700}}>{mapSelected.contName}</div>
-                  <div style={{fontSize:11,color:'var(--t3)'}}>Sana: {fmtD(mapSelected.orderDate)} | Dostavchik: {mapSelected.delivPerson || '-'}</div>
-                  <div style={{fontSize:11,color:'var(--t3)'}}>Miqdor: {fmt(mapSelected.totalQty)} ta | Lokatsiya: {mapSelected.location || '-'}</div>
+          <div style={{display:'flex',gap:8,flex:1,minHeight:0}}>
+            <div style={{position:'relative',flex:1,minWidth:0}}>
+              <GeoMapPanel
+                points={mapPoints}
+                selectedId={mapSelected?.soNum || ''}
+                onPick={(p) => setMapSelected(p?.row || null)}
+                focusPoint={mapTrackFocused ? {
+                  lat: mapTrackFocused.lat,
+                  lng: mapTrackFocused.lng,
+                  label: `${fmtD(mapTrackFocused.enteredAt || mapTrackFocused.date)} | ${mapTrackFocused.kind || ''}`,
+                } : null}
+                height="100%"
+              />
+              {mapSelected && (
+                <div className="aq-map-popup">
+                  <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}>
+                    <div style={{minWidth:260}}>
+                      <div style={{fontWeight:700}}>{mapSelected.contName}</div>
+                      <div style={{fontSize:11,color:'var(--t3)'}}>Sana: {fmtD(mapSelected.orderDate)} | Dostavchik: {mapSelected.delivPerson || '-'}</div>
+                      <div style={{fontSize:11,color:'var(--t3)'}}>Miqdor: {fmt(mapSelected.totalQty)} ta</div>
+                    </div>
+                    <div style={{display:'flex',gap:8}}>
+                      <button className="btn btn-gh btn-sm" onClick={()=>setSelectedSO(mapSelected)}>Zakaz tafsiloti</button>
+                      <button
+                        className="btn btn-bl btn-sm"
+                        onClick={() => {
+                          const c = customerById[String(mapSelected.mId || '').trim()];
+                          if (c) setCustomerDet(c);
+                        }}
+                        disabled={!customerById[String(mapSelected.mId || '').trim()]}
+                      >
+                        Sverka
+                      </button>
+                      <button className="btn btn-gh btn-sm" onClick={() => setMapSelected(null)}>Yopish</button>
+                    </div>
+                  </div>
                 </div>
-                <div style={{display:'flex',gap:8}}>
-                  <button className="btn btn-gh btn-sm" onClick={()=>setSelectedSO(mapSelected)}>Zakaz tafsiloti</button>
-                  <button
-                    className="btn btn-bl btn-sm"
-                    onClick={() => {
-                      const c = customerById[String(mapSelected.mId || '').trim()];
-                      if (c) setCustomerDet(c);
-                    }}
-                    disabled={!customerById[String(mapSelected.mId || '').trim()]}
-                  >
-                    Sverka
-                  </button>
-                  <button className="btn btn-gh btn-sm" onClick={() => setMapSelected(null)}>Yopish</button>
-                </div>
-              </div>
+              )}
             </div>
-          )}
+            {dataMode === 'real' && (
+              <div className="card" style={{width:mapTrackOpen?320:42,minWidth:mapTrackOpen?320:42,transition:'width .18s',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+                <button
+                  className="btn btn-gh btn-sm"
+                  style={{margin:6,alignSelf:mapTrackOpen?'flex-end':'center',minWidth:30,padding:'4px 8px'}}
+                  onClick={()=>setMapTrackOpen((v)=>!v)}
+                  title={mapTrackOpen ? 'Trekingni yopish' : 'Trekingni ochish'}
+                >
+                  {mapTrackOpen ? '>' : '<'}
+                </button>
+                {mapTrackOpen && (
+                  <div style={{padding:'0 8px 8px',display:'grid',gap:6,overflow:'auto',maxHeight:'100%'}}>
+                    <div style={{fontSize:12,fontWeight:700}}>Treking (vaqt bo'yicha)</div>
+                    {!mapSelected ? (
+                      <div style={{fontSize:11,color:'var(--t3)'}}>Avval xaritada mijozni tanlang.</div>
+                    ) : mapTrackRows.length === 0 ? (
+                      <div style={{fontSize:11,color:'var(--t3)'}}>Treking ma'lumoti topilmadi.</div>
+                    ) : mapTrackRows.map((tp, i) => {
+                      const active = String(tp.key || '') === String(mapTrackFocusKey || '');
+                      return (
+                        <button
+                          key={`${tp.key || i}_${i}`}
+                          className="btn btn-gh btn-sm"
+                          onClick={() => setMapTrackFocusKey(String(tp.key || ''))}
+                          style={{
+                            textAlign:'left',
+                            whiteSpace:'normal',
+                            borderColor:active?'var(--bl)':'var(--b2)',
+                            background:active?'var(--bl3)':'var(--s1)',
+                            color:active?'var(--bl)':'var(--t2)',
+                            display:'block',
+                            width:'100%',
+                            padding:'7px 8px',
+                          }}
+                        >
+                          <div style={{fontSize:11,fontWeight:700}}>{fmtD(tp.enteredAt || tp.date)} {String(tp.enteredAt || '').trim() ? `| ${String(tp.enteredAt).slice(11,16)}` : ''}</div>
+                          <div style={{fontSize:11,opacity:.95}}>{tp.kind}: {tp.product} ({fmt(tp.qty)} ta)</div>
+                          {tp.note ? <div style={{fontSize:10,opacity:.8,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{tp.note}</div> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -5323,8 +5503,9 @@ function Kassa({ D }) {
   };
   const isHiddenKassaRow = (kassaName) => normalizeCashboxKey(kassaName).replace(/\s+/g, '').includes('uoskassa');
 
-  const cashboxForStats = cashbox.filter((c) => !isExcludedKassaForStats(c?.kassa));
-  const cashboxForList = cashbox.filter((c) => !isHiddenKassaRow(c?.kassa));
+  const cashboxCore = cashbox.filter((c) => !isCustomerToCustomerTransfer(c?.opType, c?.note, c?.contName));
+  const cashboxForStats = cashboxCore.filter((c) => !isExcludedKassaForStats(c?.kassa));
+  const cashboxForList = cashboxCore.filter((c) => !isHiddenKassaRow(c?.kassa));
 
   const pays = cashboxForStats.filter((c)=>isPaymentFromCounterparty(c.opType));
   const spends = cashboxForStats.filter((c)=>isPaymentToCounterparty(c.opType));
@@ -7009,7 +7190,7 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
   );
 }
 
-function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUser, company='murodbaxsh' }) {
+function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUser, company='murodbaxsh', currentAccess=null }) {
   const [tab, setTab] = useState('qarz');
   const [search, setSearch] = useState('');
   const [debtFilterOpen, setDebtFilterOpen] = useState(false);
@@ -7022,7 +7203,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
   const [pickMode, setPickMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState({});
   const [kulerMonthsCfg, setKulerMonthsCfg] = useState(() => S.get('aq-kuler-months', {}));
-  const allowKulerTab = company !== 'ahmadtea';
+  const allowKulerTab = normalizeCompanyKey(company) !== 'ahmadtea' && ((currentAccess?.visible?.doljniki_kuler ?? true) === true);
   useEffect(() => {
     if (allowKulerTab) return;
     if (tab === 'kuler') setTab('qarz');
@@ -9482,103 +9663,79 @@ const formatMonthShort = (mk) => {
   const m = String(mk || '').match(/^(\d{4})-(\d{2})$/);
   return m ? `${m[2]}.${m[1]}` : (mk || '-');
 };
+const BLOGGER_COL = {
+  NAME: 1,          // B
+  NICK: 2,          // C
+  PHONE: 3,         // D
+  CONTRACT_TERM: 4, // E
+  CONTRACT_DATE: 5, // F
+  PLAN_WATER: 6,    // G
+  PLAN_STORY: 7,    // H
+  PLAN_REEL: 8,     // I
+  STATUS: 9,        // J
+  FACT_START: 34,   // AI
+  FACT_STEP: 3,     // [story, reel, ignored]
+};
+const parseBloggerMonthLabel = (...vals) => {
+  for (const v of vals) {
+    const mk = monthKeyFromLooseText(v);
+    if (mk) return mk;
+  }
+  return '';
+};
 const parseBloggerSheetRows = (rows = []) => {
-  if (!Array.isArray(rows) || rows.length < 2) return { items: [], months: [] };
-
-  const headerRowIndex = rows.findIndex((r = []) => {
-    const row = Array.isArray(r) ? r : [];
-    return row.some((cell) => {
-      const t = normText(cell);
-      return t.includes('insta') || t.includes('nik') || t === 'isim' || t.includes('status');
-    });
-  });
-  if (headerRowIndex < 0) return { items: [], months: [] };
-
-  const topRow = rows[headerRowIndex - 1] || [];
-  const headerRow = rows[headerRowIndex] || [];
-  const colCount = rows.reduce(
-    (mx, r) => Math.max(mx, Array.isArray(r) ? r.length : 0),
-    Math.max(topRow.length, headerRow.length)
-  );
-
-  const hNorm = Array.from({ length: colCount }, (_, i) => normText(headerRow[i]));
-  const tNorm = Array.from({ length: colCount }, (_, i) => normText(topRow[i]));
-  const findCol = (patterns = []) => {
-    const checks = patterns.map((p) => normText(p));
-    for (let i = 0; i < colCount; i += 1) {
-      const h = hNorm[i] || '';
-      const t = tNorm[i] || '';
-      if (checks.some((p) => h.includes(p) || t.includes(p))) return i;
-    }
-    return -1;
-  };
-
-  const colName = (() => { const v = findCol(['isim', 'ism']); return v >= 0 ? v : 1; })();      // B
-  const colNick = (() => { const v = findCol(['insta', 'nik']); return v >= 0 ? v : 2; })();      // C
-  const colPhone = (() => { const v = findCol(['tel', 'telefon']); return v >= 0 ? v : 3; })();   // D
-  const colStatus = (() => { const v = findCol(['status']); return v >= 0 ? v : 9; })();          // J
-  const colContractTerm = findCol(['dagavor', 'dogovor', 'kelishuv']);
-  const colContractDate = findCol(['dagavor data', 'dogovor data', 'kelishuv sana', 'data']);
-  const colPlanWater = findCol(['oylik suv', 'suv istemol', 'water plan']);
-  const colPlanStory = findCol(['oylik istora', 'oylik historia', 'story']);
-  const colPlanReel = findCol(['oylik rils', 'oylik reels', 'reels', 'rils']);
-
-  const monthByCol = Array(colCount).fill('');
+  if (!Array.isArray(rows) || rows.length < 3) return { items: [], months: [] };
+  const top0 = Array.isArray(rows[0]) ? rows[0] : [];
+  const top1 = Array.isArray(rows[1]) ? rows[1] : [];
+  const dataRows = rows.slice(2);
+  const colCount = rows.reduce((mx, r) => Math.max(mx, Array.isArray(r) ? r.length : 0), 0);
+  const monthTriples = [];
   let activeMonth = '';
-  for (let i = 0; i < colCount; i += 1) {
-    const monthMark = monthKeyFromLooseText(topRow[i]) || monthKeyFromLooseText(headerRow[i]);
-    if (monthMark) activeMonth = monthMark;
-    monthByCol[i] = activeMonth;
-  }
-
-  const metricByCol = Array(colCount).fill('');
-  for (let i = 0; i < colCount; i += 1) {
-    const marker = `${tNorm[i] || ''} ${hNorm[i] || ''}`.trim();
-    if (!marker) continue;
-    if (marker.includes('istor') || marker.includes('story')) metricByCol[i] = 'story';
-    else if (marker.includes('ril') || marker.includes('reel')) metricByCol[i] = 'reel';
-    else if ((marker.includes('kelgan') && marker.includes('mijoz')) || marker.includes('mijoz son')) metricByCol[i] = 'customers';
-    else if ((marker.includes('suv') || marker.includes('water')) && !marker.includes('oylik')) metricByCol[i] = 'water';
-  }
-
-  const pick = (row, idx) => (idx >= 0 ? row?.[idx] : '');
-  const months = new Set();
-  const items = [];
-
-  rows.slice(headerRowIndex + 1).forEach((r) => {
-    const row = Array.isArray(r) ? r : [];
-    const name = String(pick(row, colName) || '').trim();
-    const nickRaw = String(pick(row, colNick) || '').trim();
-    if (!name && !nickRaw) return;
-
-    const monthly = {};
-    for (let i = 0; i < colCount; i += 1) {
-      const mk = monthByCol[i];
-      const metric = metricByCol[i];
-      if (!mk || !metric) continue;
-      const raw = row[i];
-      if (raw == null || String(raw).trim() === '') continue;
-      const value = toNum(raw);
-      if (!monthly[mk]) monthly[mk] = { story: 0, reel: 0, customers: 0, water: 0 };
-      monthly[mk][metric] += value;
-      months.add(mk);
+  for (let col = BLOGGER_COL.FACT_START; col < colCount; col += BLOGGER_COL.FACT_STEP) {
+    let mk = '';
+    for (let off = 0; off <= 8 && !mk; off += 1) {
+      mk = parseBloggerMonthLabel(
+        top0[col - off], top1[col - off],
+        top0[col + off], top1[col + off],
+        top0[col + 1 - off], top1[col + 1 - off],
+        top0[col + 1 + off], top1[col + 1 + off]
+      );
     }
-
-    items.push({
-      name: name || '-',
-      nick: nickRaw,
-      nickNorm: normalizeNickToken(nickRaw),
-      phone: String(pick(row, colPhone) || '').trim(),
-      status: String(pick(row, colStatus) || '').trim(),
-      contractTerm: String(pick(row, colContractTerm) || '').trim(),
-      contractDate: toIsoDate(pick(row, colContractDate)),
-      planWater: Math.max(0, toNum(pick(row, colPlanWater))),
-      planStory: Math.max(0, toNum(pick(row, colPlanStory))),
-      planReel: Math.max(0, toNum(pick(row, colPlanReel))),
-      monthly,
-    });
-  });
-
+    if (mk) activeMonth = mk;
+    if (!activeMonth) continue;
+    monthTriples.push({ month: activeMonth, colStory: col, colReel: col + 1 });
+  }
+  const months = new Set(monthTriples.map((x) => x.month));
+  const items = dataRows
+    .map((r) => (Array.isArray(r) ? r : []))
+    .map((row) => {
+      const name = String(row[BLOGGER_COL.NAME] || '').trim();
+      const nickRaw = String(row[BLOGGER_COL.NICK] || '').trim();
+      if (!name && !nickRaw) return null;
+      const monthly = {};
+      monthTriples.forEach(({ month, colStory, colReel }) => {
+        if (!month) return;
+        const story = Math.max(0, toNum(row[colStory]));
+        const reel = Math.max(0, toNum(row[colReel]));
+        if (!monthly[month]) monthly[month] = { story: 0, reel: 0, customers: 0, water: 0 };
+        monthly[month].story += story;
+        monthly[month].reel += reel;
+      });
+      return {
+        name: name || '-',
+        nick: nickRaw,
+        nickNorm: normalizeNickToken(nickRaw),
+        phone: String(row[BLOGGER_COL.PHONE] || '').trim(),
+        status: String(row[BLOGGER_COL.STATUS] || '').trim(),
+        contractTerm: String(row[BLOGGER_COL.CONTRACT_TERM] || '').trim(),
+        contractDate: toIsoDate(row[BLOGGER_COL.CONTRACT_DATE]),
+        planWater: Math.max(0, toNum(row[BLOGGER_COL.PLAN_WATER])),
+        planStory: Math.max(0, toNum(row[BLOGGER_COL.PLAN_STORY])),
+        planReel: Math.max(0, toNum(row[BLOGGER_COL.PLAN_REEL])),
+        monthly,
+      };
+    })
+    .filter(Boolean);
   return {
     items,
     months: Array.from(months).sort((a, b) => a.localeCompare(b)),
@@ -9589,6 +9746,11 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
   const [bloggerSheetRows, setBloggerSheetRows] = useState([]);
   const [bloggerLoading, setBloggerLoading] = useState(false);
   const [bloggerError, setBloggerError] = useState('');
+  const [bloggerSection, setBloggerSection] = useState('current');
+  const [bloggerWorkMode, setBloggerWorkMode] = useState('worked');
+  const [bloggerSearch, setBloggerSearch] = useState('');
+  const [bloggerFilterOpen, setBloggerFilterOpen] = useState(false);
+  const [bloggerFilterState, setBloggerFilterState] = useState({});
   const showBloggerAnalytics = mode === 'bloggers';
   const showCoreAnalytics = !showBloggerAnalytics;
   const todayIso = useMemo(() => toIsoDate(new Date()), []);
@@ -9916,10 +10078,11 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
   }, [bonusDeliveredRows, nonDebtActiveIds, bloggerCustomerIds]);
   const bloggerAgreementRows = useMemo(() => {
     const isWorking = (status) => {
-      const s = normText(status);
+      const s = normalizeMatchText(status);
       if (!s) return true;
+      if (s.includes('ishlamadi')) return false;
+      if (s.includes('ishladi')) return true;
       return !(
-        s.includes('ishlamadi') ||
         s.includes('tugadi') ||
         s.includes("to'xta") ||
         s.includes('toxta') ||
@@ -10036,6 +10199,98 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
       })
       .slice(0, 24);
   }, [bloggerMapping, firstDeliveredMonthByCustomer, bloggerNameByNick]);
+  const bloggerArchiveRows = useMemo(() => {
+    const out = [];
+    bloggerAgreementRows.forEach((r) => {
+      Object.entries(r?.monthly || {}).forEach(([mk, fact]) => {
+        if (!mk) return;
+        const storyFact = Math.max(0, toNum(fact?.story));
+        const reelFact = Math.max(0, toNum(fact?.reel));
+        const planStory = Math.max(0, toNum(r?.planStory));
+        const planReel = Math.max(0, toNum(r?.planReel));
+        const onTrack = (planStory <= 0 || storyFact >= planStory) && (planReel <= 0 || reelFact >= planReel);
+        out.push({
+          month: mk,
+          name: r.name,
+          nick: r.nick,
+          status: r.status,
+          isActiveDeal: r.isActiveDeal,
+          planStory,
+          planReel,
+          storyFact,
+          reelFact,
+          linkedCustomerCount: r.linkedCustomerCount,
+          onTrack,
+        });
+      });
+    });
+    return out.sort((a, b) => (a.month === b.month ? String(a.name || '').localeCompare(String(b.name || ''), 'ru') : String(b.month || '').localeCompare(String(a.month || ''))));
+  }, [bloggerAgreementRows]);
+  const bloggerCurrentFilterColumns = useMemo(() => ([
+    { key:'name', label:'Bloger', type:'text' },
+    { key:'nick', label:'Insta nik', type:'text' },
+    { key:'status', label:'Status', type:'text' },
+    { key:'planStory', label:'Reja storis', type:'number' },
+    { key:'planReel', label:'Reja rils', type:'number' },
+    { key:'storyFact', label:'Joylangan storis', type:'number' },
+    { key:'reelFact', label:'Joylangan rils', type:'number' },
+    { key:'linkedCustomerCount', label:'Biriktirilgan mijoz', type:'number' },
+    { key:'onTrack', label:'Holat', type:'text', getValue:(r)=>r.onTrack?'Kelishuvda':'Ortda' },
+  ]), []);
+  const bloggerArchiveFilterColumns = useMemo(() => ([
+    { key:'month', label:'Oy', type:'date' },
+    { key:'name', label:'Bloger', type:'text' },
+    { key:'nick', label:'Insta nik', type:'text' },
+    { key:'status', label:'Status', type:'text' },
+    { key:'planStory', label:'Reja storis', type:'number' },
+    { key:'planReel', label:'Reja rils', type:'number' },
+    { key:'storyFact', label:'Joylangan storis', type:'number' },
+    { key:'reelFact', label:'Joylangan rils', type:'number' },
+    { key:'onTrack', label:'Holat', type:'text', getValue:(r)=>r.onTrack?'Kelishuvda':'Ortda' },
+  ]), []);
+  const bloggerActiveFilterColumns = bloggerSection === 'archive' ? bloggerArchiveFilterColumns : bloggerCurrentFilterColumns;
+  useEffect(() => {
+    setBloggerFilterState((prev) => ensureUniversalFilterState(bloggerActiveFilterColumns, prev));
+  }, [bloggerActiveFilterColumns]);
+  const bloggerRowsByMode = useMemo(() => {
+    const src = bloggerSection === 'archive' ? bloggerArchiveRows : bloggerAgreementRows;
+    return src.filter((r) => {
+      if (bloggerWorkMode === 'worked') return !!r.isActiveDeal;
+      if (bloggerWorkMode === 'not_worked') return !r.isActiveDeal;
+      return true;
+    });
+  }, [bloggerSection, bloggerArchiveRows, bloggerAgreementRows, bloggerWorkMode]);
+  const bloggerVisibleRows = useMemo(() => {
+    let rows = bloggerRowsByMode;
+    const q = String(bloggerSearch || '').trim().toLowerCase();
+    if (q) {
+      rows = rows.filter((r) =>
+        String(r?.name || '').toLowerCase().includes(q) ||
+        String(r?.nick || '').toLowerCase().includes(q) ||
+        String(r?.status || '').toLowerCase().includes(q) ||
+        String(r?.month || '').toLowerCase().includes(q)
+      );
+    }
+    return applyUniversalFilters(rows, bloggerActiveFilterColumns, bloggerFilterState);
+  }, [bloggerRowsByMode, bloggerSearch, bloggerActiveFilterColumns, bloggerFilterState]);
+  const bloggerFilterCount = useMemo(() => countUniversalFilters(bloggerFilterState), [bloggerFilterState]);
+  const exportBloggers = useCallback(() => {
+    const isArchive = bloggerSection === 'archive';
+    const rows = bloggerVisibleRows || [];
+    exportAoaExcel({
+      fileName: `Blogerlar_${isArchive ? 'Arxiv' : 'Asosiy'}_${new Date().toISOString().slice(0,10)}.xlsx`,
+      sheetName: isArchive ? 'BlogerlarArxiv' : 'BlogerlarAsosiy',
+      headers: isArchive
+        ? ['Oy', 'Bloger', 'Insta nik', 'Status', 'Reja storis', 'Reja rils', 'Joylangan storis', 'Joylangan rils', 'Holat']
+        : ['Bloger', 'Insta nik', 'Status', 'Reja storis', 'Reja rils', 'Joylangan storis', 'Joylangan rils', 'Biriktirilgan mijoz', 'Holat'],
+      columnTypes: isArchive
+        ? ['text', 'text', 'text', 'text', 'number', 'number', 'number', 'number', 'text']
+        : ['text', 'text', 'text', 'number', 'number', 'number', 'number', 'number', 'text'],
+      rows: isArchive
+        ? rows.map((r) => [formatMonthShort(r.month), r.name, r.nick || '-', r.status || '-', r.planStory, r.planReel, r.storyFact, r.reelFact, r.onTrack ? 'Kelishuvda' : 'Ortda'])
+        : rows.map((r) => [r.name, r.nick || '-', r.status || '-', r.planStory, r.planReel, r.storyFact, r.reelFact, r.linkedCustomerCount || 0, r.onTrack ? 'Kelishuvda' : 'Ortda']),
+    });
+  }, [bloggerSection, bloggerVisibleRows]);
   const recommendations = useMemo(() => {
     const out = [];
     if (monthPlanWater > 0 && forecastPlanGap > 0) {
@@ -10074,17 +10329,52 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
   if (showBloggerAnalytics) {
     return (
       <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
-        <div className="card" style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
-            <div style={{fontWeight:700}}>Blogerlar nazorati</div>
-            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-              <span className="tag">Oy: {formatMonthShort(bloggerLatestMonth)}</span>
-              <span className="tag">Jami: <strong style={{color:'var(--t1)'}}>{fmt(bloggerAgreementSummary.total)}</strong></span>
-              <span className="tag">Aktiv: <strong style={{color:'var(--bl)'}}>{fmt(bloggerAgreementSummary.active)}</strong></span>
-              <a className="btn btn-gh btn-sm" href={BLOGGER_SHEET_URL} target="_blank" rel="noreferrer">Sheet</a>
-            </div>
+        <div className="card" style={{padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
+          <div style={{fontWeight:700}}>Blogerlar nazorati</div>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <span className="tag">Oy: {formatMonthShort(bloggerLatestMonth)}</span>
+            <span className="tag">Jami: <strong style={{color:'var(--t1)'}}>{fmt(bloggerAgreementSummary.total)}</strong></span>
+            <span className="tag">Ishlidi: <strong style={{color:'var(--bl)'}}>{fmt(bloggerAgreementSummary.active)}</strong></span>
+            <span className="tag">Ortda: <strong style={{color:'var(--rd)'}}>{fmt(bloggerAgreementSummary.risk)}</strong></span>
+            <a className="btn btn-gh btn-sm" href={BLOGGER_SHEET_URL} target="_blank" rel="noreferrer">Sheet</a>
           </div>
-          <div style={{overflow:'auto',maxHeight:'72vh'}}>
+        </div>
+        <div className="card" style={{padding:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <div className="sb" style={{flex:'1 1 340px',minWidth:220}}>
+            <span style={{color:'var(--t3)'}}>Qidiruv</span>
+            <input placeholder="Bloger, nik, status..." value={bloggerSearch} onChange={(e)=>setBloggerSearch(e.target.value)} />
+          </div>
+          <div style={{position:'relative'}}>
+            <button className="btn btn-gh btn-sm" onClick={()=>setBloggerFilterOpen((v)=>!v)}>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+              </svg>
+              Filtr ({bloggerFilterCount})
+            </button>
+            <UniversalFilterPanel
+              open={bloggerFilterOpen}
+              title={bloggerSection === 'archive' ? "Bloger arxiv filtri" : "Bloger filtri"}
+              columns={bloggerActiveFilterColumns}
+              rows={bloggerRowsByMode}
+              state={bloggerFilterState}
+              setState={setBloggerFilterState}
+              onClose={()=>setBloggerFilterOpen(false)}
+              width={620}
+            />
+          </div>
+          <button className="btn btn-gr btn-sm" onClick={exportBloggers}>Excel</button>
+          <div className="tabs" style={{display:'inline-flex'}}>
+            <button className={`tab${bloggerWorkMode==='worked'?' on':''}`} onClick={()=>setBloggerWorkMode('worked')}>Ishlidi</button>
+            <button className={`tab${bloggerWorkMode==='not_worked'?' on':''}`} onClick={()=>setBloggerWorkMode('not_worked')}>Ishlamidi</button>
+            <button className={`tab${bloggerWorkMode==='all'?' on':''}`} onClick={()=>setBloggerWorkMode('all')}>Barchasi</button>
+          </div>
+          <div className="tabs" style={{display:'inline-flex'}}>
+            <button className={`tab${bloggerSection==='current'?' on':''}`} onClick={()=>setBloggerSection('current')}>Asosiy</button>
+            <button className={`tab${bloggerSection==='archive'?' on':''}`} onClick={()=>setBloggerSection('archive')}>Arxiv</button>
+          </div>
+        </div>
+        <div className="card" style={{padding:0,overflow:'hidden'}}>
+          <div style={{overflow:'auto',maxHeight:'58vh'}}>
             {bloggerLoading ? (
               <div style={{padding:16,color:'var(--t3)',fontSize:12}}>Blogerlar varaqi yuklanmoqda...</div>
             ) : bloggerError ? (
@@ -10092,41 +10382,102 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
             ) : (
               <table className="tbl">
                 <thead>
-                  <tr>
-                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                    <th>Bloger</th>
-                    <th>Insta nik</th>
-                    <th>Status</th>
-                    <th style={{textAlign:'right'}}>Reja S/R</th>
-                    <th style={{textAlign:'right'}}>Fakt S/R</th>
-                    <th style={{textAlign:'right'}}>Kelgan mijoz</th>
-                    <th style={{textAlign:'right'}}>Suv (oy)</th>
-                    <th style={{textAlign:'right'}}>Biriktirilgan</th>
-                    <th>Holat</th>
-                  </tr>
+                  {bloggerSection === 'archive' ? (
+                    <tr>
+                      <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                      <th>Oy</th>
+                      <th>Bloger</th>
+                      <th>Insta nik</th>
+                      <th>Status</th>
+                      <th style={{textAlign:'right'}}>Reja storis</th>
+                      <th style={{textAlign:'right'}}>Reja rils</th>
+                      <th style={{textAlign:'right'}}>Joylangan storis</th>
+                      <th style={{textAlign:'right'}}>Joylangan rils</th>
+                      <th>Holat</th>
+                    </tr>
+                  ) : (
+                    <tr>
+                      <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                      <th>Bloger</th>
+                      <th>Insta nik</th>
+                      <th>Status</th>
+                      <th style={{textAlign:'right'}}>Reja storis</th>
+                      <th style={{textAlign:'right'}}>Reja rils</th>
+                      <th style={{textAlign:'right'}}>Joylangan storis</th>
+                      <th style={{textAlign:'right'}}>Joylangan rils</th>
+                      <th style={{textAlign:'right'}}>Biriktirilgan mijoz</th>
+                      <th>Holat</th>
+                    </tr>
+                  )}
                 </thead>
                 <tbody>
-                  {bloggerAgreementRows.length === 0 ? (
-                    <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Blogerlar ma'lumoti topilmadi</td></tr>
-                  ) : bloggerAgreementRows.map((r, i) => (
-                    <tr key={`blogger_single_${r.nickNorm || r.name}_${i}`}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
-                      <td>{r.name}</td>
-                      <td style={{fontFamily:'var(--mono)'}}>{r.nick || '-'}</td>
-                      <td>{r.status || '-'}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}/{fmt(r.planReel)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.storyFact)}/{fmt(r.reelFact)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.customerFact)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.waterFact)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.linkedCustomerCount)}</td>
-                      <td style={{color:r.onTrack ? 'var(--gr)' : 'var(--rd)'}}>
-                        {r.isActiveDeal ? (r.onTrack ? "Kelishuvda" : "Kelishuvdan ortda") : "Faol emas"}
-                      </td>
-                    </tr>
+                  {bloggerVisibleRows.length === 0 ? (
+                    <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr>
+                  ) : bloggerVisibleRows.map((r, i) => (
+                    bloggerSection === 'archive' ? (
+                      <tr key={`blogger_ar_${r.month}_${r.nick || r.name}_${i}`}>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{formatMonthShort(r.month)}</td>
+                        <td>{r.name}</td>
+                        <td style={{fontFamily:'var(--mono)'}}>{r.nick || '-'}</td>
+                        <td>{r.status || '-'}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planReel)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.storyFact)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--pu)'}}>{fmt(r.reelFact)}</td>
+                        <td style={{color:r.onTrack ? 'var(--gr)' : 'var(--rd)'}}>{r.onTrack ? 'Kelishuvda' : 'Ortda'}</td>
+                      </tr>
+                    ) : (
+                      <tr key={`blogger_cur_${r.nickNorm || r.name}_${i}`}>
+                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
+                        <td>{r.name}</td>
+                        <td style={{fontFamily:'var(--mono)'}}>{r.nick || '-'}</td>
+                        <td>{r.status || '-'}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planReel)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.storyFact)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--pu)'}}>{fmt(r.reelFact)}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.linkedCustomerCount || 0)}</td>
+                        <td style={{color:r.onTrack ? 'var(--gr)' : 'var(--rd)'}}>{r.onTrack ? 'Kelishuvda' : 'Ortda'}</td>
+                      </tr>
+                    )
                   ))}
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+        <div className="card" style={{padding:0,overflow:'hidden'}}>
+          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Arxiv: Oylar bo'yicha umumiy bajarilish</div>
+          <div style={{overflow:'auto',maxHeight:'22vh'}}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Oy</th>
+                  <th style={{textAlign:'right'}}>Ishlidi bloger</th>
+                  <th style={{textAlign:'right'}}>Reja storis</th>
+                  <th style={{textAlign:'right'}}>Joylangan storis</th>
+                  <th style={{textAlign:'right'}}>Reja rils</th>
+                  <th style={{textAlign:'right'}}>Joylangan rils</th>
+                  <th>Holat</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bloggerMonthExecutionRows.length === 0 ? (
+                  <tr><td colSpan={7} style={{textAlign:'center',padding:16,color:'var(--t3)'}}>Arxiv ma'lumot topilmadi</td></tr>
+                ) : bloggerMonthExecutionRows.map((r, i) => (
+                  <tr key={`bmx_${r.month}_${i}`}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{formatMonthShort(r.month)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.activeCount)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.factStory)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planReel)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--pu)'}}>{fmt(r.factReel)}</td>
+                    <td style={{color:r.status==='Kelishuvda'?'var(--gr)':'var(--rd)'}}>{r.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -10710,7 +11061,14 @@ function SettingsPanel({
       fallback: true,
       children: obzvonNewPermSections.map((s) => ({ key: s.key, label: s.label, kind: 'visible', fallback: false })),
     },
-    { key: 'doljniki', label: 'Doljniki', fallback: true, children: [] },
+    {
+      key: 'doljniki',
+      label: 'Doljniki',
+      fallback: true,
+      children: [
+        { key: 'doljniki_kuler', label: 'Kuler nasiya', kind: 'visible', fallback: true },
+      ],
+    },
     {
       key: 'nazorat',
       label: 'Nazorat',
@@ -11906,11 +12264,16 @@ export default function App() {
           if (idx > 0) rowsToSend = rowsWithStableId.slice(0, idx);
           else if (idx === 0) rowsToSend = [];
         } else {
-          rowsToSend = rowsWithStableId.filter((r) => {
-            const rid = String(r.rid || r._rid || '').trim();
-            const ts = String(r.updatedAt || '').trim() || '0';
-            return String(exportedMap[rid] || '') !== ts;
-          });
+          // Sheet bo'sh yoki reset qilingan bo'lsa, local mapga qaramay to'liq qayta yuboramiz.
+          if (Number(lastInfo.lastStableId || 0) <= 0) {
+            rowsToSend = rowsWithStableId;
+          } else {
+            rowsToSend = rowsWithStableId.filter((r) => {
+              const rid = String(r.rid || r._rid || '').trim();
+              const ts = String(r.updatedAt || '').trim() || '0';
+              return String(exportedMap[rid] || '') !== ts;
+            });
+          }
         }
       }
       if (!rowsToSend.length) {
@@ -13230,6 +13593,7 @@ export default function App() {
                     onAddToObzvon={addObzvonRows}
                     currentUser={effectiveUser}
                     company={activeCompany}
+                    currentAccess={currentAccess}
                   />
                 )}
                 {page==='reports' && canViewPage('reports') && (
