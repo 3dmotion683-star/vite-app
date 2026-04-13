@@ -1698,6 +1698,10 @@ const buildBasketArchiveDifference = ({
     if (shouldSkipDriver(driver, r)) return;
     if (!canSeeAll && driver && driver !== '-' && String(driver || '').trim().toLowerCase() !== String(currentUserNorm || '').trim().toLowerCase()) return;
 
+    const product = useReturnMode ? String(r?.productTaken || '').trim() : String(r?.productGiven || '').trim();
+    const qty = useReturnMode ? Math.abs(toNum(r?.qtyTaken)) : Math.abs(toNum(r?.qtyGiven));
+    if (useReturnMode && !product && qty <= 0.0001) return; // Arxivda return tanlanmagan bo'lsa, return nazoratiga qo'shilmaydi
+
     const key = `${date}__${customerId}`;
     const a = ensureBucket(archive, key, {
       date,
@@ -1707,8 +1711,6 @@ const buildBasketArchiveDifference = ({
     if (!a.customer) a.customer = String(r?.customer || '').trim() || `ID ${customerId}`;
     if (driver) a.drivers.add(driver);
 
-    const product = useReturnMode ? String(r?.productTaken || '').trim() : String(r?.productGiven || '').trim();
-    const qty = useReturnMode ? Math.abs(toNum(r?.qtyTaken)) : Math.abs(toNum(r?.qtyGiven));
     const productKey = normalizeControlProductKey(product);
     addProduct(a, productKey, product, qty);
     if (productKey && qty > 0.0001) a.totalQty += qty;
@@ -2700,7 +2702,7 @@ function processAll(mainData) {
       const uniqueId = String(r[17] || r[18] || '').trim();
       const agent = pickFirstBy([r[21], r[20], r[18]], (v) => String(v || '').trim().length > 0);
       const delivPerson = pickFirstBy([r[23], r[24], r[22]], (v) => String(v || '').trim().length > 0); // X
-      const orderDate = pickFirstBy([r[22], r[24], r[23], r[21], r[20]], (v) => !!toDate(v)); // W
+      const orderDate = pickFirstBy([r[24], r[22], r[23], r[21], r[20]], (v) => !!toDate(v)); // Y -> W fallback
       const warehouse = pickFirstBy([r[19], r[20], r[18], r[16], r[25]], (v) => isLikelyWarehouseName(v));
       const mId = normId(pickFirstBy([r[29], r[30], r[28], r[27]], (v) => String(v || '').trim().length > 0));
       const note = pickFirstBy(
@@ -7431,7 +7433,7 @@ function Reports({
     return (rawOrders || []).filter((o) => {
       if (monthKey(o?.orderDate) !== currentMonth) return false;
       if (isVirtualWarehouseLabel(o?.warehouse)) return false;
-      if (normText(o?.status) === 'отменено') return false;
+      if (normalizeMatchText(o?.status).includes('отменено')) return false;
       const cat = normalizeMatchText(o?.cat).replace(/\s+/g, ' ').trim();
       return cat === normalizeMatchText('Вода');
     });
@@ -7975,7 +7977,7 @@ function Reports({
       if (isVirtualControlDriver(driver)) return;
       if (!canSeeAllNazorat && String(driver || '').trim().toLowerCase() !== currentUserNorm) return;
       const expectedCashbox = pickExpectedCashbox(driver, payMode);
-      const key = `${date}__${customerId}__${driver}__${payMode}__${normalizeCashboxKey(expectedCashbox)}`;
+      const key = `${date}__${customerId}__${driver}__${payMode}`;
       const row = upsert(archiveMap, key, {
         date,
         customerId,
@@ -7984,6 +7986,7 @@ function Reports({
         payMode,
         expectedCashbox,
       });
+      if (!row.expectedCashbox && expectedCashbox) row.expectedCashbox = expectedCashbox;
       row.archiveAmount += amount;
     });
 
@@ -8008,7 +8011,7 @@ function Reports({
         payMode = (kKey && byCard && kKey === byCard) ? 'card' : 'cash';
       }
       const expectedCashbox = pickExpectedCashbox(driver, payMode);
-      const key = `${date}__${customerId}__${driver}__${payMode}__${normalizeCashboxKey(expectedCashbox)}`;
+      const key = `${date}__${customerId}__${driver}__${payMode}`;
       const row = upsert(systemMap, key, {
         date,
         customerId,
@@ -8017,6 +8020,7 @@ function Reports({
         payMode,
         expectedCashbox,
       });
+      if (!row.expectedCashbox && expectedCashbox) row.expectedCashbox = expectedCashbox;
       const expectedKey = normalizeCashboxKey(expectedCashbox);
       const actualKey = normalizeCashboxKey(cashbox);
       row.systemCashboxes.add(cashbox || '-');
@@ -8037,12 +8041,11 @@ function Reports({
       const archiveAmount = Number(a?.archiveAmount || 0);
       const systemAmount = Number(s?.systemAmount || 0);
       const systemWrongCashboxAmount = Number(s?.systemWrongCashboxAmount || 0);
-      const expectedCashbox = String(base.expectedCashbox || '').trim();
+      const inferredSystemCashbox = s ? (Array.from(s.systemCashboxes || []).find((x) => String(x || '').trim() && String(x || '').trim() !== '-') || '') : '';
+      const expectedCashbox = String(base.expectedCashbox || inferredSystemCashbox || '').trim();
       const diff = archiveAmount - systemAmount;
       let status = 'OK';
-      if (!expectedCashbox) {
-        status = 'Kassa biriktirilmagan';
-      } else if (archiveAmount > 0.0001 && systemAmount <= 0.0001 && systemWrongCashboxAmount > 0.0001) {
+      if (archiveAmount > 0.0001 && systemAmount <= 0.0001 && systemWrongCashboxAmount > 0.0001) {
         status = 'Kassa mos emas';
       } else if (archiveAmount > 0.0001 && systemAmount <= 0.0001) {
         status = 'Sistemada pul topilmadi';
@@ -8052,6 +8055,8 @@ function Reports({
         status = 'Summa mos emas';
       } else if (systemWrongCashboxAmount > 0.0001) {
         status = 'Kassa mos emas';
+      } else if (!expectedCashbox) {
+        status = 'Kassa biriktirilmagan';
       }
       return {
         id: `cash_ctrl_${idx + 1}_${base.date || ''}_${base.customerId || ''}`,
@@ -9436,10 +9441,10 @@ const parseBloggerSheetRows = (rows = []) => {
     return -1;
   };
 
-  const colName = findCol(['isim', 'ism']);
-  const colNick = findCol(['insta', 'nik']);
-  const colPhone = findCol(['tel', 'telefon']);
-  const colStatus = findCol(['status']);
+  const colName = (() => { const v = findCol(['isim', 'ism']); return v >= 0 ? v : 1; })();      // B
+  const colNick = (() => { const v = findCol(['insta', 'nik']); return v >= 0 ? v : 2; })();      // C
+  const colPhone = (() => { const v = findCol(['tel', 'telefon']); return v >= 0 ? v : 3; })();   // D
+  const colStatus = (() => { const v = findCol(['status']); return v >= 0 ? v : 9; })();          // J
   const colContractTerm = findCol(['dagavor', 'dogovor', 'kelishuv']);
   const colContractDate = findCol(['dagavor data', 'dogovor data', 'kelishuv sana', 'data']);
   const colPlanWater = findCol(['oylik suv', 'suv istemol', 'water plan']);
@@ -9773,7 +9778,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
     (D?.customers || []).forEach((c) => {
       const cid = String(c?.id || '').trim();
       if (!cid) return;
-      const hay = normalizeNickToken(`${c?.source || ''} ${c?.merchantNote || ''} ${c?.name || ''}`);
+      const hay = normalizeNickToken(c?.source || '');
       if (!hay) return;
       const found = nickList.find((nick) => nick && hay.includes(nick));
       if (!found) return;
@@ -9789,7 +9794,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
   );
   const firstDeliveredMonthByCustomer = useMemo(() => {
     const m = new Map();
-    waterDeliveredRows.forEach((o) => {
+    waterOrderRows.forEach((o) => {
       const cid = String(o?.mId || '').trim();
       const mk = monthKey(o?.orderDate);
       if (!cid || !mk) return;
@@ -9797,7 +9802,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
       if (!prev || mk < prev) m.set(cid, mk);
     });
     return m;
-  }, [waterDeliveredRows]);
+  }, [waterOrderRows]);
   const bonusByMonth = useMemo(() => {
     const by = new Map();
     bonusDeliveredRows.forEach((o) => {
@@ -9857,6 +9862,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
       const storyFact = Math.max(0, toNum(monthFact?.story));
       const reelFact = Math.max(0, toNum(monthFact?.reel));
       const customerFact = Math.max(0, toNum(monthFact?.customers));
+      const waterFact = Math.max(0, toNum(monthFact?.water));
       const planStory = Math.max(0, toNum(r?.planStory));
       const planReel = Math.max(0, toNum(r?.planReel));
       const storyOk = planStory <= 0 || storyFact >= planStory;
@@ -9871,6 +9877,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
         storyFact,
         reelFact,
         customerFact,
+        waterFact,
         planStory,
         planReel,
         linkedCustomerCount: linkedSet.size,
@@ -9885,13 +9892,61 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
   const bloggerAgreementSummary = useMemo(() => {
     const active = bloggerAgreementRows.filter((r) => r.isActiveDeal);
     const onTrack = active.filter((r) => r.onTrack).length;
+    const waterFact = active.reduce((s, r) => s + Math.max(0, toNum(r?.waterFact)), 0);
+    const customerFact = active.reduce((s, r) => s + Math.max(0, toNum(r?.customerFact)), 0);
     return {
       total: bloggerAgreementRows.length,
       active: active.length,
       onTrack,
       risk: Math.max(0, active.length - onTrack),
+      waterFact,
+      customerFact,
     };
   }, [bloggerAgreementRows]);
+  const bloggerMonthExecutionRows = useMemo(() => {
+    const monthSet = new Set();
+    bloggerRows.forEach((r) => {
+      Object.keys(r?.monthly || {}).forEach((mk) => {
+        if (mk) monthSet.add(mk);
+      });
+    });
+    const months = Array.from(monthSet).sort((a, b) => a.localeCompare(b));
+    return months.map((mk) => {
+      let planStory = 0;
+      let planReel = 0;
+      let factStory = 0;
+      let factReel = 0;
+      let factCustomers = 0;
+      let factWater = 0;
+      let activeCount = 0;
+      bloggerRows.forEach((r) => {
+        const st = normText(r?.status);
+        const isActive = !(st.includes('ishlamadi') || st.includes('tugadi') || st.includes("to'xta") || st.includes('toxta') || st.includes('stop'));
+        if (!isActive) return;
+        activeCount += 1;
+        planStory += Math.max(0, toNum(r?.planStory));
+        planReel += Math.max(0, toNum(r?.planReel));
+        const m = r?.monthly?.[mk] || {};
+        factStory += Math.max(0, toNum(m?.story));
+        factReel += Math.max(0, toNum(m?.reel));
+        factCustomers += Math.max(0, toNum(m?.customers));
+        factWater += Math.max(0, toNum(m?.water));
+      });
+      const storyOk = planStory <= 0 ? true : factStory >= planStory;
+      const reelOk = planReel <= 0 ? true : factReel >= planReel;
+      return {
+        month: mk,
+        activeCount,
+        planStory,
+        planReel,
+        factStory,
+        factReel,
+        factCustomers,
+        factWater,
+        status: storyOk && reelOk ? 'Kelishuvda' : 'Ortda',
+      };
+    }).sort((a, b) => String(b.month).localeCompare(String(a.month)));
+  }, [bloggerRows]);
   const bloggerGrowthRows = useMemo(() => {
     const by = new Map();
     bloggerMapping.customerNickMap.forEach((nick, cid) => {
@@ -10178,6 +10233,8 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
           <span className="tag">Kelishuvda: <strong style={{color:'var(--gr)'}}>{fmt(bloggerAgreementSummary.onTrack)}</strong></span>
           <span className="tag">Riskda: <strong style={{color:'var(--rd)'}}>{fmt(bloggerAgreementSummary.risk)}</strong></span>
           <span className="tag">Biriktirilgan mijoz: <strong style={{color:'var(--yl)'}}>{fmt(bloggerCustomerIds.size)}</strong></span>
+          <span className="tag">Oy mijozi: <strong style={{color:'var(--gr)'}}>{fmt(bloggerAgreementSummary.customerFact)}</strong></span>
+          <span className="tag">Oy suvi: <strong style={{color:'var(--bl)'}}>{fmt(bloggerAgreementSummary.waterFact)} ta</strong></span>
         </div>
         <div style={{overflow:'auto',maxHeight:'34vh'}}>
           {bloggerLoading ? (
@@ -10195,13 +10252,14 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
                   <th style={{textAlign:'right'}}>Reja S/R</th>
                   <th style={{textAlign:'right'}}>Fakt S/R</th>
                   <th style={{textAlign:'right'}}>Kelgan mijoz</th>
+                  <th style={{textAlign:'right'}}>Suv (oy)</th>
                   <th style={{textAlign:'right'}}>Biriktirilgan</th>
                   <th>Holat</th>
                 </tr>
               </thead>
               <tbody>
                 {bloggerAgreementRows.length === 0 ? (
-                  <tr><td colSpan={9} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Blogerlar varag'idan ma'lumot topilmadi</td></tr>
+                  <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Blogerlar varag'idan ma'lumot topilmadi</td></tr>
                 ) : bloggerAgreementRows.map((r, i) => (
                   <tr key={`blogger_agree_${r.nickNorm || r.name}_${i}`}>
                     <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
@@ -10211,6 +10269,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
                     <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}/{fmt(r.planReel)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.storyFact)}/{fmt(r.reelFact)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.customerFact)}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.waterFact)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.linkedCustomerCount)}</td>
                     <td style={{color:r.onTrack ? 'var(--gr)' : 'var(--rd)'}}>
                       {r.isActiveDeal ? (r.onTrack ? "Kelishuvda" : "Kelishuvdan ortda") : "Faol emas"}
@@ -10220,6 +10279,41 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
               </tbody>
             </table>
           )}
+        </div>
+      </div>
+      <div className="card" style={{padding:0,overflow:'hidden'}}>
+        <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Blogerlar: Oylar bo'yicha kelishuv bajarilishi</div>
+        <div style={{overflow:'auto',maxHeight:'30vh'}}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                <th>Oy</th>
+                <th style={{textAlign:'right'}}>Aktiv bloger</th>
+                <th style={{textAlign:'right'}}>Reja S/R</th>
+                <th style={{textAlign:'right'}}>Fakt S/R</th>
+                <th style={{textAlign:'right'}}>Mijoz</th>
+                <th style={{textAlign:'right'}}>Suv</th>
+                <th>Holat</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bloggerMonthExecutionRows.length === 0 ? (
+                <tr><td colSpan={8} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Oylik kelishuv ma'lumoti topilmadi</td></tr>
+              ) : bloggerMonthExecutionRows.map((r, i) => (
+                <tr key={`blog_month_exec_${r.month}_${i}`}>
+                  <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
+                  <td style={{fontFamily:'var(--mono)'}}>{formatMonthShort(r.month)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.activeCount)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}/{fmt(r.planReel)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.factStory)}/{fmt(r.factReel)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.factCustomers)}</td>
+                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.factWater)}</td>
+                  <td style={{color:r.status === 'Kelishuvda' ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
       </>
