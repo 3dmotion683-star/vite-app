@@ -1913,7 +1913,7 @@ function ModernDateInput({
         onClick={() => setOpen((v) => !v)}
       >
         <span className={`modern-date-label${selectedIso ? '' : ' ph'}`}>{selectedIso ? fmtD(selectedIso) : placeholder}</span>
-        <span className="modern-date-icon" aria-hidden="true">??</span>
+        <span className="modern-date-icon" aria-hidden="true">{E.plan}</span>
       </button>
       {open && (
         <div className="modern-date-pop card">
@@ -5436,7 +5436,7 @@ function Kassa({ D }) {
             </div>
           )}
         </div>
-        <button className="btn btn-gr btn-sm" onClick={exportKassa}>? Excel</button>
+        <button className="btn btn-gr btn-sm" onClick={exportKassa}>{E.excel} Excel</button>
         <div style={{display:'flex',gap:6}}>
           <KassaFilterBtn active={fType==='all'} label="Barchasi" onClick={()=>setT('all')}/>
           <KassaFilterBtn active={fType==='in'}  label="Kirimlar"  color="var(--gr)" dot onClick={()=>setT('in')}/>
@@ -6162,7 +6162,7 @@ function Obzvon({
           <button className={`tab${tab==='op'?' on':''}`} onClick={()=>setTab('op')}>Operator jadvali</button>
           <button className={`tab${tab==='late2m'?' on':''}`} onClick={()=>setTab('late2m')}>2 oydan o'tgan mijozlar</button>
         </div>
-        <button className="btn btn-gr btn-sm" onClick={exportCurrentTab}>? Excel</button>
+        <button className="btn btn-gr btn-sm" onClick={exportCurrentTab}>{E.excel} Excel</button>
       </div>
 
       {tab==='main' && (
@@ -7161,7 +7161,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
                     width={620}
                   />
                 </div>
-                <button className="btn btn-gr btn-sm" onClick={exportDoljniki}>? Excel</button>
+                <button className="btn btn-gr btn-sm" onClick={exportDoljniki}>{E.excel} Excel</button>
                 <button className={`btn ${pickMode ? 'btn-gr' : 'btn-gh'} btn-sm`} onClick={()=>setPickMode((v)=>!v)}>
                   + Obzvonga qo'shish
                 </button>
@@ -7257,7 +7257,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
                 width={620}
               />
             </div>
-            <button className="btn btn-gr btn-sm" onClick={exportKuler}>? Excel</button>
+            <button className="btn btn-gr btn-sm" onClick={exportKuler}>{E.excel} Excel</button>
           </div>
           <div className="card" style={{overflow:'hidden',flex:1}}>
             <div style={{overflow:'auto',maxHeight:'100%'}}>
