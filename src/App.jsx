@@ -8012,6 +8012,9 @@ function Reports({
       }
       const expectedCashbox = pickExpectedCashbox(driver, payMode);
       const key = `${date}__${customerId}__${driver}__${payMode}`;
+      // Karta nazorati bir tomonlama: arxivda karta bo'lsa tekshiriladi.
+      // Sistemadagi boshqa (arxivda yo'q) karta kirimlari bu nazoratga ta'sir qilmaydi.
+      if (payMode === 'card' && !archiveMap.has(key)) return;
       const row = upsert(systemMap, key, {
         date,
         customerId,
@@ -8024,12 +8027,17 @@ function Reports({
       const expectedKey = normalizeCashboxKey(expectedCashbox);
       const actualKey = normalizeCashboxKey(cashbox);
       row.systemCashboxes.add(cashbox || '-');
-      if (expectedKey && actualKey && expectedKey !== actualKey) {
-        row.systemWrongCashboxAmount += amount;
-      } else if (expectedKey && !actualKey) {
-        row.systemWrongCashboxAmount += amount;
-      } else {
+      if (payMode === 'card') {
+        // Karta to'lovida asosiy tekshiruv: shu sana+mijoz uchun karta to'lov borligi.
         row.systemAmount += amount;
+      } else {
+        if (expectedKey && actualKey && expectedKey !== actualKey) {
+          row.systemWrongCashboxAmount += amount;
+        } else if (expectedKey && !actualKey) {
+          row.systemWrongCashboxAmount += amount;
+        } else {
+          row.systemAmount += amount;
+        }
       }
     });
 
@@ -8044,6 +8052,7 @@ function Reports({
       const inferredSystemCashbox = s ? (Array.from(s.systemCashboxes || []).find((x) => String(x || '').trim() && String(x || '').trim() !== '-') || '') : '';
       const expectedCashbox = String(base.expectedCashbox || inferredSystemCashbox || '').trim();
       const diff = archiveAmount - systemAmount;
+      const isCardPay = String(base.payMode || '') === 'card';
       let status = 'OK';
       if (archiveAmount > 0.0001 && systemAmount <= 0.0001 && systemWrongCashboxAmount > 0.0001) {
         status = 'Kassa mos emas';
@@ -8055,7 +8064,7 @@ function Reports({
         status = 'Summa mos emas';
       } else if (systemWrongCashboxAmount > 0.0001) {
         status = 'Kassa mos emas';
-      } else if (!expectedCashbox) {
+      } else if (!isCardPay && !expectedCashbox) {
         status = 'Kassa biriktirilmagan';
       }
       return {
