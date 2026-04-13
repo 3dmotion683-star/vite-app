@@ -7977,7 +7977,7 @@ function Reports({
       if (isVirtualControlDriver(driver)) return;
       if (!canSeeAllNazorat && String(driver || '').trim().toLowerCase() !== currentUserNorm) return;
       const expectedCashbox = pickExpectedCashbox(driver, payMode);
-      const key = `${date}__${customerId}__${driver}__${payMode}`;
+      const key = `${date}__${customerId}__${payMode}`;
       const row = upsert(archiveMap, key, {
         date,
         customerId,
@@ -7986,6 +7986,9 @@ function Reports({
         payMode,
         expectedCashbox,
       });
+      if ((!row.driver || row.driver === '-') && driver && driver !== '-') row.driver = driver;
+      const cName = String(r?.customer || '').trim();
+      if (cName && (!row.customer || row.customer.startsWith('ID '))) row.customer = cName;
       if (!row.expectedCashbox && expectedCashbox) row.expectedCashbox = expectedCashbox;
       row.archiveAmount += amount;
     });
@@ -8011,7 +8014,7 @@ function Reports({
         payMode = (kKey && byCard && kKey === byCard) ? 'card' : 'cash';
       }
       const expectedCashbox = pickExpectedCashbox(driver, payMode);
-      const key = `${date}__${customerId}__${driver}__${payMode}`;
+      const key = `${date}__${customerId}__${payMode}`;
       // Karta nazorati bir tomonlama: arxivda karta bo'lsa tekshiriladi.
       // Sistemadagi boshqa (arxivda yo'q) karta kirimlari bu nazoratga ta'sir qilmaydi.
       if (payMode === 'card' && !archiveMap.has(key)) return;
@@ -8023,6 +8026,9 @@ function Reports({
         payMode,
         expectedCashbox,
       });
+      if ((!row.driver || row.driver === '-') && driver && driver !== '-') row.driver = driver;
+      const cName = String(r?.contName || '').trim();
+      if (cName && (!row.customer || row.customer.startsWith('ID '))) row.customer = cName;
       if (!row.expectedCashbox && expectedCashbox) row.expectedCashbox = expectedCashbox;
       const expectedKey = normalizeCashboxKey(expectedCashbox);
       const actualKey = normalizeCashboxKey(cashbox);
