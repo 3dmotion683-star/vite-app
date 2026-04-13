@@ -3503,6 +3503,12 @@ body,input,select,button{font-family:var(--sans)}
 .aq-map-wrap{position:relative;overflow:visible}
 .aq-map-toolbar{position:absolute;top:10px;left:10px;right:10px;z-index:3200;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .aq-map-popup{position:absolute;left:10px;right:10px;bottom:10px;z-index:3200;background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:8px 10px;backdrop-filter:blur(8px)}
+.aq-map-track-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:3260;min-width:30px;padding:4px 8px}
+.aq-map-track-drawer{position:absolute;top:10px;bottom:10px;right:10px;z-index:3250;width:320px;max-width:calc(100% - 56px);display:flex;flex-direction:column;overflow:hidden;transition:transform .2s ease,opacity .2s ease}
+.aq-map-track-drawer.closed{transform:translateX(calc(100% + 18px));opacity:.0;pointer-events:none}
+.aq-map-track-drawer.open{transform:translateX(0);opacity:1;pointer-events:auto}
+.aq-map-wrap [class*="ymaps-"][class*="copyright"]{display:none!important}
+.aq-map-wrap [class*="ymaps-"][class*="gotoymaps"]{display:none!important}
 .aq-map-pin{background:transparent!important;border:none!important}
 .aq-map-pin span{display:block;width:18px;height:18px;border-radius:11px 11px 11px 2px;transform:rotate(-45deg);background:linear-gradient(180deg,#38bdf8 0%,#0284c7 100%);border:2px solid #dff6ff;box-shadow:0 6px 16px rgba(2,132,199,.45)}
 .aq-map-pin.on span{background:linear-gradient(180deg,#4ade80 0%,#16a34a 100%);border-color:#dcfce7;box-shadow:0 6px 16px rgba(22,163,74,.42)}
@@ -5405,18 +5411,18 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
               )}
             </div>
             {dataMode === 'real' && (
-              <div className="card" style={{width:mapTrackOpen?320:42,minWidth:mapTrackOpen?320:42,transition:'width .18s',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+              <>
                 <button
-                  className="btn btn-gh btn-sm"
-                  style={{margin:6,alignSelf:mapTrackOpen?'flex-end':'center',minWidth:30,padding:'4px 8px'}}
+                  className="btn btn-gh btn-sm aq-map-track-toggle"
+                  style={{right: mapTrackOpen ? 336 : 10}}
                   onClick={()=>setMapTrackOpen((v)=>!v)}
                   title={mapTrackOpen ? 'Trekingni yopish' : 'Trekingni ochish'}
                 >
                   {mapTrackOpen ? '>' : '<'}
                 </button>
-                {mapTrackOpen && (
-                  <div style={{padding:'0 8px 8px',display:'grid',gap:6,overflow:'auto',maxHeight:'100%'}}>
-                    <div style={{fontSize:12,fontWeight:700}}>Treking (vaqt bo'yicha)</div>
+                <div className={`card aq-map-track-drawer ${mapTrackOpen ? 'open' : 'closed'}`}>
+                  <div style={{padding:'8px 8px 0',fontSize:12,fontWeight:700}}>Treking (vaqt bo'yicha)</div>
+                  <div style={{padding:'8px',display:'grid',gap:6,overflow:'auto',maxHeight:'100%'}}>
                     {!mapSelected ? (
                       <div style={{fontSize:11,color:'var(--t3)'}}>Avval xaritada mijozni tanlang.</div>
                     ) : mapTrackRows.length === 0 ? (
@@ -5446,8 +5452,8 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
                       );
                     })}
                   </div>
-                )}
-              </div>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -10330,7 +10336,13 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
     return (
       <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
         <div className="card" style={{padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
-          <div style={{fontWeight:700}}>Blogerlar nazorati</div>
+          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+            <div style={{fontWeight:700}}>Blogerlar nazorati</div>
+            <div className="tabs" style={{display:'inline-flex'}}>
+              <button className={`tab${bloggerSection==='current'?' on':''}`} onClick={()=>setBloggerSection('current')}>Bloger</button>
+              <button className={`tab${bloggerSection==='archive'?' on':''}`} onClick={()=>setBloggerSection('archive')}>Arxiv</button>
+            </div>
+          </div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             <span className="tag">Oy: {formatMonthShort(bloggerLatestMonth)}</span>
             <span className="tag">Jami: <strong style={{color:'var(--t1)'}}>{fmt(bloggerAgreementSummary.total)}</strong></span>
@@ -10367,10 +10379,6 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
             <button className={`tab${bloggerWorkMode==='worked'?' on':''}`} onClick={()=>setBloggerWorkMode('worked')}>Ishlidi</button>
             <button className={`tab${bloggerWorkMode==='not_worked'?' on':''}`} onClick={()=>setBloggerWorkMode('not_worked')}>Ishlamidi</button>
             <button className={`tab${bloggerWorkMode==='all'?' on':''}`} onClick={()=>setBloggerWorkMode('all')}>Barchasi</button>
-          </div>
-          <div className="tabs" style={{display:'inline-flex'}}>
-            <button className={`tab${bloggerSection==='current'?' on':''}`} onClick={()=>setBloggerSection('current')}>Asosiy</button>
-            <button className={`tab${bloggerSection==='archive'?' on':''}`} onClick={()=>setBloggerSection('archive')}>Arxiv</button>
           </div>
         </div>
         <div className="card" style={{padding:0,overflow:'hidden'}}>
