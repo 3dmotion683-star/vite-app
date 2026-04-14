@@ -10989,6 +10989,35 @@ function SettingsPanel({
   const [driverWarehouseMap, setDriverWarehouseMap] = useState(() => S.get(bindingStorageKey, {}));
   const [driverCashMap, setDriverCashMap] = useState(() => S.get(bindingCashStorageKey, {}));
   const [driverCardCashMap, setDriverCardCashMap] = useState(() => S.get(bindingCardCashStorageKey, {}));
+  const bindingEmployeeRows = useMemo(
+    () => parseLeftoverEmployeesRows(Array.isArray(D?.rawEmployeeSheetRows) ? D.rawEmployeeSheetRows : []),
+    [D?.rawEmployeeSheetRows]
+  );
+  const bindingEmpNameById = useMemo(() => {
+    const m = {};
+    (bindingEmployeeRows || []).forEach((r) => {
+      const id = normalizeIdKey(r?.id);
+      if (id && r?.name && !m[id]) m[id] = String(r.name).trim();
+    });
+    return m;
+  }, [bindingEmployeeRows]);
+  const bindingEmpNameByEmail = useMemo(() => {
+    const m = {};
+    (bindingEmployeeRows || []).forEach((r) => {
+      const email = String(r?.email || '').trim().toLowerCase();
+      if (email && r?.name && !m[email]) m[email] = String(r.name).trim();
+    });
+    return m;
+  }, [bindingEmployeeRows]);
+  const normalizeBindingDriverName = useCallback((rawDriver) => {
+    const raw = String(rawDriver || '').trim();
+    if (!raw) return '';
+    const id = normalizeIdKey(raw);
+    if (id && bindingEmpNameById[id]) return bindingEmpNameById[id];
+    const email = raw.toLowerCase();
+    if (email && bindingEmpNameByEmail[email]) return bindingEmpNameByEmail[email];
+    return raw;
+  }, [bindingEmpNameById, bindingEmpNameByEmail]);
   useEffect(() => {
     setDriverWarehouseMap(S.get(bindingStorageKey, {}));
   }, [bindingStorageKey]);
@@ -11012,17 +11041,25 @@ function SettingsPanel({
     setSel(users[0] || 'Admin');
   }, [users, sel]);
   const bindingDrivers = useMemo(() => {
-    const src = (D?.rawOrders || []).filter((o) =>
-      isWaterProduct(o.product) &&
-      isOrderDoc(o.docType) &&
-      !isCancelledStatus(o.status)
-    ).map((o) => String(o.delivPerson || o.agent || '').trim()).filter(Boolean);
+    const orderDrivers = (D?.rawOrders || [])
+      .filter((o) => isOrderDoc(o.docType) && !isCancelledStatus(o.status))
+      .map((o) => normalizeBindingDriverName(o.delivPerson || o.agent || ''))
+      .filter(Boolean);
+    const archiveDrivers = parseLeftoverArchiveRows(Array.isArray(D?.rawArchiveSheetRows) ? D.rawArchiveSheetRows : [])
+      .map((r) => normalizeBindingDriverName(r?.driver || ''))
+      .filter(Boolean);
+    const mappedDrivers = [
+      ...Object.keys(driverWarehouseMap || {}),
+      ...Object.keys(driverCashMap || {}),
+      ...Object.keys(driverCardCashMap || {}),
+    ].map((d) => normalizeBindingDriverName(d)).filter(Boolean);
+    const src = [...orderDrivers, ...archiveDrivers, ...mappedDrivers];
     const uniq = Array.from(new Set(src))
       .filter((d) => !isVirtualDriverLabel(d))
       .sort((a, b) => a.localeCompare(b, 'ru'));
     if (isAdminSession) return uniq;
     return uniq.filter((d) => d === currentUser);
-  }, [D, isAdminSession, currentUser]);
+  }, [D, isAdminSession, currentUser, driverWarehouseMap, driverCashMap, driverCardCashMap, normalizeBindingDriverName]);
   const bindingWarehouses = useMemo(() => {
     const allTransfers = Array.isArray(D?.warehouseTransfers) ? D.warehouseTransfers : [];
     const strict = allTransfers
