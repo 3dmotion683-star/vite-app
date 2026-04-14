@@ -7698,7 +7698,11 @@ function Reports({
     });
     return m;
   }, [employeeRows]);
-  const resolveNazoratDriverName = useCallback((rawDriver) => {
+  const normalizeNazoratDriverKey = useCallback(
+    (v) => normalizeMatchText(v).replace(/[^a-z0-9а-я]/gi, ''),
+    []
+  );
+  const resolveNazoratDriverNameBase = useCallback((rawDriver) => {
     const raw = String(rawDriver || '').trim();
     if (!raw) return '-';
     const id = normId(raw);
@@ -7714,6 +7718,62 @@ function Reports({
     }
     return raw;
   }, [employeeNameByEmail, employeeNameById]);
+  const archiveDriverAliasMap = useMemo(() => {
+    const systemDriversByDateCustomer = new Map();
+    (rawOrders || []).forEach((o) => {
+      if (!isOrderDoc(o?.docType)) return;
+      if (isCancelledStatus(o?.status)) return;
+      if (!isMainWarehouseLabel(o?.warehouse)) return;
+      const date = toIsoDate(o?.orderDate);
+      const customerId = normalizeIdKey(o?.mId);
+      if (!date || !customerId) return;
+      const driver = resolveNazoratDriverNameBase(o?.delivPerson || o?.agent || '');
+      const driverKey = normalizeNazoratDriverKey(driver);
+      if (!driver || driver === '-' || !driverKey) return;
+      const mapKey = `${date}__${customerId}`;
+      if (!systemDriversByDateCustomer.has(mapKey)) systemDriversByDateCustomer.set(mapKey, new Set());
+      systemDriversByDateCustomer.get(mapKey).add(driver);
+    });
+
+    const aliasCounts = new Map();
+    (parseLeftoverArchiveRows(rawArchiveSheetRows || []) || []).forEach((r) => {
+      const date = String(r?.date || '').trim();
+      const customerId = normalizeIdKey(r?.customerId);
+      if (!date || !customerId) return;
+      const archiveDriver = resolveNazoratDriverNameBase(r?.driver || '');
+      const archiveDriverKey = normalizeNazoratDriverKey(archiveDriver);
+      if (!archiveDriver || archiveDriver === '-' || !archiveDriverKey) return;
+      const mapKey = `${date}__${customerId}`;
+      const sysDrivers = systemDriversByDateCustomer.get(mapKey);
+      if (!sysDrivers || !sysDrivers.size) return;
+      sysDrivers.forEach((sysDriver) => {
+        const sysKey = normalizeNazoratDriverKey(sysDriver);
+        if (!sysKey || sysKey === archiveDriverKey) return;
+        if (!aliasCounts.has(sysKey)) aliasCounts.set(sysKey, new Map());
+        const next = aliasCounts.get(sysKey);
+        next.set(archiveDriver, (next.get(archiveDriver) || 0) + 1);
+      });
+    });
+
+    const out = new Map();
+    aliasCounts.forEach((candidates, oldKey) => {
+      const ranked = Array.from(candidates.entries()).sort((a, b) => b[1] - a[1]);
+      if (!ranked.length) return;
+      const [bestName, bestCount] = ranked[0];
+      const secondCount = ranked[1]?.[1] || 0;
+      if (bestName && bestCount > 0 && bestCount >= secondCount) {
+        out.set(oldKey, bestName);
+      }
+    });
+    return out;
+  }, [rawOrders, rawArchiveSheetRows, resolveNazoratDriverNameBase, normalizeNazoratDriverKey]);
+  const resolveNazoratDriverName = useCallback((rawDriver) => {
+    const base = resolveNazoratDriverNameBase(rawDriver);
+    const k = normalizeNazoratDriverKey(base);
+    if (!k) return base;
+    const aliased = archiveDriverAliasMap.get(k);
+    return aliased || base;
+  }, [resolveNazoratDriverNameBase, normalizeNazoratDriverKey, archiveDriverAliasMap]);
   const controlDateRangeLabel = useMemo(
     () => `${CONTROL_COMPARE_START_DATE_LABEL} dan kechagi sanagacha (${fmtD(controlEndDate)})`,
     [controlEndDate]
