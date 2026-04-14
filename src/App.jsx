@@ -3619,6 +3619,7 @@ const S = {
   get: (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):d; } catch { return d; } },
   set: (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} },
 };
+const BINDING_UPDATE_EVENT = 'aq-binding-maps-updated';
 const DEFAULT_USERS = ['Dildora', 'Dilfuza', 'Admin'];
 const DEFAULT_USER_CREDS = { Dildora:'Dildora', Dilfuza:'Dilfuza', Admin:'12345' };
 const DEFAULT_CUSTOMER_TABS = {
@@ -7902,6 +7903,18 @@ function Reports({
   useEffect(() => {
     setDriverCardCashMap(S.get(cardCashStorageKey, {}));
   }, [cardCashStorageKey]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onBindingMapsUpdated = (evt) => {
+      const eventCompany = normalizeCompanyKey(evt?.detail?.company || company);
+      if (eventCompany !== normalizeCompanyKey(company)) return;
+      setDriverWarehouseMap(S.get(mapStorageKey, {}));
+      setDriverCashMap(S.get(cashStorageKey, {}));
+      setDriverCardCashMap(S.get(cardCashStorageKey, {}));
+    };
+    window.addEventListener(BINDING_UPDATE_EVENT, onBindingMapsUpdated);
+    return () => window.removeEventListener(BINDING_UPDATE_EVENT, onBindingMapsUpdated);
+  }, [company, mapStorageKey, cashStorageKey, cardCashStorageKey]);
   const resolvedDriverWarehouseMap = useMemo(() => {
     const out = {};
     Object.entries(driverWarehouseMap || {}).forEach(([driver, warehouse]) => {
@@ -11035,6 +11048,14 @@ function SettingsPanel({
     S.set(bindingCardCashStorageKey, driverCardCashMap || {});
   }, [bindingCardCashStorageKey, driverCardCashMap]);
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.dispatchEvent(new CustomEvent(BINDING_UPDATE_EVENT, {
+        detail: { source: 'settings', company: normalizeCompanyKey(company) },
+      }));
+    } catch {}
+  }, [company, driverWarehouseMap, driverCashMap, driverCardCashMap]);
+  useEffect(() => {
     if (users.includes(sel)) return;
     setSel(users[0] || 'Admin');
   }, [users, sel]);
@@ -11846,6 +11867,7 @@ export default function App() {
   const [autoLoad,setAutoLoad] = useState({ loading:false, progress:'', error:'' });
   const [remoteAccessLoaded, setRemoteAccessLoaded] = useState(false);
   const [obzvonAllLoaded, setObzvonAllLoaded] = useState(false);
+  const [bindingSyncTick, setBindingSyncTick] = useState(0);
   const skipCloudPushRef = useRef(false);
   const remoteAccessConfigRef = useRef(null);
   const obzvonAllNewRowsRef = useRef(obzvonAllNewRows || []);
@@ -11896,6 +11918,12 @@ export default function App() {
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onBindingUpdated = () => setBindingSyncTick((v) => v + 1);
+    window.addEventListener(BINDING_UPDATE_EVENT, onBindingUpdated);
+    return () => window.removeEventListener(BINDING_UPDATE_EVENT, onBindingUpdated);
+  }, []);
   const buildDefaultCreds = useCallback((baseUsers) => {
     const m = {};
     (baseUsers || []).forEach((u) => { m[u] = u; });
@@ -11914,6 +11942,67 @@ export default function App() {
     });
     return merged;
   }, [users, userCreds, buildDefaultCreds]);
+  const sanitizeBindingMap = useCallback((rawMap) => {
+    const out = {};
+    if (!rawMap || typeof rawMap !== 'object') return out;
+    Object.entries(rawMap).forEach(([rawKey, rawVal]) => {
+      const key = String(rawKey || '').trim();
+      const val = String(rawVal || '').trim();
+      if (!key || !val) return;
+      out[key] = val;
+    });
+    return out;
+  }, []);
+  const readAllBindingMaps = useCallback(() => {
+    const out = {};
+    (COMPANY_OPTIONS || []).forEach((item) => {
+      const companyKey = normalizeCompanyKey(item?.key || item);
+      out[companyKey] = {
+        warehouseMap: sanitizeBindingMap(S.get(`aq-driver-warehouse-map-${companyKey}`, {})),
+        cashMap: sanitizeBindingMap(S.get(`aq-driver-cash-map-${companyKey}`, {})),
+        cardCashMap: sanitizeBindingMap(S.get(`aq-driver-card-cash-map-${companyKey}`, {})),
+      };
+    });
+    return out;
+  }, [sanitizeBindingMap]);
+  const applyRemoteBindingMaps = useCallback((rawPayload) => {
+    if (!rawPayload || typeof rawPayload !== 'object') return false;
+    let changed = false;
+    Object.entries(rawPayload).forEach(([rawCompany, rawMaps]) => {
+      const companyKey = normalizeCompanyKey(rawCompany);
+      const maps = (rawMaps && typeof rawMaps === 'object') ? rawMaps : {};
+      const nextWarehouse = sanitizeBindingMap(maps.warehouseMap ?? maps.warehouse ?? {});
+      const nextCash = sanitizeBindingMap(maps.cashMap ?? maps.cash ?? {});
+      const nextCardCash = sanitizeBindingMap(maps.cardCashMap ?? maps.cardCash ?? maps.card ?? {});
+
+      const warehouseStorageKey = `aq-driver-warehouse-map-${companyKey}`;
+      const cashStorageKey = `aq-driver-cash-map-${companyKey}`;
+      const cardCashStorageKey = `aq-driver-card-cash-map-${companyKey}`;
+
+      const prevWarehouse = sanitizeBindingMap(S.get(warehouseStorageKey, {}));
+      const prevCash = sanitizeBindingMap(S.get(cashStorageKey, {}));
+      const prevCardCash = sanitizeBindingMap(S.get(cardCashStorageKey, {}));
+
+      if (JSON.stringify(prevWarehouse) !== JSON.stringify(nextWarehouse)) {
+        S.set(warehouseStorageKey, nextWarehouse);
+        changed = true;
+      }
+      if (JSON.stringify(prevCash) !== JSON.stringify(nextCash)) {
+        S.set(cashStorageKey, nextCash);
+        changed = true;
+      }
+      if (JSON.stringify(prevCardCash) !== JSON.stringify(nextCardCash)) {
+        S.set(cardCashStorageKey, nextCardCash);
+        changed = true;
+      }
+    });
+    if (changed && typeof window !== 'undefined') {
+      try {
+        window.dispatchEvent(new CustomEvent(BINDING_UPDATE_EVENT, { detail: { source: 'remote' } }));
+      } catch {}
+    }
+    return changed;
+  }, [sanitizeBindingMap]);
   const applyRemoteAccessConfig = useCallback((payload) => {
     let cfg = payload;
     if (typeof cfg === 'string') {
@@ -11930,12 +12019,16 @@ export default function App() {
 
     const rawAccess = cfg.access && typeof cfg.access === 'object' ? cfg.access : {};
     const rawCreds = cfg.userCreds && typeof cfg.userCreds === 'object' ? cfg.userCreds : {};
+    const rawBindingMaps = (cfg.bindingMaps && typeof cfg.bindingMaps === 'object')
+      ? cfg.bindingMaps
+      : ((cfg.bindingsByCompany && typeof cfg.bindingsByCompany === 'object') ? cfg.bindingsByCompany : {});
     const remoteUpdatedAt = toDate(cfg.updatedAt)?.getTime() || 0;
     const localUpdatedAt = Number(S.get(ACCESS_UPDATED_AT_KEY, 0)) || 0;
     // Juda eski remote payload lokalni bosib yubormasin.
     if (remoteUpdatedAt && localUpdatedAt && remoteUpdatedAt < localUpdatedAt - 1000) {
       return true;
     }
+    applyRemoteBindingMaps(rawBindingMaps);
 
     const nextAccess = {};
     const nextCreds = {};
@@ -11975,7 +12068,7 @@ export default function App() {
     S.set('aq-user-creds', nextCreds);
     S.set(ACCESS_UPDATED_AT_KEY, remoteUpdatedAt || Date.now());
     return true;
-  }, [users, access, userCreds]);
+  }, [users, access, userCreds, applyRemoteBindingMaps]);
 
   const loadRemoteAccessConfig = useCallback(async () => {
     if (!accessApiUrl) {
@@ -12650,6 +12743,7 @@ export default function App() {
       users,
       access,
       userCreds,
+      bindingMaps: readAllBindingMaps(),
       updatedAt: new Date(nowTs).toISOString(),
       updatedBy: sessionUser,
     };
@@ -12657,7 +12751,7 @@ export default function App() {
       pushRemoteAccessConfig(payload);
     }, 350);
     return () => clearTimeout(t);
-  }, [users, access, userCreds, isLoggedIn, sessionUser, remoteAccessLoaded, pushRemoteAccessConfig]);
+  }, [users, access, userCreds, bindingSyncTick, isLoggedIn, sessionUser, remoteAccessLoaded, pushRemoteAccessConfig, readAllBindingMaps]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
