@@ -8118,7 +8118,8 @@ function Reports({
       if (!isPermWaterProduct(o?.product)) return;
       const date = toIsoDate(o?.orderDate);
       if (!date) return;
-      const driver = resolveNazoratDriverName(o?.delivPerson || o?.agent || '');
+      // Permesheniya nazoratida dostavchik ismi faqat baza (item_basket) dagi nomdan olinadi.
+      const driver = resolveNazoratDriverNameBase(o?.delivPerson || o?.agent || '');
       if (!driver || driver === '-' || isVirtualControlDriver(driver)) return;
       if (!canSeeAllNazorat && String(driver).trim().toLowerCase() !== currentUserNorm) return;
       const driverKey = normalizeDriverLookupKey(driver);
@@ -8131,7 +8132,7 @@ function Reports({
     return Array.from(byDateDriver.values()).sort((a, b) => (
       a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date)
     ));
-  }, [rawOrders, canSeeAllNazorat, currentUserNorm, resolveNazoratDriverName, isVirtualControlDriver, isPermWaterProduct, normalizeDriverLookupKey]);
+  }, [rawOrders, canSeeAllNazorat, currentUserNorm, resolveNazoratDriverNameBase, isVirtualControlDriver, isPermWaterProduct, normalizeDriverLookupKey]);
 
   const { orderQtyByDateDriver, orderDatesByDriver, permDriverDisplayByKey } = useMemo(() => {
     const qtyMap = new Map();
@@ -8148,6 +8149,16 @@ function Reports({
       if (!displayByKey.has(driverKey)) displayByKey.set(driverKey, String(r?.driver || '').trim() || '-');
     });
     return { orderQtyByDateDriver: qtyMap, orderDatesByDriver: datesByDriver, permDriverDisplayByKey: displayByKey };
+  }, [permOrderRowsAll]);
+
+  const orderQtyTotalByDriverKey = useMemo(() => {
+    const m = new Map();
+    (permOrderRowsAll || []).forEach((r) => {
+      const dk = String(r?.driverKey || '').trim();
+      if (!dk) return;
+      m.set(dk, (m.get(dk) || 0) + Math.abs(toNum(r?.orderQty)));
+    });
+    return m;
   }, [permOrderRowsAll]);
 
   const { transferQtyByDateWarehouse, transferDatesByWarehouse } = useMemo(() => {
@@ -8170,16 +8181,54 @@ function Reports({
     return { transferQtyByDateWarehouse: qtyMap, transferDatesByWarehouse: datesByWarehouse };
   }, [warehouseTransfers, isVirtualControlWarehouse, isPermWaterProduct]);
 
+  const sanitizedResolvedDriverWarehouseMap = useMemo(() => {
+    const byWarehouse = new Map();
+    Object.entries(driverWarehouseMap || {}).forEach(([driverRaw, warehouseRaw]) => {
+      const driver = resolveNazoratDriverNameBase(driverRaw);
+      const driverKey = normalizeDriverLookupKey(driver);
+      const warehouse = String(warehouseRaw || '').trim();
+      const warehouseKey = normalizeWarehouseKey(warehouse);
+      if (!driver || driver === '-' || !driverKey || !warehouse || !warehouseKey) return;
+      if (isVirtualControlDriver(driver) || isVirtualControlWarehouse(warehouse)) return;
+      if (!byWarehouse.has(warehouseKey)) byWarehouse.set(warehouseKey, []);
+      byWarehouse.get(warehouseKey).push({ driver, driverKey, warehouse });
+    });
+
+    const out = {};
+    byWarehouse.forEach((items) => {
+      const picked = [...items].sort((a, b) => {
+        const aq = Number(orderQtyTotalByDriverKey.get(a.driverKey) || 0);
+        const bq = Number(orderQtyTotalByDriverKey.get(b.driverKey) || 0);
+        if (bq !== aq) return bq - aq;
+        const ain = permDriverDisplayByKey.has(a.driverKey) ? 1 : 0;
+        const bin = permDriverDisplayByKey.has(b.driverKey) ? 1 : 0;
+        if (bin !== ain) return bin - ain;
+        return String(a.driver || '').localeCompare(String(b.driver || ''), 'ru');
+      })[0];
+      if (picked?.driver && picked?.warehouse) out[picked.driver] = picked.warehouse;
+    });
+    return out;
+  }, [
+    driverWarehouseMap,
+    resolveNazoratDriverNameBase,
+    normalizeDriverLookupKey,
+    normalizeWarehouseKey,
+    isVirtualControlDriver,
+    isVirtualControlWarehouse,
+    orderQtyTotalByDriverKey,
+    permDriverDisplayByKey,
+  ]);
+
   const warehouseByDriverKey = useMemo(() => {
     const m = new Map();
-    Object.entries(resolvedDriverWarehouseMap || {}).forEach(([driver, warehouse]) => {
+    Object.entries(sanitizedResolvedDriverWarehouseMap || {}).forEach(([driver, warehouse]) => {
       const dk = normalizeDriverLookupKey(driver);
       const w = String(warehouse || '').trim();
       if (!dk || !w) return;
       if (!m.has(dk)) m.set(dk, w);
     });
     return m;
-  }, [resolvedDriverWarehouseMap, normalizeDriverLookupKey]);
+  }, [sanitizedResolvedDriverWarehouseMap, normalizeDriverLookupKey]);
 
   const allPermDrivers = useMemo(() => {
     const byKey = new Map();
@@ -8187,25 +8236,25 @@ function Reports({
       if (!key) return;
       byKey.set(key, String(name || '').trim() || '-');
     });
-    Object.keys(resolvedDriverWarehouseMap || {}).forEach((driver) => {
+    Object.keys(sanitizedResolvedDriverWarehouseMap || {}).forEach((driver) => {
       const d = String(driver || '').trim();
       if (!d || isVirtualControlDriver(d)) return;
       const dk = normalizeDriverLookupKey(d);
       if (!dk) return;
-      if (!byKey.has(dk)) byKey.set(dk, resolveNazoratDriverName(d));
+      if (!byKey.has(dk)) byKey.set(dk, resolveNazoratDriverNameBase(d));
     });
     let out = Array.from(byKey.entries()).map(([driverKey, driver]) => ({ driverKey, driver }));
     if (!canSeeAllNazorat) {
       out = out.filter((x) => String(x.driver || '').trim().toLowerCase() === currentUserNorm);
     }
     return out.sort((a, b) => String(a.driver || '').localeCompare(String(b.driver || ''), 'ru'));
-  }, [permDriverDisplayByKey, resolvedDriverWarehouseMap, isVirtualControlDriver, normalizeDriverLookupKey, resolveNazoratDriverName, canSeeAllNazorat, currentUserNorm]);
+  }, [permDriverDisplayByKey, sanitizedResolvedDriverWarehouseMap, isVirtualControlDriver, normalizeDriverLookupKey, resolveNazoratDriverNameBase, canSeeAllNazorat, currentUserNorm]);
 
   const orderControlRows = useMemo(() => {
     const out = [];
     allPermDrivers.forEach(({ driverKey, driver }) => {
       if (!driverKey || !driver || isVirtualControlDriver(driver)) return;
-      const warehouse = String(warehouseByDriverKey.get(driverKey) || lookupByDriverName(resolvedDriverWarehouseMap, driver) || '').trim();
+      const warehouse = String(warehouseByDriverKey.get(driverKey) || lookupByDriverName(sanitizedResolvedDriverWarehouseMap, driver) || '').trim();
       const warehouseKey = normalizeWarehouseKey(warehouse);
       const orderDates = orderDatesByDriver.get(driverKey) || new Set();
       const transferDates = warehouseKey ? (transferDatesByWarehouse.get(warehouseKey) || new Set()) : new Set();
@@ -8246,7 +8295,7 @@ function Reports({
     allPermDrivers,
     isVirtualControlDriver,
     warehouseByDriverKey,
-    resolvedDriverWarehouseMap,
+    sanitizedResolvedDriverWarehouseMap,
     lookupByDriverName,
     orderDatesByDriver,
     transferDatesByWarehouse,
@@ -8260,7 +8309,7 @@ function Reports({
       driver: r.driver,
       warehouse: r.warehouse,
       orderQty: r.orderQty,
-      status: r.warehouse === '-' ? 'Sklad biriktirilmagan' : 'OK',
+      status: r.status || 'OK',
     })),
     [orderControlRows]
   );
@@ -8273,9 +8322,11 @@ function Reports({
         driver: r.driver,
         warehouse: r.warehouse,
         transferQty: r.transferQty,
-        status: r.warehouse === '-'
-          ? 'Sklad biriktirilmagan'
-          : (Number(r.transferQty || 0) > 0.0001 ? 'OK' : "Permesheniya oynasidan topilmadi"),
+        status: r.status || (
+          r.warehouse === '-'
+            ? 'Sklad biriktirilmagan'
+            : (Number(r.transferQty || 0) > 0.0001 ? 'OK' : "Permesheniya oynasidan topilmadi")
+        ),
       })),
     [orderControlRows]
   );
