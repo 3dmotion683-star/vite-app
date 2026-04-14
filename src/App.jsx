@@ -7997,8 +7997,6 @@ function Reports({
       if (isVirtualControlWarehouse(o.warehouse)) return false;
       const dateKey = toIsoDate(o.orderDate);
       if (!dateKey) return false;
-      if (dateKey < CONTROL_COMPARE_START_DATE) return false;
-      if (controlEndDate && dateKey > controlEndDate) return false;
       const driver = resolveNazoratDriverName(o.delivPerson || o.agent || '');
       if (isVirtualControlDriver(driver)) return false;
       if (!driver) return false;
@@ -8012,7 +8010,7 @@ function Reports({
       rows = rows.filter((r) => String(r.driver || '').trim().toLowerCase() === currentUserNorm);
     }
     return rows;
-  }, [rawOrders, canSeeAllNazorat, currentUserNorm, controlEndDate, resolveNazoratDriverName, isVirtualControlDriver, isVirtualControlWarehouse]);
+  }, [rawOrders, canSeeAllNazorat, currentUserNorm, resolveNazoratDriverName, isVirtualControlDriver, isVirtualControlWarehouse]);
 
   const transferRows = useMemo(() => {
     return (warehouseTransfers || []).filter((r) => {
@@ -8021,8 +8019,6 @@ function Reports({
       if (isVirtualControlWarehouse(r.toWarehouse) || isVirtualControlWarehouse(r.fromWarehouse)) return false;
       const d = toIsoDate(r.moveDate);
       if (!d) return false;
-      if (d < CONTROL_COMPARE_START_DATE) return false;
-      if (controlEndDate && d > controlEndDate) return false;
       const from = String(r.fromWarehouse || '').trim();
       if (!from) return false;
       return true;
@@ -8031,7 +8027,7 @@ function Reports({
       fromWarehouse: String(r.fromWarehouse || '').trim(),
       qty: Math.abs(toNum(r.qty)),
     }));
-  }, [warehouseTransfers, controlEndDate, isVirtualControlWarehouse]);
+  }, [warehouseTransfers, isVirtualControlWarehouse]);
 
   const { orderQtyByDriverDate, orderDatesByDriver } = useMemo(() => {
     const qtyMap = new Map();
@@ -8900,7 +8896,7 @@ function Reports({
 
         {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' && (
           <div style={{fontSize:11,color:'var(--t3)'}}>
-            Chegara: {controlDateRangeLabel}. Faqat "Основной склад"dan urilgan zakazlar hisobga olinadi. "Vertual" dostavchik/ombor nazoratga kirmaydi. Dostavchik-sklad biriktirish: Nastroyka &gt; Biriktirish bo'limida.
+            Sana chegarasisiz (hammasi tekshiriladi). Faqat "Основной склад"dan urilgan zakazlar hisobga olinadi. "Vertual" dostavchik/ombor nazoratga kirmaydi. Dostavchik-sklad biriktirish: Nastroyka &gt; Biriktirish bo'limida.
           </div>
         )}
         {nazoratSection === 'orders' && nazoratOrderSection === 'duplicates' && (
