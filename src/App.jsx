@@ -7702,6 +7702,18 @@ function Reports({
     (v) => normalizeMatchText(v).replace(/[^a-z0-9а-я]/gi, ''),
     []
   );
+  const canAliasSourceDriverName = useCallback((driverName) => {
+    const raw = String(driverName || '').trim();
+    if (!raw || raw === '-') return false;
+    const low = normalizeMatchText(raw);
+    const hasLetters = /[a-zа-я]/i.test(raw);
+    const hasDigits = /\d/.test(raw);
+    if (raw.includes('@')) return true;
+    if (!hasLetters && hasDigits) return true; // masalan: "4", "12"
+    if (low.includes('dostavchik') || low.includes('driver') || low.includes('водитель')) return true;
+    if (/[;,]/.test(raw) && hasDigits) return true; // masalan: "4, Kamron"
+    return false;
+  }, []);
   const resolveNazoratDriverNameBase = useCallback((rawDriver) => {
     const raw = String(rawDriver || '').trim();
     if (!raw) return '-';
@@ -7747,6 +7759,7 @@ function Reports({
       const sysDrivers = systemDriversByDateCustomer.get(mapKey);
       if (!sysDrivers || !sysDrivers.size) return;
       sysDrivers.forEach((sysDriver) => {
+        if (!canAliasSourceDriverName(sysDriver)) return;
         const sysKey = normalizeNazoratDriverKey(sysDriver);
         if (!sysKey || sysKey === archiveDriverKey) return;
         if (!aliasCounts.has(sysKey)) aliasCounts.set(sysKey, new Map());
@@ -7761,12 +7774,12 @@ function Reports({
       if (!ranked.length) return;
       const [bestName, bestCount] = ranked[0];
       const secondCount = ranked[1]?.[1] || 0;
-      if (bestName && bestCount > 0 && bestCount >= secondCount) {
+      if (bestName && bestCount >= 2 && bestCount > secondCount) {
         out.set(oldKey, bestName);
       }
     });
     return out;
-  }, [rawOrders, rawArchiveSheetRows, resolveNazoratDriverNameBase, normalizeNazoratDriverKey]);
+  }, [rawOrders, rawArchiveSheetRows, resolveNazoratDriverNameBase, normalizeNazoratDriverKey, canAliasSourceDriverName]);
   const resolveNazoratDriverName = useCallback((rawDriver) => {
     const base = resolveNazoratDriverNameBase(rawDriver);
     const k = normalizeNazoratDriverKey(base);
