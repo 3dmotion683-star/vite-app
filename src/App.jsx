@@ -10941,7 +10941,7 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
 function SettingsPanel({
   users, setUsers, access, setAccess, currentUser, setCurrentUser,
   webhookUrl, setWebhookUrl, userCreds, setUserCreds, onSwitchUser, isAdminSession=false, viewerAccess=null,
-  D=null, company='murodbaxsh',
+  D=null, company='murodbaxsh', rawArchiveSheetRows = [], rawEmployeeSheetRows = [],
 }) {
   const [tab, setTab] = useState('staff');
   const [sel, setSel] = useState(currentUser || users[0] || 'Admin');
@@ -10989,10 +10989,12 @@ function SettingsPanel({
   const [driverWarehouseMap, setDriverWarehouseMap] = useState(() => S.get(bindingStorageKey, {}));
   const [driverCashMap, setDriverCashMap] = useState(() => S.get(bindingCashStorageKey, {}));
   const [driverCardCashMap, setDriverCardCashMap] = useState(() => S.get(bindingCardCashStorageKey, {}));
-  const bindingEmployeeRows = useMemo(
-    () => parseLeftoverEmployeesRows(Array.isArray(D?.rawEmployeeSheetRows) ? D.rawEmployeeSheetRows : []),
-    [D?.rawEmployeeSheetRows]
-  );
+  const bindingEmployeeRows = useMemo(() => {
+    const src = (Array.isArray(rawEmployeeSheetRows) && rawEmployeeSheetRows.length)
+      ? rawEmployeeSheetRows
+      : (Array.isArray(D?.rawEmployeeSheetRows) ? D.rawEmployeeSheetRows : []);
+    return parseLeftoverEmployeesRows(src);
+  }, [rawEmployeeSheetRows, D?.rawEmployeeSheetRows]);
   const bindingEmpNameById = useMemo(() => {
     const m = {};
     (bindingEmployeeRows || []).forEach((r) => {
@@ -11041,25 +11043,69 @@ function SettingsPanel({
     setSel(users[0] || 'Admin');
   }, [users, sel]);
   const bindingDrivers = useMemo(() => {
+    const splitDriverTokens = (raw) => String(raw || '')
+      .split(/[;|/]/g)
+      .map((x) => String(x || '').trim())
+      .filter(Boolean)
+      .flatMap((chunk) => {
+        const commaParts = chunk.split(',').map((x) => String(x || '').trim()).filter(Boolean);
+        if (commaParts.length <= 1) return [chunk];
+        return commaParts;
+      })
+      .map((x) => x.replace(/^\d+\s*[-:,.]?\s*/g, '').trim())
+      .filter((x) => x && !/^\d+$/.test(x));
+    const canonicalKey = (v) => normalizeMatchText(v)
+      .replace(/^\d+\s*/g, '')
+      .replace(/[^a-z0-9а-я]/gi, '')
+      .trim();
+
     const orderDrivers = (D?.rawOrders || [])
       .filter((o) => isOrderDoc(o.docType) && !isCancelledStatus(o.status))
-      .map((o) => normalizeBindingDriverName(o.delivPerson || o.agent || ''))
+      .flatMap((o) => splitDriverTokens(o.delivPerson || o.agent || ''))
+      .map((d) => normalizeBindingDriverName(d))
       .filter(Boolean);
-    const archiveDrivers = parseLeftoverArchiveRows(Array.isArray(D?.rawArchiveSheetRows) ? D.rawArchiveSheetRows : [])
-      .map((r) => normalizeBindingDriverName(r?.driver || ''))
+    const archiveSrc = (Array.isArray(rawArchiveSheetRows) && rawArchiveSheetRows.length)
+      ? rawArchiveSheetRows
+      : (Array.isArray(D?.rawArchiveSheetRows) ? D.rawArchiveSheetRows : []);
+    const archiveDrivers = parseLeftoverArchiveRows(archiveSrc)
+      .flatMap((r) => splitDriverTokens(r?.driver || ''))
+      .map((d) => normalizeBindingDriverName(d))
       .filter(Boolean);
     const mappedDrivers = [
       ...Object.keys(driverWarehouseMap || {}),
       ...Object.keys(driverCashMap || {}),
       ...Object.keys(driverCardCashMap || {}),
-    ].map((d) => normalizeBindingDriverName(d)).filter(Boolean);
-    const src = [...orderDrivers, ...archiveDrivers, ...mappedDrivers];
-    const uniq = Array.from(new Set(src))
-      .filter((d) => !isVirtualDriverLabel(d))
-      .sort((a, b) => a.localeCompare(b, 'ru'));
+    ]
+      .flatMap((d) => splitDriverTokens(d))
+      .map((d) => normalizeBindingDriverName(d))
+      .filter(Boolean);
+
+    const merged = new Map();
+    [...orderDrivers, ...archiveDrivers, ...mappedDrivers].forEach((name) => {
+      const cleaned = String(name || '').trim();
+      if (!cleaned || isVirtualDriverLabel(cleaned)) return;
+      const k = canonicalKey(cleaned);
+      if (!k) return;
+      const prev = merged.get(k);
+      if (!prev || String(cleaned).length > String(prev).length) {
+        merged.set(k, cleaned);
+      }
+    });
+
+    const uniq = Array.from(merged.values()).sort((a, b) => a.localeCompare(b, 'ru'));
     if (isAdminSession) return uniq;
     return uniq.filter((d) => d === currentUser);
-  }, [D, isAdminSession, currentUser, driverWarehouseMap, driverCashMap, driverCardCashMap, normalizeBindingDriverName]);
+  }, [
+    D?.rawOrders,
+    D?.rawArchiveSheetRows,
+    rawArchiveSheetRows,
+    isAdminSession,
+    currentUser,
+    driverWarehouseMap,
+    driverCashMap,
+    driverCardCashMap,
+    normalizeBindingDriverName,
+  ]);
   const bindingWarehouses = useMemo(() => {
     const allTransfers = Array.isArray(D?.warehouseTransfers) ? D.warehouseTransfers : [];
     const strict = allTransfers
@@ -13811,7 +13857,7 @@ export default function App() {
                     mode="bloggers"
                   />
                 )}
-                {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} D={D} company={activeCompany} />}
+                {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} D={D} company={activeCompany} rawArchiveSheetRows={leftoverArchiveSheetRows} rawEmployeeSheetRows={leftoverEmployeeSheetRows} />}
               </>
             )}
           </div>
