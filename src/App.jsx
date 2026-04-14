@@ -7323,11 +7323,9 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
   const [pickMode, setPickMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState({});
   const [kulerMonthsCfg, setKulerMonthsCfg] = useState(() => S.get('aq-kuler-months', {}));
-  // Bo'limga ruxsat bo'lsa, ichki "Kuler nasiya" ham ko'rinsin.
-  // Alohida ruxsat ishlatilsa ham qo'llab-quvvatlaydi, lekin section ruxsati ustuvor.
+  // Doljniki bo'limi ochiq bo'lsa, Kuler nasiya ham ko'rinadi (faqat Ahmadtea'da yopiq).
   const allowKulerTab = normalizeCompanyKey(company) !== 'ahmadtea' && (
-    ((currentAccess?.visible?.doljniki ?? true) !== false) ||
-    ((currentAccess?.visible?.doljniki_kuler ?? true) !== false)
+    (currentAccess?.visible?.doljniki ?? true) !== false
   );
   useEffect(() => {
     if (allowKulerTab) return;
@@ -7683,11 +7681,13 @@ function Reports({
   const showReport = mode !== 'nazorat';
   const showNazorat = mode !== 'reports';
   const reportsSectionEnabled = (currentAccess?.visible?.reports ?? true) !== false;
-  const isOperatorRole = String(currentAccess?.role || '').trim().toLowerCase() === 'operator';
-  // Oylik/kunlik plan ko'rsatkichlari faqat operator lavozimi uchun ko'rinadi.
-  const allowMonthlyWaterCard = reportsSectionEnabled && isOperatorRole;
-  const allowPlanRemainderCard = reportsSectionEnabled && isOperatorRole;
-  const showDailyPlanColumn = reportsSectionEnabled && isOperatorRole;
+  const roleKey = String(currentAccess?.role || '').trim().toLowerCase();
+  const isOperatorRole = roleKey === 'operator';
+  const isAdminRole = roleKey === 'admin' || String(currentUser || '') === 'Admin';
+  // Oylik/kunlik plan ko'rsatkichlari: operator va admin uchun ko'rinadi, supervisor uchun yopiq.
+  const allowMonthlyWaterCard = reportsSectionEnabled && (isOperatorRole || isAdminRole);
+  const allowPlanRemainderCard = reportsSectionEnabled && (isOperatorRole || isAdminRole);
+  const showDailyPlanColumn = reportsSectionEnabled && (isOperatorRole || isAdminRole);
   const controlEndDate = getYesterdayIsoDate();
   const employeeRows = useMemo(
     () => parseLeftoverEmployeesRows(rawEmployeeSheetRows || []),
