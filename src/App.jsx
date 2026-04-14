@@ -7323,7 +7323,12 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
   const [pickMode, setPickMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState({});
   const [kulerMonthsCfg, setKulerMonthsCfg] = useState(() => S.get('aq-kuler-months', {}));
-  const allowKulerTab = normalizeCompanyKey(company) !== 'ahmadtea' && ((currentAccess?.visible?.doljniki_kuler ?? true) === true);
+  // Bo'limga ruxsat bo'lsa, ichki "Kuler nasiya" ham ko'rinsin.
+  // Alohida ruxsat ishlatilsa ham qo'llab-quvvatlaydi, lekin section ruxsati ustuvor.
+  const allowKulerTab = normalizeCompanyKey(company) !== 'ahmadtea' && (
+    ((currentAccess?.visible?.doljniki ?? true) !== false) ||
+    ((currentAccess?.visible?.doljniki_kuler ?? true) !== false)
+  );
   useEffect(() => {
     if (allowKulerTab) return;
     if (tab === 'kuler') setTab('qarz');
@@ -7677,6 +7682,12 @@ function Reports({
   const currentUserNorm = String(currentUser || '').trim().toLowerCase();
   const showReport = mode !== 'nazorat';
   const showNazorat = mode !== 'reports';
+  const reportsSectionEnabled = (currentAccess?.visible?.reports ?? true) !== false;
+  const isOperatorRole = String(currentAccess?.role || '').trim().toLowerCase() === 'operator';
+  // Oylik/kunlik plan ko'rsatkichlari faqat operator lavozimi uchun ko'rinadi.
+  const allowMonthlyWaterCard = reportsSectionEnabled && isOperatorRole;
+  const allowPlanRemainderCard = reportsSectionEnabled && isOperatorRole;
+  const showDailyPlanColumn = reportsSectionEnabled && isOperatorRole;
   const controlEndDate = getYesterdayIsoDate();
   const employeeRows = useMemo(
     () => parseLeftoverEmployeesRows(rawEmployeeSheetRows || []),
@@ -7830,7 +7841,8 @@ function Reports({
   const visibleRows = useMemo(() => {
     const base = (obzvonNewRows || []).filter((r) => !isObzvonDeletedRow(r));
     if (canSeeAll) return base;
-    return base.filter((r) => String(r.operator || '').trim() === String(currentUser || '').trim());
+    const me = normalizeUserKey(currentUser);
+    return base.filter((r) => normalizeUserKey(r.operator) === me);
   }, [obzvonNewRows, canSeeAll, currentUser]);
 
   const rowsToday = useMemo(
@@ -8977,18 +8989,22 @@ function Reports({
       )}
       {showReport && (
       <div className="g4">
-        <StatCard
-          l={`Oylik sotilgan suv (${currentMonth})  |  ${companyLabelByKey(company)}`}
-          v={`${fmt(monthWaterQty)} ta`}
-          s={`Zakaz: ${fmt(monthWaterStats.soldQty)}  |  Vozvrat: -${fmt(monthWaterStats.returnedQty)}  |  Netto: ${fmt(monthWaterSum)} so'm`}
-          c="var(--bl)"
-        />
-        <StatCard
-          l="BUGUNGI PLAN QOLDIQ"
-          v={`${fmt(basePlanForDisplay)} ta`}
-          s={`Keyingi ish kuni (${nextWorkDate ? toIsoDate(nextWorkDate) : '-'}) rejasi: ${fmt(basePlanForDisplay)}  |  operatorga: ${fmt(currentPlanTarget)}  |  oy qoldiq: ${fmt(remainingMonthPlanQty)}  |  ish kun: ${fmt(remainingWorkDays)}`}
-          c="var(--gr)"
-        />
+        {allowMonthlyWaterCard && (
+          <StatCard
+            l={`Oylik sotilgan suv (${currentMonth})  |  ${companyLabelByKey(company)}`}
+            v={`${fmt(monthWaterQty)} ta`}
+            s={`Zakaz: ${fmt(monthWaterStats.soldQty)}  |  Vozvrat: -${fmt(monthWaterStats.returnedQty)}  |  Netto: ${fmt(monthWaterSum)} so'm`}
+            c="var(--bl)"
+          />
+        )}
+        {allowPlanRemainderCard && (
+          <StatCard
+            l="BUGUNGI PLAN QOLDIQ"
+            v={`${fmt(basePlanForDisplay)} ta`}
+            s={`Keyingi ish kuni (${nextWorkDate ? toIsoDate(nextWorkDate) : '-'}) rejasi: ${fmt(basePlanForDisplay)}  |  operatorga: ${fmt(currentPlanTarget)}  |  oy qoldiq: ${fmt(remainingMonthPlanQty)}  |  ish kun: ${fmt(remainingWorkDays)}`}
+            c="var(--gr)"
+          />
+        )}
         <StatCard
           l="QARZDORLIK ISHLOVI"
           v={`${debtWorkedCount} ta`}
@@ -9019,12 +9035,12 @@ function Reports({
                 <th style={{textAlign:'right'}}>Qarz mijoz</th>
                 <th style={{textAlign:'right'}}>Qarz summa</th>
                 <th>Qaysi sanaga zakaz</th>
-                <th style={{textAlign:'right'}}>Kunlik plan</th>
+                {showDailyPlanColumn && <th style={{textAlign:'right'}}>Kunlik plan</th>}
               </tr>
             </thead>
             <tbody>
               {dailyRows.length===0 ? (
-                <tr><td colSpan={9} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Bugungi natija yo'q</td></tr>
+                <tr><td colSpan={showDailyPlanColumn ? 9 : 8} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Bugungi natija yo'q</td></tr>
               ) : (
                 <>
                   {dailyRows.map((r, i) => (
@@ -9038,7 +9054,9 @@ function Reports({
                         <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.debtCount)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--rd)'}}>{fmt(r.debtSum)}</td>
                         <td style={{fontSize:11,color:'var(--t2)'}}>-</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
+                        {showDailyPlanColumn && (
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
+                        )}
                       </tr>
                       {(r.dateEntries || []).map((d, j) => (
                         <tr key={`rep_${i}_${j}_${d.date}`} style={{background:'rgba(88,166,255,.05)'}}>
@@ -9050,7 +9068,7 @@ function Reports({
                           <td style={{textAlign:'right',color:'var(--t4)'}}>-</td>
                           <td style={{textAlign:'right',color:'var(--t4)'}}>-</td>
                           <td style={{fontFamily:'var(--mono)',fontSize:11}}>{d.date}</td>
-                          <td style={{textAlign:'right',color:'var(--t4)'}}>-</td>
+                          {showDailyPlanColumn && <td style={{textAlign:'right',color:'var(--t4)'}}>-</td>}
                         </tr>
                       ))}
                     </Fragment>
@@ -9064,9 +9082,11 @@ function Reports({
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.debtCount)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--rd)'}}>{fmt(dailyTotals.debtSum)}</td>
                     <td style={{fontWeight:700,color:'var(--t3)'}}>-</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>
-                      {fmt(canSeeAll ? currentPlanTarget * Math.max(1, dailyRows.length) : currentPlanTarget)}
-                    </td>
+                    {showDailyPlanColumn && (
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>
+                        {fmt(canSeeAll ? currentPlanTarget * Math.max(1, dailyRows.length) : currentPlanTarget)}
+                      </td>
+                    )}
                   </tr>
                 </>
               )}
