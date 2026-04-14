@@ -8057,6 +8057,7 @@ function Reports({
   }, [normalizeDriverLookupKey]);
   const [nazoratSection, setNazoratSection] = useState('orders');
   const [nazoratOrderSection, setNazoratOrderSection] = useState('transfer');
+  const [nazoratPermSection, setNazoratPermSection] = useState('errors');
   const [nazoratReturnSection, setNazoratReturnSection] = useState('return_order');
   const [nazoratReturnDiffSection, setNazoratReturnDiffSection] = useState('customer');
   const [nazoratGapSection, setNazoratGapSection] = useState('customer');
@@ -8066,10 +8067,11 @@ function Reports({
   const [nazoratFilterState, setNazoratFilterState] = useState({});
   useEffect(() => {
     if (nazoratSection !== 'orders') setNazoratOrderSection('transfer');
+    if (!(nazoratSection === 'orders' && nazoratOrderSection === 'transfer')) setNazoratPermSection('errors');
     if (nazoratSection !== 'returns') setNazoratReturnSection('return_order');
     if (nazoratSection !== 'gap') setNazoratGapSection('customer');
     if (nazoratSection !== 'cash') setNazoratCashSection('payment');
-  }, [nazoratSection]);
+  }, [nazoratSection, nazoratOrderSection]);
   useEffect(() => {
     if (nazoratReturnSection !== 'return_return') setNazoratReturnDiffSection('customer');
   }, [nazoratReturnSection]);
@@ -8098,99 +8100,108 @@ function Reports({
     return rows;
   }, [rawOrders, canSeeAllNazorat, currentUserNorm, resolveNazoratDriverName, isVirtualControlDriver, isVirtualControlWarehouse]);
 
+  const isPermWaterProduct = useCallback((product) => {
+    const p = normProduct(product);
+    return (
+      p === 'murodbaxsh 18.9l' ||
+      p === 'бонус murodbaxsh 18.9l' ||
+      p === 'bonus murodbaxsh 18.9l'
+    );
+  }, []);
+
+  const permOrderRowsAll = useMemo(() => {
+    const byDateDriver = new Map();
+    (rawOrders || []).forEach((o) => {
+      if (!isOrderDoc(o?.docType)) return;
+      if (isCancelledStatus(o?.status)) return;
+      if (!isMainWarehouseLabel(o?.warehouse)) return;
+      if (!isPermWaterProduct(o?.product)) return;
+      const date = toIsoDate(o?.orderDate);
+      if (!date) return;
+      const driver = resolveNazoratDriverName(o?.delivPerson || o?.agent || '');
+      if (!driver || driver === '-' || isVirtualControlDriver(driver)) return;
+      if (!canSeeAllNazorat && String(driver).trim().toLowerCase() !== currentUserNorm) return;
+      const key = `${date}__${driver}`;
+      if (!byDateDriver.has(key)) byDateDriver.set(key, { date, driver, orderQty: 0, status: 'OK' });
+      const row = byDateDriver.get(key);
+      row.orderQty += Math.abs(toNum(o?.qty));
+    });
+    return Array.from(byDateDriver.values()).sort((a, b) => (
+      a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date)
+    ));
+  }, [rawOrders, canSeeAllNazorat, currentUserNorm, resolveNazoratDriverName, isVirtualControlDriver, isPermWaterProduct]);
+
   const transferRows = useMemo(() => {
-    return (warehouseTransfers || []).filter((r) => {
-      if (!isWaterProduct(r.product)) return false;
-      if (!isMainWarehouseLabel(r.toWarehouse)) return false;
-      if (isVirtualControlWarehouse(r.toWarehouse) || isVirtualControlWarehouse(r.fromWarehouse)) return false;
-      const d = toIsoDate(r.moveDate);
-      if (!d) return false;
-      const from = String(r.fromWarehouse || '').trim();
-      if (!from) return false;
-      return true;
-    }).map((r) => ({
-      date: toIsoDate(r.moveDate),
-      fromWarehouse: String(r.fromWarehouse || '').trim(),
-      qty: Math.abs(toNum(r.qty)),
-    }));
-  }, [warehouseTransfers, isVirtualControlWarehouse]);
-
-  const { orderQtyByDriverDate, orderDatesByDriver } = useMemo(() => {
-    const qtyMap = new Map();
-    const datesByDriver = new Map();
-    controlOrderRows.forEach((r) => {
-      const key = `${r.driver}__${r.date}`;
-      qtyMap.set(key, (qtyMap.get(key) || 0) + Math.abs(toNum(r.qty)));
-      if (!datesByDriver.has(r.driver)) datesByDriver.set(r.driver, new Set());
-      datesByDriver.get(r.driver).add(r.date);
+    const byDateFromTo = new Map();
+    (warehouseTransfers || []).forEach((r) => {
+      if (!isMainWarehouseLabel(r?.toWarehouse)) return;
+      if (!isPermWaterProduct(r?.product)) return;
+      if (isVirtualControlWarehouse(r?.toWarehouse) || isVirtualControlWarehouse(r?.fromWarehouse)) return;
+      const date = toIsoDate(r?.moveDate);
+      if (!date) return;
+      const fromWarehouse = String(r?.fromWarehouse || '').trim() || '-';
+      const toWarehouse = String(r?.toWarehouse || '').trim() || '-';
+      const key = `${date}__${fromWarehouse}__${toWarehouse}`;
+      if (!byDateFromTo.has(key)) byDateFromTo.set(key, { date, fromWarehouse, toWarehouse, transferQty: 0, status: 'OK' });
+      const row = byDateFromTo.get(key);
+      row.transferQty += Math.abs(toNum(r?.qty));
     });
-    return { orderQtyByDriverDate: qtyMap, orderDatesByDriver: datesByDriver };
-  }, [controlOrderRows]);
+    return Array.from(byDateFromTo.values()).sort((a, b) => (
+      a.date === b.date ? a.fromWarehouse.localeCompare(b.fromWarehouse, 'ru') : a.date.localeCompare(b.date)
+    ));
+  }, [warehouseTransfers, isVirtualControlWarehouse, isPermWaterProduct]);
 
-  const { transferQtyByWarehouseDate, transferDatesByWarehouse } = useMemo(() => {
-    const qtyMap = new Map();
-    const datesByWarehouse = new Map();
-    transferRows.forEach((r) => {
-      const warehouseKey = normalizeWarehouseKey(r.fromWarehouse);
-      if (!warehouseKey) return;
-      const key = `${warehouseKey}__${r.date}`;
-      qtyMap.set(key, (qtyMap.get(key) || 0) + Math.abs(toNum(r.qty)));
-      if (!datesByWarehouse.has(warehouseKey)) datesByWarehouse.set(warehouseKey, new Set());
-      datesByWarehouse.get(warehouseKey).add(r.date);
+  const orderQtyByDate = useMemo(() => {
+    const m = new Map();
+    (permOrderRowsAll || []).forEach((r) => {
+      const d = String(r?.date || '').trim();
+      if (!d) return;
+      m.set(d, (m.get(d) || 0) + Math.abs(toNum(r?.orderQty)));
     });
-    return { transferQtyByWarehouseDate: qtyMap, transferDatesByWarehouse: datesByWarehouse };
+    return m;
+  }, [permOrderRowsAll]);
+
+  const transferQtyByDate = useMemo(() => {
+    const m = new Map();
+    (transferRows || []).forEach((r) => {
+      const d = String(r?.date || '').trim();
+      if (!d) return;
+      m.set(d, (m.get(d) || 0) + Math.abs(toNum(r?.transferQty)));
+    });
+    return m;
   }, [transferRows]);
 
-  const allDrivers = useMemo(() => {
-    const set = new Set([
-      ...Array.from(orderDatesByDriver.keys()),
-      ...Object.keys(resolvedDriverWarehouseMap || {}),
+  const orderControlRows = useMemo(() => {
+    const allDates = new Set([
+      ...Array.from(orderQtyByDate.keys()),
+      ...Array.from(transferQtyByDate.keys()),
     ]);
-    let rows = Array.from(set)
-      .filter((x) => x && !isVirtualControlDriver(x))
-      .sort((a, b) => a.localeCompare(b, 'ru'));
-    if (!canSeeAllNazorat) rows = rows.filter((x) => String(x || '').trim().toLowerCase() === currentUserNorm);
-    return rows;
-  }, [orderDatesByDriver, resolvedDriverWarehouseMap, canSeeAllNazorat, currentUserNorm, isVirtualControlDriver]);
-
-  const dailyControlRows = useMemo(() => {
-    const out = [];
-    allDrivers.forEach((driver) => {
-      if (isVirtualControlDriver(driver)) return;
-      const warehouse = String(resolvedDriverWarehouseMap?.[driver] || '').trim();
-      if (isVirtualControlWarehouse(warehouse)) return;
-      const warehouseKey = normalizeWarehouseKey(warehouse);
-      const orderDates = orderDatesByDriver.get(driver) || new Set();
-      const transferDates = warehouseKey ? (transferDatesByWarehouse.get(warehouseKey) || new Set()) : new Set();
-      const allDates = Array.from(new Set([...orderDates, ...transferDates])).sort((a, b) => a.localeCompare(b));
-      allDates.forEach((date) => {
-        const orderQty = Number(orderQtyByDriverDate.get(`${driver}__${date}`) || 0);
-        const transferQty = warehouseKey ? Number(transferQtyByWarehouseDate.get(`${warehouseKey}__${date}`) || 0) : 0;
-        if (!warehouse && !orderQty && !transferQty) return;
-        if (warehouse && !orderQty && !transferQty) return;
-        out.push({
+    return Array.from(allDates)
+      .sort((a, b) => a.localeCompare(b))
+      .map((date) => {
+        const hasOrder = orderQtyByDate.has(date);
+        const hasTransfer = transferQtyByDate.has(date);
+        const orderQty = Number(orderQtyByDate.get(date) || 0);
+        const transferQty = Number(transferQtyByDate.get(date) || 0);
+        const diff = orderQty - transferQty;
+        let status = 'OK';
+        if (!hasOrder) status = "Zakaz oynasidan topilmadi";
+        else if (!hasTransfer) status = "Permesheniya oynasidan topilmadi";
+        else if (Math.abs(diff) > 0.0001) status = 'Mos emas';
+        return {
           date,
-          driver,
-          warehouse: warehouse || '-',
           orderQty,
           transferQty,
-          diff: orderQty - transferQty,
-          mappingMissing: !warehouse,
-        });
+          diff,
+          status,
+          hasOrder,
+          hasTransfer,
+        };
       });
-    });
-    return out.sort((a, b) => (a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date)));
-  }, [allDrivers, resolvedDriverWarehouseMap, orderDatesByDriver, transferDatesByWarehouse, orderQtyByDriverDate, transferQtyByWarehouseDate, isVirtualControlDriver, isVirtualControlWarehouse]);
+  }, [orderQtyByDate, transferQtyByDate]);
 
-  const orderControlRows = useMemo(
-    () => dailyControlRows.map((r) => ({
-      ...r,
-      status: r.mappingMissing ? 'Sklad biriktirilmagan' : (r.diff === 0 ? 'OK' : 'Mos emas'),
-    })),
-    [dailyControlRows]
-  );
   const orderMismatchRows = useMemo(
-    () => orderControlRows.filter((r) => r.mappingMissing || r.diff !== 0),
+    () => orderControlRows.filter((r) => String(r?.status || '').toUpperCase() !== 'OK'),
     [orderControlRows]
   );
   const duplicateOrderRows = useMemo(() => {
@@ -8554,13 +8565,24 @@ function Reports({
     }
     return viewKey === 'all' ? (diffData?.customerRowsAll || []) : (diffData?.customerRowsErrors || []);
   }, []);
-  const nazoratOrderColumns = useMemo(() => ([
+  const nazoratPermCompareColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'orderQty', label:'Zakaz suv soni', type:'number' },
+    { key:'transferQty', label:'Permesheniya soni', type:'number' },
+    { key:'diff', label:'Farq', type:'number' },
+    { key:'status', label:'Holat', type:'text' },
+  ]), []);
+  const nazoratPermOrderColumns = useMemo(() => ([
     { key:'date', label:'Sana', type:'date' },
     { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'warehouse', label:'Sklad', type:'text' },
     { key:'orderQty', label:'Zakaz suv soni', type:'number' },
-    { key:'transferQty', label:'Permesheniya (obshiyga)', type:'number' },
-    { key:'diff', label:'Farq', type:'number' },
+    { key:'status', label:'Holat', type:'text' },
+  ]), []);
+  const nazoratPermTransferColumns = useMemo(() => ([
+    { key:'date', label:'Sana', type:'date' },
+    { key:'fromWarehouse', label:'Qaysi skladan', type:'text' },
+    { key:'toWarehouse', label:'Qaysi skladga', type:'text' },
+    { key:'transferQty', label:'Permesheniya soni', type:'number' },
     { key:'status', label:'Holat', type:'text' },
   ]), []);
   const nazoratOrderDuplicateColumns = useMemo(() => ([
@@ -8667,7 +8689,10 @@ function Reports({
   ]), []);
   const activeNazoratColumns = useMemo(() => {
     if (nazoratSection === 'orders') {
-      return nazoratOrderSection === 'duplicates' ? nazoratOrderDuplicateColumns : nazoratOrderColumns;
+      if (nazoratOrderSection === 'duplicates') return nazoratOrderDuplicateColumns;
+      if (nazoratPermSection === 'orders') return nazoratPermOrderColumns;
+      if (nazoratPermSection === 'transfer') return nazoratPermTransferColumns;
+      return nazoratPermCompareColumns;
     }
     if (nazoratSection === 'returns') {
       if (nazoratReturnSection === 'return_order') return nazoratReturnColumns;
@@ -8682,10 +8707,13 @@ function Reports({
   }, [
     nazoratSection,
     nazoratOrderSection,
+    nazoratPermSection,
     nazoratReturnSection,
     nazoratReturnDiffSection,
     nazoratGapSection,
-    nazoratOrderColumns,
+    nazoratPermCompareColumns,
+    nazoratPermOrderColumns,
+    nazoratPermTransferColumns,
     nazoratOrderDuplicateColumns,
     nazoratReturnColumns,
     nazoratReturnDiffCustomerColumns,
@@ -8699,6 +8727,8 @@ function Reports({
   const activeNazoratBaseRows = useMemo(() => {
     if (nazoratSection === 'orders') {
       if (nazoratOrderSection === 'duplicates') return nazoratView === 'errors' ? duplicateMismatchRows : duplicateOrderRows;
+      if (nazoratPermSection === 'orders') return permOrderRowsAll;
+      if (nazoratPermSection === 'transfer') return transferRows;
       return nazoratView === 'errors' ? orderMismatchRows : orderControlRows;
     }
     if (nazoratSection === 'returns') {
@@ -8712,12 +8742,15 @@ function Reports({
   }, [
     nazoratSection,
     nazoratOrderSection,
+    nazoratPermSection,
     nazoratReturnSection,
     nazoratReturnDiffSection,
     nazoratGapSection,
     nazoratView,
     orderMismatchRows,
     orderControlRows,
+    permOrderRowsAll,
+    transferRows,
     duplicateMismatchRows,
     duplicateOrderRows,
     returnMismatchRows,
@@ -8759,7 +8792,13 @@ function Reports({
       if (nazoratOrderSection === 'duplicates') {
         return { fileName: `Dublikat_zakazlar_${todayIso}.xlsx`, sheetName: 'Dublikat_zakazlar' };
       }
-      return { fileName: `Zakaz_nazorati_${todayIso}.xlsx`, sheetName: 'Zakaz_nazorati' };
+      if (nazoratPermSection === 'orders') {
+        return { fileName: `Permesheniya_zakaz_${todayIso}.xlsx`, sheetName: 'Permesheniya_Zakaz' };
+      }
+      if (nazoratPermSection === 'transfer') {
+        return { fileName: `Permesheniya_qabul_${todayIso}.xlsx`, sheetName: 'Permesheniya_Qabul' };
+      }
+      return { fileName: `Permesheniya_hato_${todayIso}.xlsx`, sheetName: 'Permesheniya_Hato' };
     }
     if (nazoratSection === 'returns') {
       if (nazoratReturnSection === 'return_order') {
@@ -8783,7 +8822,7 @@ function Reports({
       return { fileName: `Zakaz_farqi_son_hatolari_${todayIso}.xlsx`, sheetName: 'ZakazFarqiSon' };
     }
     return { fileName: `Zakaz_farqi_mijoz_hatolari_${todayIso}.xlsx`, sheetName: 'ZakazFarqiMijoz' };
-  }, [nazoratSection, nazoratOrderSection, nazoratReturnSection, nazoratReturnDiffSection, nazoratGapSection, todayIso]);
+  }, [nazoratSection, nazoratOrderSection, nazoratPermSection, nazoratReturnSection, nazoratReturnDiffSection, nazoratGapSection, todayIso]);
 
   const exportNazorat = () => {
     exportAoaExcel({
@@ -8951,7 +8990,11 @@ function Reports({
                 <UniversalFilterPanel
                   open={nazoratFilterOpen}
                   title={nazoratSection === 'orders'
-                    ? (nazoratOrderSection === 'duplicates' ? 'Dublikat zakazlar filtri' : 'Zakaz nazorati filtri')
+                    ? (nazoratOrderSection === 'duplicates'
+                      ? 'Dublikat zakazlar filtri'
+                      : (nazoratPermSection === 'orders'
+                        ? 'Permesheniya: Zakaz filtri'
+                        : (nazoratPermSection === 'transfer' ? 'Permesheniya: Permesheniya filtri' : 'Permesheniya: Hato filtri')))
                     : (nazoratSection === 'returns'
                       ? (nazoratReturnSection === 'return_order' ? 'Vozvrat & Zakaz filtri' : 'Vozvrat & Vozvrat filtri')
                       : (nazoratSection === 'cash' ? "Pul nazorati filtri" : 'Zakaz farqi filtri'))}
@@ -8978,11 +9021,24 @@ function Reports({
               </div>
             </div>
           )}
+          {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' && (
+            <div style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',flexWrap:'wrap',width:'100%'}}>
+              <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
+                <button className={`tab${nazoratPermSection==='errors'?' on':''}`} onClick={()=>setNazoratPermSection('errors')}>Hato</button>
+                <button className={`tab${nazoratPermSection==='orders'?' on':''}`} onClick={()=>setNazoratPermSection('orders')}>Zakaz</button>
+                <button className={`tab${nazoratPermSection==='transfer'?' on':''}`} onClick={()=>setNazoratPermSection('transfer')}>Permesheniya</button>
+              </div>
+            </div>
+          )}
         </div>
 
         {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' && (
           <div style={{fontSize:11,color:'var(--t3)'}}>
-            Sana chegarasisiz (hammasi tekshiriladi). Faqat "Основной склад"dan urilgan zakazlar hisobga olinadi. "Vertual" dostavchik/ombor nazoratga kirmaydi. Dostavchik-sklad biriktirish: Nastroyka &gt; Biriktirish bo'limida.
+            {nazoratPermSection === 'errors'
+              ? 'Hato: Zakaz va Permesheniya sana bo‘yicha solishtiriladi. Teng bo‘lsa OK, farq bo‘lsa "Mos emas", topilmasa mos oynadan topilmadi holati chiqadi.'
+              : (nazoratPermSection === 'orders'
+                ? 'Zakaz: public.view_item_basket dan faqat "Основной склад" + suv mahsulotlari ("Murodbaxsh 18.9L", "БОНУС Murodbaxsh 18.9L") olinadi. Sana + dostavchik bo‘yicha yig‘iladi.'
+                : 'Permesheniya: public.view_warehouse_transfer dan T(На склад) = "Основной склад" va suv mahsulotlari olinadi. Sana + qaysi skladan bo‘yicha yig‘iladi.')}
           </div>
         )}
         {nazoratSection === 'orders' && nazoratOrderSection === 'duplicates' && (
@@ -9013,44 +9069,77 @@ function Reports({
             {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' ? (
               <table className="tbl" style={{width:'max(100%, 1120px)',minWidth:1120,tableLayout:'fixed'}}>
                 <thead>
-                  <tr>
-                    <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
-                    <th>Sana</th>
-                    <th>Dostavchik</th>
-                    <th>Sklad</th>
-                    <th style={{textAlign:'right'}}>Zakaz suv soni</th>
-                    <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
-                    <th style={{textAlign:'right'}}>Farq</th>
-                    <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Holat</th>
-                  </tr>
+                  {nazoratPermSection === 'errors' ? (
+                    <tr>
+                      <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
+                      <th>Sana</th>
+                      <th style={{textAlign:'right'}}>Zakaz suv soni</th>
+                      <th style={{textAlign:'right'}}>Permesheniya soni</th>
+                      <th style={{textAlign:'right'}}>Farq</th>
+                      <th style={{width:260,minWidth:260,maxWidth:260,whiteSpace:'nowrap'}}>Holat</th>
+                    </tr>
+                  ) : nazoratPermSection === 'orders' ? (
+                    <tr>
+                      <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
+                      <th>Sana</th>
+                      <th>Dostavchik</th>
+                      <th style={{textAlign:'right'}}>Zakaz suv soni</th>
+                      <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Holat</th>
+                    </tr>
+                  ) : (
+                    <tr>
+                      <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
+                      <th>Sana</th>
+                      <th>Qaysi skladan</th>
+                      <th>Qaysi skladga</th>
+                      <th style={{textAlign:'right'}}>Permesheniya soni</th>
+                      <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Holat</th>
+                    </tr>
+                  )}
                 </thead>
                 <tbody>
                   {nazoratFilteredRows.length === 0 ? (
-                    <tr><td colSpan={8} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
+                    <tr><td colSpan={6} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
                   ) : (
                     <>
-                      {nazoratFilteredRows.map((r, i) => (
-                        <tr key={`nord_${i}_${r.driver}_${r.date}`} style={r.status === 'OK' ? undefined : {background:'rgba(248,81,73,.07)'}}>
+                      {nazoratPermSection === 'errors' && nazoratFilteredRows.map((r, i) => (
+                        <tr key={`nord_err_${i}_${r.date}`} style={r.status === 'OK' ? undefined : {background:'rgba(248,81,73,.07)'}}>
                           <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
                           <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
-                          <td>{r.driver}</td>
-                          <td>{r.warehouse}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
-                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',background:r.status === 'OK' ? 'var(--s1)' : 'rgba(248,81,73,.08)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
+                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',background:r.status === 'OK' ? 'var(--s1)' : 'rgba(248,81,73,.08)',width:260,minWidth:260,maxWidth:260,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
                         </tr>
                       ))}
-                      {nazoratView === 'all' && (
+                      {nazoratPermSection === 'orders' && nazoratFilteredRows.map((r, i) => (
+                        <tr key={`nord_ord_${i}_${r.driver}_${r.date}`}>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
+                          <td>{r.driver || '-'}</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
+                          <td style={{fontSize:11,color:'var(--gr)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>OK</td>
+                        </tr>
+                      ))}
+                      {nazoratPermSection === 'transfer' && nazoratFilteredRows.map((r, i) => (
+                        <tr key={`nord_tr_${i}_${r.fromWarehouse}_${r.date}`}>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
+                          <td>{r.fromWarehouse || '-'}</td>
+                          <td>{r.toWarehouse || '-'}</td>
+                          <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
+                          <td style={{fontSize:11,color:'var(--gr)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>OK</td>
+                        </tr>
+                      ))}
+                      {nazoratPermSection === 'errors' && nazoratView === 'all' && (
                         <tr style={{background:'var(--s2)'}}>
                           <td style={{fontWeight:800}}>#</td>
-                          <td colSpan={3} style={{fontWeight:800}}>ITOG</td>
+                          <td style={{fontWeight:800}}>ITOG</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--gr)'}}>{fmt(orderDisplayTotals.orderQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--bl)'}}>{fmt(orderDisplayTotals.transferQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:orderDisplayTotals.orderQty-orderDisplayTotals.transferQty===0?'var(--gr)':'var(--rd)'}}>
                             {fmt(orderDisplayTotals.orderQty - orderDisplayTotals.transferQty)}
                           </td>
-                          <td />
                         </tr>
                       )}
                     </>
