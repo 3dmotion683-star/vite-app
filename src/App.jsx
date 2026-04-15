@@ -21,33 +21,20 @@ const EXCLUDED_Z_CATEGORIES = [
   'uos',
   'rasxod',
   'rasxodnik',
-  'расход',
-  'расходник',
   'postavshik',
-  'поставщик',
   'personal',
-  'персонал',
   'dolg',
-  'долг',
   'vip',
   'kuler',
-  'кулер',
   'ofis',
-  'офис',
-  'ahmad choy',
-  'ahmad tea',
 ];
 const isAllowedAA = (v) => {
   const s = String(v || '').trim().toLowerCase();
   return s === '' || s.includes(ALLOWED_AA_KEYWORD);
 };
 const isExcludedZCategory = (v) => {
-  const s = normalizeMatchText(v).replace(/\s+/g, ' ').trim();
-  if (!s) return false;
-  return EXCLUDED_Z_CATEGORIES.some((k) => {
-    const key = normalizeMatchText(k).replace(/\s+/g, ' ').trim();
-    return key && (s === key || s.includes(key) || key.includes(s));
-  });
+  const s = String(v || '').trim().toLowerCase();
+  return EXCLUDED_Z_CATEGORIES.some((k) => s === k);
 };
 const normCurrency = (v) => {
   const s = String(v || '').trim().toUpperCase();
@@ -82,6 +69,12 @@ const normalizeAccessApiUrl = (v) => {
   const s = String(v || '').trim();
   if (!s) return OBZVON_WEBHOOK_DEFAULT;
   return /workers\.dev/i.test(s) ? s : OBZVON_WEBHOOK_DEFAULT;
+};
+const normalizeBotArchiveUrl = (v) => {
+  const s = String(v || '').trim();
+  if (!s) return BOT_ARCHIVE_DEFAULT;
+  if (!/^https?:\/\//i.test(s)) return BOT_ARCHIVE_DEFAULT;
+  return s.replace(/\/+$/, '');
 };
 function getDebtStats(customers = []) {
   const debtorsUZS = customers.filter((c) => c.balanceUZS < 0);
@@ -155,18 +148,15 @@ const ACCESS_SYNC_URL_KEY = 'aq-access-api-url';
 const ACCESS_UPDATED_AT_KEY = 'aq-access-updated-at';
 // Access konfiguratsiya sinxroni uchun Cloudflare Worker API URL:
 const OBZVON_WEBHOOK_DEFAULT = 'https://solitary-brook-4889aquabiz-api.3dmotion683.workers.dev';
+const BOT_ARCHIVE_URL_KEY = 'aq-bot-archive-url';
+const BOT_ARCHIVE_ADMIN_KEY = 'aq-bot-archive-admin-key';
+const BOT_ARCHIVE_DEFAULT = 'https://suv-telegram-bot.3dmotion683.workers.dev';
 // Google Sheetga yozish uchun fallback Apps Script URL
 const OBZVON_EXPORT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyi1OP_a_5C7-TBujLuo9dDast0RLVelhQsTiO6dlN_mefi55vnTHm_ZRXpDFFTTXb7qA/exec';
 const LEFTOVER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1n73ggQbkdpKj0gPJQAhlppUHmPTzfuAXjhHPrAJHgmo/edit?gid=971866254#gid=971866254';
 const LEFTOVER_SHEET_ID = '1n73ggQbkdpKj0gPJQAhlppUHmPTzfuAXjhHPrAJHgmo';
-const LEFTOVER_QZI_GID = '1558522420'; // Q_Z_I
 const LEFTOVER_REASON_GID = '971866254'; // Qolib_ketgan_zakazlar_Arxiv
 const LEFTOVER_ARCHIVE_GID = '1642247768'; // Arxiv
-const LEFTOVER_EMPLOYEES_GID = '1637417945'; // XODIMLAR
-const BLOGGER_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1f-rWiPP4uHpA4prtFEs-hYU20yyAV73bYtAIEciKs8Y/edit?gid=1712204630#gid=1712204630';
-const BLOGGER_SHEET_ID = '1f-rWiPP4uHpA4prtFEs-hYU20yyAV73bYtAIEciKs8Y';
-const BLOGGER_SHEET_GID = '1712204630';
-const BLOGGER_SHEET_NAME = 'Blogerlar';
 
 /* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў HELPERS Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const fmt  = (n) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
@@ -195,9 +185,7 @@ const E = {
   phone: '\u{1F4DE}',
   doc: '\u{1F4C4}',
   report: '\u{1F4CA}',
-  plan: '\u{1F4C5}',
-  test: '\u{1F9EA}',
-  blogger: '\u{1F4E3}',
+  plan: '📆',
   bell: '\u{1F514}',
   water: '\u{1F4A7}',
   uzs: '\u{1F4B4}',
@@ -205,16 +193,6 @@ const E = {
   tara: '\u{1F9F4}',
   sv: '\u{1F4CB}',
 };
-const TELEGRAM_HELP_OPERATORS = String(
-  import.meta.env.VITE_TG_OPERATORS || '@Dilfuza_Murodbaxsh_suv,@Dilya_Murodbaxsh'
-)
-  .split(',')
-  .map((v) => String(v || '').trim())
-  .filter(Boolean);
-const TG_BOT_ORDER_STORAGE_KEY = 'aq-tg-bot-orders-v1';
-const TG_BOT_ORDER_EVENT = 'aq-tg-bot-orders-updated';
-const TG_BOT_ORDER_STATUSES = ['Yangi', 'Qabul qilindi', 'Jarayonda', 'Bajarildi', "Bekor qilingan"];
-const TG_BOT_ORDER_PRODUCTS = ['Murodbaxsh 18.9L', 'БОНУС Murodbaxsh 18.9L'];
 const FILTER_CHECK_LABEL_STYLE = {
   display: 'grid',
   gridTemplateColumns: '14px minmax(0,1fr)',
@@ -518,7 +496,7 @@ function UniversalFilterPanel({
   return (
     <>
       <div
-        style={{position:'fixed',inset:0,zIndex:3999,background:'transparent',touchAction:'none'}}
+        style={{position:'fixed',inset:0,zIndex:79,background:'transparent',touchAction:'none'}}
         onClick={onClose}
         onMouseDown={onClose}
         onTouchStart={onClose}
@@ -531,11 +509,10 @@ function UniversalFilterPanel({
           position:'absolute',
           top:40,
           ...(placement.side === 'left' ? { right:0, left:'auto' } : { left:0, right:'auto' }),
-          zIndex:4000,
+          zIndex:80,
           width:placement.panelWidth,
           maxWidth:'calc(100vw - 16px)',
           padding:12,
-          background:'var(--s1)',
           boxShadow:'0 24px 60px rgba(0,0,0,.6)',
           backdropFilter:'blur(10px)',
           overflow:'hidden',
@@ -699,7 +676,7 @@ const isNameExcludedForActiveStats = (name) => {
 const isNameInactiveByPrefix = (name) => {
   const n = String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
   if (!n) return false;
-  return /^(я|рї)/.test(n);
+  return /^(я|ya|ря|рї)\s+(tugatildi|eski)\b/.test(n);
 };
 const isNearlyZero = (v) => Math.abs(Number(v || 0)) < 0.0001;
 const hasTagWord = (text, key) => {
@@ -749,18 +726,7 @@ const normalizeStoredCompanyKey = (v) => {
   return s ? normalizeCompanyKey(s) : '';
 };
 const companyLabelByKey = (v) => (normalizeCompanyKey(v) === 'ahmadtea' ? 'Ahmadtea' : 'Murodbaxsh');
-const normalizeIdKey = (v) => {
-  const s = String(v ?? '').trim();
-  if (!s) return '';
-  const compact = s.replace(/\s+/g, '');
-  if (/^\d+$/.test(compact)) return compact;
-  const mFloat = compact.match(/^(\d+)[.,]0+$/);
-  if (mFloat) return mFloat[1];
-  const seq = compact.match(/(\d{3,})/);
-  if (seq) return seq[1];
-  return compact;
-};
-const normalizeUserKey = (v) => String(v ?? '').trim().toLowerCase();
+const normalizeIdKey = (v) => String(v ?? '').trim();
 const filterDataByCustomerIds = (baseData, idSetInput) => {
   const source = baseData || {};
   const ids = new Set(
@@ -841,41 +807,6 @@ function toDate(v) {
   const d = new Date(s);
   return isNaN(d) ? null : d;
 }
-const parseDateTimeLoose = (v) => {
-  const s = String(v || '').trim();
-  if (!s) return null;
-  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if (m) {
-    return new Date(
-      Number(m[1]),
-      Number(m[2]) - 1,
-      Number(m[3]),
-      Number(m[4] || 0),
-      Number(m[5] || 0),
-      Number(m[6] || 0),
-    );
-  }
-  m = s.match(/^(\d{2})[./](\d{2})[./](\d{4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
-  if (m) {
-    return new Date(
-      Number(m[3]),
-      Number(m[2]) - 1,
-      Number(m[1]),
-      Number(m[4] || 0),
-      Number(m[5] || 0),
-      Number(m[6] || 0),
-    );
-  }
-  const d = new Date(s);
-  return isNaN(d) ? null : d;
-};
-const extractClockText = (v) => {
-  const s = String(v || '').trim();
-  if (!s) return '';
-  const m = s.match(/(\d{1,2}):(\d{2})/);
-  if (!m) return '';
-  return `${String(m[1]).padStart(2, '0')}:${m[2]}`;
-};
 const fmtD = (v) => { const d = toDate(v); return d ? d.toLocaleDateString('ru-RU') : '-'; };
 const daysAgo = (v) => {
   const d = toDate(v); if (!d) return null;
@@ -1026,115 +957,6 @@ const getLeftoverCompareDate = (baseDate = new Date(), rolloverHour = LEFTOVER_R
   d.setDate(d.getDate() - backDays);
   return toIsoDate(d);
 };
-const isValidLatLng = (lat, lng) => {
-  const la = Number(lat);
-  const ln = Number(lng);
-  if (!Number.isFinite(la) || !Number.isFinite(ln)) return false;
-  if (Math.abs(la) > 90 || Math.abs(ln) > 180) return false;
-  if (Math.abs(la) < 0.00001 && Math.abs(ln) < 0.00001) return false;
-  return true;
-};
-const TASHKENT_CENTER = { lat: 41.311081, lng: 69.240562 };
-const toGeoNum = (raw) => {
-  const text = String(raw ?? '').trim();
-  if (!text) return 0;
-  const m = text.match(/-?\d{1,3}(?:[.,]\d+)?/);
-  if (!m) return 0;
-  return toNum(String(m[0]).replace(',', '.'));
-};
-const geoScoreToTashkent = (lat, lng) =>
-  Math.abs(Number(lat) - TASHKENT_CENTER.lat) + Math.abs(Number(lng) - TASHKENT_CENTER.lng);
-const pickBestGeoCandidate = (candidates = []) => {
-  const valid = (candidates || []).filter((c) => isValidLatLng(c?.lat, c?.lng));
-  if (!valid.length) return { lat: 0, lng: 0 };
-  return valid.reduce((best, cur) =>
-    geoScoreToTashkent(cur.lat, cur.lng) < geoScoreToTashkent(best.lat, best.lng) ? cur : best
-  );
-};
-const parsePairDirect = (firstRaw, secondRaw) => {
-  const lat = toGeoNum(firstRaw);
-  const lng = toGeoNum(secondRaw);
-  return isValidLatLng(lat, lng) ? { lat, lng } : { lat: 0, lng: 0 };
-};
-const parseMerchantGeoFromQR = (qRaw, rRaw) => {
-  const joined = `${String(qRaw ?? '').trim()},${String(rRaw ?? '').trim()}`;
-  const pair = parsePairDirect(qRaw, rRaw);
-  return { ...pair, joined };
-};
-const parseArchiveGeoFromK = (value = '') => {
-  const raw = String(value || '').trim();
-  if (!raw) return { lat: 0, lng: 0 };
-  let text = raw;
-  try {
-    text = decodeURIComponent(raw);
-  } catch {}
-  const candidates = [];
-  const push = (latRaw, lngRaw) => {
-    const p = parsePairDirect(latRaw, lngRaw);
-    if (isValidLatLng(p.lat, p.lng)) candidates.push(p);
-  };
-
-  // URL query ko'rinishlari: ll=lng,lat | pt=lng,lat | whatshere[point]=lng,lat
-  const queryRe = /(?:^|[?&#])(ll|pt|whatshere(?:%5B|\[)point(?:%5D|\]))=([^&#]+)/ig;
-  let q;
-  while ((q = queryRe.exec(text))) {
-    let payload = String(q[2] || '');
-    try { payload = decodeURIComponent(payload); } catch {}
-    const pair = payload.match(/(-?\d{1,3}(?:[.,]\d+)?)\s*[,;]\s*(-?\d{1,3}(?:[.,]\d+)?)/);
-    if (pair) push(pair[2], pair[1]); // lng,lat -> lat,lng
-  }
-
-  // "@lat,lng" ko'rinishi
-  const atRe = /@(-?\d{1,3}(?:[.,]\d{4,})),\s*(-?\d{1,3}(?:[.,]\d{4,}))/g;
-  let at;
-  while ((at = atRe.exec(text))) {
-    push(at[1], at[2]);
-  }
-
-  // Umumiy ko'rinish (aniqroq: kamida 4 xonali kasr)
-  const pairRe = /(-?\d{1,3}(?:[.,]\d{4,}))\s*[,; ]\s*(-?\d{1,3}(?:[.,]\d{4,}))/g;
-  let m;
-  while ((m = pairRe.exec(text))) {
-    push(m[1], m[2]);
-    push(m[2], m[1]);
-  }
-
-  return pickBestGeoCandidate(candidates);
-};
-const splitQziTextTokens = (value = '', splitter = /[;,|/]/g) => (
-  Array.from(new Set(
-    String(value || '')
-      .split(splitter)
-      .map((x) => String(x || '').trim())
-      .filter(Boolean)
-  ))
-);
-const parseLeftoverQziRows = (rawRows = []) => (
-  (rawRows || [])
-    .slice(1)
-    .map((r, i) => ({
-      rowId: `qzi_${i + 1}`,
-      runAt: String(r?.[0] || '').trim(),
-      date: toIsoDate(r?.[1]),
-      customerId: normalizeIdKey(r?.[2]),
-      customer: String(r?.[3] || '').trim(),
-      driversText: String(r?.[4] || '').trim(),
-      drivers: splitQziTextTokens(r?.[4]),
-      orderNosText: String(r?.[5] || '').trim(),
-      orderNos: splitQziTextTokens(r?.[5]),
-      productsText: String(r?.[6] || '').trim(),
-      totalQty: Math.abs(toNum(r?.[7])),
-      totalSum: Math.abs(toNum(r?.[8])),
-      notes: String(r?.[9] || '').trim(),
-      lineCount: Math.abs(toNum(r?.[10])),
-      reason: String(r?.[11] || '').trim(),
-      recordKey: String(r?.[12] || '').trim(),
-      sendStatus: String(r?.[13] || '').trim(),
-      sentAt: String(r?.[14] || '').trim(),
-      sendResult: String(r?.[15] || '').trim(),
-    }))
-    .filter((r) => r.date || r.customerId || r.orderNos.length || r.recordKey)
-);
 const parseLeftoverReasonRows = (rawRows = []) => (
   (rawRows || [])
     .slice(1)
@@ -1153,79 +975,25 @@ const parseLeftoverReasonRows = (rawRows = []) => (
 const parseLeftoverArchiveRows = (rawRows = []) => (
   (rawRows || [])
     .slice(1)
-    .map((r, i) => {
-      const location = String(r?.[10] || '').trim();
-      const geoFromK = parseArchiveGeoFromK(location);
-      return {
-        rowId: `arxiv_${i + 1}`,
-        date: toIsoDate(r?.[0]),
-        customerId: normalizeIdKey(r?.[2]),
-        customer: String(r?.[3] || '').trim(),
-        productGiven: String(r?.[4] || '').trim(),
-        qtyGiven: Math.abs(toNum(r?.[5])),
-        productTaken: String(r?.[6] || '').trim(),
-        qtyTaken: Math.abs(toNum(r?.[7])),
-        payType: String(r?.[8] || '').trim(),
-        payAmount: toNum(r?.[9]),
-        location,
-        enteredAt: String(r?.[11] || '').trim(),
-        note: String(r?.[12] || '').trim(),
-        driver: String(r?.[13] || '').trim(),
-        uid: String(r?.[14] || '').trim(),
-        lat: geoFromK.lat,
-        lng: geoFromK.lng,
-      };
-    })
+    .map((r, i) => ({
+      rowId: `arxiv_${i + 1}`,
+      date: toIsoDate(r?.[0]),
+      customerId: normalizeIdKey(r?.[2]),
+      customer: String(r?.[3] || '').trim(),
+      productGiven: String(r?.[4] || '').trim(),
+      qtyGiven: Math.abs(toNum(r?.[5])),
+      productTaken: String(r?.[6] || '').trim(),
+      qtyTaken: Math.abs(toNum(r?.[7])),
+      payType: String(r?.[8] || '').trim(),
+      payAmount: toNum(r?.[9]),
+      location: String(r?.[10] || '').trim(),
+      enteredAt: String(r?.[11] || '').trim(),
+      note: String(r?.[12] || '').trim(),
+      driver: String(r?.[13] || '').trim(),
+      uid: String(r?.[14] || '').trim(),
+    }))
     .filter((r) => r.date || r.customerId || r.uid || r.qtyGiven || r.productGiven)
 );
-const parseLeftoverEmployeesRows = (rawRows = []) => (
-  (rawRows || [])
-    .slice(1)
-    .map((r) => ({
-      id: normalizeIdKey(r?.[0]),
-      email: String(r?.[1] || '').trim().toLowerCase(),
-      name: String(r?.[2] || '').trim(),
-      role: String(r?.[3] || '').trim(),
-    }))
-    .filter((x) => x.id || x.email || x.name)
-);
-const LEFTOVER_WATER_PRODUCT_KEY = 'suv';
-const LEFTOVER_WATER_LABEL = 'Suv';
-const LEFTOVER_WATER_PRODUCT_ALIASES = new Set([
-  'murodbaxsh 18.9l',
-  'бонус murodbaxsh 18.9l',
-  'bonus murodbaxsh 18.9l',
-]);
-const LEFTOVER_ARCHIVE_IGNORED_MARKERS = ['fleyer', 'flyer', 'flayer', 'флаер', 'флайер'];
-const isLeftoverWaterProduct = (product = '') => {
-  const p = normProduct(product);
-  if (!p) return false;
-  if (LEFTOVER_WATER_PRODUCT_ALIASES.has(p)) return true;
-  if (p.includes('murodbaxsh') && p.includes('18.9')) return true;
-  if (p.includes('муродбахш') && p.includes('18.9')) return true;
-  return false;
-};
-const isLeftoverIgnoredArchiveProduct = (product = '') => {
-  const p = normProduct(product);
-  if (!p) return false;
-  return LEFTOVER_ARCHIVE_IGNORED_MARKERS.some((mark) => p.includes(mark));
-};
-const toLeftoverProductKey = (product = '', source = 'order') => {
-  const p = normProduct(product);
-  if (!p) return '';
-  if (source === 'archive' && isLeftoverIgnoredArchiveProduct(p)) return '';
-  if (isLeftoverWaterProduct(p)) return LEFTOVER_WATER_PRODUCT_KEY;
-  return p;
-};
-const toLeftoverProductLabel = (productKey = '', fallback = '') => {
-  if (productKey === LEFTOVER_WATER_PRODUCT_KEY) return LEFTOVER_WATER_LABEL;
-  return String(fallback || productKey || '').trim() || '-';
-};
-const toLeftoverDisplayProduct = (product = '') => {
-  const productKey = toLeftoverProductKey(product, 'order');
-  if (!productKey) return '';
-  return toLeftoverProductLabel(productKey, product);
-};
 const buildOrderGroupsFromRawOrders = (rawOrders = []) => {
   const groups = {};
   (rawOrders || []).forEach((o) => {
@@ -1278,63 +1046,33 @@ const buildOrderGroupsFromRawOrders = (rawOrders = []) => {
 };
 const buildLeftoverAnalysis = ({
   rawOrders = [],
-  rawQziRows = [],
   rawReasonRows = [],
   rawArchiveRows = [],
   targetDate = '',
   currentUser = 'Admin',
   canSeeAll = true,
-  allowedCustomerIds = null,
-  includeAllQziRows = false,
 }) => {
   const compareDate = targetDate || getLeftoverCompareDate(new Date());
-  const orderGroups = buildOrderGroupsFromRawOrders(rawOrders);
-  const orderCustomerIds = new Set(
-    (orderGroups || [])
-      .map((g) => String(g?.mId || '').trim())
-      .filter(Boolean)
-  );
-  const explicitAllowedIds = new Set(
-    Array.from(allowedCustomerIds || [])
-      .map((id) => normalizeIdKey(id))
-      .filter(Boolean)
-  );
-  const scopedCustomerIds = canSeeAll
-    ? new Set()
-    : (explicitAllowedIds.size ? explicitAllowedIds : orderCustomerIds);
   const allReasonRows = parseLeftoverReasonRows(rawReasonRows);
   const reasonRows = canSeeAll
     ? allReasonRows
-    : allReasonRows.filter((r) => scopedCustomerIds.has(String(r?.customerId || '').trim()));
+    : allReasonRows.filter((r) => {
+        const drv = normalizeMatchText(r.driver);
+        const usr = normalizeMatchText(currentUser);
+        if (!drv) return true;
+        return drv === usr;
+      });
   const archiveRows = parseLeftoverArchiveRows(rawArchiveRows);
-  const scopedOrderGroups = canSeeAll
-    ? orderGroups
-    : orderGroups.filter((g) => scopedCustomerIds.has(String(g?.mId || '').trim()));
-  const qziRows = parseLeftoverQziRows(rawQziRows);
-  const scopedQziRows = (canSeeAll
-    ? qziRows
-    : qziRows.filter((r) => scopedCustomerIds.has(String(r?.customerId || '').trim()))
-  ).filter((r) => includeAllQziRows || !compareDate || r.date === compareDate);
+  const orderGroups = buildOrderGroupsFromRawOrders(rawOrders);
 
   const orderBySoNum = new Map();
-  const orderListBySoNum = new Map();
   const orderByUid = new Map();
   const orderByDateCustomer = new Map();
-  const orderListByDateCustomer = new Map();
-  const orderListByCustomer = new Map();
-  scopedOrderGroups.forEach((g) => {
+  orderGroups.forEach((g) => {
     const soKey = normalizeMatchText(g.soNum);
     if (soKey && !orderBySoNum.has(soKey)) orderBySoNum.set(soKey, g);
-    if (soKey) {
-      if (!orderListBySoNum.has(soKey)) orderListBySoNum.set(soKey, []);
-      orderListBySoNum.get(soKey).push(g);
-    }
     const dcKey = `${g.orderDate}__${g.mId}`;
     if (!orderByDateCustomer.has(dcKey)) orderByDateCustomer.set(dcKey, g);
-    if (!orderListByDateCustomer.has(dcKey)) orderListByDateCustomer.set(dcKey, []);
-    orderListByDateCustomer.get(dcKey).push(g);
-    if (!orderListByCustomer.has(g.mId)) orderListByCustomer.set(g.mId, []);
-    orderListByCustomer.get(g.mId).push(g);
     (g.items || []).forEach((it) => {
       const u = normalizeMatchText(it.uniqueId);
       if (u && !orderByUid.has(u)) orderByUid.set(u, g);
@@ -1375,188 +1113,85 @@ const buildLeftoverAnalysis = ({
     archiveByCustomerYesterday.get(r.customerId).push(r);
   });
 
-  let missingRows = [];
+  const missingRows = [];
   const productGapRows = [];
-  if (scopedQziRows.length) {
-    missingRows = scopedQziRows
-      .map((r, idx) => {
-        const customerId = String(r.customerId || '').trim();
-        const matchedByKey = new Map();
-        const pushMatched = (g) => {
-          if (!g?.key) return;
-          matchedByKey.set(g.key, g);
-        };
-
-        (r.orderNos || []).forEach((orderNo) => {
-          const soKey = normalizeMatchText(orderNo);
-          if (!soKey) return;
-          const candidates = (orderListBySoNum.get(soKey) || [])
-            .filter((g) => !customerId || g.mId === customerId);
-          if (!candidates.length) return;
-          const sameDate = r.date
-            ? candidates.filter((g) => g.orderDate === r.date)
-            : [];
-          (sameDate.length ? sameDate : candidates).forEach(pushMatched);
+  orderGroups
+    .filter((g) => g.orderDate === compareDate)
+    .forEach((g) => {
+      const matchedArchiveRows = archiveByCustomerYesterday.get(g.mId) || [];
+      const hasArchive = matchedArchiveRows.length > 0;
+      const deliveredTotal = matchedArchiveRows.reduce((s, r) => s + Math.abs(toNum(r.qtyGiven)), 0);
+      const orderedTotal = Number(g.totalQty || 0);
+      const qtyDiff = orderedTotal - deliveredTotal;
+      const orderedByProduct = new Map();
+      const orderedLabelByProduct = new Map();
+      (g.items || []).forEach((it) => {
+        const pKey = normProduct(it.product || '');
+        if (!pKey) return;
+        orderedByProduct.set(pKey, (orderedByProduct.get(pKey) || 0) + Math.abs(toNum(it.qty)));
+        if (!orderedLabelByProduct.has(pKey)) orderedLabelByProduct.set(pKey, String(it.product || '').trim() || '-');
+      });
+      const deliveredByProduct = new Map();
+      matchedArchiveRows.forEach((a) => {
+        const pKey = normProduct(a.productGiven || '');
+        if (!pKey) return;
+        deliveredByProduct.set(pKey, (deliveredByProduct.get(pKey) || 0) + Math.abs(toNum(a.qtyGiven)));
+      });
+      const productDiff = [];
+      orderedByProduct.forEach((orderedQty, pKey) => {
+        const deliveredQty = Number(deliveredByProduct.get(pKey) || 0);
+        if (deliveredQty + 0.0001 >= orderedQty) return;
+        productDiff.push({
+          product: orderedLabelByProduct.get(pKey) || pKey,
+          orderedQty,
+          deliveredQty,
+          diffQty: orderedQty - deliveredQty,
         });
+      });
+      const reasonText = pickReasonText(g);
+      const noteText = Array.from(new Set((g.items || []).map((it) => String(it.note || '').trim()).filter(Boolean))).join(' | ');
 
-        if (!matchedByKey.size && customerId && r.date) {
-          (orderListByDateCustomer.get(`${r.date}__${customerId}`) || []).forEach(pushMatched);
-        }
-        if (!matchedByKey.size && customerId) {
-          (orderListByCustomer.get(customerId) || []).forEach(pushMatched);
-        }
-
-        const matchedGroups = Array.from(matchedByKey.values());
-        const mergedItems = matchedGroups.flatMap((g) => g.items || []);
-        const orderIds = Array.from(new Set([
-          ...(r.orderNos || []).map((x) => String(x || '').trim()).filter(Boolean),
-          ...matchedGroups.map((g) => String(g.soNum || '').trim()).filter(Boolean),
-        ]));
-        const drivers = Array.from(new Set([
-          ...(r.drivers || []).map((x) => String(x || '').trim()).filter(Boolean),
-          ...matchedGroups.map((g) => String(g.delivPerson || g.agent || '').trim()).filter(Boolean),
-        ]));
-        const notes = Array.from(new Set([
-          String(r.notes || '').trim(),
-          ...mergedItems.map((it) => String(it.note || '').trim()),
-        ].filter(Boolean)));
-
-        const qtyFromOrders = mergedItems.reduce((s, it) => s + Math.abs(toNum(it?.qty)), 0);
-        const sumFromOrdersUZS = matchedGroups.reduce((s, g) => s + Math.abs(toNum(g?.totalSumUZS)), 0);
-        const sumFromOrdersUSD = matchedGroups.reduce((s, g) => s + Math.abs(toNum(g?.totalSumUSD)), 0);
-        const orderIdText = orderIds.join(' | ') || '-';
-        const driverText = drivers.join(', ') || r.driversText || '-';
-        const customerText = String(r.customer || '').trim()
-          || matchedGroups[0]?.contName
-          || (customerId ? `ID ${customerId}` : '-');
-        const uid = mergedItems
-          .map((it) => String(it?.uniqueId || '').trim())
-          .find(Boolean) || '';
-        const reasonText = String(r.reason || '').trim();
-        const noteText = notes.join(' | ');
-
-        let soGroup = null;
-        if (matchedGroups.length === 1) {
-          soGroup = matchedGroups[0];
-        } else if (matchedGroups.length > 1) {
-          soGroup = {
-            key: `qzi_group_${r.recordKey || `${r.date}_${customerId}_${idx}`}`,
-            soNum: orderIdText,
-            contName: customerText,
-            mId: customerId,
-            orderDate: r.date || compareDate,
-            delivPerson: driverText,
-            agent: driverText,
-            docType: 'Заказ',
-            status: 'Q_Z_I',
-            currency: 'UZS',
-            items: mergedItems,
-            totalQty: qtyFromOrders,
-            totalSumUZS: sumFromOrdersUZS || Math.abs(toNum(r.totalSum)),
-            totalSumUSD: sumFromOrdersUSD || 0,
-          };
-        }
-
-        return {
-          id: `left_qzi_${r.recordKey || `${r.date}_${customerId}_${idx}`}`,
-          date: r.date || compareDate,
-          customerId,
-          customer: customerText,
-          orderId: orderIdText,
-          uid,
-          driver: driverText,
-          qty: qtyFromOrders > 0 ? qtyFromOrders : Math.abs(toNum(r.totalQty)),
-          sumUZS: sumFromOrdersUZS > 0 ? sumFromOrdersUZS : Math.abs(toNum(r.totalSum)),
+      if (!hasArchive) {
+        missingRows.push({
+          id: `left_missing_${g.soNum}_${g.mId}_${g.orderDate}`,
+          date: g.orderDate,
+          customerId: g.mId,
+          customer: g.contName,
+          orderId: g.soNum,
+          uid: (g.items || []).map((it) => String(it.uniqueId || '').trim()).filter(Boolean)[0] || '',
+          driver: g.delivPerson || '-',
+          qty: orderedTotal,
+          sumUZS: Number(g.totalSumUZS || 0),
           note: noteText,
           reason: reasonText,
-          statusText: reasonText || "Q_Z_I ro'yxatidan",
-          soGroup,
-        };
-      })
-      .filter((r) => r.date || r.customerId || r.orderId);
-  } else {
-    scopedOrderGroups
-      .filter((g) => g.orderDate === compareDate)
-      .forEach((g) => {
-        const matchedArchiveRows = archiveByCustomerYesterday.get(g.mId) || [];
-        const hasArchive = matchedArchiveRows.length > 0;
-        let deliveredTotal = 0;
-        const orderedByProduct = new Map();
-        const orderedLabelByProduct = new Map();
-        (g.items || []).forEach((it) => {
-          const pKey = toLeftoverProductKey(it.product || '', 'order');
-          if (pKey !== LEFTOVER_WATER_PRODUCT_KEY) return;
-          if (!pKey) return;
-          orderedByProduct.set(pKey, (orderedByProduct.get(pKey) || 0) + Math.abs(toNum(it.qty)));
-          if (!orderedLabelByProduct.has(pKey)) orderedLabelByProduct.set(pKey, toLeftoverProductLabel(pKey, String(it.product || '').trim()));
+          statusText: "Arxivda mijoz ID topilmadi (zakaz bormagan)",
+          soGroup: g,
         });
-        const orderedTotal = Number(orderedByProduct.get(LEFTOVER_WATER_PRODUCT_KEY) || 0);
-        const deliveredByProduct = new Map();
-        matchedArchiveRows.forEach((a) => {
-          const pKey = toLeftoverProductKey(a.productGiven || '', 'archive');
-          if (pKey !== LEFTOVER_WATER_PRODUCT_KEY) return;
-          if (!pKey) return;
-          const qtyGiven = Math.abs(toNum(a.qtyGiven));
-          deliveredByProduct.set(pKey, (deliveredByProduct.get(pKey) || 0) + qtyGiven);
-          deliveredTotal += qtyGiven;
-        });
-        const qtyDiff = orderedTotal - deliveredTotal;
-        const productDiff = [];
-        orderedByProduct.forEach((orderedQty, pKey) => {
-          const deliveredQty = Number(deliveredByProduct.get(pKey) || 0);
-          if (deliveredQty + 0.0001 >= orderedQty) return;
-          productDiff.push({
-            product: orderedLabelByProduct.get(pKey) || pKey,
-            orderedQty,
-            deliveredQty,
-            diffQty: orderedQty - deliveredQty,
-          });
-        });
-        const reasonText = pickReasonText(g);
-        const noteText = Array.from(new Set((g.items || []).map((it) => String(it.note || '').trim()).filter(Boolean))).join(' | ');
+        return;
+      }
 
-        if (!hasArchive) {
-          missingRows.push({
-            id: `left_missing_${g.soNum}_${g.mId}_${g.orderDate}`,
-            date: g.orderDate,
-            customerId: g.mId,
-            customer: g.contName,
-            orderId: g.soNum,
-            uid: (g.items || []).map((it) => String(it.uniqueId || '').trim()).filter(Boolean)[0] || '',
-            driver: g.delivPerson || '-',
-            qty: orderedTotal,
-            sumUZS: Number(g.totalSumUZS || 0),
-            note: noteText,
-            reason: reasonText,
-            statusText: "Arxivda mijoz ID topilmadi (zakaz bormagan)",
-            soGroup: g,
-          });
-          return;
-        }
-
-        if (productDiff.length || Math.abs(qtyDiff) > 0.0001) {
-          const productDiffText = productDiff.length
-            ? productDiff.map((x) => `${x.product}: ${fmt(x.orderedQty)} / ${fmt(x.deliveredQty)}`).join(' | ')
-            : '-';
-          productGapRows.push({
-            id: `left_gap_${g.soNum}_${g.mId}_${g.orderDate}`,
-            date: g.orderDate,
-            customerId: g.mId,
-            customer: g.contName,
-            orderId: g.soNum,
-            driver: g.delivPerson || '-',
-            orderedQty: orderedTotal,
-            deliveredQty: deliveredTotal,
-            diffQty: qtyDiff,
-            productDiffText,
-            note: noteText,
-            reason: reasonText,
-            statusText: productDiff.length ? "Mahsulot to'liq berilmagan" : 'Soni mos emas',
-            soGroup: g,
-          });
-        }
-      });
-  }
+      if (productDiff.length || Math.abs(qtyDiff) > 0.0001) {
+        const productDiffText = productDiff.length
+          ? productDiff.map((x) => `${x.product}: ${fmt(x.orderedQty)} / ${fmt(x.deliveredQty)}`).join(' | ')
+          : '-';
+        productGapRows.push({
+          id: `left_gap_${g.soNum}_${g.mId}_${g.orderDate}`,
+          date: g.orderDate,
+          customerId: g.mId,
+          customer: g.contName,
+          orderId: g.soNum,
+          driver: g.delivPerson || '-',
+          orderedQty: orderedTotal,
+          deliveredQty: deliveredTotal,
+          diffQty: qtyDiff,
+          productDiffText,
+          note: noteText,
+          reason: reasonText,
+          statusText: productDiff.length ? "Mahsulot to'liq berilmagan" : 'Soni mos emas',
+          soGroup: g,
+        });
+      }
+    });
 
   const reasonDetailedRows = reasonRows.map((r) => {
     const bySo = orderBySoNum.get(normalizeMatchText(r.orderId));
@@ -1564,342 +1199,28 @@ const buildLeftoverAnalysis = ({
     const byDate = orderByDateCustomer.get(`${r.date}__${r.customerId}`);
     const soGroup = bySo || byUid || byDate || null;
     const archiveMatched = archiveByDateCustomer.get(`${r.date}__${r.customerId}`) || [];
-    const waterItems = (soGroup?.items || []).filter((it) => toLeftoverProductKey(it.product || '', 'order') === LEFTOVER_WATER_PRODUCT_KEY);
-    const orderWaterQty = waterItems.reduce((s, it) => s + Math.abs(toNum(it.qty)), 0);
-    const orderWaterSumUZS = waterItems.reduce((s, it) => {
-      const ccy = String(it.currency || '').trim().toUpperCase() || 'UZS';
-      if (ccy === 'USD') return s;
-      return s + Math.abs(toNum(it.sum));
-    }, 0);
-    const archiveQty = archiveMatched.reduce((s, a) => {
-      const pKey = toLeftoverProductKey(a.productGiven || '', 'archive');
-      if (pKey !== LEFTOVER_WATER_PRODUCT_KEY) return s;
-      return s + Math.abs(toNum(a.qtyGiven));
-    }, 0);
+    const archiveQty = archiveMatched.reduce((s, a) => s + Math.abs(toNum(a.qtyGiven)), 0);
     return {
       ...r,
-      qty: Number(orderWaterQty || 0),
-      sumUZS: Number(orderWaterSumUZS || 0),
+      qty: Number(soGroup?.totalQty || 0),
+      sumUZS: Number(soGroup?.totalSumUZS || 0),
       orderNote: Array.from(new Set((soGroup?.items || []).map((it) => String(it.note || '').trim()).filter(Boolean))).join(' | '),
-      product: Array.from(new Set(waterItems.map((it) => toLeftoverDisplayProduct(it.product || '')).filter(Boolean))).join(' | '),
+      product: Array.from(new Set((soGroup?.items || []).map((it) => String(it.product || '').trim()).filter(Boolean))).join(' | '),
       orderStatus: String(soGroup?.status || '').trim(),
       archiveQty,
       statusText: soGroup ? 'Zakaz topildi' : 'Zakaz topilmadi',
       soGroup,
     };
   });
-  const sortByDateDesc = (a, b) => {
-    const da = String(a?.date || '');
-    const db = String(b?.date || '');
-    if (da !== db) return db.localeCompare(da);
-    const ao = String(a?.orderId || '');
-    const bo = String(b?.orderId || '');
-    if (ao !== bo) return bo.localeCompare(ao);
-    const ai = Number(String(a?.rowId || '').replace(/\D+/g, '')) || 0;
-    const bi = Number(String(b?.rowId || '').replace(/\D+/g, '')) || 0;
-    return bi - ai;
-  };
-  const withNo = (rows = []) => rows.map((r, idx) => ({ ...r, no: idx + 1 }));
-  const sortedMissingRows = withNo([...missingRows].sort(sortByDateDesc));
-  const sortedProductGapRows = withNo([...productGapRows].sort(sortByDateDesc));
-  const sortedReasonDetailedRows = withNo([...reasonDetailedRows].sort(sortByDateDesc));
 
   return {
-    source: scopedQziRows.length ? 'qzi' : 'legacy',
     compareDate,
     reasonRows,
-    qziRows: scopedQziRows,
     archiveRows,
-    orderGroups: scopedOrderGroups,
-    missingRows: sortedMissingRows,
-    productGapRows: sortedProductGapRows,
-    reasonDetailedRows: sortedReasonDetailedRows,
-  };
-};
-const sortByDateDescCustomerAsc = (a, b) => {
-  const da = String(a?.date || '');
-  const db = String(b?.date || '');
-  if (da !== db) return db.localeCompare(da);
-  const ca = String(a?.customer || '');
-  const cb = String(b?.customer || '');
-  if (ca !== cb) return ca.localeCompare(cb, 'ru');
-  const ia = String(a?.customerId || '');
-  const ib = String(b?.customerId || '');
-  return ia.localeCompare(ib, 'ru');
-};
-const CONTROL_COMPARE_START_DATE = '2026-03-02';
-const CONTROL_COMPARE_START_DATE_LABEL = '02.03.2026';
-const CONTROL_PRODUCT_MURODBAXSH_KEY = 'murodbaxsh 18.9l';
-const CONTROL_IGNORED_PRODUCT_MARKERS = [
-  'kapsula olish kerak',
-  'pul olish kerak',
-  'flyer',
-  'fleyer',
-  'flayer',
-  'flayr',
-  'флаер',
-  'флайер',
-];
-const normalizeControlProductKey = (product = '') => {
-  const p = normProduct(product);
-  if (!p) return '';
-  if (CONTROL_IGNORED_PRODUCT_MARKERS.some((mark) => p.includes(mark))) return '';
-  if (p === 'bonus murodbaxsh 18.9l' || p === 'бонус murodbaxsh 18.9l' || p === CONTROL_PRODUCT_MURODBAXSH_KEY) {
-    return CONTROL_PRODUCT_MURODBAXSH_KEY;
-  }
-  return p;
-};
-const controlProductLabelByKey = (productKey = '', fallback = '') => {
-  if (productKey === CONTROL_PRODUCT_MURODBAXSH_KEY) return 'Murodbaxsh 18.9L';
-  return String(fallback || productKey || '').trim() || '-';
-};
-const makeBucketProductsText = (productQty = new Map(), productLabel = new Map(), withQty = true) => {
-  if (!(productQty instanceof Map) || productQty.size === 0) return '-';
-  const entries = Array.from(productQty.entries())
-    .filter(([, qty]) => Number(qty || 0) > 0.0001)
-    .map(([pKey, qty]) => ({
-      key: pKey,
-      qty: Number(qty || 0),
-      label: controlProductLabelByKey(pKey, productLabel.get(pKey) || pKey),
-    }))
-    .sort((a, b) => b.qty - a.qty || a.label.localeCompare(b.label, 'ru'));
-  if (!entries.length) return '-';
-  return withQty
-    ? entries.map((x) => `${x.label}: ${fmt(x.qty)}`).join(' | ')
-    : entries.map((x) => x.label).join(' | ');
-};
-const buildBasketArchiveDifference = ({
-  rawOrders = [],
-  archiveRows = [],
-  mode = 'order', // 'order' | 'return'
-  startDate = CONTROL_COMPARE_START_DATE,
-  endDate = '',
-  canSeeAll = true,
-  currentUserNorm = '',
-  activeCustomerIds = null,
-  resolveDriverName = (v) => String(v || '').trim() || '-',
-  shouldSkipDriver = () => false,
-}) => {
-  const useReturnMode = mode === 'return';
-  const allowedCustomerIds = activeCustomerIds instanceof Set ? activeCustomerIds : null;
-  const basket = new Map();
-  const archive = new Map();
-  const scopedCustomerIds = new Set();
-  const addProduct = (bucket, productKey, productLabel, qty = 0) => {
-    if (!bucket || !productKey) return;
-    const q = Math.abs(toNum(qty));
-    if (q <= 0.0001) return;
-    bucket.productQty.set(productKey, (bucket.productQty.get(productKey) || 0) + q);
-    if (!bucket.productLabel.has(productKey)) {
-      bucket.productLabel.set(productKey, toLeftoverProductLabel(productKey, productLabel || productKey));
-    }
-  };
-  const ensureBucket = (map, key, base = {}) => {
-    if (!map.has(key)) {
-      map.set(key, {
-        date: String(base.date || ''),
-        customerId: String(base.customerId || ''),
-        customer: String(base.customer || '').trim(),
-        orderIds: new Set(),
-        drivers: new Set(),
-        notes: new Set(),
-        productQty: new Map(),
-        productLabel: new Map(),
-        totalQty: 0,
-        totalSumUZS: 0,
-      });
-    }
-    return map.get(key);
-  };
-
-  (rawOrders || []).forEach((o) => {
-    if (useReturnMode ? !isReturnDoc(o?.docType) : !isOrderDoc(o?.docType)) return;
-    if (isCancelledStatus(o?.status)) return;
-    const date = toIsoDate(o?.orderDate);
-    const customerId = normalizeIdKey(o?.mId);
-    if (!date || !customerId) return;
-    if (startDate && date < startDate) return;
-    if (endDate && date > endDate) return;
-    if (allowedCustomerIds && allowedCustomerIds.size && !allowedCustomerIds.has(customerId)) return;
-
-    const driver = resolveDriverName(o?.delivPerson || o?.agent || '');
-    if (shouldSkipDriver(driver, o)) return;
-    if (!canSeeAll && String(driver || '').trim().toLowerCase() !== String(currentUserNorm || '').trim().toLowerCase()) return;
-
-    const key = `${date}__${customerId}`;
-    scopedCustomerIds.add(customerId);
-    const b = ensureBucket(basket, key, {
-      date,
-      customerId,
-      customer: String(o?.contName || '').trim() || `ID ${customerId}`,
-    });
-    if (!b.customer) b.customer = String(o?.contName || '').trim() || `ID ${customerId}`;
-
-    const orderNo = String(o?.soNum || '').trim();
-    if (orderNo) b.orderIds.add(orderNo);
-    if (driver) b.drivers.add(driver);
-    const note = String(o?.note || '').trim();
-    if (note) b.notes.add(note);
-
-    const product = String(o?.product || '').trim();
-    const productKey = normalizeControlProductKey(product);
-    addProduct(b, productKey, product, o?.qty);
-
-    if (productKey) {
-      const qtyAbs = Math.abs(toNum(o?.qty));
-      const sumAbs = Math.abs(toNum(o?.sum));
-      b.totalQty += qtyAbs;
-      if (String(o?.currency || '').trim().toUpperCase() !== 'USD') b.totalSumUZS += sumAbs;
-    }
-  });
-
-  (archiveRows || []).forEach((r) => {
-    const date = toIsoDate(r?.date);
-    const customerId = normalizeIdKey(r?.customerId);
-    if (!date || !customerId) return;
-    if (startDate && date < startDate) return;
-    if (endDate && date > endDate) return;
-    if (allowedCustomerIds && allowedCustomerIds.size && !allowedCustomerIds.has(customerId)) return;
-    if (!canSeeAll && scopedCustomerIds.size && !scopedCustomerIds.has(customerId)) return;
-
-    const driver = resolveDriverName(r?.driver || '');
-    if (shouldSkipDriver(driver, r)) return;
-    if (!canSeeAll && driver && driver !== '-' && String(driver || '').trim().toLowerCase() !== String(currentUserNorm || '').trim().toLowerCase()) return;
-
-    const product = useReturnMode ? String(r?.productTaken || '').trim() : String(r?.productGiven || '').trim();
-    const qty = useReturnMode ? Math.abs(toNum(r?.qtyTaken)) : Math.abs(toNum(r?.qtyGiven));
-    if (useReturnMode && !product && qty <= 0.0001) return; // Arxivda return tanlanmagan bo'lsa, return nazoratiga qo'shilmaydi
-
-    const key = `${date}__${customerId}`;
-    const a = ensureBucket(archive, key, {
-      date,
-      customerId,
-      customer: String(r?.customer || '').trim() || `ID ${customerId}`,
-    });
-    if (!a.customer) a.customer = String(r?.customer || '').trim() || `ID ${customerId}`;
-    if (driver) a.drivers.add(driver);
-
-    const productKey = normalizeControlProductKey(product);
-    addProduct(a, productKey, product, qty);
-    if (productKey && qty > 0.0001) a.totalQty += qty;
-  });
-
-  const allKeys = new Set([...basket.keys(), ...archive.keys()]);
-  const masterRows = Array.from(allKeys).map((key, idx) => {
-    const b = basket.get(key) || null;
-    const a = archive.get(key) || null;
-    const [date = '', customerId = ''] = String(key || '').split('__');
-
-    const customer = String(b?.customer || a?.customer || '').trim() || (customerId ? `ID ${customerId}` : '-');
-    const orderId = Array.from(b?.orderIds || []).filter(Boolean).join(', ') || '-';
-    const driver = Array.from(new Set([...(b?.drivers || []), ...(a?.drivers || [])])).filter(Boolean).join(', ') || '-';
-    const note = Array.from(b?.notes || []).filter(Boolean).join(' | ');
-
-    const systemQty = Number(b?.totalQty || 0);
-    const archiveQty = Number(a?.totalQty || 0);
-    const diffQty = systemQty - archiveQty;
-    const systemProductsText = makeBucketProductsText(b?.productQty, b?.productLabel);
-    const archiveProductsText = makeBucketProductsText(a?.productQty, a?.productLabel);
-    const systemProductNamesText = makeBucketProductsText(b?.productQty, b?.productLabel, false);
-    const archiveProductNamesText = makeBucketProductsText(a?.productQty, a?.productLabel, false);
-
-    const result = {
-      id: `${useReturnMode ? 'ret' : 'ord'}_cmp_${date}_${customerId}_${idx + 1}`,
-      date,
-      customerId,
-      customer,
-      orderId,
-      driver,
-      note,
-      systemQty,
-      archiveQty,
-      diffQty,
-      systemProductsText,
-      archiveProductsText,
-      systemProductNamesText,
-      archiveProductNamesText,
-      productDiffText: '-',
-      qtyDiffText: '-',
-      status: 'OK',
-      mismatchType: 'ok',
-      hasSystem: !!b,
-      hasArchive: !!a,
-      hasProductMismatch: false,
-      hasQtyMismatch: false,
-    };
-
-    if (!b || !a) {
-      result.mismatchType = 'customer';
-      result.status = !a ? "Arxivda mijoz topilmadi" : 'Sistemada mijoz topilmadi';
-      return result;
-    }
-
-    const bKeys = new Set(Array.from(b.productQty.keys()));
-    const aKeys = new Set(Array.from(a.productQty.keys()));
-    const missingInArchive = Array.from(bKeys).filter((k) => !aKeys.has(k));
-    const extraInArchive = Array.from(aKeys).filter((k) => !bKeys.has(k));
-    if (missingInArchive.length || extraInArchive.length) {
-      const parts = [];
-      if (missingInArchive.length) {
-        parts.push(`Arxivda yo'q: ${missingInArchive.map((k) => controlProductLabelByKey(k, b.productLabel.get(k))).join(', ')}`);
-      }
-      if (extraInArchive.length) {
-        parts.push(`Sistemada yo'q: ${extraInArchive.map((k) => controlProductLabelByKey(k, a.productLabel.get(k))).join(', ')}`);
-      }
-      result.mismatchType = 'product';
-      result.hasProductMismatch = true;
-      result.status = 'Mahsulot hatosi';
-      result.productDiffText = parts.join(' | ') || '-';
-      return result;
-    }
-
-    const qtyParts = [];
-    Array.from(bKeys).forEach((pKey) => {
-      const bQty = Number(b.productQty.get(pKey) || 0);
-      const aQty = Number(a.productQty.get(pKey) || 0);
-      if (Math.abs(bQty - aQty) <= 0.0001) return;
-      qtyParts.push(`${controlProductLabelByKey(pKey, b.productLabel.get(pKey) || a.productLabel.get(pKey) || pKey)}: ${fmt(bQty)} / ${fmt(aQty)}`);
-    });
-    if (qtyParts.length) {
-      result.mismatchType = 'qty';
-      result.hasQtyMismatch = true;
-      result.status = 'Son hatosi';
-      result.qtyDiffText = qtyParts.join(' | ');
-    }
-
-    return result;
-  }).sort(sortByDateDescCustomerAsc);
-
-  const customerRowsAll = masterRows.map((r) => ({
-    ...r,
-    status: r.mismatchType === 'customer' ? r.status : 'OK',
-  }));
-  const customerRowsErrors = customerRowsAll.filter((r) => r.mismatchType === 'customer');
-
-  const productRowsAll = masterRows
-    .filter((r) => r.hasSystem && r.hasArchive)
-    .map((r) => ({
-      ...r,
-      status: r.mismatchType === 'product' ? 'Mahsulot hatosi' : 'OK',
-    }));
-  const productRowsErrors = productRowsAll.filter((r) => r.mismatchType === 'product');
-
-  const qtyRowsAll = masterRows
-    .filter((r) => r.hasSystem && r.hasArchive && !r.hasProductMismatch)
-    .map((r) => ({
-      ...r,
-      status: r.mismatchType === 'qty' ? 'Son hatosi' : 'OK',
-    }));
-  const qtyRowsErrors = qtyRowsAll.filter((r) => r.mismatchType === 'qty');
-
-  return {
-    masterRows,
-    customerRowsAll,
-    customerRowsErrors,
-    productRowsAll,
-    productRowsErrors,
-    qtyRowsAll,
-    qtyRowsErrors,
+    orderGroups,
+    missingRows,
+    productGapRows,
+    reasonDetailedRows,
   };
 };
 const shiftMonthKey = (monthKeyValue, delta = 0) => {
@@ -1984,7 +1305,7 @@ function ModernDateInput({
         onClick={() => setOpen((v) => !v)}
       >
         <span className={`modern-date-label${selectedIso ? '' : ' ph'}`}>{selectedIso ? fmtD(selectedIso) : placeholder}</span>
-        <span className="modern-date-icon" aria-hidden="true">{E.plan}</span>
+        <span className="modern-date-icon" aria-hidden="true">📅</span>
       </button>
       {open && (
         <div className="modern-date-pop card">
@@ -2026,198 +1347,6 @@ function ModernDateInput({
       )}
     </div>
   );
-}
-const isValidGeoPoint = (lat, lng) => {
-  const la = Number(lat);
-  const ln = Number(lng);
-  if (!Number.isFinite(la) || !Number.isFinite(ln)) return false;
-  if (Math.abs(la) > 90 || Math.abs(ln) > 180) return false;
-  if (Math.abs(la) < 0.00001 && Math.abs(ln) < 0.00001) return false;
-  return true;
-};
-const YMAPS_JS_ID = 'aq-ymaps-js';
-const YMAPS_JS_SRC = 'https://api-maps.yandex.ru/2.1/?lang=ru_RU';
-let ymapsLoadPromise = null;
-const buildMapPinSvgUri = ({ selected = false } = {}) => {
-  const top = selected ? '#4ade80' : '#38bdf8';
-  const bottom = selected ? '#16a34a' : '#0284c7';
-  const glow = selected ? 'rgba(34,197,94,.45)' : 'rgba(14,165,233,.45)';
-  const stroke = selected ? '#dcfce7' : '#dff6ff';
-  const svg = `
-<svg xmlns="http://www.w3.org/2000/svg" width="36" height="46" viewBox="0 0 36 46">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${top}"/>
-      <stop offset="100%" stop-color="${bottom}"/>
-    </linearGradient>
-    <filter id="f" x="-60%" y="-60%" width="220%" height="220%">
-      <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="${glow}"/>
-    </filter>
-  </defs>
-  <ellipse cx="18" cy="39" rx="8.5" ry="3.3" fill="${glow}" opacity=".5"/>
-  <path filter="url(#f)" d="M18 2C11.4 2 6 7.4 6 14c0 9.6 10.6 20.6 11.1 21.1a1.25 1.25 0 0 0 1.8 0C19.4 34.6 30 23.6 30 14 30 7.4 24.6 2 18 2z" fill="url(#g)" stroke="${stroke}" stroke-width="2"/>
-  <circle cx="18" cy="14" r="5.3" fill="#ffffff" opacity=".92"/>
-</svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-};
-const MAP_PIN_URI = {
-  off: buildMapPinSvgUri({ selected: false }),
-  on: buildMapPinSvgUri({ selected: true }),
-};
-const ensureYandexLoaded = () => {
-  if (typeof window === 'undefined') return Promise.reject(new Error('window not available'));
-  if (window.ymaps?.Map) {
-    return new Promise((resolve) => window.ymaps.ready(() => resolve(window.ymaps)));
-  }
-  if (ymapsLoadPromise) return ymapsLoadPromise;
-  ymapsLoadPromise = new Promise((resolve, reject) => {
-    try {
-      const fail = (err) => {
-        ymapsLoadPromise = null;
-        reject(err instanceof Error ? err : new Error(String(err || 'Yandex Maps xatosi')));
-      };
-      const complete = () => {
-        const waitUntilReady = (attempt = 0) => {
-          if (window.ymaps?.Map) {
-            window.ymaps.ready(() => resolve(window.ymaps));
-            return;
-          }
-          if (attempt >= 400) {
-            fail(new Error('Yandex Maps global topilmadi'));
-            return;
-          }
-          setTimeout(() => waitUntilReady(attempt + 1), 50);
-        };
-        waitUntilReady(0);
-      };
-      const existing = document.getElementById(YMAPS_JS_ID);
-      if (existing) {
-        if (existing.getAttribute('data-loaded') === '1' || window.ymaps?.Map) complete();
-        else {
-          existing.addEventListener('load', complete, { once: true });
-          setTimeout(complete, 120);
-        }
-        return;
-      }
-      const script = document.createElement('script');
-      script.id = YMAPS_JS_ID;
-      script.src = YMAPS_JS_SRC;
-      script.async = true;
-      script.onload = () => {
-        script.setAttribute('data-loaded', '1');
-        complete();
-      };
-      script.onerror = () => fail(new Error('Yandex Maps script yuklanmadi'));
-      document.head.appendChild(script);
-    } catch (e) {
-      ymapsLoadPromise = null;
-      reject(e);
-    }
-  });
-  return ymapsLoadPromise;
-};
-function GeoMapPanel({ points = [], selectedId = '', onPick = () => {}, height = 420, focusPoint = null }) {
-  const hostRef = useRef(null);
-  const mapRef = useRef(null);
-  const onPickRef = useRef(onPick);
-  const [err, setErr] = useState('');
-  useEffect(() => { onPickRef.current = onPick; }, [onPick]);
-
-  useEffect(() => {
-    let cancelled = false;
-    ensureYandexLoaded()
-      .then((ymaps) => {
-        if (cancelled || !hostRef.current) return;
-        if (!mapRef.current) {
-          mapRef.current = new ymaps.Map(hostRef.current, {
-            center: [41.311081, 69.240562],
-            zoom: 11,
-            controls: ['zoomControl'],
-          }, {
-            suppressMapOpenBlock: true,
-            yandexMapDisablePoiInteractivity: true,
-          });
-        }
-        const map = mapRef.current;
-        if (!map) return;
-        map.geoObjects.removeAll();
-
-        const valid = (points || []).filter((p) => isValidGeoPoint(p?.lat, p?.lng));
-        valid.forEach((p) => {
-          const isSel = String(p?.id || '') === String(selectedId || '');
-          const marker = new ymaps.Placemark(
-            [Number(p.lat), Number(p.lng)],
-            { hintContent: String(p?.label || '').trim() || 'Nuqta' },
-            {
-              iconLayout: 'default#image',
-              iconImageHref: isSel ? MAP_PIN_URI.on : MAP_PIN_URI.off,
-              iconImageSize: [28, 36],
-              iconImageOffset: [-14, -36],
-              zIndex: isSel ? 680 : 500,
-            }
-          );
-          marker.events.add('click', () => onPickRef.current?.(p));
-          map.geoObjects.add(marker);
-        });
-
-        const fp = (focusPoint && isValidGeoPoint(focusPoint?.lat, focusPoint?.lng))
-          ? { lat: Number(focusPoint.lat), lng: Number(focusPoint.lng), label: String(focusPoint.label || '').trim() || 'Tanlangan nuqta' }
-          : null;
-        if (fp) {
-          const marker = new ymaps.Placemark(
-            [fp.lat, fp.lng],
-            { hintContent: fp.label },
-            {
-              iconLayout: 'default#image',
-              iconImageHref: MAP_PIN_URI.on,
-              iconImageSize: [32, 42],
-              iconImageOffset: [-16, -42],
-              zIndex: 1200,
-            }
-          );
-          map.geoObjects.add(marker);
-          map.setCenter([fp.lat, fp.lng], 15, { duration: 0 });
-        } else if (!valid.length) {
-          map.setCenter([41.311081, 69.240562], 11, { duration: 0 });
-        } else if (valid.length === 1) {
-          map.setCenter([Number(valid[0].lat), Number(valid[0].lng)], 14, { duration: 0 });
-        } else {
-          const lats = valid.map((p) => Number(p.lat));
-          const lngs = valid.map((p) => Number(p.lng));
-          const bounds = [
-            [Math.min(...lats), Math.min(...lngs)],
-            [Math.max(...lats), Math.max(...lngs)],
-          ];
-          map.setBounds(bounds, {
-            checkZoomRange: true,
-            zoomMargin: 28,
-            duration: 0,
-          });
-        }
-        setTimeout(() => map.container.fitToViewport(), 0);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setErr(String(e?.message || e || 'Xarita yuklanmadi'));
-      });
-    return () => { cancelled = true; };
-  }, [points, selectedId, focusPoint]);
-
-  useEffect(() => () => {
-    if (mapRef.current) {
-      mapRef.current.destroy();
-      mapRef.current = null;
-    }
-  }, []);
-
-  if (err) {
-    return (
-      <div className="card" style={{height, display:'grid', placeItems:'center', color:'var(--rd)'}}>
-        Xarita yuklanmadi: {err}
-      </div>
-    );
-  }
-  return <div ref={hostRef} style={{height, width:'100%', borderRadius:10, overflow:'hidden'}} />;
 }
 const normId = (v) => {
   const s = String(v ?? '').trim();
@@ -2265,25 +1394,6 @@ const isMainWarehouseLabel = (v) => {
     s.includes('asosiysklad')
   );
 };
-const isVirtualWarehouseLabel = (v) => {
-  const s = normalizeWarehouseKey(v).replace(/\s+/g, '');
-  if (!s) return false;
-  return (
-    s.includes('virtual') ||
-    s.includes('vertual') ||
-    s.includes('виртуал')
-  );
-};
-const isVirtualDriverLabel = (v) => {
-  const s = normalizeMatchText(v).replace(/\s+/g, '');
-  if (!s) return false;
-  return (
-    s.includes('virtual') ||
-    s.includes('vertual') ||
-    s.includes('виртуал')
-  );
-};
-const normalizeCashboxKey = (v) => normalizeWarehouseKey(v).replace(/\s+/g, ' ').trim();
 const textHasAny = (text, needles = []) =>
   needles.some((n) => text === n || text.includes(n));
 const pickFirstBy = (candidates = [], predicate) => {
@@ -2329,71 +1439,6 @@ const isPaymentToCounterparty = (v) => {
     (t.includes('оплата') && t.includes('контрагент') && !isPaymentFromCounterparty(v)) ||
     (t.includes('oplata') && t.includes('kontragent') && t.includes(' to '))
   );
-};
-const detectPaymentMode = (...vals) => {
-  const t = normalizeMatchText(vals.filter(Boolean).join(' '));
-  if (!t) return '';
-  if (
-    t.includes('karta') ||
-    t.includes('карта') ||
-    t.includes('card') ||
-    t.includes('terminal')
-  ) {
-    return 'card';
-  }
-  if (
-    t.includes('naqt') ||
-    t.includes('нал') ||
-    t.includes('cash') ||
-    t.includes('налич')
-  ) {
-    return 'cash';
-  }
-  return '';
-};
-const isCustomerToCustomerTransfer = (...vals) => {
-  const t = normalizeMatchText(vals.filter(Boolean).join(' '));
-  if (!t) return false;
-  const checks = [
-    'мijozdan mijozga',
-    'mijozdan mijozga',
-    'между клиентами',
-    'клиент клиент',
-    'klient klient',
-    'customer to customer',
-    'perevod',
-    'перевод',
-    'perekidka',
-    'перекидка',
-    'perebroska',
-    'переброска',
-  ];
-  return checks.some((x) => t.includes(x));
-};
-const pickBestOrderDate = (...vals) => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const futureLimit = new Date(today);
-  futureLimit.setDate(futureLimit.getDate() + 3);
-  const candidates = vals
-    .map((v) => ({ raw: String(v || '').trim(), d: toDate(v) }))
-    .filter((x) => x.raw && x.d)
-    .filter((x) => x.d <= futureLimit);
-  if (!candidates.length) {
-    const fallback = vals.find((v) => toDate(v));
-    return String(fallback || '').trim();
-  }
-  candidates.sort((a, b) => b.d - a.d);
-  return candidates[0].raw;
-};
-const isMonthlyWaterSalesRow = (row, targetMonth = '') => {
-  if (!row) return false;
-  const mk = monthKey(row?.orderDate);
-  if (targetMonth && mk !== targetMonth) return false;
-  if (isVirtualWarehouseLabel(row?.warehouse)) return false;
-  if (normalizeMatchText(row?.status).includes('отменено')) return false;
-  const cat = normalizeMatchText(row?.cat).replace(/\s+/g, ' ').trim();
-  return cat === normalizeMatchText('Вода');
 };
 const isLikelyDocType = (v) => {
   const s = String(v || '').trim();
@@ -2598,7 +1643,7 @@ function parseGsCsv(text) {
     }).filter((r) => r.some((v) => v));
   }
 }
-async function fetchSheetCsv(sheetId, gid, label, timeoutMs = 12000) {
+async function fetchSheetCsv(sheetId, gid, label) {
   const sources = [
     buildGsUrl(sheetId, gid),
     `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`,
@@ -2611,7 +1656,7 @@ async function fetchSheetCsv(sheetId, gid, label, timeoutMs = 12000) {
   ]);
   for (const u of urls) {
     try {
-      const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
+      const r = await fetch(u, { signal: AbortSignal.timeout(12000) });
       if (!r.ok) continue;
       const text = await r.text();
       if (text.trim().startsWith('<')) continue;
@@ -2622,7 +1667,7 @@ async function fetchSheetCsv(sheetId, gid, label, timeoutMs = 12000) {
   }
   throw new Error(`"${label}" varaqi yuklanmadi. GID: ${gid}`);
 }
-async function fetchSheetCsvByName(sheetId, sheetName, label, timeoutMs = 12000) {
+async function fetchSheetCsvByName(sheetId, sheetName, label) {
   const sources = [
     buildGsUrlByName(sheetId, sheetName),
     `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`,
@@ -2634,7 +1679,7 @@ async function fetchSheetCsvByName(sheetId, sheetName, label, timeoutMs = 12000)
   ]);
   for (const u of urls) {
     try {
-      const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
+      const r = await fetch(u, { signal: AbortSignal.timeout(12000) });
       if (!r.ok) continue;
       const text = await r.text();
       if (text.trim().startsWith('<')) continue;
@@ -2645,7 +1690,7 @@ async function fetchSheetCsvByName(sheetId, sheetName, label, timeoutMs = 12000)
   }
   throw new Error(`"${label}" varaqi yuklanmadi. Sheet: ${sheetName}`);
 }
-async function fetchSheetOpenSheet(sheetId, sheetName, label, timeoutMs = 12000) {
+async function fetchSheetOpenSheet(sheetId, sheetName, label) {
   const base = `https://opensheet.elk.sh/${sheetId}/${encodeURIComponent(sheetName)}`;
   const urls = [
     base,
@@ -2654,7 +1699,7 @@ async function fetchSheetOpenSheet(sheetId, sheetName, label, timeoutMs = 12000)
   ];
   for (const u of urls) {
     try {
-      const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
+      const r = await fetch(u, { signal: AbortSignal.timeout(12000) });
       if (!r.ok) continue;
       const js = await r.json();
       if (!Array.isArray(js) || js.length === 0) continue;
@@ -2741,7 +1786,6 @@ function processAll(mainData) {
       const source = String(r[25] || '').trim(); // Z ustun
       const merchNote = String(r[19] || '').trim(); // T ustun = primechaniya
       const aaValue = String(r[26] || '').trim(); // AA ustun
-      const merchantGeo = parseMerchantGeoFromQR(r[16], r[17]);
       allMerchants.push({ id, name, source, merchNote, aaTag: aaValue });
       contacts.push({
         id,
@@ -2749,8 +1793,6 @@ function processAll(mainData) {
         phone:    String(r[3]  || '').trim().replace(/[^+\d]/g,'').slice(0,13),
         contact:  String(r[4]  || '').trim(),
         address:  String(r[14] || '').trim(),
-        lat: merchantGeo.lat, // Q/R
-        lng: merchantGeo.lng, // Q/R
         district: pickPreferredDistrict(r[21]),
         source,
         aaTag: aaValue,
@@ -2834,7 +1876,7 @@ function processAll(mainData) {
       const uniqueId = String(r[17] || r[18] || '').trim();
       const agent = pickFirstBy([r[21], r[20], r[18]], (v) => String(v || '').trim().length > 0);
       const delivPerson = pickFirstBy([r[23], r[24], r[22]], (v) => String(v || '').trim().length > 0); // X
-      const orderDate = pickBestOrderDate(r[22], r[24], r[23], r[21], r[20]); // W -> Y fallback (future-shift himoya)
+      const orderDate = pickFirstBy([r[22], r[24], r[23], r[21], r[20]], (v) => !!toDate(v)); // W
       const warehouse = pickFirstBy([r[19], r[20], r[18], r[16], r[25]], (v) => isLikelyWarehouseName(v));
       const mId = normId(pickFirstBy([r[29], r[30], r[28], r[27]], (v) => String(v || '').trim().length > 0));
       const note = pickFirstBy(
@@ -2941,15 +1983,11 @@ function processAll(mainData) {
   if (assignSheet) {
     assignSheet.slice(1).forEach((r) => {
       const code = String(r[0] || '').trim();
-      const codeNorm = code.toLowerCase();
       const id = normId(r[1]);
       if (!id) return;
       let operator = '';
-      if (codeNorm === 'op3' || codeNorm === '5' || codeNorm === 'dildora') operator = 'Dildora';
-      if (codeNorm === 'op2' || codeNorm === '4' || codeNorm === 'dilfuza') operator = 'Dilfuza';
-      if (!operator) {
-        operator = String(r[2] || r[3] || '').trim();
-      }
+      if (code === 'Op3' || code === '5') operator = 'Dildora';
+      if (code === 'Op2' || code === '4') operator = 'Dilfuza';
       if (operator) assignmentById[id] = operator;
     });
   }
@@ -3018,8 +2056,6 @@ function processAll(mainData) {
       aaTag: c.aaTag || '',
       merchantNote: c.merchantNote || '',
       address: c.address,
-      lat: c.lat,
-      lng: c.lng,
       balanceUZS,
       balanceUSD,
       balance: balanceUZS,
@@ -3483,8 +2519,8 @@ body,input,select,button{font-family:var(--sans)}
 .btn-bl:hover{filter:brightness(1.03)}
 .btn-gr{background:var(--gr);color:#000;box-shadow:0 4px 14px rgba(63,185,80,.16)}
 .btn-gr:hover{filter:brightness(1.03)}
-.btn-gh{background:color-mix(in oklab, var(--s2) 86%, #000 14%);color:var(--t2);border:1px solid var(--b1)}
-.btn-gh:hover{background:color-mix(in oklab, var(--s3) 90%, #000 10%);color:var(--t1)}
+.btn-gh{background:transparent;color:var(--t2);border:1px solid var(--b1)}
+.btn-gh:hover{background:var(--s3);color:var(--t1)}
 .btn-sm{padding:5px 10px;font-size:11.5px}
 .input{width:100%;padding:8px 11px;border:1px solid var(--b1);border-radius:var(--r);
   font-size:13px;color:var(--t1);background:var(--s3);background:linear-gradient(180deg,var(--s3),color-mix(in oklab, var(--s3) 82%, var(--bg)));
@@ -3515,7 +2551,7 @@ body,input,select,button{font-family:var(--sans)}
 .modern-date-actions{display:flex;justify-content:space-between;gap:8px;margin-top:8px}
 .card{background:var(--s1);border:1px solid var(--b2);border-radius:var(--rl)}
 .tag{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;font-family:var(--mono)}
-.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:5200;padding:16px;backdrop-filter:blur(5px)}
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:300;padding:16px;backdrop-filter:blur(5px)}
 .modal{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);width:100%;max-width:900px;max-height:94vh;overflow-y:auto;box-shadow:0 32px 80px rgba(0,0,0,.8)}
 .mhdr{padding:14px 20px;border-bottom:1px solid var(--b2);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--s1);z-index:1}
 .mbdy{padding:16px 20px}
@@ -3544,20 +2580,6 @@ body,input,select,button{font-family:var(--sans)}
 .tab:focus-visible{outline:2px solid var(--bl);outline-offset:1px}
 .tab.on{background:var(--s1);color:var(--t1);box-shadow:0 1px 4px rgba(0,0,0,.4)}
 .tab:active{transform:translateY(1px)}
-[data-filter-boundary="1"]{position:relative}
-.aq-map-wrap{position:relative;overflow:visible}
-.aq-map-toolbar{position:absolute;top:10px;left:10px;right:10px;z-index:3200;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.aq-map-popup{position:absolute;left:10px;right:10px;bottom:10px;z-index:3200;background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:8px 10px;backdrop-filter:blur(8px)}
-.aq-map-track-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);z-index:3260;min-width:30px;padding:4px 8px}
-.aq-map-track-drawer{position:absolute;top:10px;bottom:10px;right:10px;z-index:3250;width:320px;max-width:calc(100% - 56px);display:flex;flex-direction:column;overflow:hidden;transition:transform .2s ease,opacity .2s ease}
-.aq-map-track-drawer.closed{transform:translateX(calc(100% + 18px));opacity:.0;pointer-events:none}
-.aq-map-track-drawer.open{transform:translateX(0);opacity:1;pointer-events:auto}
-.aq-map-wrap [class*="ymaps-"][class*="copyright"]{display:none!important}
-.aq-map-wrap [class*="ymaps-"][class*="gotoymaps"]{display:none!important}
-.aq-map-pin{background:transparent!important;border:none!important}
-.aq-map-pin span{display:block;width:18px;height:18px;border-radius:11px 11px 11px 2px;transform:rotate(-45deg);background:linear-gradient(180deg,#38bdf8 0%,#0284c7 100%);border:2px solid #dff6ff;box-shadow:0 6px 16px rgba(2,132,199,.45)}
-.aq-map-pin.on span{background:linear-gradient(180deg,#4ade80 0%,#16a34a 100%);border-color:#dcfce7;box-shadow:0 6px 16px rgba(22,163,74,.42)}
-.leaflet-pane,.leaflet-top,.leaflet-bottom{z-index:1200}
 .nav-i{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--r);cursor:pointer;color:var(--t2);font-size:13px;font-weight:500;transition:all .13s;user-select:none;position:relative}
 .nav-i:hover{background:var(--s2);color:var(--t1)}
 .nav-i.on{background:var(--bl2);color:var(--bl)}
@@ -3601,6 +2623,10 @@ body,input,select,button{font-family:var(--sans)}
 .hol-day.out{opacity:.55}
 .hol-day.weekly:not(.on){border-style:dashed}
 .hol-day:disabled{cursor:not-allowed;opacity:.6}
+@media (max-width: 768px){
+  .sv-tbl th{font-size:9px;padding:6px 5px}
+  .sv-tbl td{font-size:10px;padding:6px 5px}
+}
 `;
 const LIGHT_THEME_VARS = {
   '--bg': '#f4f7fb',
@@ -3629,81 +2655,6 @@ const S = {
   get: (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):d; } catch { return d; } },
   set: (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} },
 };
-const readTelegramBotOrders = () => {
-  const raw = S.get(TG_BOT_ORDER_STORAGE_KEY, []);
-  if (!Array.isArray(raw)) return [];
-  return raw
-    .map((r) => ({
-      id: String(r?.id || '').trim(),
-      source: 'telegram_bot',
-      createdAt: String(r?.createdAt || '').trim() || new Date().toISOString(),
-      updatedAt: String(r?.updatedAt || '').trim() || String(r?.createdAt || '').trim() || new Date().toISOString(),
-      status: TG_BOT_ORDER_STATUSES.includes(String(r?.status || '').trim()) ? String(r.status).trim() : 'Yangi',
-      customerId: normId(r?.customerId),
-      customerName: String(r?.customerName || '').trim(),
-      customerAddress: String(r?.customerAddress || '').trim(),
-      customerPhone: String(r?.customerPhone || '').trim(),
-      district: String(r?.district || '').trim(),
-      product: String(r?.product || '').trim() || 'Murodbaxsh 18.9L',
-      qty: Math.max(0, Math.abs(toNum(r?.qty))),
-      note: String(r?.note || '').trim(),
-      telegramUserId: String(r?.telegramUserId || '').trim(),
-      telegramUsername: String(r?.telegramUsername || '').trim(),
-      telegramFirstName: String(r?.telegramFirstName || '').trim(),
-      telegramLastName: String(r?.telegramLastName || '').trim(),
-      history: Array.isArray(r?.history) ? r.history : [],
-    }))
-    .filter((r) => r.id && r.customerId)
-    .sort((a, b) => {
-      const ta = parseDateTimeLoose(a.createdAt)?.getTime() || 0;
-      const tb = parseDateTimeLoose(b.createdAt)?.getTime() || 0;
-      return tb - ta;
-    });
-};
-const writeTelegramBotOrders = (rows = []) => {
-  const list = Array.isArray(rows) ? rows : [];
-  S.set(TG_BOT_ORDER_STORAGE_KEY, list);
-  if (typeof window !== 'undefined') {
-    try {
-      window.dispatchEvent(new CustomEvent(TG_BOT_ORDER_EVENT, { detail: { count: list.length, at: Date.now() } }));
-    } catch {}
-  }
-};
-const appendTelegramBotOrder = (order = {}) => {
-  const nowIso = new Date().toISOString();
-  const id = String(order?.id || `TG-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`).trim();
-  if (!id) return null;
-  const nextRow = {
-    id,
-    source: 'telegram_bot',
-    createdAt: String(order?.createdAt || nowIso).trim(),
-    updatedAt: String(order?.updatedAt || nowIso).trim(),
-    status: TG_BOT_ORDER_STATUSES.includes(String(order?.status || '').trim()) ? String(order.status).trim() : 'Yangi',
-    customerId: normId(order?.customerId),
-    customerName: String(order?.customerName || '').trim(),
-    customerAddress: String(order?.customerAddress || '').trim(),
-    customerPhone: String(order?.customerPhone || '').trim(),
-    district: String(order?.district || '').trim(),
-    product: String(order?.product || '').trim() || TG_BOT_ORDER_PRODUCTS[0],
-    qty: Math.max(0, Math.abs(toNum(order?.qty))),
-    note: String(order?.note || '').trim(),
-    telegramUserId: String(order?.telegramUserId || '').trim(),
-    telegramUsername: String(order?.telegramUsername || '').trim(),
-    telegramFirstName: String(order?.telegramFirstName || '').trim(),
-    telegramLastName: String(order?.telegramLastName || '').trim(),
-    history: Array.isArray(order?.history) ? order.history : [],
-  };
-  if (!nextRow.customerId || !nextRow.qty) return null;
-  nextRow.history = [
-    ...nextRow.history,
-    { at: nowIso, status: nextRow.status, by: 'telegram_bot' },
-  ];
-  const prev = readTelegramBotOrders();
-  const merged = [nextRow, ...prev.filter((r) => String(r?.id || '').trim() !== nextRow.id)];
-  writeTelegramBotOrders(merged);
-  return nextRow;
-};
-const BINDING_UPDATE_EVENT = 'aq-binding-maps-updated';
 const DEFAULT_USERS = ['Dildora', 'Dilfuza', 'Admin'];
 const DEFAULT_USER_CREDS = { Dildora:'Dildora', Dilfuza:'Dilfuza', Admin:'12345' };
 const DEFAULT_CUSTOMER_TABS = {
@@ -3721,7 +2672,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, telegram_bot:false, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3730,7 +2681,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, telegram_bot:false, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3739,7 +2690,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'all',
     role: 'admin',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, nazorat:true, reports:true, plan:true, refresh:true, telegram_bot:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
     ui: { theme:'dark' },
     company: { canSwitch:true, default:'murodbaxsh' },
   },
@@ -3764,7 +2715,7 @@ function normalizeAccessConfig(user, cfg) {
         activeScope:'own',
         role:'operator',
         customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS },
-        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+        visible:{ ...DEFAULT_VISIBLE_PAGES, telegram_bot:false, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
         ui:{ theme:'dark' },
         company:{ canSwitch:false, default:'murodbaxsh' },
       };
@@ -3792,8 +2743,6 @@ function normalizeAccessConfig(user, cfg) {
     normalized.visible.obzvon_new_delete = true;
     normalized.visible.obzvon_new_publish = true;
   }
-  // "Qolib ketgan zakazlar" bo'limi barcha foydalanuvchilar uchun doim ochiq.
-  normalized.visible.left_orders = true;
   return normalized;
 }
 
@@ -4077,8 +3026,8 @@ function CustomerDetail({ c, D, onClose }) {
                 <span>{E.uzs} Balans UZS: <strong style={{color:balColor(finalBalUZS)}}>{fmt(Math.abs(finalBalUZS))} so'm</strong></span>
                 <span>{E.usd} Balans USD: <strong style={{color:balColor(finalBalUSD)}}>{fmt(Math.abs(finalBalUSD))} $</strong></span>
               </div>
-              <div ref={sverkaWrapRef} style={{overflow:'auto',maxHeight:'52vh',borderRadius:9,border:'1px solid var(--b2)'}}>
-                <table className="tbl sv-tbl" style={{minWidth:1000}}>
+              <div ref={sverkaWrapRef} style={{overflow:'auto',maxHeight:'62vh',borderRadius:9,border:'1px solid var(--b2)',WebkitOverflowScrolling:'touch'}}>
+                <table className="tbl sv-tbl" style={{minWidth:860}}>
                   <thead>
                     <tr>
                       <th style={{minWidth:80}}>Kod</th>
@@ -4307,23 +3256,8 @@ function Dashboard({ D }) {
   const { customers, cashbox, rawOrders, debtorsByBalance=[] } = D;
   const now = new Date();
   const curMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const waterSalesRows = (rawOrders || []).filter((o) => isMonthlyWaterSalesRow(o));
-  const wDelThisMonth = waterSalesRows.filter((o) => monthKey(o.orderDate)===curMonthKey);
-  const wDelThisMonthStats = useMemo(() => {
-    let soldQty = 0;
-    let returnedQty = 0;
-    let netQty = 0;
-    let netSum = 0;
-    (wDelThisMonth || []).forEach((o) => {
-      const q = toNum(o?.qty);
-      const s = String(o?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(o?.sum);
-      if (q >= 0) soldQty += q;
-      else returnedQty += Math.abs(q);
-      netQty += q;
-      netSum += s;
-    });
-    return { soldQty, returnedQty, netQty, netSum };
-  }, [wDelThisMonth]);
+  const wDel = (rawOrders||[]).filter((o) => isWaterProduct(o.product) && isOrderDoc(o.docType) && isDeliveredStatus(o.status));
+  const wDelThisMonth = wDel.filter((o) => monthKey(o.orderDate)===curMonthKey);
   const pays = (cashbox||[]).filter((c) => isPaymentFromCounterparty(c.opType));
   const debtors = debtorsByBalance.length ? debtorsByBalance : customers.filter((c) => c.balanceUZS < 0);
   const stale2m = customers
@@ -4331,8 +3265,8 @@ function Dashboard({ D }) {
     .sort((a,b) => (b.daysAgo || 0) - (a.daysAgo || 0));
 
   const monthOptions = useMemo(
-    () => [...new Set(waterSalesRows.map((o) => monthKey(o.orderDate)).filter(Boolean))].sort(),
-    [waterSalesRows]
+    () => [...new Set(wDel.map((o) => monthKey(o.orderDate)).filter(Boolean))].sort(),
+    [wDel]
   );
   const [agentMonth, setAgentMonth] = useState(curMonthKey);
   const [rayonMonth, setRayonMonth] = useState(curMonthKey);
@@ -4357,42 +3291,41 @@ function Dashboard({ D }) {
   }, [pays]);
   const byMonth = useMemo(() => {
     const m = {};
-    waterSalesRows.forEach((o) => {
+    wDel.forEach((o) => {
       const k = monthKey(o.orderDate); if (!k) return;
       if (!m[k]) m[k]={key:k,qty:0,sumUZS:0};
-      m[k].qty += toNum(o?.qty);
-      if (String(o?.currency || '').toUpperCase() !== 'USD') m[k].sumUZS += toNum(o?.sum);
+      m[k].qty+=Math.abs(o.qty);
+      if (o.currency !== 'USD') m[k].sumUZS += o.sum;
     });
     return Object.values(m).sort((a,b)=>a.key.localeCompare(b.key)).slice(-12);
-  }, [waterSalesRows]);
+  }, [wDel]);
   const byDist = useMemo(() => {
-    const source = rayonMonth === 'all' ? waterSalesRows : waterSalesRows.filter((o) => monthKey(o.orderDate) === rayonMonth);
+    const source = rayonMonth === 'all' ? wDel : wDel.filter((o) => monthKey(o.orderDate) === rayonMonth);
     const m = {};
     source.forEach((o) => {
       const c = customers.find((x)=>x.id===o.mId);
       const d = c?.district || "Noma'lum";
       if (!m[d]) m[d] = { name:d, qty:0, sum:0, custs:new Set() };
-      m[d].qty += toNum(o?.qty);
-      m[d].sum += (String(o?.currency || '').toUpperCase()==='USD' ? 0 : toNum(o?.sum));
+      m[d].qty += Math.abs(o.qty || 0);
+      m[d].sum += (o.currency==='USD' ? 0 : (o.sum || 0));
       if (o.mId) m[d].custs.add(o.mId);
     });
     return Object.values(m)
       .map((x)=>({ ...x, custs:x.custs.size }))
       .sort((a,b)=>b.sum-a.sum);
-  }, [waterSalesRows, customers, rayonMonth]);
+  }, [wDel, customers, rayonMonth]);
   const agents = useMemo(() => {
     const source = agentMonth === 'all'
-      ? waterSalesRows
-      : waterSalesRows.filter((o) => monthKey(o.orderDate) === agentMonth);
+      ? wDel
+      : wDel.filter((o) => monthKey(o.orderDate) === agentMonth);
     const m = {};
     source.forEach((o) => {
       const a=o.agent||'-';
       if (!m[a]) m[a]={name:a,qty:0,sum:0};
-      m[a].qty += toNum(o?.qty);
-      m[a].sum += (String(o?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(o?.sum));
+      m[a].qty+=Math.abs(o.qty); m[a].sum+=o.sum;
     });
     return Object.values(m).sort((a,b)=>b.sum-a.sum).slice(0,7);
-  }, [waterSalesRows, agentMonth]);
+  }, [wDel, agentMonth]);
 
   const debtSum = debtors.reduce((s, c) => s + Math.abs(c.balanceUZS || 0), 0);
   const COLORS = ['#58a6ff','#3fb950','#f85149','#d29922','#bc8cff','#f0883e','#79c0ff','#56d364','#ffa657'];
@@ -4405,9 +3338,9 @@ function Dashboard({ D }) {
         <StatCard l="JAMI IDISH" v={customers.reduce((s,c)=>s+c.tara,0)+' ta'} s="barcha mijozlarda" c="var(--pu)"/>
         <StatCard l="2 OY OLMAGAN" v={stale2m.length+' ta'} s="aktiv mijozlar ichidan" c="var(--yl)"/>
         <StatCard
-          l={`Oylik sotilgan suv (${curMonthKey})`}
-          v={fmt(wDelThisMonthStats.netQty)+' ta'}
-          s={`Zakaz: ${fmt(wDelThisMonthStats.soldQty)}  |  Vozvrat: -${fmt(wDelThisMonthStats.returnedQty)}  |  Netto: ${fmt(wDelThisMonthStats.netSum)} so'm`} c="var(--gr)"/>
+          l={`SUV (${String(now.getMonth()+1).padStart(2,'0')}.${now.getFullYear()})`}
+          v={fmt(wDelThisMonth.reduce((s,o)=>s+Math.abs(o.qty),0))+' ta'}
+          s={fmt(wDelThisMonth.reduce((s,o)=>s+o.sum,0))+" so'm"} c="var(--gr)"/>
       </div>
 
       <div className="g2">
@@ -4487,7 +3420,7 @@ function Dashboard({ D }) {
                 </div>
               </div>
               <div style={{height:4,background:'var(--s3)',borderRadius:2}}>
-                <div style={{height:'100%',width:`${(Math.abs(d.sum)/(Math.max(1,...byDist.map((x)=>Math.abs(x.sum||0)))))*100}%`,background:COLORS[i%COLORS.length],borderRadius:2,transition:'width .5s'}}/>
+                <div style={{height:'100%',width:`${(d.sum/(byDist[0]?.sum||1))*100}%`,background:COLORS[i%COLORS.length],borderRadius:2,transition:'width .5s'}}/>
               </div>
             </div>
           ))}
@@ -4517,10 +3450,8 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   const { customers } = D;
   const [segment, setSegment] = useState('all');
   const [search,setS]   = useState('');
-  const [viewMode, setViewMode] = useState('list');
   const [sort,setSort]  = useState({ col:'name', dir:'asc' });
   const [det,setDet]    = useState(null);
-  const [mapSelected, setMapSelected] = useState(null);
   const [showAdv, setShowAdv] = useState(false);
   const [uFilterOpen, setUFilterOpen] = useState(false);
   const [uFilterState, setUFilterState] = useState({});
@@ -4535,11 +3466,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   const sources = [...new Set(customers.map((c)=>c.source).filter(Boolean))].sort();
   const agents = [...new Set(customers.map((c)=>c.lastAgent).filter(Boolean))].sort();
   const ownIds = useMemo(
-    () => new Set(
-      Object.entries(assignmentById || {})
-        .filter(([, op]) => normalizeUserKey(op) === normalizeUserKey(currentUser))
-        .map(([id]) => id)
-    ),
+    () => new Set(Object.entries(assignmentById || {}).filter(([, op]) => op === currentUser).map(([id]) => id)),
     [assignmentById, currentUser]
   );
   const tabVisible = {
@@ -4568,7 +3495,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     [customers]
   );
   const nonAhmadteaNonZ = useMemo(
-    () => nonAhmadtea.filter((c) => !isExcludedZCategory(c.source) && !isExcludedMerchant(c.source || '')),
+    () => nonAhmadtea.filter((c) => !isExcludedZCategory(c.source)),
     [nonAhmadtea]
   );
   const activeBase = useMemo(
@@ -4590,10 +3517,10 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
       return activeBase.filter((c) => ownIds.has(c.id));
     }
     if (segment === 'inactive') {
-      return nonAhmadtea.filter((c) => isNameInactiveByPrefix(c.name));
+      return nonAhmadteaNonZ.filter((c) => isNameInactiveByPrefix(c.name));
     }
     if (segment === 'other_customers') {
-      return nonAhmadtea.filter((c) => isExcludedZCategory(c.source));
+      return nonAhmadtea.filter((c) => isExcludedZCategory(c.source) && !isNameInactiveByPrefix(c.name));
     }
     // Hamma mijozlar: public.view_merchants dagi hamma mijoz.
     return customers;
@@ -4657,23 +3584,6 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
       return sort.dir==='asc'?(av>bv?1:-1):av<bv?1:-1;
     });
   }, [segmentCustomers,search,sort,adv,segment,customerFilterColumns,uFilterState]);
-  const mapPoints = useMemo(
-    () => list
-      .filter((c) => isValidGeoPoint(c?.lat, c?.lng))
-      .map((c) => ({
-        id: String(c.id || ''),
-        lat: Number(c.lat),
-        lng: Number(c.lng),
-        label: String(c.name || '').trim() || `ID ${c.id}`,
-        row: c,
-      })),
-    [list]
-  );
-  useEffect(() => {
-    if (!mapSelected) return;
-    const ok = list.some((c) => String(c.id || '') === String(mapSelected.id || ''));
-    if (!ok) setMapSelected(null);
-  }, [list, mapSelected]);
 
   const activeFilters = useMemo(() => {
     let count = 0;
@@ -4692,7 +3602,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   const tog = (col) => setSort((s) => s.col===col?{col,dir:s.dir==='asc'?'desc':'asc'}:{col,dir:'asc'});
   const SI = ({c:col}) => sort.col===col
     ? <span style={{marginLeft:3}}>{sort.dir==='asc'?'^':'v'}</span>
-    : <span style={{marginLeft:3,opacity:.2}}>¦</span>;
+    : <span style={{marginLeft:3,opacity:.2}}>↕</span>;
   const balColor = (v) => v<0?'var(--rd)':v>0?'var(--gr)':'var(--t3)';
   const debt = getDebtStats(segmentCustomers);
 
@@ -4703,202 +3613,134 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
           <button key={t.id} className={`tab${segment===t.id?' on':''}`} onClick={()=>setSegment(t.id)}>{t.label}</button>
         ))}
       </div>
-      {viewMode === 'list' && (
-        <div className="g4">
-          <StatCard l="JAMI MIJOZLAR" v={segmentCustomers.length} s={segmentCustomers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
-          <StatCard l="QARZDORLAR" v={debt.uzsCount+' ta'} s={fmt(debt.uzsSum)+" so'm"} c="var(--rd)"/>
-          <StatCard l="JAMI IDISH" v={segmentCustomers.reduce((s,c)=>s+c.tara,0)+' ta'} s="barcha mijozlarda" c="var(--pu)"/>
-          <StatCard l="FILTRLANGAN" v={list.length+' ta'} c="var(--gr)"/>
+      <div className="g4">
+        <StatCard l="JAMI MIJOZLAR" v={segmentCustomers.length} s={segmentCustomers.filter((c)=>c.hasOrders).length+' aktiv'} c="var(--bl)"/>
+        <StatCard l="QARZDORLAR" v={debt.uzsCount+' ta'} s={fmt(debt.uzsSum)+" so'm"} c="var(--rd)"/>
+        <StatCard l="JAMI IDISH" v={segmentCustomers.reduce((s,c)=>s+c.tara,0)+' ta'} s="barcha mijozlarda" c="var(--pu)"/>
+        <StatCard l="FILTRLANGAN" v={list.length+' ta'} c="var(--gr)"/>
+      </div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',position:'relative'}}>
+        <div className="sb" style={{flex:2,minWidth:200}}>
+          <span style={{color:'var(--t3)'}}>{E.find}</span>
+          <input placeholder="Ism, telefon, ID bo'yicha..." value={search} onChange={(e)=>setS(e.target.value)}/>
         </div>
-      )}
-      {viewMode === 'list' && (
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center',position:'relative',zIndex:10}}>
-          <div className="sb" style={{flex:'1 1 560px',minWidth:240,maxWidth:'none'}}>
-            <span style={{color:'var(--t3)'}}>{E.find}</span>
-            <input placeholder="Ism, telefon, ID bo'yicha..." value={search} onChange={(e)=>setS(e.target.value)}/>
-          </div>
-          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <div className="tabs" style={{display:'inline-flex'}}>
-              <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
-              <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
-            </div>
-            <div style={{position:'relative'}}>
-              <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-                </svg>
-                Filtr ({universalFilterCount})
-              </button>
-              <UniversalFilterPanel
-                open={uFilterOpen}
-                title="Mijozlar filtri"
-                columns={customerFilterColumns}
-                rows={segmentCustomers}
-                state={uFilterState}
-                setState={setUFilterState}
-                onClose={()=>setUFilterOpen(false)}
-                width={620}
-              />
-            </div>
-            <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
-          </div>
+        <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+          </svg>
+          Filtr ({universalFilterCount})
+        </button>
+        <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
+        <UniversalFilterPanel
+          open={uFilterOpen}
+          title="Mijozlar filtri"
+          columns={customerFilterColumns}
+          rows={segmentCustomers}
+          state={uFilterState}
+          setState={setUFilterState}
+          onClose={()=>setUFilterOpen(false)}
+          width={620}
+        />
 
-          {showAdv && (
-              <div className="card" style={{position:'absolute',top:40,left:0,right:'auto',zIndex:50,width:'min(520px, calc(100vw - 24px))',padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)',overflow:'hidden'}}>
-              <div className="g2" style={{marginBottom:8}}>
-                <div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Rayon</div>
-                  <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                    {dists.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.districts.includes(d)} onChange={(e)=>setAdv((p)=>({...p,districts:e.target.checked?[...p.districts,d]:p.districts.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
-                  </div>
-                </div>
-                <div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Manba</div>
-                  <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                    {sources.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.sources.includes(d)} onChange={(e)=>setAdv((p)=>({...p,sources:e.target.checked?[...p.sources,d]:p.sources.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
-                  </div>
-                </div>
-                <div>
-                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Agent</div>
-                  <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
-                    {agents.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.agents.includes(d)} onChange={(e)=>setAdv((p)=>({...p,agents:e.target.checked?[...p.agents,d]:p.agents.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
-                  </div>
-                </div>
-                <div style={{display:'grid',gap:6}}>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                    <input className="input" placeholder="Balans UZS dan" value={adv.uzsFrom} onChange={(e)=>setAdv((p)=>({...p,uzsFrom:e.target.value}))}/>
-                    <input className="input" placeholder="Balans UZS gacha" value={adv.uzsTo} onChange={(e)=>setAdv((p)=>({...p,uzsTo:e.target.value}))}/>
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                    <input className="input" placeholder="Balans USD dan" value={adv.usdFrom} onChange={(e)=>setAdv((p)=>({...p,usdFrom:e.target.value}))}/>
-                    <input className="input" placeholder="Balans USD gacha" value={adv.usdTo} onChange={(e)=>setAdv((p)=>({...p,usdTo:e.target.value}))}/>
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                    <input className="input" placeholder="Idish dan" value={adv.taraFrom} onChange={(e)=>setAdv((p)=>({...p,taraFrom:e.target.value}))}/>
-                    <input className="input" placeholder="Idish gacha" value={adv.taraTo} onChange={(e)=>setAdv((p)=>({...p,taraTo:e.target.value}))}/>
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                    <input className="input" placeholder="Kun dan" value={adv.daysFrom} onChange={(e)=>setAdv((p)=>({...p,daysFrom:e.target.value}))}/>
-                    <input className="input" placeholder="Kun gacha" value={adv.daysTo} onChange={(e)=>setAdv((p)=>({...p,daysTo:e.target.value}))}/>
-                  </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
-                    <ModernDateInput value={adv.lastFrom} onChange={(e)=>setAdv((p)=>({...p,lastFrom:e.target.value}))} />
-                    <ModernDateInput value={adv.lastTo} onChange={(e)=>setAdv((p)=>({...p,lastTo:e.target.value}))} />
-                  </div>
+        {showAdv && (
+            <div className="card" style={{position:'absolute',top:40,left:0,right:'auto',zIndex:50,width:'min(520px, calc(100vw - 24px))',padding:14,boxShadow:'0 24px 60px rgba(0,0,0,.55)',backdropFilter:'blur(8px)',overflow:'hidden'}}>
+            <div className="g2" style={{marginBottom:8}}>
+              <div>
+                <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Rayon</div>
+                <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
+                  {dists.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.districts.includes(d)} onChange={(e)=>setAdv((p)=>({...p,districts:e.target.checked?[...p.districts,d]:p.districts.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
                 </div>
               </div>
-              <div style={{display:'flex',justifyContent:'space-between'}}>
-                <button className="btn btn-gh btn-sm" onClick={()=>setAdv({ districts:[], sources:[], agents:[], uzsFrom:'', uzsTo:'', usdFrom:'', usdTo:'', taraFrom:'', taraTo:'', daysFrom:'', daysTo:'', lastFrom:'', lastTo:'' })}>
-                  Tozalash
-                </button>
-                <button className="btn btn-bl btn-sm" onClick={()=>setShowAdv(false)}>Qo'llash</button>
+              <div>
+                <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Manba</div>
+                <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
+                  {sources.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.sources.includes(d)} onChange={(e)=>setAdv((p)=>({...p,sources:e.target.checked?[...p.sources,d]:p.sources.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
+                </div>
+              </div>
+              <div>
+                <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Agent</div>
+                <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
+                  {agents.map((d)=><label key={d} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={adv.agents.includes(d)} onChange={(e)=>setAdv((p)=>({...p,agents:e.target.checked?[...p.agents,d]:p.agents.filter((x)=>x!==d)}))}/><span style={FILTER_CHECK_TEXT_STYLE}>{d}</span></label>)}
+                </div>
+              </div>
+              <div style={{display:'grid',gap:6}}>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                  <input className="input" placeholder="Balans UZS dan" value={adv.uzsFrom} onChange={(e)=>setAdv((p)=>({...p,uzsFrom:e.target.value}))}/>
+                  <input className="input" placeholder="Balans UZS gacha" value={adv.uzsTo} onChange={(e)=>setAdv((p)=>({...p,uzsTo:e.target.value}))}/>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                  <input className="input" placeholder="Balans USD dan" value={adv.usdFrom} onChange={(e)=>setAdv((p)=>({...p,usdFrom:e.target.value}))}/>
+                  <input className="input" placeholder="Balans USD gacha" value={adv.usdTo} onChange={(e)=>setAdv((p)=>({...p,usdTo:e.target.value}))}/>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                  <input className="input" placeholder="Idish dan" value={adv.taraFrom} onChange={(e)=>setAdv((p)=>({...p,taraFrom:e.target.value}))}/>
+                  <input className="input" placeholder="Idish gacha" value={adv.taraTo} onChange={(e)=>setAdv((p)=>({...p,taraTo:e.target.value}))}/>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                  <input className="input" placeholder="Kun dan" value={adv.daysFrom} onChange={(e)=>setAdv((p)=>({...p,daysFrom:e.target.value}))}/>
+                  <input className="input" placeholder="Kun gacha" value={adv.daysTo} onChange={(e)=>setAdv((p)=>({...p,daysTo:e.target.value}))}/>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                  <ModernDateInput value={adv.lastFrom} onChange={(e)=>setAdv((p)=>({...p,lastFrom:e.target.value}))} />
+                  <ModernDateInput value={adv.lastTo} onChange={(e)=>setAdv((p)=>({...p,lastTo:e.target.value}))} />
+                </div>
               </div>
             </div>
-          )}
-        </div>
-      )}
-      {viewMode === 'list' ? (
-        <div className="card" style={{overflow:'hidden',flex:1}}>
-          <div style={{overflow:'auto',maxHeight:'100%'}}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th onClick={()=>tog('id')} style={{minWidth:75}}>ID <SI c="id"/></th>
-                  <th onClick={()=>tog('name')} style={{minWidth:210}}>Kontragent <SI c="name"/></th>
-                  <th style={{minWidth:115}}>Telefon</th>
-                  <th onClick={()=>tog('district')} style={{minWidth:95}}>Rayon <SI c="district"/></th>
-                  <th onClick={()=>tog('balanceUZS')} style={{minWidth:110}}>Balans UZS <SI c="balanceUZS"/></th>
-                  <th onClick={()=>tog('balanceUSD')} style={{minWidth:95}}>Balans USD <SI c="balanceUSD"/></th>
-                  <th onClick={()=>tog('tara')} style={{minWidth:65}}>Idish <SI c="tara"/></th>
-                  <th onClick={()=>tog('kulers')} style={{minWidth:55}}>Kuler <SI c="kulers"/></th>
-                  <th onClick={()=>tog('lastOrderDate')} style={{minWidth:100}}>Oxirgi zakaz <SI c="lastOrderDate"/></th>
-                  <th onClick={()=>tog('daysAgo')} style={{minWidth:55}}>Kun <SI c="daysAgo"/></th>
-                  <th onClick={()=>tog('lastQty')} style={{minWidth:55}}>Dona <SI c="lastQty"/></th>
-                  <th style={{minWidth:80}}>Agent</th>
-                </tr>
-              </thead>
-              <tbody>
-                {list.length===0
-                  ? <tr><td colSpan={12} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
-                  : list.map((c,i) => (
-                    <tr key={c.id||i} onClick={()=>setDet(c)}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:10.5,color:'var(--t3)'}}>{c.id}</td>
-                      <td>
-                        <div style={{fontWeight:600,fontSize:12.5,maxWidth:205,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
-                        {c.address && <div style={{fontSize:10.5,color:'var(--t3)',maxWidth:205,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.address}</div>}
-                      </td>
-                      <td><a href={`tel:${c.phone}`} onClick={(e)=>e.stopPropagation()} style={{color:'var(--bl)',textDecoration:'none',fontFamily:'var(--mono)',fontSize:11.5}}>{c.phone}</a></td>
-                      <td style={{fontSize:12}}>{c.district||'-'}</td>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:balColor(c.balanceUZS)}}>{c.balanceUZS<0?'-':c.balanceUZS>0?'+':''}{fmt(Math.abs(c.balanceUZS))}</td>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:balColor(c.balanceUSD)}}>{c.balanceUSD!==0?<>{c.balanceUSD<0?'-':c.balanceUSD>0?'+':''}{fmt(Math.abs(c.balanceUSD))}$</>:'-'}</td>
-                      <td style={{textAlign:'center',fontWeight:700,color:c.tara<0?'var(--rd)':'var(--bl)'}}>{c.tara!==0?(c.tara<0?'-':'')+Math.abs(c.tara):'-'}</td>
-                      <td style={{textAlign:'center'}}>{c.kulers>0?<span className="tag" style={{background:'var(--yl2)',color:'var(--yl)'}}>{c.kulers}</span>:'-'}</td>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.lastOrderDate)}</td>
-                      <td>{c.daysAgo!=null&&c.daysAgo>=0 ? <span className="tag" style={{background:c.daysAgo>30?'var(--rd2)':c.daysAgo>14?'var(--yl2)':c.daysAgo>7?'var(--or2)':'var(--s3)',color:c.daysAgo>30?'var(--rd)':c.daysAgo>14?'var(--yl)':c.daysAgo>7?'var(--or)':'var(--t3)'}}>{c.daysAgo}k</span> : '-'}</td>
-                      <td style={{textAlign:'center'}}>{c.lastQty||'-'}</td>
-                      <td style={{fontSize:12}}>{c.lastAgent||'-'}</td>
-                    </tr>
-                  ))
-                }
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : (
-        <div className="card aq-map-wrap" style={{flex:1,minHeight:0,padding:8,display:'flex'}}>
-          <GeoMapPanel
-            points={mapPoints}
-            selectedId={mapSelected?.id || ''}
-            onPick={(p) => setMapSelected(p?.row || null)}
-            height="100%"
-          />
-          <div className="aq-map-toolbar">
-            <div className="sb" style={{flex:'1 1 560px',minWidth:240,maxWidth:'none'}}>
-              <span style={{color:'var(--t3)'}}>{E.find}</span>
-              <input placeholder="Ism, telefon, ID bo'yicha..." value={search} onChange={(e)=>setS(e.target.value)}/>
-            </div>
-            <div className="tabs" style={{display:'inline-flex'}}>
-              <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
-              <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
-            </div>
-            <div style={{position:'relative'}}>
-              <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-                </svg>
-                Filtr ({universalFilterCount})
+            <div style={{display:'flex',justifyContent:'space-between'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setAdv({ districts:[], sources:[], agents:[], uzsFrom:'', uzsTo:'', usdFrom:'', usdTo:'', taraFrom:'', taraTo:'', daysFrom:'', daysTo:'', lastFrom:'', lastTo:'' })}>
+                Tozalash
               </button>
-              <UniversalFilterPanel
-                open={uFilterOpen}
-                title="Mijozlar filtri"
-                columns={customerFilterColumns}
-                rows={segmentCustomers}
-                state={uFilterState}
-                setState={setUFilterState}
-                onClose={()=>setUFilterOpen(false)}
-                width={620}
-              />
+              <button className="btn btn-bl btn-sm" onClick={()=>setShowAdv(false)}>Qo'llash</button>
             </div>
-            <button className="btn btn-gr btn-sm" onClick={()=>exportAllReport(segmentCustomers)}>Excel hisobot</button>
-            <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Xaritada: {mapPoints.length} ta</span>
           </div>
-          {mapSelected && (
-            <div className="aq-map-popup">
-              <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-                <div style={{minWidth:260}}>
-                  <div style={{fontWeight:700,fontSize:13}}>{mapSelected.name}</div>
-                  <div style={{fontSize:11,color:'var(--t3)'}}>ID: {mapSelected.id} | {mapSelected.phone || '-'} | {mapSelected.district || '-'}</div>
-                  <div style={{fontSize:11,color:'var(--t3)',maxWidth:740,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mapSelected.address || '-'}</div>
-                </div>
-                <div style={{display:'flex',gap:8}}>
-                  <button className="btn btn-bl btn-sm" onClick={() => setDet(mapSelected)}>Sverka</button>
-                  <button className="btn btn-gh btn-sm" onClick={() => setMapSelected(null)}>Yopish</button>
-                </div>
-              </div>
-            </div>
-          )}
+        )}
+      </div>
+      <div className="card" style={{overflow:'hidden',flex:1}}>
+        <div style={{overflow:'auto',maxHeight:'100%'}}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th onClick={()=>tog('id')} style={{minWidth:75}}>ID <SI c="id"/></th>
+                <th onClick={()=>tog('name')} style={{minWidth:210}}>Kontragent <SI c="name"/></th>
+                <th style={{minWidth:115}}>Telefon</th>
+                <th onClick={()=>tog('district')} style={{minWidth:95}}>Rayon <SI c="district"/></th>
+                <th onClick={()=>tog('balanceUZS')} style={{minWidth:110}}>Balans UZS <SI c="balanceUZS"/></th>
+                <th onClick={()=>tog('balanceUSD')} style={{minWidth:95}}>Balans USD <SI c="balanceUSD"/></th>
+                <th onClick={()=>tog('tara')} style={{minWidth:65}}>Idish <SI c="tara"/></th>
+                <th onClick={()=>tog('kulers')} style={{minWidth:55}}>Kuler <SI c="kulers"/></th>
+                <th onClick={()=>tog('lastOrderDate')} style={{minWidth:100}}>Oxirgi zakaz <SI c="lastOrderDate"/></th>
+                <th onClick={()=>tog('daysAgo')} style={{minWidth:55}}>Kun <SI c="daysAgo"/></th>
+                <th onClick={()=>tog('lastQty')} style={{minWidth:55}}>Dona <SI c="lastQty"/></th>
+                <th style={{minWidth:80}}>Agent</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.length===0
+                ? <tr><td colSpan={12} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
+                : list.map((c,i) => (
+                  <tr key={c.id||i} onClick={()=>setDet(c)}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:10.5,color:'var(--t3)'}}>{c.id}</td>
+                    <td>
+                      <div style={{fontWeight:600,fontSize:12.5,maxWidth:205,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</div>
+                      {c.address && <div style={{fontSize:10.5,color:'var(--t3)',maxWidth:205,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.address}</div>}
+                    </td>
+                    <td><a href={`tel:${c.phone}`} onClick={(e)=>e.stopPropagation()} style={{color:'var(--bl)',textDecoration:'none',fontFamily:'var(--mono)',fontSize:11.5}}>{c.phone}</a></td>
+                    <td style={{fontSize:12}}>{c.district||'-'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:balColor(c.balanceUZS)}}>{c.balanceUZS<0?'-':c.balanceUZS>0?'+':''}{fmt(Math.abs(c.balanceUZS))}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:balColor(c.balanceUSD)}}>{c.balanceUSD!==0?<>{c.balanceUSD<0?'-':c.balanceUSD>0?'+':''}{fmt(Math.abs(c.balanceUSD))}$</>:'-'}</td>
+                    <td style={{textAlign:'center',fontWeight:700,color:c.tara<0?'var(--rd)':'var(--bl)'}}>{c.tara!==0?(c.tara<0?'-':'')+Math.abs(c.tara):'-'}</td>
+                    <td style={{textAlign:'center'}}>{c.kulers>0?<span className="tag" style={{background:'var(--yl2)',color:'var(--yl)'}}>{c.kulers}</span>:'-'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.lastOrderDate)}</td>
+                    <td>{c.daysAgo!=null&&c.daysAgo>=0 ? <span className="tag" style={{background:c.daysAgo>30?'var(--rd2)':c.daysAgo>14?'var(--yl2)':c.daysAgo>7?'var(--or2)':'var(--s3)',color:c.daysAgo>30?'var(--rd)':c.daysAgo>14?'var(--yl)':c.daysAgo>7?'var(--or)':'var(--t3)'}}>{c.daysAgo}k</span> : '-'}</td>
+                    <td style={{textAlign:'center'}}>{c.lastQty||'-'}</td>
+                    <td style={{fontSize:12}}>{c.lastAgent||'-'}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
       {det && <CustomerDetail c={det} D={D} onClose={()=>setDet(null)}/>}
     </div>
   );
@@ -4964,12 +3806,11 @@ function SoDetailModal({ soGroup, onClose }) {
 }
 
 /* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў ZAKAZLAR Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
-function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
-  const { rawOrders = [], customers = [] } = D;
-  const [dataMode, setDataMode] = useState('system');
-  const [viewMode, setViewMode] = useState('list');
-  const [search, setS] = useState('');
-  const [fType, setT] = useState('zakaz');
+function Orders({ D }) {
+  const { rawOrders=[], customers=[] } = D;
+  const [search,setS]  = useState('');
+  const [fType,setT]   = useState('zakaz');
+  const [showFilter, setShowFilter] = useState(false);
   const [uFilterOpen, setUFilterOpen] = useState(false);
   const [uFilterState, setUFilterState] = useState({});
   const [fAgents, setAgents] = useState([]);
@@ -4981,244 +3822,52 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
   const [fQtyTo, setQtyTo] = useState('');
   const [fSumFrom, setSumFrom] = useState('');
   const [fSumTo, setSumTo] = useState('');
-  const [selectedSO, setSelectedSO] = useState(null);
-  const [mapSelected, setMapSelected] = useState(null);
-  const [customerDet, setCustomerDet] = useState(null);
-  const [mapTrackOpen, setMapTrackOpen] = useState(false);
-  const [mapTrackDriver, setMapTrackDriver] = useState('');
-  const [mapTrackFocusKey, setMapTrackFocusKey] = useState('');
-  const [botStatusFilter, setBotStatusFilter] = useState('all');
-  const [botOrdersTick, setBotOrdersTick] = useState(0);
-
+  const [selectedSO,setSelectedSO] = useState(null);
   const districtById = useMemo(() => {
     const m = {};
     (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c.district || ''; });
     return m;
   }, [customers]);
-  const customerById = useMemo(() => {
-    const m = {};
-    (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c; });
-    return m;
-  }, [customers]);
-  const employeeRows = useMemo(
-    () => parseLeftoverEmployeesRows(rawEmployeeSheetRows || []),
-    [rawEmployeeSheetRows]
-  );
-  const employeeNameById = useMemo(() => {
-    const m = {};
-    (employeeRows || []).forEach((r) => {
-      const id = normId(r.id);
-      if (id && r.name && !m[id]) m[id] = r.name;
-    });
-    return m;
-  }, [employeeRows]);
-  const employeeNameByEmail = useMemo(() => {
-    const m = {};
-    (employeeRows || []).forEach((r) => {
-      const email = String(r.email || '').trim().toLowerCase();
-      if (email && r.name && !m[email]) m[email] = r.name;
-    });
-    return m;
-  }, [employeeRows]);
-  const resolveDriverName = useCallback((rawDriver) => {
-    const raw = String(rawDriver || '').trim();
-    if (!raw) return '-';
-    const id = normId(raw);
-    if (id && employeeNameById[id]) return employeeNameById[id];
-    const email = raw.toLowerCase();
-    if (email && employeeNameByEmail[email]) return employeeNameByEmail[email];
-    return raw;
-  }, [employeeNameById, employeeNameByEmail]);
-  const botOrders = useMemo(() => readTelegramBotOrders(), [botOrdersTick]);
-  useEffect(() => {
-    const onBotOrders = () => setBotOrdersTick((v) => v + 1);
-    const onStorage = (e) => {
-      if (e?.key && e.key !== TG_BOT_ORDER_STORAGE_KEY) return;
-      onBotOrders();
-    };
-    if (typeof window !== 'undefined') {
-      window.addEventListener(TG_BOT_ORDER_EVENT, onBotOrders);
-      window.addEventListener('storage', onStorage);
-    }
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener(TG_BOT_ORDER_EVENT, onBotOrders);
-        window.removeEventListener('storage', onStorage);
-      }
-    };
-  }, []);
-  const setBotOrderStatus = useCallback((id, nextStatus) => {
-    const safeStatus = TG_BOT_ORDER_STATUSES.includes(String(nextStatus || '').trim())
-      ? String(nextStatus).trim()
-      : 'Yangi';
-    const rows = readTelegramBotOrders();
-    const nextRows = rows.map((r) => {
-      if (String(r?.id || '').trim() !== String(id || '').trim()) return r;
-      const history = Array.isArray(r.history) ? r.history.slice() : [];
-      history.push({
-        at: new Date().toISOString(),
-        status: safeStatus,
-        by: 'app_operator',
-      });
-      return {
-        ...r,
-        status: safeStatus,
-        updatedAt: new Date().toISOString(),
-        history,
-      };
-    });
-    writeTelegramBotOrders(nextRows);
-    setBotOrdersTick((v) => v + 1);
-  }, []);
+
   const soGroups = useMemo(() => {
     const groups = {};
-    (rawOrders || []).forEach((o) => {
+    rawOrders.forEach((o) => {
       if (!o.soNum) return;
       if (!groups[o.soNum]) {
         groups[o.soNum] = {
-          soNum: o.soNum,
-          contName: o.contName,
-          mId: o.mId,
+          soNum: o.soNum, contName: o.contName, mId: o.mId,
           district: districtById[String(o.mId || '').trim()] || '',
-          orderDate: o.orderDate,
-          delivPerson: o.delivPerson,
-          agent: o.agent,
-          docType: o.docType,
-          status: o.status,
-          currency: o.currency || 'UZS',
-          items: [],
-          totalQty: 0,
-          totalSumUZS: 0,
-          totalSumUSD: 0,
-          lat: customerById[String(o.mId || '').trim()]?.lat,
-          lng: customerById[String(o.mId || '').trim()]?.lng,
-          location: '',
+          orderDate: o.orderDate, delivPerson: o.delivPerson,
+          agent: o.agent, docType: o.docType, status: o.status,
+          currency: o.currency||'UZS', items: [],
+          totalQty: 0, totalSumUZS: 0, totalSumUSD: 0,
         };
       }
       const g = groups[o.soNum];
       g.items.push(o);
-      g.totalQty += Math.abs(o.qty || 0);
-      if (o.currency === 'USD') g.totalSumUSD += o.sum || 0;
-      else g.totalSumUZS += o.sum || 0;
+      g.totalQty += Math.abs(o.qty||0);
+      if (o.currency==='USD') g.totalSumUSD+=o.sum||0;
+      else g.totalSumUZS+=o.sum||0;
     });
     return Object.values(groups);
-  }, [rawOrders, districtById, customerById]);
+  }, [rawOrders, districtById]);
 
-  const realGroups = useMemo(() => {
-    const rows = parseLeftoverArchiveRows(rawArchiveSheetRows || []);
-    const groups = new Map();
-    const upsert = (r, type, qty, product) => {
-      const cid = String(r.customerId || '').trim();
-      const c = customerById[cid];
-      const dateKey = toIsoDate(r.date || r.enteredAt || '');
-      const key = `${dateKey || 'nodate'}__${cid}__${type}`;
-      const driverName = resolveDriverName(r.driver);
-      if (!groups.has(key)) {
-        const lat = isValidGeoPoint(r.lat, r.lng) ? Number(r.lat) : 0;
-        const lng = isValidGeoPoint(r.lat, r.lng) ? Number(r.lng) : 0;
-        groups.set(key, {
-          soNum: `ARX-${dateKey || 'nodate'}-${cid || 'nocid'}-${type}`,
-          contName: String(r.customer || c?.name || `ID ${cid}`),
-          mId: cid,
-          district: c?.district || '',
-          orderDate: dateKey || r.enteredAt || '',
-          delivPerson: driverName || '-',
-          agent: driverName || '-',
-          docType: type === 'return' ? 'Возврат' : 'Заказ',
-          status: 'Arxiv',
-          currency: 'UZS',
-          items: [],
-          totalQty: 0,
-          totalSumUZS: 0,
-          totalSumUSD: 0,
-          location: String(r.location || '').trim(),
-          lat,
-          lng,
-          tracePoints: [],
-          _enteredAt: String(r.enteredAt || '').trim(),
-        });
-      }
-      const g = groups.get(key);
-      const lineQty = Math.abs(toNum(qty));
-      if (!lineQty) return;
-      const pay = Math.abs(toNum(r.payAmount));
-      g.items.push({
-        product: String(product || '-').trim() || '-',
-        qty: lineQty,
-        sum: pay,
-        price: lineQty > 0 ? pay / lineQty : 0,
-        currency: 'UZS',
-      });
-      g.totalQty += lineQty;
-      if (type === 'order') g.totalSumUZS += pay;
-      if (!g.location && r.location) g.location = String(r.location || '').trim();
-      if (!isValidGeoPoint(g.lat, g.lng) && isValidGeoPoint(r.lat, r.lng)) {
-        g.lat = Number(r.lat);
-        g.lng = Number(r.lng);
-      }
-      if (!g.delivPerson || g.delivPerson === '-') {
-        g.delivPerson = driverName || '-';
-        g.agent = driverName || '-';
-      }
-      g.tracePoints.push({
-        key: `${String(r.uid || '').trim()}__${type}__${lineQty}__${String(r.enteredAt || '').trim()}`,
-        enteredAt: String(r.enteredAt || '').trim(),
-        date: dateKey || '',
-        lat: isValidGeoPoint(r.lat, r.lng) ? Number(r.lat) : 0,
-        lng: isValidGeoPoint(r.lat, r.lng) ? Number(r.lng) : 0,
-        product: String(product || '-').trim() || '-',
-        qty: lineQty,
-        payAmount: pay,
-        note: String(r.note || '').trim(),
-        kind: type === 'return' ? 'Vozvrat' : 'Zakaz',
-      });
-    };
-    rows.forEach((r) => {
-      const qtyGiven = Math.abs(toNum(r.qtyGiven));
-      const qtyTaken = Math.abs(toNum(r.qtyTaken));
-      if (qtyGiven > 0.0001) upsert(r, 'order', qtyGiven, r.productGiven || r.productTaken || '-');
-      if (qtyTaken > 0.0001) upsert(r, 'return', qtyTaken, r.productTaken || r.productGiven || '-');
-    });
-    return Array.from(groups.values())
-      .sort((a, b) => {
-        const da = toDate(a.orderDate || a._enteredAt);
-        const db = toDate(b.orderDate || b._enteredAt);
-        if (da && db) return db - da;
-        return String(b.orderDate || '').localeCompare(String(a.orderDate || ''));
-      })
-      .map((g) => {
-        const tracePoints = Array.isArray(g.tracePoints) ? g.tracePoints.slice().sort((a, b) => {
-          const da = toDate(a.enteredAt || a.date);
-          const db = toDate(b.enteredAt || b.date);
-          if (da && db) return db - da;
-          return String(b.enteredAt || '').localeCompare(String(a.enteredAt || ''));
-        }) : [];
-        const { _enteredAt, ...row } = g;
-        return {
-          ...row,
-          tracePoints,
-        };
-      });
-  }, [rawArchiveSheetRows, customerById, resolveDriverName]);
-
-  const activePool = dataMode === 'real' ? realGroups : soGroups;
-  const allZakaz = activePool.filter((g) => isOrderDoc(g.docType));
-  const allVozvrat = activePool.filter((g) => isReturnDoc(g.docType));
-  const base = fType === 'zakaz' ? allZakaz : fType === 'vozvrat' ? allVozvrat : activePool;
-
+  const allZakaz   = soGroups.filter((g)=>isOrderDoc(g.docType));
+  const allVozvrat = soGroups.filter((g)=>isReturnDoc(g.docType));
+  const baseByType = fType==='zakaz'?allZakaz:fType==='vozvrat'?allVozvrat:soGroups;
+  const base = baseByType;
   const options = useMemo(() => ({
-    agents: [...new Set(activePool.map((g) => g.agent).filter(Boolean))].sort(),
-    statuses: [...new Set(activePool.map((g) => g.status).filter(Boolean))].sort(),
-    currencies: [...new Set(activePool.map((g) => g.currency || 'UZS').filter(Boolean))].sort(),
-  }), [activePool]);
-
+    agents: [...new Set(soGroups.map((g)=>g.agent).filter(Boolean))].sort(),
+    statuses: [...new Set(soGroups.map((g)=>g.status).filter(Boolean))].sort(),
+    currencies: [...new Set(soGroups.map((g)=>g.currency || 'UZS').filter(Boolean))].sort(),
+  }), [soGroups]);
   const inRange = (v, from, to) => {
     const n = Number(v || 0);
     if (from !== '' && n < Number(from)) return false;
     if (to !== '' && n > Number(to)) return false;
     return true;
   };
-
+  const toggleIn = (setter, val) => setter((prev) => prev.includes(val) ? prev.filter((x)=>x!==val) : [...prev, val]);
   const orderFilterColumns = useMemo(() => ([
     { key:'soNum', label:'Zakaz No', type:'text' },
     { key:'contName', label:'Kontragent', type:'text' },
@@ -5234,7 +3883,6 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
     { key:'agent', label:'Agent', type:'text' },
     { key:'currency', label:'Valyuta', type:'text' },
   ]), []);
-
   useEffect(() => {
     setUFilterState((prev) => ensureUniversalFilterState(orderFilterColumns, prev));
   }, [orderFilterColumns]);
@@ -5242,15 +3890,10 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
   const list = useMemo(() => {
     let r = base;
     const q = search.toLowerCase();
-    if (q) r = r.filter((g) =>
-      (g.contName || '').toLowerCase().includes(q) ||
-      (g.soNum || '').toLowerCase().includes(q) ||
-      String(g.mId || '').toLowerCase().includes(q) ||
-      String(g.delivPerson || '').toLowerCase().includes(q)
-    );
-    if (fAgents.length) r = r.filter((g) => fAgents.includes(g.agent || ''));
-    if (fStatuses.length) r = r.filter((g) => fStatuses.includes(g.status || ''));
-    if (fCurrencies.length) r = r.filter((g) => fCurrencies.includes(g.currency || 'UZS'));
+    if (q) r=r.filter((g)=>(g.contName||'').toLowerCase().includes(q)||(g.soNum||'').toLowerCase().includes(q));
+    if (fAgents.length) r = r.filter((g)=>fAgents.includes(g.agent || ''));
+    if (fStatuses.length) r = r.filter((g)=>fStatuses.includes(g.status || ''));
+    if (fCurrencies.length) r = r.filter((g)=>fCurrencies.includes(g.currency || 'UZS'));
     if (fDateFrom) {
       const df = toDate(fDateFrom);
       if (df) r = r.filter((g) => {
@@ -5265,218 +3908,33 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
         return d ? d <= dt : false;
       });
     }
-    r = r.filter((g) => inRange(g.totalQty, fQtyFrom, fQtyTo));
-    r = r.filter((g) => inRange(g.totalSumUZS, fSumFrom, fSumTo));
+    r = r.filter((g)=>inRange(g.totalQty, fQtyFrom, fQtyTo));
+    r = r.filter((g)=>inRange(g.totalSumUZS, fSumFrom, fSumTo));
     r = applyUniversalFilters(r, orderFilterColumns, uFilterState);
-    return [...r].sort((a, b) => {
-      const da = toDate(a.orderDate);
-      const db = toDate(b.orderDate);
-      return da && db ? db - da : 0;
+    return [...r].sort((a,b) => {
+      const da=toDate(a.orderDate), db=toDate(b.orderDate);
+      return da&&db?db-da:0;
     });
-  }, [base, search, fAgents, fStatuses, fCurrencies, fDateFrom, fDateTo, fQtyFrom, fQtyTo, fSumFrom, fSumTo, orderFilterColumns, uFilterState]);
+  }, [base,search,fAgents,fStatuses,fCurrencies,fDateFrom,fDateTo,fQtyFrom,fQtyTo,fSumFrom,fSumTo,orderFilterColumns,uFilterState]);
 
+  const activeFilterCount = useMemo(() => {
+    let c = 0;
+    if (fAgents.length) c++;
+    if (fStatuses.length) c++;
+    if (fCurrencies.length) c++;
+    if (fDateFrom || fDateTo) c++;
+    if (fQtyFrom !== '' || fQtyTo !== '') c++;
+    if (fSumFrom !== '' || fSumTo !== '') c++;
+    return c;
+  }, [fAgents, fStatuses, fCurrencies, fDateFrom, fDateTo, fQtyFrom, fQtyTo, fSumFrom, fSumTo]);
   const universalFilterCount = useMemo(() => countUniversalFilters(uFilterState), [uFilterState]);
-  const todayIso = useMemo(() => toIsoDate(new Date()), []);
-  const hasExplicitDateFilter = useMemo(() => {
-    if (String(fDateFrom || '').trim() || String(fDateTo || '').trim()) return true;
-    const uf = uFilterState?.orderDate || {};
-    const hasSelected = Array.isArray(uf.selected) && uf.selected.length > 0;
-    const hasValue = String(uf.value ?? '').trim() !== '';
-    return hasSelected || hasValue;
-  }, [fDateFrom, fDateTo, uFilterState]);
-  const mapList = useMemo(() => {
-    if (viewMode !== 'map') return list;
-    if (hasExplicitDateFilter) return list;
-    return list.filter((g) => toIsoDate(g.orderDate) === todayIso);
-  }, [viewMode, list, hasExplicitDateFilter, todayIso]);
-
-  const mapPoints = useMemo(
-    () => mapList
-      .map((g) => {
-        let lat = 0;
-        let lng = 0;
-        if (dataMode === 'real') {
-          lat = Number(g.lat || 0);
-          lng = Number(g.lng || 0);
-        } else {
-          const c = customerById[String(g.mId || '').trim()];
-          lat = Number(c?.lat || 0);
-          lng = Number(c?.lng || 0);
-        }
-        if (!isValidGeoPoint(lat, lng)) return null;
-        return {
-          id: String(g.soNum || ''),
-          lat,
-          lng,
-          label: `${g.contName || 'Mijoz'} (${fmt(g.totalQty)} ta)`,
-          row: { ...g, lat, lng },
-        };
-      })
-      .filter(Boolean),
-    [mapList, customerById, dataMode]
-  );
-
-  useEffect(() => {
-    if (!mapSelected) return;
-    const ok = mapList.some((g) => String(g.soNum || '') === String(mapSelected.soNum || ''));
-    if (!ok) setMapSelected(null);
-    else if (dataMode === 'real') {
-      const d = String(mapSelected.delivPerson || '').trim();
-      if (d) setMapTrackDriver((prev) => prev || d);
-    }
-  }, [mapList, mapSelected, dataMode]);
-  const mapTrackDrivers = useMemo(() => {
-    if (dataMode !== 'real') return [];
-    return Array.from(
-      new Set(
-        mapList
-          .map((g) => String(g?.delivPerson || '-').trim() || '-')
-          .filter(Boolean)
-      )
-    ).sort((a, b) => a.localeCompare(b, 'ru'));
-  }, [dataMode, mapList]);
-  useEffect(() => {
-    if (dataMode !== 'real') {
-      setMapTrackDriver('');
-      return;
-    }
-    if (!mapTrackDrivers.length) {
-      setMapTrackDriver('');
-      return;
-    }
-    if (!mapTrackDriver || !mapTrackDrivers.includes(mapTrackDriver)) {
-      setMapTrackDriver(mapTrackDrivers[0]);
-    }
-  }, [dataMode, mapTrackDrivers, mapTrackDriver]);
-  const mapTrackRows = useMemo(() => {
-    if (dataMode !== 'real') return [];
-    const selectedDriver = String(mapTrackDriver || '').trim();
-    const out = [];
-    mapList.forEach((g) => {
-      const driver = String(g?.delivPerson || '-').trim() || '-';
-      if (selectedDriver && driver !== selectedDriver) return;
-      const traces = Array.isArray(g?.tracePoints) && g.tracePoints.length
-        ? g.tracePoints
-        : [{
-            key: `${g.soNum || ''}__fallback`,
-            enteredAt: g.orderDate || '',
-            date: g.orderDate || '',
-            lat: g.lat,
-            lng: g.lng,
-          }];
-      traces.forEach((tp, i) => {
-        const lat = isValidGeoPoint(tp?.lat, tp?.lng) ? Number(tp.lat) : Number(g?.lat || 0);
-        const lng = isValidGeoPoint(tp?.lat, tp?.lng) ? Number(tp.lng) : Number(g?.lng || 0);
-        const enteredAt = String(tp?.enteredAt || '').trim();
-        const date = String(tp?.date || g?.orderDate || '').trim();
-        const clock = extractClockText(enteredAt || date);
-        out.push({
-          key: `${String(g?.soNum || '')}__${String(tp?.key || i)}`,
-          driver,
-          customer: String(g?.contName || '').trim() || '-',
-          customerId: String(g?.mId || '').trim() || '',
-          enteredAt: enteredAt || date,
-          date,
-          clock,
-          lat,
-          lng,
-          row: { ...g, lat, lng },
-        });
-      });
-    });
-    return out.sort((a, b) => {
-      const ta = parseDateTimeLoose(a.enteredAt || a.date)?.getTime() || 0;
-      const tb = parseDateTimeLoose(b.enteredAt || b.date)?.getTime() || 0;
-      if (ta !== tb) return ta - tb; // ertalabdan kechgacha
-      return String(a.customer || '').localeCompare(String(b.customer || ''), 'ru');
-    });
-  }, [dataMode, mapList, mapTrackDriver]);
-  useEffect(() => {
-    if (!mapTrackRows.length) {
-      setMapTrackFocusKey('');
-      return;
-    }
-    const firstKey = String(mapTrackRows[0]?.key || '').trim();
-    if (!firstKey) return;
-    setMapTrackFocusKey((prev) => {
-      if (!prev) return firstKey;
-      const has = mapTrackRows.some((x) => String(x?.key || '').trim() === String(prev).trim());
-      return has ? prev : firstKey;
-    });
-  }, [mapTrackRows]);
-  const mapTrackFocused = useMemo(
-    () => mapTrackRows.find((x) => String(x.key || '').trim() === String(mapTrackFocusKey || '').trim()) || null,
-    [mapTrackRows, mapTrackFocusKey]
-  );
-  useEffect(() => {
-    if (!mapTrackFocused?.row) return;
-    setMapSelected((prev) => {
-      if (prev && String(prev.soNum || '') === String(mapTrackFocused.row.soNum || '')) return prev;
-      return mapTrackFocused.row;
-    });
-  }, [mapTrackFocused]);
-  useEffect(() => {
-    if (dataMode === 'real') return;
-    setMapTrackOpen(false);
-    setMapTrackDriver('');
-    setMapTrackFocusKey('');
-  }, [dataMode]);
-  useEffect(() => {
-    if (dataMode !== 'bot') return;
-    if (viewMode !== 'list') setViewMode('list');
-    setSelectedSO(null);
-    setMapSelected(null);
-  }, [dataMode, viewMode]);
-
-  const botList = useMemo(() => {
-    if (dataMode !== 'bot') return [];
-    const q = String(search || '').trim().toLowerCase();
-    let rows = botOrders;
-    if (botStatusFilter !== 'all') rows = rows.filter((r) => String(r?.status || '').trim() === botStatusFilter);
-    if (!q) return rows;
-    return rows.filter((r) => [
-      r.id,
-      r.customerId,
-      r.customerName,
-      r.customerAddress,
-      r.customerPhone,
-      r.product,
-      r.note,
-      r.telegramUsername,
-      r.telegramFirstName,
-      r.telegramLastName,
-      r.status,
-    ].some((x) => String(x || '').toLowerCase().includes(q)));
-  }, [dataMode, botOrders, botStatusFilter, search]);
 
   const exportOrders = () => {
-    if (dataMode === 'bot') {
-      exportAoaExcel({
-        fileName: `Bot_zakazlar_${new Date().toISOString().slice(0,10)}.xlsx`,
-        sheetName: 'BotZakazlar',
-        headers: ['ID', 'Yaratilgan', 'Status', 'Mijoz ID', 'Kontragent', 'Telefon', 'Rayon', 'Manzil', 'Mahsulot', 'Soni', 'Izoh', 'Telegram'],
-        rows: botList.map((r) => [
-          r.id,
-          fmtD(r.createdAt),
-          r.status,
-          r.customerId,
-          r.customerName,
-          r.customerPhone,
-          r.district,
-          r.customerAddress,
-          r.product,
-          r.qty,
-          r.note,
-          r.telegramUsername || [r.telegramFirstName, r.telegramLastName].filter(Boolean).join(' '),
-        ]),
-      });
-      return;
-    }
     exportAoaExcel({
-      fileName: `Zakazlar_${dataMode}_${new Date().toISOString().slice(0,10)}.xlsx`,
-      sheetName: dataMode === 'real' ? 'ZakazlarReal' : 'ZakazlarSistem',
-      headers: ['Zakaz', 'Mijoz', 'ID', 'Sana', 'Tur', 'Status', 'Valyuta', 'Dona', 'Summa UZS', 'Summa USD', 'Agent', 'Dostavchik', 'Mahsulot soni', 'Lokatsiya'],
-      columnTypes: ['text', 'text', 'text', 'date', 'text', 'text', 'text', 'number', 'number', 'number', 'text', 'text', 'number', 'text'],
+      fileName: `Zakazlar_${new Date().toISOString().slice(0,10)}.xlsx`,
+      sheetName: 'Zakazlar',
+      headers: ['Zakaz', 'Mijoz', 'ID', 'Sana', 'Tur', 'Status', 'Valyuta', 'Dona', 'Summa UZS', 'Summa USD', 'Agent', 'Dostavchik', 'Mahsulot soni'],
+      columnTypes: ['text', 'text', 'text', 'date', 'text', 'text', 'text', 'number', 'number', 'number', 'text', 'text', 'number'],
       rows: list.map((g) => [
         g.soNum,
         g.contName,
@@ -5491,319 +3949,149 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
         g.agent || '',
         g.delivPerson || '',
         g.items.length,
-        g.location || '',
       ]),
     });
   };
 
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
-      <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-        <div className="tabs" style={{display:'inline-flex'}}>
-          <button className={`tab${dataMode==='system'?' on':''}`} onClick={()=>setDataMode('system')}>Sistem</button>
-          <button className={`tab${dataMode==='real'?' on':''}`} onClick={()=>setDataMode('real')}>Real</button>
-          <button className={`tab${dataMode==='bot'?' on':''}`} onClick={()=>setDataMode('bot')}>Bot zakazlar</button>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <div className="sb" style={{flex:1}}>
+          <span style={{color:'var(--t3)'}}>Qidiruv</span>
+          <input placeholder="Mijoz, zakaz no..." value={search} onChange={(e)=>setS(e.target.value)}/>
         </div>
-        {dataMode !== 'bot' && (
-          <div className="tabs">
-            {[['zakaz','Zakaz'],['vozvrat','Vozvrat'],['all','Barchasi']].map(([t,l]) => (
-              <button key={t} className={`tab${fType===t?' on':''}`} onClick={()=>setT(t)}>{l}</button>
-            ))}
-          </div>
-        )}
-      </div>
-      {viewMode === 'list' && (
-        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-          <div className="sb" style={{flex:'1 1 560px',minWidth:240,maxWidth:'none'}}>
-            <span style={{color:'var(--t3)'}}>Qidiruv</span>
-            <input placeholder={dataMode==='bot' ? 'ID, kontragent, telefon, izoh...' : 'Mijoz, zakaz no...'} value={search} onChange={(e)=>setS(e.target.value)} />
-          </div>
-          {dataMode !== 'bot' ? (
-            <>
-              <div className="tabs" style={{display:'inline-flex'}}>
-                <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
-                <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
+        <div className="tabs">
+          {[['zakaz','Zakaz'],['vozvrat','Vozvrat'],['all','Barchasi']].map(([t,l]) => (
+            <button key={t} className={`tab${fType===t?' on':''}`} onClick={()=>setT(t)}>{l}</button>
+          ))}
+        </div>
+        <div style={{position:'relative'}}>
+          <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+            </svg>
+            Filtr{universalFilterCount>0?` (${universalFilterCount})`:''}
+          </button>
+          <UniversalFilterPanel
+            open={uFilterOpen}
+            title="Zakazlar filtri"
+            columns={orderFilterColumns}
+            rows={base}
+            state={uFilterState}
+            setState={setUFilterState}
+            onClose={()=>setUFilterOpen(false)}
+            width={620}
+          />
+          {showFilter && (
+            <div className="card" style={{position:'absolute',top:34,left:0,right:'auto',zIndex:50,width:'min(380px, calc(100vw - 24px))',padding:10,overflow:'hidden'}}>
+              <div className="g2" style={{gap:10}}>
+                <div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Agent</div>
+                  <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
+                    {options.agents.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={fAgents.includes(x)} onChange={()=>toggleIn(setAgents,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Status</div>
+                  <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
+                    {options.statuses.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={fStatuses.includes(x)} onChange={()=>toggleIn(setStatuses,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:11,color:'var(--t3)',marginBottom:4}}>Valyuta</div>
+                  <div style={{maxHeight:90,overflow:'auto',border:'1px solid var(--b1)',borderRadius:8,padding:6}}>
+                    {options.currencies.map((x)=><label key={x} style={FILTER_CHECK_LABEL_STYLE}><input type="checkbox" checked={fCurrencies.includes(x)} onChange={()=>toggleIn(setCurrencies,x)}/><span style={FILTER_CHECK_TEXT_STYLE}>{x}</span></label>)}
+                  </div>
+                </div>
+                <div style={{display:'grid',gap:6}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    <ModernDateInput value={fDateFrom} onChange={(e)=>setDateFrom(e.target.value)} />
+                    <ModernDateInput value={fDateTo} onChange={(e)=>setDateTo(e.target.value)} />
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    <input className="input" placeholder="Dona dan" value={fQtyFrom} onChange={(e)=>setQtyFrom(e.target.value)} />
+                    <input className="input" placeholder="Dona gacha" value={fQtyTo} onChange={(e)=>setQtyTo(e.target.value)} />
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6}}>
+                    <input className="input" placeholder="Summa dan (UZS)" value={fSumFrom} onChange={(e)=>setSumFrom(e.target.value)} />
+                    <input className="input" placeholder="Summa gacha (UZS)" value={fSumTo} onChange={(e)=>setSumTo(e.target.value)} />
+                  </div>
+                </div>
               </div>
-              <div style={{position:'relative'}}>
-                <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-                  </svg>
-                  Filtr{universalFilterCount>0?` (${universalFilterCount})`:''}
-                </button>
-                <UniversalFilterPanel
-                  open={uFilterOpen}
-                  title={dataMode === 'real' ? "Real zakazlar filtri" : "Sistem zakazlar filtri"}
-                  columns={orderFilterColumns}
-                  rows={base}
-                  state={uFilterState}
-                  setState={setUFilterState}
-                  onClose={()=>setUFilterOpen(false)}
-                  width={620}
-                />
+              <div style={{display:'flex',justifyContent:'space-between',marginTop:8}}>
+                <button className="btn btn-gh btn-sm" onClick={()=>{
+                  setAgents([]); setStatuses([]); setCurrencies([]);
+                  setDateFrom(''); setDateTo('');
+                  setQtyFrom(''); setQtyTo('');
+                  setSumFrom(''); setSumTo('');
+                }}>Tozalash</button>
+                <button className="btn btn-bl btn-sm" onClick={()=>setShowFilter(false)}>Qo'llash</button>
               </div>
-            </>
-          ) : (
-            <div className="tabs" style={{display:'inline-flex'}}>
-              <button className={`tab${botStatusFilter==='all'?' on':''}`} onClick={()=>setBotStatusFilter('all')}>Barchasi</button>
-              {TG_BOT_ORDER_STATUSES.map((st) => (
-                <button key={`bot_st_${st}`} className={`tab${botStatusFilter===st?' on':''}`} onClick={()=>setBotStatusFilter(st)}>{st}</button>
-              ))}
             </div>
           )}
-          <div style={{display:'inline-flex',gap:8,alignItems:'center'}}>
-            {dataMode === 'bot' && <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Bot zakaz: {botList.length} ta</span>}
-            <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>
-          </div>
         </div>
-      )}
-
-      {viewMode === 'list' ? (
-        <div className="card" style={{overflow:'hidden',flex:1}}>
-          <div style={{overflow:'auto',maxHeight:'100%'}}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>No</th>
-                  {dataMode === 'bot' ? (
-                    <>
-                      <th>Yaratilgan</th><th>Status</th><th>Mijoz ID</th><th>Kontragent</th><th>Telefon</th>
-                      <th>Mahsulot</th><th style={{textAlign:'center'}}>Soni</th><th>Izoh</th><th>Telegram</th>
-                    </>
-                  ) : dataMode === 'real' ? (
-                    <>
-                      <th>Mijoz ID</th><th>Kontragent</th><th>Sana</th>
-                      <th>Dostavchik</th><th style={{textAlign:'center'}}>Dona</th>
-                      <th style={{textAlign:'right'}}>Summa UZS</th>
-                      <th style={{textAlign:'center'}}>Mahsulotlar</th>
-                      <th>Tur</th><th>Status</th>
-                    </>
-                  ) : (
-                    <>
-                      <th>Zakaz No</th><th>Kontragent</th><th>Rayon</th><th>Sana</th>
-                      <th>Dostavchik</th><th style={{textAlign:'center'}}>Dona</th>
-                      <th style={{textAlign:'right'}}>Summa UZS</th>
-                      <th style={{textAlign:'right'}}>Summa USD</th>
-                      <th style={{textAlign:'center'}}>Mahsulotlar</th>
-                      <th>Tur</th><th>Agent</th><th>Status</th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {(dataMode === 'bot' ? botList : list).length===0
-                  ? <tr><td colSpan={dataMode === 'bot' ? 10 : (dataMode === 'real' ? 10 : 13)} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
-                  : (dataMode === 'bot' ? botList : list).slice(0,600).map((g,i) => (
-                    <tr key={i} onClick={()=>{ if (dataMode !== 'bot') setSelectedSO(g); }}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
-                      {dataMode === 'bot' ? (
-                        <>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(g.createdAt)}</td>
-                          <td>
-                            <select
-                              className="select"
-                              value={String(g.status || 'Yangi')}
-                              onChange={(e) => setBotOrderStatus(g.id, e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              style={{minWidth:130}}
-                            >
-                              {TG_BOT_ORDER_STATUSES.map((st) => <option key={`bot_st_sel_${st}`} value={st}>{st}</option>)}
-                            </select>
-                          </td>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.customerId || '-'}</td>
-                          <td style={{maxWidth:220,fontWeight:600}}>
-                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:216,fontSize:12}}>{g.customerName || '-'}</span>
-                          </td>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{g.customerPhone || '-'}</td>
-                          <td style={{maxWidth:190}}>
-                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:186,fontSize:12}}>{g.product || '-'}</span>
-                          </td>
-                          <td style={{textAlign:'center',fontWeight:700,color:'var(--bl)'}}>{fmt(g.qty || 0)}</td>
-                          <td style={{maxWidth:260}}>
-                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:256,fontSize:11,color:'var(--t2)'}}>{g.note || '-'}</span>
-                          </td>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.telegramUsername || [g.telegramFirstName, g.telegramLastName].filter(Boolean).join(' ') || '-'}</td>
-                        </>
-                      ) : dataMode === 'real' ? (
-                        <>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.mId || '-'}</td>
-                          <td style={{maxWidth:240,fontWeight:600}}>
-                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:236,fontSize:12}}>{g.contName}</span>
-                          </td>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(g.orderDate)}</td>
-                          <td style={{fontSize:11,color:'var(--t2)'}}>{g.delivPerson||'-'}</td>
-                          <td style={{textAlign:'center',fontWeight:700,color:'var(--t1)'}}>{g.totalQty}</td>
-                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:g.totalSumUZS?'var(--gr)':'var(--t4)'}}>{g.totalSumUZS?fmt(g.totalSumUZS):'-'}</td>
-                          <td style={{textAlign:'center'}}><span className="tag" style={{background:'var(--s3)',color:'var(--t3)',cursor:'pointer'}}>{g.items.length} ta</span></td>
-                          <td><span className="tag" style={{background:isOrderDoc(g.docType)?'var(--bl3)':'var(--or2)',color:isOrderDoc(g.docType)?'var(--bl)':'var(--or)',fontSize:10}}>{g.docType}</span></td>
-                          <td><span className="tag" style={{background:'var(--s3)',color:'var(--t3)',fontSize:10}}>{g.status}</span></td>
-                        </>
-                      ) : (
-                        <>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.soNum}</td>
-                          <td style={{maxWidth:180,fontWeight:600}}>
-                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178,fontSize:12}}>{g.contName}</span>
-                          </td>
-                          <td style={{fontSize:11,color:'var(--t3)'}}>{g.district || '-'}</td>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(g.orderDate)}</td>
-                          <td style={{fontSize:11,color:'var(--t2)'}}>{g.delivPerson||'-'}</td>
-                          <td style={{textAlign:'center',fontWeight:700,color:'var(--t1)'}}>{g.totalQty}</td>
-                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:g.totalSumUZS?'var(--gr)':'var(--t4)'}}>{g.totalSumUZS?fmt(g.totalSumUZS):'-'}</td>
-                          <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:g.totalSumUSD?'var(--yl)':'var(--t4)'}}>{g.totalSumUSD?fmt(g.totalSumUSD)+' $':'-'}</td>
-                          <td style={{textAlign:'center'}}><span className="tag" style={{background:'var(--s3)',color:'var(--t3)',cursor:'pointer'}}>{g.items.length} ta</span></td>
-                          <td><span className="tag" style={{background:isOrderDoc(g.docType)?'var(--bl3)':'var(--or2)',color:isOrderDoc(g.docType)?'var(--bl)':'var(--or)',fontSize:10}}>{g.docType}</span></td>
-                          <td style={{fontSize:12}}>{g.agent||'-'}</td>
-                          <td><span className="tag" style={{background:isDeliveredStatus(g.status)?'var(--gr2)':isCancelledStatus(g.status)?'var(--rd2)':'var(--s3)',color:isDeliveredStatus(g.status)?'var(--gr)':isCancelledStatus(g.status)?'var(--t4)':'var(--t3)',fontSize:10}}>{g.status}</span></td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+        <button className="btn btn-gr btn-sm" onClick={exportOrders}>? Excel</button>
+      </div>
+      <div className="card" style={{overflow:'hidden',flex:1}}>
+        <div style={{overflow:'auto',maxHeight:'100%'}}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Zakaz No</th><th>Kontragent</th><th>Rayon</th><th>Sana</th>
+                <th>Dostavchik</th><th style={{textAlign:'center'}}>Dona</th>
+                <th style={{textAlign:'right'}}>Summa UZS</th>
+                <th style={{textAlign:'right'}}>Summa USD</th>
+                <th style={{textAlign:'center'}}>Mahsulotlar</th>
+                <th>Tur</th><th>Agent</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {list.length===0
+                ? <tr><td colSpan={12} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
+                : list.slice(0,600).map((g,i) => (
+                  <tr key={i} onClick={()=>setSelectedSO(g)}>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.soNum}</td>
+                    <td style={{maxWidth:180,fontWeight:600}}>
+                      <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:178,fontSize:12}}>{g.contName}</span>
+                    </td>
+                    <td style={{fontSize:11,color:'var(--t3)'}}>{g.district || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(g.orderDate)}</td>
+                    <td style={{fontSize:11,color:'var(--t2)'}}>{g.delivPerson||'-'}</td>
+                    <td style={{textAlign:'center',fontWeight:700,color:'var(--t1)'}}>{g.totalQty}</td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:g.totalSumUZS?'var(--gr)':'var(--t4)'}}>
+                      {g.totalSumUZS?fmt(g.totalSumUZS):'-'}
+                    </td>
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:g.totalSumUSD?'var(--yl)':'var(--t4)'}}>
+                      {g.totalSumUSD?fmt(g.totalSumUSD)+' $':'-'}
+                    </td>
+                    <td style={{textAlign:'center'}}>
+                      <span className="tag" style={{background:'var(--s3)',color:'var(--t3)',cursor:'pointer'}}>{g.items.length} ta</span>
+                    </td>
+                    <td>
+                      <span className="tag" style={{background:isOrderDoc(g.docType)?'var(--bl3)':'var(--or2)',color:isOrderDoc(g.docType)?'var(--bl)':'var(--or)',fontSize:10}}>
+                        {g.docType}
+                      </span>
+                    </td>
+                    <td style={{fontSize:12}}>{g.agent||'-'}</td>
+                    <td>
+                      <span className="tag" style={{
+                        background:isDeliveredStatus(g.status)?'var(--gr2)':isCancelledStatus(g.status)?'var(--rd2)':'var(--s3)',
+                        color:isDeliveredStatus(g.status)?'var(--gr)':isCancelledStatus(g.status)?'var(--t4)':'var(--t3)',
+                        fontSize:10,
+                      }}>{g.status}</span>
+                    </td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
         </div>
-      ) : (
-        <div className="card aq-map-wrap" style={{padding:8,flex:1,minHeight:0,display:'flex'}}>
-          <div className="aq-map-toolbar">
-            <div className="sb" style={{flex:'1 1 560px',minWidth:240,maxWidth:'none'}}>
-              <span style={{color:'var(--t3)'}}>Qidiruv</span>
-              <input placeholder="Mijoz, zakaz no..." value={search} onChange={(e)=>setS(e.target.value)} />
-            </div>
-            <div className="tabs" style={{display:'inline-flex'}}>
-              <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
-              <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
-            </div>
-            <div style={{position:'relative'}}>
-              <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
-                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-                </svg>
-                Filtr{universalFilterCount>0?` (${universalFilterCount})`:''}
-              </button>
-              <UniversalFilterPanel
-                open={uFilterOpen}
-                title={dataMode === 'real' ? "Real zakazlar filtri" : "Sistem zakazlar filtri"}
-                columns={orderFilterColumns}
-                rows={base}
-                state={uFilterState}
-                setState={setUFilterState}
-                onClose={()=>setUFilterOpen(false)}
-                width={620}
-              />
-            </div>
-            <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>
-            <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Nuqta: {mapPoints.length} ta</span>
-            {!hasExplicitDateFilter && (
-              <span className="tag" style={{background:'var(--bl2)',color:'var(--bl)'}}>Bugungi sana</span>
-            )}
-            <span className="tag" style={{background:'var(--s2)',color:'var(--t3)'}}>
-              {dataMode === 'real' ? 'Real arxiv lokatsiyasi' : 'Mijoz lokatsiyasi'}
-            </span>
-          </div>
-          <div style={{display:'flex',gap:8,flex:1,minHeight:0}}>
-            <div style={{position:'relative',flex:1,minWidth:0}}>
-              <GeoMapPanel
-                points={mapPoints}
-                selectedId={mapSelected?.soNum || ''}
-                onPick={(p) => setMapSelected(p?.row || null)}
-                focusPoint={mapTrackFocused ? {
-                  lat: mapTrackFocused.lat,
-                  lng: mapTrackFocused.lng,
-                  label: `${mapTrackFocused.clock ? `${mapTrackFocused.clock} | ` : ''}${mapTrackFocused.customer || 'Mijoz'}`,
-                } : null}
-                height="100%"
-              />
-              {mapSelected && (
-                <div className="aq-map-popup">
-                  <div style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}>
-                    <div style={{minWidth:260}}>
-                      <div style={{fontWeight:700}}>{mapSelected.contName}</div>
-                      <div style={{fontSize:11,color:'var(--t3)'}}>Sana: {fmtD(mapSelected.orderDate)} | Dostavchik: {mapSelected.delivPerson || '-'}</div>
-                      <div style={{fontSize:11,color:'var(--t3)'}}>Miqdor: {fmt(mapSelected.totalQty)} ta</div>
-                    </div>
-                    <div style={{display:'flex',gap:8}}>
-                      <button className="btn btn-gh btn-sm" onClick={()=>setSelectedSO(mapSelected)}>Zakaz tafsiloti</button>
-                      <button
-                        className="btn btn-bl btn-sm"
-                        onClick={() => {
-                          const c = customerById[String(mapSelected.mId || '').trim()];
-                          if (c) setCustomerDet(c);
-                        }}
-                        disabled={!customerById[String(mapSelected.mId || '').trim()]}
-                      >
-                        Sverka
-                      </button>
-                      <button className="btn btn-gh btn-sm" onClick={() => setMapSelected(null)}>Yopish</button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            {dataMode === 'real' && (
-              <>
-                <button
-                  className="btn btn-gh btn-sm aq-map-track-toggle"
-                  style={{right: mapTrackOpen ? 336 : 10}}
-                  onClick={()=>setMapTrackOpen((v)=>!v)}
-                  title={mapTrackOpen ? 'Trekingni yopish' : 'Trekingni ochish'}
-                >
-                  {mapTrackOpen ? '>' : '<'}
-                </button>
-                <div className={`card aq-map-track-drawer ${mapTrackOpen ? 'open' : 'closed'}`}>
-                  <div style={{padding:'8px 8px 0',fontSize:12,fontWeight:700}}>Treking (vaqt bo'yicha)</div>
-                  <div style={{padding:'8px',display:'grid',gap:6,borderBottom:'1px solid var(--b2)'}}>
-                    <div style={{fontSize:11,color:'var(--t3)'}}>Dostavchik</div>
-                    <select className="select" value={mapTrackDriver} onChange={(e)=>setMapTrackDriver(e.target.value)}>
-                      {mapTrackDrivers.length === 0 ? (
-                        <option value="">-</option>
-                      ) : mapTrackDrivers.map((d) => (
-                        <option key={`trk_drv_${d}`} value={d}>{d}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={{padding:'8px',display:'grid',gap:6,overflow:'auto',maxHeight:'100%'}}>
-                    {mapTrackRows.length === 0 ? (
-                      <div style={{fontSize:11,color:'var(--t3)'}}>Treking ma'lumoti topilmadi.</div>
-                    ) : mapTrackRows.map((tp, i) => {
-                      const active = String(tp.key || '') === String(mapTrackFocusKey || '');
-                      return (
-                        <button
-                          key={`${tp.key || i}_${i}`}
-                          className="btn btn-gh btn-sm"
-                          onClick={() => setMapTrackFocusKey(String(tp.key || ''))}
-                          style={{
-                            textAlign:'left',
-                            whiteSpace:'normal',
-                            borderColor:active?'var(--bl)':'var(--b2)',
-                            background:active?'var(--bl3)':'var(--s1)',
-                            color:active?'var(--bl)':'var(--t2)',
-                            display:'block',
-                            width:'100%',
-                            padding:'7px 8px',
-                          }}
-                        >
-                          <div style={{fontSize:11,fontWeight:700}}>
-                            {fmtD(tp.enteredAt || tp.date)} {tp.clock ? `| ${tp.clock}` : ''}
-                          </div>
-                          <div style={{fontSize:11,opacity:.95,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                            {tp.customer || '-'}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
-      {selectedSO && <SoDetailModal soGroup={selectedSO} onClose={()=>setSelectedSO(null)} />}
-      {customerDet && <CustomerDetail c={customerDet} D={D} onClose={()=>setCustomerDet(null)} />}
+      </div>
+      {selectedSO && <SoDetailModal soGroup={selectedSO} onClose={()=>setSelectedSO(null)}/>}
     </div>
   );
-}function KassaFilterBtn({ active, label, color, dot, onClick }) {
+}
+function KassaFilterBtn({ active, label, color, dot, onClick }) {
   return (
     <button onClick={onClick} style={{
       cursor:'pointer',
@@ -5838,34 +4126,21 @@ function Kassa({ D }) {
     (customers || []).forEach((c) => { m[String(c.id || '').trim()] = c.district || ''; });
     return m;
   }, [customers]);
-  const isExcludedKassaForStats = (kassaName) => {
-    const key = normalizeCashboxKey(kassaName).replace(/\s+/g, '');
-    if (!key) return false;
-    return (
-      key.includes('перекидкасум') ||
-      key.includes('perekidkasum') ||
-      key.includes('uoskassa')
-    );
-  };
-  const isHiddenKassaRow = (kassaName) => normalizeCashboxKey(kassaName).replace(/\s+/g, '').includes('uoskassa');
-
-  const cashboxCore = cashbox.filter((c) => !isCustomerToCustomerTransfer(c?.opType, c?.note, c?.contName));
-  const cashboxForStats = cashboxCore.filter((c) => !isExcludedKassaForStats(c?.kassa));
-  const cashboxForList = cashboxCore.filter((c) => !isHiddenKassaRow(c?.kassa));
-
-  const pays = cashboxForStats.filter((c)=>isPaymentFromCounterparty(c.opType));
-  const spends = cashboxForStats.filter((c)=>isPaymentToCounterparty(c.opType));
-  const totalIn  = pays.reduce((s,c)=>s+c.amount,0);
-  const totalOut = spends.reduce((s,c)=>s+c.amount,0);
-
-  const baseIn = cashboxForList.filter((c)=>isPaymentFromCounterparty(c.opType));
-  const baseOut = cashboxForList.filter((c)=>isPaymentToCounterparty(c.opType));
-  const base = fType==='in' ? baseIn : fType==='out' ? baseOut : cashboxForList;
+  const now = new Date();
+  const curMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const pays   = cashbox.filter((c)=>isPaymentFromCounterparty(c.opType));
+  const spends = cashbox.filter((c)=>isPaymentToCounterparty(c.opType));
+  const paysMonth = pays.filter((c)=>monthKey(c.sana)===curMonthKey);
+  const spendsMonth = spends.filter((c)=>monthKey(c.sana)===curMonthKey);
+  const cashMonth = cashbox.filter((c)=>monthKey(c.sana)===curMonthKey);
+  const totalIn  = paysMonth.reduce((s,c)=>s+c.amount,0);
+  const totalOut = spendsMonth.reduce((s,c)=>s+c.amount,0);
+  const base = fType==='in'?pays:fType==='out'?spends:cashbox;
   const options = useMemo(() => ({
-    operators: [...new Set(cashboxForList.map((x)=>x.operator).filter(Boolean))].sort(),
-    opTypes: [...new Set(cashboxForList.map((x)=>x.opType).filter(Boolean))].sort(),
-    kassas: [...new Set(cashboxForList.map((x)=>x.kassa).filter(Boolean))].sort(),
-  }), [cashboxForList]);
+    operators: [...new Set(cashbox.map((x)=>x.operator).filter(Boolean))].sort(),
+    opTypes: [...new Set(cashbox.map((x)=>x.opType).filter(Boolean))].sort(),
+    kassas: [...new Set(cashbox.map((x)=>x.kassa).filter(Boolean))].sort(),
+  }), [cashbox]);
   const toggleIn = (setter, val) => setter((prev) => prev.includes(val) ? prev.filter((x)=>x!==val) : [...prev, val]);
   const kassaFilterColumns = useMemo(() => ([
     { key:'sana', label:'Sana', type:'date' },
@@ -5955,10 +4230,10 @@ function Kassa({ D }) {
   return (
     <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
       <div className="g4">
-        <StatCard l="KIRIM (UMUMIY)"  v={fmt(totalIn)+" so'm"}  s={pays.length+' ta operatsiya'}   c="var(--gr)"/>
-        <StatCard l="CHIQIM (UMUMIY)" v={fmt(totalOut)+" so'm"} s={spends.length+' ta operatsiya'} c="var(--rd)"/>
-        <StatCard l="SALDO (UMUMIY)" v={fmt(totalIn-totalOut)+" so'm"} s="barcha vaqt: kirim minus chiqim" c={totalIn-totalOut>=0?'var(--gr)':'var(--rd)'}/>
-        <StatCard l="JAMI OPR."   v={cashboxForStats.length+' ta'}  s={'"Перекидка Сум" va "uos kassa"siz'} c="var(--bl)"/>
+        <StatCard l={`KIRIM (${curMonthKey})`}  v={fmt(totalIn)+" so'm"}  s={paysMonth.length+' ta operatsiya'}   c="var(--gr)"/>
+        <StatCard l={`CHIQIM (${curMonthKey})`} v={fmt(totalOut)+" so'm"} s={spendsMonth.length+' ta operatsiya'} c="var(--rd)"/>
+        <StatCard l="SALDO (OYLIK)" v={fmt(totalIn-totalOut)+" so'm"} s="joriy oy: kirim minus chiqim" c={totalIn-totalOut>=0?'var(--gr)':'var(--rd)'}/>
+        <StatCard l="OYLIK OPR."   v={cashMonth.length+' ta'}  s="joriy oy yozuvlari" c="var(--bl)"/>
       </div>
       <div style={{display:'flex',gap:8,alignItems:'center'}}>
         <div className="sb" style={{flex:1}}>
@@ -6025,7 +4300,7 @@ function Kassa({ D }) {
             </div>
           )}
         </div>
-        <button className="btn btn-gr btn-sm" onClick={exportKassa}>Excel</button>
+        <button className="btn btn-gr btn-sm" onClick={exportKassa}>? Excel</button>
         <div style={{display:'flex',gap:6}}>
           <KassaFilterBtn active={fType==='all'} label="Barchasi" onClick={()=>setT('all')}/>
           <KassaFilterBtn active={fType==='in'}  label="Kirimlar"  color="var(--gr)" dot onClick={()=>setT('in')}/>
@@ -6540,7 +4815,7 @@ function Obzvon({
       if (!isActiveCustomerName(c.name)) return;
       if (currentUser !== 'Admin') {
         const owner = assignment[mid] || '';
-        if (owner && normalizeUserKey(owner) !== normalizeUserKey(currentUser)) return;
+        if (owner && owner !== currentUser) return;
       }
       const passed = daysAgo(used[0].orderDate) ?? 0;
       out.push({
@@ -6751,7 +5026,7 @@ function Obzvon({
           <button className={`tab${tab==='op'?' on':''}`} onClick={()=>setTab('op')}>Operator jadvali</button>
           <button className={`tab${tab==='late2m'?' on':''}`} onClick={()=>setTab('late2m')}>2 oydan o'tgan mijozlar</button>
         </div>
-        <button className="btn btn-gr btn-sm" onClick={exportCurrentTab}>{E.excel} Excel</button>
+        <button className="btn btn-gr btn-sm" onClick={exportCurrentTab}>? Excel</button>
       </div>
 
       {tab==='main' && (
@@ -7536,7 +5811,7 @@ function KulerModal({ row, D, onClose, onSaveMonths }) {
   );
 }
 
-function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUser, company='murodbaxsh', currentAccess=null }) {
+function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUser, company='murodbaxsh' }) {
   const [tab, setTab] = useState('qarz');
   const [search, setSearch] = useState('');
   const [debtFilterOpen, setDebtFilterOpen] = useState(false);
@@ -7549,10 +5824,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
   const [pickMode, setPickMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState({});
   const [kulerMonthsCfg, setKulerMonthsCfg] = useState(() => S.get('aq-kuler-months', {}));
-  // Doljniki bo'limi ochiq bo'lsa, Kuler nasiya ham ko'rinadi (faqat Ahmadtea'da yopiq).
-  const allowKulerTab = normalizeCompanyKey(company) !== 'ahmadtea' && (
-    (currentAccess?.visible?.doljniki ?? true) !== false
-  );
+  const allowKulerTab = company !== 'ahmadtea';
   useEffect(() => {
     if (allowKulerTab) return;
     if (tab === 'kuler') setTab('qarz');
@@ -7753,7 +6025,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
                     width={620}
                   />
                 </div>
-                <button className="btn btn-gr btn-sm" onClick={exportDoljniki}>{E.excel} Excel</button>
+                <button className="btn btn-gr btn-sm" onClick={exportDoljniki}>? Excel</button>
                 <button className={`btn ${pickMode ? 'btn-gr' : 'btn-gh'} btn-sm`} onClick={()=>setPickMode((v)=>!v)}>
                   + Obzvonga qo'shish
                 </button>
@@ -7849,7 +6121,7 @@ function Doljniki({ rows, otherRows = [], D, kulerRows, onAddToObzvon, currentUs
                 width={620}
               />
             </div>
-            <button className="btn btn-gr btn-sm" onClick={exportKuler}>{E.excel} Excel</button>
+            <button className="btn btn-gr btn-sm" onClick={exportKuler}>? Excel</button>
           </div>
           <div className="card" style={{overflow:'hidden',flex:1}}>
             <div style={{overflow:'auto',maxHeight:'100%'}}>
@@ -7894,8 +6166,6 @@ function Reports({
   planRows=[],
   planOffDays=[],
   obzvonNewRows=[],
-  rawArchiveSheetRows=[],
-  rawEmployeeSheetRows=[],
   mode='reports',
 }) {
   const { rawOrders=[], warehouseTransfers=[] } = D;
@@ -7906,138 +6176,10 @@ function Reports({
   const currentUserNorm = String(currentUser || '').trim().toLowerCase();
   const showReport = mode !== 'nazorat';
   const showNazorat = mode !== 'reports';
-  const reportsSectionEnabled = (currentAccess?.visible?.reports ?? true) !== false;
-  const roleKey = String(currentAccess?.role || '').trim().toLowerCase();
-  const isOperatorRole = roleKey === 'operator';
-  const isAdminRole = roleKey === 'admin' || String(currentUser || '') === 'Admin';
-  // Oylik/kunlik plan ko'rsatkichlari: operator va admin uchun ko'rinadi, supervisor uchun yopiq.
-  const allowMonthlyWaterCard = reportsSectionEnabled && (isOperatorRole || isAdminRole);
-  const allowPlanRemainderCard = reportsSectionEnabled && (isOperatorRole || isAdminRole);
-  const showDailyPlanColumn = reportsSectionEnabled && (isOperatorRole || isAdminRole);
-  const controlEndDate = getYesterdayIsoDate();
-  const employeeRows = useMemo(
-    () => parseLeftoverEmployeesRows(rawEmployeeSheetRows || []),
-    [rawEmployeeSheetRows]
-  );
-  const employeeNameById = useMemo(() => {
-    const m = {};
-    (employeeRows || []).forEach((r) => {
-      const id = normId(r.id);
-      if (id && r.name && !m[id]) m[id] = r.name;
-    });
-    return m;
-  }, [employeeRows]);
-  const employeeNameByEmail = useMemo(() => {
-    const m = {};
-    (employeeRows || []).forEach((r) => {
-      const email = String(r.email || '').trim().toLowerCase();
-      if (email && r.name && !m[email]) m[email] = r.name;
-    });
-    return m;
-  }, [employeeRows]);
-  const normalizeNazoratDriverKey = useCallback(
-    (v) => normalizeMatchText(v).replace(/[^a-z0-9а-я]/gi, ''),
-    []
-  );
-  const canAliasSourceDriverName = useCallback((driverName) => {
-    const raw = String(driverName || '').trim();
-    if (!raw || raw === '-') return false;
-    const low = normalizeMatchText(raw);
-    const hasLetters = /[a-zа-я]/i.test(raw);
-    const hasDigits = /\d/.test(raw);
-    if (raw.includes('@')) return true;
-    if (!hasLetters && hasDigits) return true; // masalan: "4", "12"
-    if (low.includes('dostavchik') || low.includes('driver') || low.includes('водитель')) return true;
-    if (/[;,]/.test(raw) && hasDigits) return true; // masalan: "4, Kamron"
-    return false;
-  }, []);
-  const resolveNazoratDriverNameBase = useCallback((rawDriver) => {
-    const raw = String(rawDriver || '').trim();
-    if (!raw) return '-';
-    const id = normId(raw);
-    if (id && employeeNameById[id]) return employeeNameById[id];
-    const email = raw.toLowerCase();
-    if (email && employeeNameByEmail[email]) return employeeNameByEmail[email];
-    const pair = raw.match(/^(\d+)\s*[,;]\s*(.+)$/);
-    if (pair) {
-      const byId = employeeNameById[normId(pair[1])];
-      if (byId) return byId;
-      const second = String(pair[2] || '').trim();
-      if (second) return second;
-    }
-    return raw;
-  }, [employeeNameByEmail, employeeNameById]);
-  const archiveDriverAliasMap = useMemo(() => {
-    const systemDriversByDateCustomer = new Map();
-    (rawOrders || []).forEach((o) => {
-      if (!isOrderDoc(o?.docType)) return;
-      if (isCancelledStatus(o?.status)) return;
-      if (!isMainWarehouseLabel(o?.warehouse)) return;
-      const date = toIsoDate(o?.orderDate);
-      const customerId = normalizeIdKey(o?.mId);
-      if (!date || !customerId) return;
-      const driver = resolveNazoratDriverNameBase(o?.delivPerson || o?.agent || '');
-      const driverKey = normalizeNazoratDriverKey(driver);
-      if (!driver || driver === '-' || !driverKey) return;
-      const mapKey = `${date}__${customerId}`;
-      if (!systemDriversByDateCustomer.has(mapKey)) systemDriversByDateCustomer.set(mapKey, new Set());
-      systemDriversByDateCustomer.get(mapKey).add(driver);
-    });
-
-    const aliasCounts = new Map();
-    (parseLeftoverArchiveRows(rawArchiveSheetRows || []) || []).forEach((r) => {
-      const date = String(r?.date || '').trim();
-      const customerId = normalizeIdKey(r?.customerId);
-      if (!date || !customerId) return;
-      const archiveDriver = resolveNazoratDriverNameBase(r?.driver || '');
-      const archiveDriverKey = normalizeNazoratDriverKey(archiveDriver);
-      if (!archiveDriver || archiveDriver === '-' || !archiveDriverKey) return;
-      const mapKey = `${date}__${customerId}`;
-      const sysDrivers = systemDriversByDateCustomer.get(mapKey);
-      if (!sysDrivers || !sysDrivers.size) return;
-      sysDrivers.forEach((sysDriver) => {
-        if (!canAliasSourceDriverName(sysDriver)) return;
-        const sysKey = normalizeNazoratDriverKey(sysDriver);
-        if (!sysKey || sysKey === archiveDriverKey) return;
-        if (!aliasCounts.has(sysKey)) aliasCounts.set(sysKey, new Map());
-        const next = aliasCounts.get(sysKey);
-        next.set(archiveDriver, (next.get(archiveDriver) || 0) + 1);
-      });
-    });
-
-    const out = new Map();
-    aliasCounts.forEach((candidates, oldKey) => {
-      const ranked = Array.from(candidates.entries()).sort((a, b) => b[1] - a[1]);
-      if (!ranked.length) return;
-      const [bestName, bestCount] = ranked[0];
-      const secondCount = ranked[1]?.[1] || 0;
-      if (bestName && bestCount >= 2 && bestCount > secondCount) {
-        out.set(oldKey, bestName);
-      }
-    });
-    return out;
-  }, [rawOrders, rawArchiveSheetRows, resolveNazoratDriverNameBase, normalizeNazoratDriverKey, canAliasSourceDriverName]);
-  const resolveNazoratDriverName = useCallback((rawDriver) => {
-    const base = resolveNazoratDriverNameBase(rawDriver);
-    const k = normalizeNazoratDriverKey(base);
-    if (!k) return base;
-    const aliased = archiveDriverAliasMap.get(k);
-    return aliased || base;
-  }, [resolveNazoratDriverNameBase, normalizeNazoratDriverKey, archiveDriverAliasMap]);
-  const controlDateRangeLabel = useMemo(
-    () => `${CONTROL_COMPARE_START_DATE_LABEL} dan kechagi sanagacha (${fmtD(controlEndDate)})`,
-    [controlEndDate]
-  );
-  const isVirtualControlDriver = useCallback((v) => isVirtualDriverLabel(v), []);
-  const isVirtualControlWarehouse = useCallback((v) => isVirtualWarehouseLabel(v), []);
   const activeControlCustomerIds = useMemo(() => {
     return new Set(
       (D.customers || [])
-        .filter((c) => (
-          isMurodbaxshCustomer(c) &&
-          !isExcludedZCategory(c?.source) &&
-          !isNameInactiveByPrefix(c?.name || '')
-        ))
+        .filter((c) => !isExcludedZCategory(c?.source) && !isNameInactiveByPrefix(c?.name || ''))
         .map((c) => String(c?.id || '').trim())
         .filter(Boolean)
     );
@@ -8067,8 +6209,7 @@ function Reports({
   const visibleRows = useMemo(() => {
     const base = (obzvonNewRows || []).filter((r) => !isObzvonDeletedRow(r));
     if (canSeeAll) return base;
-    const me = normalizeUserKey(currentUser);
-    return base.filter((r) => normalizeUserKey(r.operator) === me);
+    return base.filter((r) => String(r.operator || '').trim() === String(currentUser || '').trim());
   }, [obzvonNewRows, canSeeAll, currentUser]);
 
   const rowsToday = useMemo(
@@ -8077,25 +6218,15 @@ function Reports({
   );
 
   const monthWaterOrders = useMemo(() => {
-    return (rawOrders || []).filter((o) => isMonthlyWaterSalesRow(o, currentMonth));
+    return (rawOrders || []).filter((o) =>
+      isWaterProduct(o.product) &&
+      isOrderDoc(o.docType) &&
+      isDeliveredStatus(o.status) &&
+      monthKey(o.orderDate) === currentMonth
+    );
   }, [rawOrders, currentMonth]);
-  const monthWaterStats = useMemo(() => {
-    let soldQty = 0;
-    let returnedQty = 0;
-    let netQty = 0;
-    let netSum = 0;
-    (monthWaterOrders || []).forEach((o) => {
-      const q = toNum(o?.qty);
-      const s = String(o?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(o?.sum);
-      if (q >= 0) soldQty += q;
-      else returnedQty += Math.abs(q);
-      netQty += q;
-      netSum += s;
-    });
-    return { soldQty, returnedQty, netQty, netSum };
-  }, [monthWaterOrders]);
-  const monthWaterQty = monthWaterStats.netQty;
-  const monthWaterSum = monthWaterStats.netSum;
+  const monthWaterQty = monthWaterOrders.reduce((s,o)=>s + Math.abs(o.qty || 0), 0);
+  const monthWaterSum = monthWaterOrders.reduce((s,o)=>s + (o.currency === 'USD' ? 0 : (o.sum || 0)), 0);
 
   const todayDate = useMemo(() => {
     const d = toDate(todayIso);
@@ -8109,15 +6240,16 @@ function Reports({
     return new Date(y, m, 0);
   }, [currentMonth, todayDate]);
   const soldUntilTodayQty = useMemo(() => {
-    return (rawOrders || [])
-      .filter((o) => {
-        if (!isMonthlyWaterSalesRow(o, currentMonth)) return false;
-        const od = toDate(o.orderDate);
-        if (!od) return false;
-        od.setHours(0, 0, 0, 0);
-        return od <= todayDate;
-      })
-      .reduce((s, o) => s + toNum(o?.qty), 0);
+    return (rawOrders || []).filter((o) => {
+      if (!isWaterProduct(o.product)) return false;
+      if (!isOrderDoc(o.docType)) return false;
+      if (isCancelledStatus(o.status)) return false;
+      if (monthKey(o.orderDate) !== currentMonth) return false;
+      const od = toDate(o.orderDate);
+      if (!od) return false;
+      od.setHours(0, 0, 0, 0);
+      return od <= todayDate;
+    }).reduce((s, o) => s + Math.abs(o.qty || 0), 0);
   }, [rawOrders, currentMonth, todayDate]);
   const remainingMonthPlanQty = Math.max(0, Number(selectedPlan.waterPlan || 0) - soldUntilTodayQty);
   const tomorrowDate = useMemo(() => {
@@ -8194,125 +6326,18 @@ function Reports({
     () => `aq-driver-warehouse-map-${normalizeCompanyKey(company)}`,
     [company]
   );
-  const cashStorageKey = useMemo(
-    () => `aq-driver-cash-map-${normalizeCompanyKey(company)}`,
-    [company]
-  );
-  const cardCashStorageKey = useMemo(
-    () => `aq-driver-card-cash-map-${normalizeCompanyKey(company)}`,
-    [company]
-  );
   const [driverWarehouseMap, setDriverWarehouseMap] = useState(() => S.get(mapStorageKey, {}));
-  const [driverCashMap, setDriverCashMap] = useState(() => S.get(cashStorageKey, {}));
-  const [driverCardCashMap, setDriverCardCashMap] = useState(() => S.get(cardCashStorageKey, {}));
   useEffect(() => {
     setDriverWarehouseMap(S.get(mapStorageKey, {}));
   }, [mapStorageKey]);
-  useEffect(() => {
-    setDriverCashMap(S.get(cashStorageKey, {}));
-  }, [cashStorageKey]);
-  useEffect(() => {
-    setDriverCardCashMap(S.get(cardCashStorageKey, {}));
-  }, [cardCashStorageKey]);
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const onBindingMapsUpdated = (evt) => {
-      const eventCompany = normalizeCompanyKey(evt?.detail?.company || company);
-      if (eventCompany !== normalizeCompanyKey(company)) return;
-      setDriverWarehouseMap(S.get(mapStorageKey, {}));
-      setDriverCashMap(S.get(cashStorageKey, {}));
-      setDriverCardCashMap(S.get(cardCashStorageKey, {}));
-    };
-    window.addEventListener(BINDING_UPDATE_EVENT, onBindingMapsUpdated);
-    return () => window.removeEventListener(BINDING_UPDATE_EVENT, onBindingMapsUpdated);
-  }, [company, mapStorageKey, cashStorageKey, cardCashStorageKey]);
-  const resolvedDriverWarehouseMap = useMemo(() => {
-    const out = {};
-    Object.entries(driverWarehouseMap || {}).forEach(([driver, warehouse]) => {
-      const dRaw = String(driver || '').trim();
-      const dResolved = resolveNazoratDriverName(dRaw);
-      const val = String(warehouse || '').trim();
-      if (!dRaw || !val) return;
-      out[dRaw] = val;
-      if (dResolved && !out[dResolved]) out[dResolved] = val;
-    });
-    return out;
-  }, [driverWarehouseMap, resolveNazoratDriverName]);
-  const resolvedDriverCashMap = useMemo(() => {
-    const out = {};
-    Object.entries(driverCashMap || {}).forEach(([driver, cashbox]) => {
-      const dRaw = String(driver || '').trim();
-      const dResolved = resolveNazoratDriverName(dRaw);
-      const val = String(cashbox || '').trim();
-      if (!dRaw || !val) return;
-      out[dRaw] = val;
-      if (dResolved && !out[dResolved]) out[dResolved] = val;
-    });
-    return out;
-  }, [driverCashMap, resolveNazoratDriverName]);
-  const resolvedDriverCardCashMap = useMemo(() => {
-    const out = {};
-    Object.entries(driverCardCashMap || {}).forEach(([driver, cashbox]) => {
-      const dRaw = String(driver || '').trim();
-      const dResolved = resolveNazoratDriverName(dRaw);
-      const val = String(cashbox || '').trim();
-      if (!dRaw || !val) return;
-      out[dRaw] = val;
-      if (dResolved && !out[dResolved]) out[dResolved] = val;
-    });
-    return out;
-  }, [driverCardCashMap, resolveNazoratDriverName]);
-  const normalizeDriverLookupKey = useCallback(
-    (v) => normalizeMatchText(v).replace(/[^a-z0-9а-я]/gi, ''),
-    []
-  );
-  const lookupByDriverName = useCallback((sourceMap = {}, driverName = '') => {
-    const driver = String(driverName || '').trim();
-    if (!driver) return '';
-    const direct = String(sourceMap?.[driver] || '').trim();
-    if (direct) return direct;
-
-    const driverNorm = normalizeDriverLookupKey(driver);
-    if (!driverNorm) return '';
-
-    const entries = Object.entries(sourceMap || {});
-    for (const [k, v] of entries) {
-      const kn = normalizeDriverLookupKey(k);
-      if (kn && kn === driverNorm && String(v || '').trim()) return String(v || '').trim();
-    }
-    for (const [k, v] of entries) {
-      const kn = normalizeDriverLookupKey(k);
-      if (!kn || !String(v || '').trim()) continue;
-      if (driverNorm.includes(kn) || kn.includes(driverNorm)) return String(v || '').trim();
-    }
-
-    const afterComma = driver.split(/[;,]/).map((x) => String(x || '').trim()).filter(Boolean).pop() || '';
-    if (afterComma && afterComma !== driver) {
-      const fromComma = String(sourceMap?.[afterComma] || '').trim();
-      if (fromComma) return fromComma;
-    }
-    return '';
-  }, [normalizeDriverLookupKey]);
   const [nazoratSection, setNazoratSection] = useState('orders');
   const [nazoratOrderSection, setNazoratOrderSection] = useState('transfer');
-  const [nazoratPermSection, setNazoratPermSection] = useState('errors');
-  const [nazoratReturnSection, setNazoratReturnSection] = useState('return_order');
-  const [nazoratReturnDiffSection, setNazoratReturnDiffSection] = useState('customer');
-  const [nazoratGapSection, setNazoratGapSection] = useState('customer');
-  const [nazoratCashSection, setNazoratCashSection] = useState('payment');
   const [nazoratView, setNazoratView] = useState('errors');
   const [nazoratFilterOpen, setNazoratFilterOpen] = useState(false);
   const [nazoratFilterState, setNazoratFilterState] = useState({});
   useEffect(() => {
     if (nazoratSection !== 'orders') setNazoratOrderSection('transfer');
-    if (!(nazoratSection === 'orders' && nazoratOrderSection === 'transfer')) setNazoratPermSection('errors');
-    if (nazoratSection !== 'returns') setNazoratReturnSection('return_order');
-    if (nazoratSection !== 'gap') setNazoratGapSection('customer');
-    if (nazoratSection !== 'cash') setNazoratCashSection('payment');
-  }, [nazoratSection, nazoratOrderSection]);
-  useEffect(() => {
-    if (nazoratReturnSection !== 'return_return') setNazoratReturnDiffSection('customer');
-  }, [nazoratReturnSection]);
+  }, [nazoratSection]);
 
   const controlOrderRows = useMemo(() => {
     let rows = (rawOrders || []).filter((o) => {
@@ -8320,257 +6345,110 @@ function Reports({
       if (!isOrderDoc(o.docType)) return false;
       if (isCancelledStatus(o.status)) return false;
       if (!isMainWarehouseLabel(o.warehouse)) return false;
-      if (isVirtualControlWarehouse(o.warehouse)) return false;
       const dateKey = toIsoDate(o.orderDate);
       if (!dateKey) return false;
-      const driver = resolveNazoratDriverName(o.delivPerson || o.agent || '');
-      if (isVirtualControlDriver(driver)) return false;
+      const driver = String(o.delivPerson || o.agent || '').trim();
       if (!driver) return false;
       return true;
     }).map((o) => ({
       date: toIsoDate(o.orderDate),
-      driver: resolveNazoratDriverName(o.delivPerson || o.agent || ''),
+      driver: String(o.delivPerson || o.agent || '').trim(),
       qty: Math.abs(toNum(o.qty)),
     }));
     if (!canSeeAllNazorat) {
       rows = rows.filter((r) => String(r.driver || '').trim().toLowerCase() === currentUserNorm);
     }
     return rows;
-  }, [rawOrders, canSeeAllNazorat, currentUserNorm, resolveNazoratDriverName, isVirtualControlDriver, isVirtualControlWarehouse]);
+  }, [rawOrders, canSeeAllNazorat, currentUserNorm]);
 
-  const isPermWaterProduct = useCallback((product) => {
-    const p = normProduct(product);
-    return (
-      p === 'murodbaxsh 18.9l' ||
-      p === 'бонус murodbaxsh 18.9l' ||
-      p === 'bonus murodbaxsh 18.9l'
-    );
-  }, []);
+  const transferRows = useMemo(() => {
+    return (warehouseTransfers || []).filter((r) => {
+      if (!isWaterProduct(r.product)) return false;
+      if (!isMainWarehouseLabel(r.toWarehouse)) return false;
+      const d = toIsoDate(r.moveDate);
+      if (!d) return false;
+      const from = String(r.fromWarehouse || '').trim();
+      if (!from) return false;
+      return true;
+    }).map((r) => ({
+      date: toIsoDate(r.moveDate),
+      fromWarehouse: String(r.fromWarehouse || '').trim(),
+      qty: Math.abs(toNum(r.qty)),
+    }));
+  }, [warehouseTransfers]);
 
-  const permOrderRowsAll = useMemo(() => {
-    const byDateDriver = new Map();
-    (rawOrders || []).forEach((o) => {
-      if (!isOrderDoc(o?.docType)) return;
-      if (isCancelledStatus(o?.status)) return;
-      if (!isMainWarehouseLabel(o?.warehouse)) return;
-      if (!isPermWaterProduct(o?.product)) return;
-      const date = toIsoDate(o?.orderDate);
-      if (!date) return;
-      // Permesheniya nazoratida dostavchik ismi faqat baza (item_basket) dagi nomdan olinadi.
-      const driver = resolveNazoratDriverNameBase(o?.delivPerson || o?.agent || '');
-      if (!driver || driver === '-' || isVirtualControlDriver(driver)) return;
-      if (!canSeeAllNazorat && String(driver).trim().toLowerCase() !== currentUserNorm) return;
-      const driverKey = normalizeDriverLookupKey(driver);
-      if (!driverKey) return;
-      const key = `${date}__${driverKey}`;
-      if (!byDateDriver.has(key)) byDateDriver.set(key, { date, driver, driverKey, orderQty: 0, status: 'OK' });
-      const row = byDateDriver.get(key);
-      row.orderQty += Math.abs(toNum(o?.qty));
-    });
-    return Array.from(byDateDriver.values()).sort((a, b) => (
-      a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date)
-    ));
-  }, [rawOrders, canSeeAllNazorat, currentUserNorm, resolveNazoratDriverNameBase, isVirtualControlDriver, isPermWaterProduct, normalizeDriverLookupKey]);
-
-  const { orderQtyByDateDriver, orderDatesByDriver, permDriverDisplayByKey } = useMemo(() => {
+  const { orderQtyByDriverDate, orderDatesByDriver } = useMemo(() => {
     const qtyMap = new Map();
     const datesByDriver = new Map();
-    const displayByKey = new Map();
-    (permOrderRowsAll || []).forEach((r) => {
-      const date = String(r?.date || '').trim();
-      const driverKey = String(r?.driverKey || '').trim();
-      if (!date || !driverKey) return;
-      const qtyKey = `${driverKey}__${date}`;
-      qtyMap.set(qtyKey, (qtyMap.get(qtyKey) || 0) + Math.abs(toNum(r?.orderQty)));
-      if (!datesByDriver.has(driverKey)) datesByDriver.set(driverKey, new Set());
-      datesByDriver.get(driverKey).add(date);
-      if (!displayByKey.has(driverKey)) displayByKey.set(driverKey, String(r?.driver || '').trim() || '-');
+    controlOrderRows.forEach((r) => {
+      const key = `${r.driver}__${r.date}`;
+      qtyMap.set(key, (qtyMap.get(key) || 0) + Math.abs(toNum(r.qty)));
+      if (!datesByDriver.has(r.driver)) datesByDriver.set(r.driver, new Set());
+      datesByDriver.get(r.driver).add(r.date);
     });
-    return { orderQtyByDateDriver: qtyMap, orderDatesByDriver: datesByDriver, permDriverDisplayByKey: displayByKey };
-  }, [permOrderRowsAll]);
+    return { orderQtyByDriverDate: qtyMap, orderDatesByDriver: datesByDriver };
+  }, [controlOrderRows]);
 
-  const orderQtyTotalByDriverKey = useMemo(() => {
-    const m = new Map();
-    (permOrderRowsAll || []).forEach((r) => {
-      const dk = String(r?.driverKey || '').trim();
-      if (!dk) return;
-      m.set(dk, (m.get(dk) || 0) + Math.abs(toNum(r?.orderQty)));
-    });
-    return m;
-  }, [permOrderRowsAll]);
-
-  const { transferQtyByDateWarehouse, transferDatesByWarehouse } = useMemo(() => {
+  const { transferQtyByWarehouseDate, transferDatesByWarehouse } = useMemo(() => {
     const qtyMap = new Map();
     const datesByWarehouse = new Map();
-    (warehouseTransfers || []).forEach((r) => {
-      if (!isMainWarehouseLabel(r?.toWarehouse)) return;
-      if (!isPermWaterProduct(r?.product)) return;
-      if (isVirtualControlWarehouse(r?.toWarehouse) || isVirtualControlWarehouse(r?.fromWarehouse)) return;
-      const date = toIsoDate(r?.moveDate);
-      if (!date) return;
-      const warehouse = String(r?.fromWarehouse || '').trim();
-      const warehouseKey = normalizeWarehouseKey(warehouse);
+    transferRows.forEach((r) => {
+      const warehouseKey = normalizeWarehouseKey(r.fromWarehouse);
       if (!warehouseKey) return;
-      const key = `${warehouseKey}__${date}`;
-      qtyMap.set(key, (qtyMap.get(key) || 0) + Math.abs(toNum(r?.qty)));
+      const key = `${warehouseKey}__${r.date}`;
+      qtyMap.set(key, (qtyMap.get(key) || 0) + Math.abs(toNum(r.qty)));
       if (!datesByWarehouse.has(warehouseKey)) datesByWarehouse.set(warehouseKey, new Set());
-      datesByWarehouse.get(warehouseKey).add(date);
+      datesByWarehouse.get(warehouseKey).add(r.date);
     });
-    return { transferQtyByDateWarehouse: qtyMap, transferDatesByWarehouse: datesByWarehouse };
-  }, [warehouseTransfers, isVirtualControlWarehouse, isPermWaterProduct]);
+    return { transferQtyByWarehouseDate: qtyMap, transferDatesByWarehouse: datesByWarehouse };
+  }, [transferRows]);
 
-  const sanitizedResolvedDriverWarehouseMap = useMemo(() => {
-    const byWarehouse = new Map();
-    Object.entries(driverWarehouseMap || {}).forEach(([driverRaw, warehouseRaw]) => {
-      const driver = resolveNazoratDriverNameBase(driverRaw);
-      const driverKey = normalizeDriverLookupKey(driver);
-      const warehouse = String(warehouseRaw || '').trim();
-      const warehouseKey = normalizeWarehouseKey(warehouse);
-      if (!driver || driver === '-' || !driverKey || !warehouse || !warehouseKey) return;
-      if (isVirtualControlDriver(driver) || isVirtualControlWarehouse(warehouse)) return;
-      if (!byWarehouse.has(warehouseKey)) byWarehouse.set(warehouseKey, []);
-      byWarehouse.get(warehouseKey).push({ driver, driverKey, warehouse });
-    });
+  const allDrivers = useMemo(() => {
+    const set = new Set([
+      ...Array.from(orderDatesByDriver.keys()),
+      ...Object.keys(driverWarehouseMap || {}),
+    ]);
+    let rows = Array.from(set).filter(Boolean).sort((a, b) => a.localeCompare(b, 'ru'));
+    if (!canSeeAllNazorat) rows = rows.filter((x) => String(x || '').trim().toLowerCase() === currentUserNorm);
+    return rows;
+  }, [orderDatesByDriver, driverWarehouseMap, canSeeAllNazorat, currentUserNorm]);
 
-    const out = {};
-    byWarehouse.forEach((items) => {
-      const picked = [...items].sort((a, b) => {
-        const aq = Number(orderQtyTotalByDriverKey.get(a.driverKey) || 0);
-        const bq = Number(orderQtyTotalByDriverKey.get(b.driverKey) || 0);
-        if (bq !== aq) return bq - aq;
-        const ain = permDriverDisplayByKey.has(a.driverKey) ? 1 : 0;
-        const bin = permDriverDisplayByKey.has(b.driverKey) ? 1 : 0;
-        if (bin !== ain) return bin - ain;
-        return String(a.driver || '').localeCompare(String(b.driver || ''), 'ru');
-      })[0];
-      if (picked?.driver && picked?.warehouse) out[picked.driver] = picked.warehouse;
-    });
-    return out;
-  }, [
-    driverWarehouseMap,
-    resolveNazoratDriverNameBase,
-    normalizeDriverLookupKey,
-    normalizeWarehouseKey,
-    isVirtualControlDriver,
-    isVirtualControlWarehouse,
-    orderQtyTotalByDriverKey,
-    permDriverDisplayByKey,
-  ]);
-
-  const warehouseByDriverKey = useMemo(() => {
-    const m = new Map();
-    Object.entries(sanitizedResolvedDriverWarehouseMap || {}).forEach(([driver, warehouse]) => {
-      const dk = normalizeDriverLookupKey(driver);
-      const w = String(warehouse || '').trim();
-      if (!dk || !w) return;
-      if (!m.has(dk)) m.set(dk, w);
-    });
-    return m;
-  }, [sanitizedResolvedDriverWarehouseMap, normalizeDriverLookupKey]);
-
-  const allPermDrivers = useMemo(() => {
-    const byKey = new Map();
-    permDriverDisplayByKey.forEach((name, key) => {
-      if (!key) return;
-      byKey.set(key, String(name || '').trim() || '-');
-    });
-    Object.keys(sanitizedResolvedDriverWarehouseMap || {}).forEach((driver) => {
-      const d = String(driver || '').trim();
-      if (!d || isVirtualControlDriver(d)) return;
-      const dk = normalizeDriverLookupKey(d);
-      if (!dk) return;
-      if (!byKey.has(dk)) byKey.set(dk, resolveNazoratDriverNameBase(d));
-    });
-    let out = Array.from(byKey.entries()).map(([driverKey, driver]) => ({ driverKey, driver }));
-    if (!canSeeAllNazorat) {
-      out = out.filter((x) => String(x.driver || '').trim().toLowerCase() === currentUserNorm);
-    }
-    return out.sort((a, b) => String(a.driver || '').localeCompare(String(b.driver || ''), 'ru'));
-  }, [permDriverDisplayByKey, sanitizedResolvedDriverWarehouseMap, isVirtualControlDriver, normalizeDriverLookupKey, resolveNazoratDriverNameBase, canSeeAllNazorat, currentUserNorm]);
-
-  const orderControlRows = useMemo(() => {
+  const dailyControlRows = useMemo(() => {
     const out = [];
-    allPermDrivers.forEach(({ driverKey, driver }) => {
-      if (!driverKey || !driver || isVirtualControlDriver(driver)) return;
-      const warehouse = String(warehouseByDriverKey.get(driverKey) || lookupByDriverName(sanitizedResolvedDriverWarehouseMap, driver) || '').trim();
+    allDrivers.forEach((driver) => {
+      const warehouse = String(driverWarehouseMap?.[driver] || '').trim();
       const warehouseKey = normalizeWarehouseKey(warehouse);
-      const orderDates = orderDatesByDriver.get(driverKey) || new Set();
+      const orderDates = orderDatesByDriver.get(driver) || new Set();
       const transferDates = warehouseKey ? (transferDatesByWarehouse.get(warehouseKey) || new Set()) : new Set();
       const allDates = Array.from(new Set([...orderDates, ...transferDates])).sort((a, b) => a.localeCompare(b));
       allDates.forEach((date) => {
-        const orderQty = Number(orderQtyByDateDriver.get(`${driverKey}__${date}`) || 0);
-        const transferQty = warehouseKey ? Number(transferQtyByDateWarehouse.get(`${warehouseKey}__${date}`) || 0) : 0;
-        if (!warehouse && orderQty <= 0.0001 && transferQty <= 0.0001) return;
-        if (warehouse && orderQty <= 0.0001 && transferQty <= 0.0001) return;
-        const hasOrder = orderQty > 0.0001;
-        const hasTransfer = transferQty > 0.0001;
-        const diff = orderQty - transferQty;
-        let status = 'OK';
-        if (!warehouse) status = 'Sklad biriktirilmagan';
-        else if (!hasOrder && hasTransfer) status = "Zakaz oynasidan topilmadi";
-        else if (hasOrder && !hasTransfer) status = "Permesheniya oynasidan topilmadi";
-        else if (Math.abs(diff) > 0.0001) status = 'Mos emas';
+        const orderQty = Number(orderQtyByDriverDate.get(`${driver}__${date}`) || 0);
+        const transferQty = warehouseKey ? Number(transferQtyByWarehouseDate.get(`${warehouseKey}__${date}`) || 0) : 0;
+        if (!warehouse && !orderQty && !transferQty) return;
+        if (warehouse && !orderQty && !transferQty) return;
         out.push({
           date,
           driver,
-          driverKey,
           warehouse: warehouse || '-',
           orderQty,
           transferQty,
-          diff,
-          status,
-          hasOrder,
-          hasTransfer,
+          diff: orderQty - transferQty,
+          mappingMissing: !warehouse,
         });
       });
     });
-    return out.sort((a, b) => (
-      a.date === b.date
-        ? String(a.driver || '').localeCompare(String(b.driver || ''), 'ru')
-        : String(a.date || '').localeCompare(String(b.date || ''))
-    ));
-  }, [
-    allPermDrivers,
-    isVirtualControlDriver,
-    warehouseByDriverKey,
-    sanitizedResolvedDriverWarehouseMap,
-    lookupByDriverName,
-    orderDatesByDriver,
-    transferDatesByWarehouse,
-    orderQtyByDateDriver,
-    transferQtyByDateWarehouse,
-  ]);
+    return out.sort((a, b) => (a.date === b.date ? a.driver.localeCompare(b.driver, 'ru') : a.date.localeCompare(b.date)));
+  }, [allDrivers, driverWarehouseMap, orderDatesByDriver, transferDatesByWarehouse, orderQtyByDriverDate, transferQtyByWarehouseDate]);
 
-  const permOrderDisplayRows = useMemo(
-    () => orderControlRows.filter((r) => Number(r.orderQty || 0) > 0.0001).map((r) => ({
-      date: r.date,
-      driver: r.driver,
-      warehouse: r.warehouse,
-      orderQty: r.orderQty,
-      status: r.status || 'OK',
+  const orderControlRows = useMemo(
+    () => dailyControlRows.map((r) => ({
+      ...r,
+      status: r.mappingMissing ? 'Sklad biriktirilmagan' : (r.diff === 0 ? 'OK' : 'Mos emas'),
     })),
-    [orderControlRows]
+    [dailyControlRows]
   );
-
-  const transferRows = useMemo(
-    () => orderControlRows
-      .filter((r) => Number(r.orderQty || 0) > 0.0001 || Number(r.transferQty || 0) > 0.0001)
-      .map((r) => ({
-        date: r.date,
-        driver: r.driver,
-        warehouse: r.warehouse,
-        transferQty: r.transferQty,
-        status: r.status || (
-          r.warehouse === '-'
-            ? 'Sklad biriktirilmagan'
-            : (Number(r.transferQty || 0) > 0.0001 ? 'OK' : "Permesheniya oynasidan topilmadi")
-        ),
-      })),
-    [orderControlRows]
-  );
-
   const orderMismatchRows = useMemo(
-    () => orderControlRows.filter((r) => String(r?.status || '').toUpperCase() !== 'OK'),
+    () => orderControlRows.filter((r) => r.mappingMissing || r.diff !== 0),
     [orderControlRows]
   );
   const duplicateOrderRows = useMemo(() => {
@@ -8580,14 +6458,10 @@ function Reports({
       if (!isOrderDoc(o.docType)) return;
       if (isCancelledStatus(o.status)) return;
       if (!isMainWarehouseLabel(o.warehouse)) return;
-      if (isVirtualControlWarehouse(o.warehouse)) return;
       const date = toIsoDate(o.orderDate);
       const customerId = String(o.mId || '').trim();
       if (!date || !customerId) return;
-      if (date < CONTROL_COMPARE_START_DATE) return;
-      if (controlEndDate && date > controlEndDate) return;
-      const driver = resolveNazoratDriverName(o.delivPerson || o.agent || '');
-      if (isVirtualControlDriver(driver)) return;
+      const driver = String(o.delivPerson || o.agent || '').trim() || '-';
       if (!canSeeAllNazorat && String(driver).trim().toLowerCase() !== currentUserNorm) return;
       const orderId = String(o.soNum || '').trim();
       if (!orderId) return;
@@ -8641,7 +6515,7 @@ function Reports({
         status: Array.from(new Set(r.docs)).length > 1 ? 'Dublikat' : 'OK',
       }))
       .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
-  }, [rawOrders, canSeeAllNazorat, currentUserNorm, controlEndDate, resolveNazoratDriverName, isVirtualControlDriver, isVirtualControlWarehouse]);
+  }, [rawOrders, canSeeAllNazorat, currentUserNorm]);
   const duplicateMismatchRows = useMemo(
     () => duplicateOrderRows.filter((r) => r.docsCount > 1),
     [duplicateOrderRows]
@@ -8652,15 +6526,11 @@ function Reports({
       if (isCancelledStatus(o.status)) return false;
       const date = toIsoDate(o.orderDate);
       if (!date) return false;
-      if (date < CONTROL_COMPARE_START_DATE) return false;
-      if (controlEndDate && date > controlEndDate) return false;
       const customerId = String(o.mId || '').trim();
       if (!customerId) return false;
       if (!activeControlCustomerIds.has(customerId)) return false;
-      if (isVirtualControlWarehouse(o.warehouse)) return false;
-      const person = resolveNazoratDriverName(o.delivPerson || o.agent || '');
-      if (isVirtualControlDriver(person)) return false;
       if (!canSeeAllNazorat) {
+        const person = String(o.delivPerson || o.agent || '').trim();
         if (String(person || '').trim().toLowerCase() !== currentUserNorm) return false;
       }
       return true;
@@ -8682,7 +6552,7 @@ function Reports({
           customer: String(o.contName || '').trim() || `ID ${customerId}`,
           returnNo: String(o.soNum || '').trim(),
           qty: Math.abs(toNum(o.qty)),
-          driver: resolveNazoratDriverName(o.delivPerson || o.agent || ''),
+          driver: String(o.delivPerson || o.agent || '').trim() || '-',
           warehouse: String(o.warehouse || '').trim() || '-',
           note: String(o.note || '').trim() || String(o.cat || '').trim() || '-',
           hasOrder,
@@ -8690,271 +6560,18 @@ function Reports({
         };
       })
       .sort((a, b) => (a.date === b.date ? a.customer.localeCompare(b.customer, 'ru') : a.date.localeCompare(b.date)));
-  }, [rawOrders, activeControlCustomerIds, canSeeAllNazorat, currentUserNorm, controlEndDate, resolveNazoratDriverName, isVirtualControlDriver]);
+  }, [rawOrders, activeControlCustomerIds, canSeeAllNazorat, currentUserNorm]);
   const returnMismatchRows = useMemo(
     () => returnControlRows.filter((r) => !r.hasOrder),
     [returnControlRows]
   );
-  const parsedArchiveRows = useMemo(
-    () => (parseLeftoverArchiveRows(rawArchiveSheetRows || []) || []).map((r) => ({
-      ...r,
-      driver: resolveNazoratDriverName(r?.driver || ''),
-    })),
-    [rawArchiveSheetRows, resolveNazoratDriverName]
-  );
-  const orderArchiveDiff = useMemo(() => buildBasketArchiveDifference({
-    rawOrders,
-    archiveRows: parsedArchiveRows,
-    mode: 'order',
-    startDate: CONTROL_COMPARE_START_DATE,
-    endDate: controlEndDate,
-    canSeeAll: canSeeAllNazorat,
-    currentUserNorm,
-    activeCustomerIds: activeControlCustomerIds,
-    resolveDriverName: resolveNazoratDriverName,
-    shouldSkipDriver: (driver, row) => isVirtualControlDriver(driver) || isVirtualControlWarehouse(row?.warehouse),
-  }), [rawOrders, parsedArchiveRows, canSeeAllNazorat, currentUserNorm, activeControlCustomerIds, controlEndDate, resolveNazoratDriverName, isVirtualControlDriver, isVirtualControlWarehouse]);
-  const returnArchiveDiff = useMemo(() => buildBasketArchiveDifference({
-    rawOrders,
-    archiveRows: parsedArchiveRows,
-    mode: 'return',
-    startDate: CONTROL_COMPARE_START_DATE,
-    endDate: controlEndDate,
-    canSeeAll: canSeeAllNazorat,
-    currentUserNorm,
-    activeCustomerIds: activeControlCustomerIds,
-    resolveDriverName: resolveNazoratDriverName,
-    shouldSkipDriver: (driver, row) => isVirtualControlDriver(driver) || isVirtualControlWarehouse(row?.warehouse),
-  }), [rawOrders, parsedArchiveRows, canSeeAllNazorat, currentUserNorm, activeControlCustomerIds, controlEndDate, resolveNazoratDriverName, isVirtualControlDriver, isVirtualControlWarehouse]);
-  const pickExpectedCashbox = useCallback((driverName, payMode) => {
-    const driver = String(driverName || '').trim();
-    if (!driver) return '';
-    const candidates = Array.from(new Set([
-      driver,
-      ...driver.split(/[;,/]/g).map((x) => String(x || '').trim()).filter(Boolean),
-    ]));
-    const lookupCash = () => {
-      for (const name of candidates) {
-        const v = lookupByDriverName(resolvedDriverCashMap, name);
-        if (v) return v;
-      }
-      return '';
-    };
-    const lookupCard = () => {
-      for (const name of candidates) {
-        const v = lookupByDriverName(resolvedDriverCardCashMap, name);
-        if (v) return v;
-      }
-      return '';
-    };
-    if (payMode === 'card') {
-      return lookupCard();
-    }
-    if (payMode === 'cash') {
-      return lookupCash();
-    }
-    return lookupCash() || lookupCard() || '';
-  }, [lookupByDriverName, resolvedDriverCardCashMap, resolvedDriverCashMap]);
-  const nazoratCashRowsAll = useMemo(() => {
-    const archiveMap = new Map();
-    const systemMap = new Map();
-    const dateInRange = (dateKey) => {
-      if (!dateKey) return false;
-      if (dateKey < CONTROL_COMPARE_START_DATE) return false;
-      if (controlEndDate && dateKey > controlEndDate) return false;
-      return true;
-    };
-    const makeArchiveKey = (date, customerId, driver, payMode) => (
-      `${String(date || '').trim()}__${String(customerId || '').trim()}__${String(driver || '-').trim() || '-'}__${String(payMode || '').trim()}`
-    );
-    const makeSystemKey = (date, customerId, payMode) => (
-      `${String(date || '').trim()}__${String(customerId || '').trim()}__${String(payMode || '').trim()}`
-    );
-
-    const upsertArchive = (key, base) => {
-      if (!archiveMap.has(key)) {
-        archiveMap.set(key, {
-          key,
-          date: String(base?.date || '').trim(),
-          customerId: String(base?.customerId || '').trim(),
-          customer: String(base?.customer || '').trim() || `ID ${String(base?.customerId || '').trim()}`,
-          driver: String(base?.driver || '-').trim() || '-',
-          payMode: String(base?.payMode || '').trim(),
-          expectedCashbox: String(base?.expectedCashbox || '').trim(),
-          archiveAmount: 0,
-        });
-      }
-      return archiveMap.get(key);
-    };
-    const upsertSystem = (key, base) => {
-      if (!systemMap.has(key)) {
-        systemMap.set(key, {
-          key,
-          date: String(base?.date || '').trim(),
-          customerId: String(base?.customerId || '').trim(),
-          customer: String(base?.customer || '').trim() || `ID ${String(base?.customerId || '').trim()}`,
-          payMode: String(base?.payMode || '').trim(),
-          totalAmount: 0,
-          cashboxAmounts: new Map(),
-          cashboxNames: new Set(),
-        });
-      }
-      return systemMap.get(key);
-    };
-
-    (parsedArchiveRows || []).forEach((r) => {
-      const date = toIsoDate(r?.date);
-      const customerId = normalizeIdKey(r?.customerId);
-      const amount = Math.abs(toNum(r?.payAmount));
-      if (!dateInRange(date) || !customerId || amount <= 0.0001) return;
-      if (!activeControlCustomerIds.has(customerId)) return;
-
-      const payMode = detectPaymentMode(r?.payType);
-      if (payMode !== 'cash' && payMode !== 'card') return;
-
-      const driver = resolveNazoratDriverName(r?.driver || '');
-      if (isVirtualControlDriver(driver)) return;
-      if (!canSeeAllNazorat && String(driver || '').trim().toLowerCase() !== currentUserNorm) return;
-
-      const expectedCashbox = pickExpectedCashbox(driver, payMode);
-      const key = makeArchiveKey(date, customerId, driver, payMode);
-      const row = upsertArchive(key, {
-        date,
-        customerId,
-        customer: r?.customer,
-        driver,
-        payMode,
-        expectedCashbox,
-      });
-      const cName = String(r?.customer || '').trim();
-      if (cName && (!row.customer || row.customer.startsWith('ID '))) row.customer = cName;
-      if (!row.expectedCashbox && expectedCashbox) row.expectedCashbox = expectedCashbox;
-      row.archiveAmount += amount;
-    });
-
-    const systemCashRows = D?.rawCash || D?.cashbox || [];
-    (systemCashRows || []).forEach((r) => {
-      if (!isPaymentFromCounterparty(r?.opType)) return;
-      const date = toIsoDate(r?.sana);
-      const customerId = normalizeIdKey(r?.mId);
-      const amount = Math.abs(toNum(r?.amount));
-      if (!dateInRange(date) || !customerId || amount <= 0.0001) return;
-      if (!activeControlCustomerIds.has(customerId)) return;
-
-      const driver = resolveNazoratDriverName(r?.operator || '');
-      if (isVirtualControlDriver(driver)) return;
-      if (!canSeeAllNazorat && String(driver || '').trim().toLowerCase() !== currentUserNorm) return;
-
-      const cashbox = String(r?.kassa || '').trim();
-      let payMode = detectPaymentMode(r?.opType, r?.note, cashbox);
-      if (!payMode) {
-        const k = normalizeMatchText(cashbox);
-        if (k.includes('karta') || k.includes('карта') || k.includes('card') || k.includes('terminal')) payMode = 'card';
-        else payMode = 'cash';
-      }
-      if (payMode !== 'cash' && payMode !== 'card') return;
-
-      const key = makeSystemKey(date, customerId, payMode);
-      const row = upsertSystem(key, {
-        date,
-        customerId,
-        customer: r?.contName,
-        payMode,
-      });
-      const cName = String(r?.contName || '').trim();
-      if (cName && (!row.customer || row.customer.startsWith('ID '))) row.customer = cName;
-      row.totalAmount += amount;
-      const cashboxKey = normalizeCashboxKey(cashbox) || '-';
-      row.cashboxAmounts.set(cashboxKey, (row.cashboxAmounts.get(cashboxKey) || 0) + amount);
-      row.cashboxNames.add(cashbox || '-');
-    });
-
-    return Array.from(archiveMap.values()).map((a, idx) => {
-      const s = systemMap.get(makeSystemKey(a.date, a.customerId, a.payMode));
-      const archiveAmount = Number(a.archiveAmount || 0);
-      const systemAmount = Number(s?.totalAmount || 0);
-      const expectedCashbox = String(a.expectedCashbox || '').trim();
-      const expectedKey = normalizeCashboxKey(expectedCashbox);
-      const matchedAmount = expectedKey
-        ? Number(s?.cashboxAmounts?.get(expectedKey) || 0)
-        : 0;
-      const wrongCashboxAmount = Math.max(0, systemAmount - matchedAmount);
-      const diff = archiveAmount - matchedAmount;
-
-      let status = 'OK';
-      if (!expectedCashbox) {
-        status = 'Kassa biriktirilmagan';
-      } else if (matchedAmount <= 0.0001 && systemAmount > 0.0001) {
-        status = 'Kassa mos emas';
-      } else if (matchedAmount <= 0.0001) {
-        status = 'Sistemada pul topilmadi';
-      } else if (Math.abs(diff) > 0.0001) {
-        status = 'Summa mos emas';
-      }
-
-      return {
-        id: `cash_ctrl_${idx + 1}_${a.date || ''}_${a.customerId || ''}`,
-        date: String(a.date || ''),
-        customerId: String(a.customerId || ''),
-        customer: String(a.customer || '').trim() || `ID ${String(a.customerId || '').trim()}`,
-        driver: String(a.driver || '-').trim() || '-',
-        payType: String(a.payMode || '') === 'card' ? 'Karta' : 'Naqt',
-        expectedCashbox: expectedCashbox || '-',
-        systemCashbox: s ? Array.from(s.cashboxNames || []).filter(Boolean).join(', ') || '-' : '-',
-        archiveAmount,
-        systemAmount,
-        matchedSystemAmount: matchedAmount,
-        wrongCashboxAmount,
-        diff,
-        status,
-      };
-    }).sort(sortByDateDescCustomerAsc);
-  }, [
-    parsedArchiveRows,
-    D,
-    activeControlCustomerIds,
-    canSeeAllNazorat,
-    currentUserNorm,
-    controlEndDate,
-    resolveNazoratDriverName,
-    isVirtualControlDriver,
-    pickExpectedCashbox,
-  ]);
-  const nazoratCashRowsErrors = useMemo(
-    () => nazoratCashRowsAll.filter((r) => r.status !== 'OK'),
-    [nazoratCashRowsAll]
-  );
-  const pickDiffRowsByCategory = useCallback((diffData, categoryKey, viewKey = 'errors') => {
-    const key = String(categoryKey || 'customer');
-    if (key === 'product') {
-      return viewKey === 'all' ? (diffData?.productRowsAll || []) : (diffData?.productRowsErrors || []);
-    }
-    if (key === 'qty') {
-      return viewKey === 'all' ? (diffData?.qtyRowsAll || []) : (diffData?.qtyRowsErrors || []);
-    }
-    return viewKey === 'all' ? (diffData?.customerRowsAll || []) : (diffData?.customerRowsErrors || []);
-  }, []);
-  const nazoratPermCompareColumns = useMemo(() => ([
+  const nazoratOrderColumns = useMemo(() => ([
     { key:'date', label:'Sana', type:'date' },
     { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'warehouse', label:'Biriktirilgan sklad', type:'text' },
+    { key:'warehouse', label:'Sklad', type:'text' },
     { key:'orderQty', label:'Zakaz suv soni', type:'number' },
-    { key:'transferQty', label:'Permesheniya soni', type:'number' },
+    { key:'transferQty', label:'Permesheniya (obshiyga)', type:'number' },
     { key:'diff', label:'Farq', type:'number' },
-    { key:'status', label:'Holat', type:'text' },
-  ]), []);
-  const nazoratPermOrderColumns = useMemo(() => ([
-    { key:'date', label:'Sana', type:'date' },
-    { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'warehouse', label:'Biriktirilgan sklad', type:'text' },
-    { key:'orderQty', label:'Zakaz suv soni', type:'number' },
-    { key:'status', label:'Holat', type:'text' },
-  ]), []);
-  const nazoratPermTransferColumns = useMemo(() => ([
-    { key:'date', label:'Sana', type:'date' },
-    { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'warehouse', label:'Biriktirilgan sklad', type:'text' },
-    { key:'transferQty', label:'Permesheniya soni', type:'number' },
     { key:'status', label:'Holat', type:'text' },
   ]), []);
   const nazoratOrderDuplicateColumns = useMemo(() => ([
@@ -8979,160 +6596,16 @@ function Reports({
     { key:'note', label:'Izoh', type:'text' },
     { key:'status', label:'Status', type:'text' },
   ]), []);
-  const nazoratDiffCustomerColumns = useMemo(() => ([
-    { key:'date', label:'Sana', type:'date' },
-    { key:'customerId', label:'Mijoz ID', type:'text' },
-    { key:'customer', label:'Mijoz', type:'text' },
-    { key:'orderId', label:'Zakaz ID', type:'text' },
-    { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'systemQty', label:'Sistem soni', type:'number' },
-    { key:'archiveQty', label:'Arxiv soni', type:'number' },
-    { key:'status', label:'Holat', type:'text' },
-  ]), []);
-  const nazoratDiffProductColumns = useMemo(() => ([
-    { key:'date', label:'Sana', type:'date' },
-    { key:'customerId', label:'Mijoz ID', type:'text' },
-    { key:'customer', label:'Mijoz', type:'text' },
-    { key:'orderId', label:'Zakaz ID', type:'text' },
-    { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'systemProductNamesText', label:'Sistem mahsulot', type:'text' },
-    { key:'archiveProductNamesText', label:'Arxiv mahsulot', type:'text' },
-    { key:'productDiffText', label:'Farq', type:'text' },
-    { key:'status', label:'Holat', type:'text' },
-  ]), []);
-  const nazoratDiffQtyColumns = useMemo(() => ([
-    { key:'date', label:'Sana', type:'date' },
-    { key:'customerId', label:'Mijoz ID', type:'text' },
-    { key:'customer', label:'Mijoz', type:'text' },
-    { key:'orderId', label:'Zakaz ID', type:'text' },
-    { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'systemQty', label:'Sistem soni', type:'number' },
-    { key:'archiveQty', label:'Arxiv soni', type:'number' },
-    { key:'diffQty', label:'Farq', type:'number' },
-    { key:'qtyDiffText', label:'Son farqi', type:'text' },
-    { key:'status', label:'Holat', type:'text' },
-  ]), []);
-  const nazoratReturnDiffCustomerColumns = useMemo(() => ([
-    { key:'date', label:'Sana', type:'date' },
-    { key:'customerId', label:'Mijoz ID', type:'text' },
-    { key:'customer', label:'Mijoz', type:'text' },
-    { key:'orderId', label:'Vozvrat ID', type:'text' },
-    { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'systemQty', label:'Sistem soni', type:'number' },
-    { key:'archiveQty', label:'Arxiv soni', type:'number' },
-    { key:'status', label:'Holat', type:'text' },
-  ]), []);
-  const nazoratReturnDiffProductColumns = useMemo(() => ([
-    { key:'date', label:'Sana', type:'date' },
-    { key:'customerId', label:'Mijoz ID', type:'text' },
-    { key:'customer', label:'Mijoz', type:'text' },
-    { key:'orderId', label:'Vozvrat ID', type:'text' },
-    { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'systemProductNamesText', label:'Sistem mahsulot', type:'text' },
-    { key:'archiveProductNamesText', label:'Arxiv mahsulot', type:'text' },
-    { key:'productDiffText', label:'Farq', type:'text' },
-    { key:'status', label:'Holat', type:'text' },
-  ]), []);
-  const nazoratReturnDiffQtyColumns = useMemo(() => ([
-    { key:'date', label:'Sana', type:'date' },
-    { key:'customerId', label:'Mijoz ID', type:'text' },
-    { key:'customer', label:'Mijoz', type:'text' },
-    { key:'orderId', label:'Vozvrat ID', type:'text' },
-    { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'systemQty', label:'Sistem soni', type:'number' },
-    { key:'archiveQty', label:'Arxiv soni', type:'number' },
-    { key:'diffQty', label:'Farq', type:'number' },
-    { key:'qtyDiffText', label:'Son farqi', type:'text' },
-    { key:'status', label:'Holat', type:'text' },
-  ]), []);
-  const nazoratCashColumns = useMemo(() => ([
-    { key:'date', label:'Sana', type:'date' },
-    { key:'customerId', label:'Mijoz ID', type:'text' },
-    { key:'customer', label:'Mijoz', type:'text' },
-    { key:'driver', label:'Dostavchik', type:'text' },
-    { key:'payType', label:"To'lov turi", type:'text' },
-    { key:'expectedCashbox', label:'Biriktirilgan kassa', type:'text' },
-    { key:'systemCashbox', label:'Sistem kassasi', type:'text' },
-    { key:'archiveAmount', label:'Arxiv summa', type:'number' },
-    { key:'matchedSystemAmount', label:'Sistem summa', type:'number' },
-    { key:'wrongCashboxAmount', label:'Boshqa kassa summa', type:'number' },
-    { key:'diff', label:'Farq', type:'number' },
-    { key:'status', label:'Holat', type:'text' },
-  ]), []);
-  const activeNazoratColumns = useMemo(() => {
-    if (nazoratSection === 'orders') {
-      if (nazoratOrderSection === 'duplicates') return nazoratOrderDuplicateColumns;
-      if (nazoratPermSection === 'orders') return nazoratPermOrderColumns;
-      if (nazoratPermSection === 'transfer') return nazoratPermTransferColumns;
-      return nazoratPermCompareColumns;
-    }
-    if (nazoratSection === 'returns') {
-      if (nazoratReturnSection === 'return_order') return nazoratReturnColumns;
-      if (nazoratReturnDiffSection === 'product') return nazoratReturnDiffProductColumns;
-      if (nazoratReturnDiffSection === 'qty') return nazoratReturnDiffQtyColumns;
-      return nazoratReturnDiffCustomerColumns;
-    }
-    if (nazoratSection === 'cash') return nazoratCashColumns;
-    if (nazoratGapSection === 'product') return nazoratDiffProductColumns;
-    if (nazoratGapSection === 'qty') return nazoratDiffQtyColumns;
-    return nazoratDiffCustomerColumns;
-  }, [
-    nazoratSection,
-    nazoratOrderSection,
-    nazoratPermSection,
-    nazoratReturnSection,
-    nazoratReturnDiffSection,
-    nazoratGapSection,
-    nazoratPermCompareColumns,
-    nazoratPermOrderColumns,
-    nazoratPermTransferColumns,
-    nazoratOrderDuplicateColumns,
-    nazoratReturnColumns,
-    nazoratReturnDiffCustomerColumns,
-    nazoratReturnDiffProductColumns,
-    nazoratReturnDiffQtyColumns,
-    nazoratCashColumns,
-    nazoratDiffCustomerColumns,
-    nazoratDiffProductColumns,
-    nazoratDiffQtyColumns,
-  ]);
+  const activeNazoratColumns = nazoratSection === 'orders'
+    ? (nazoratOrderSection === 'duplicates' ? nazoratOrderDuplicateColumns : nazoratOrderColumns)
+    : nazoratReturnColumns;
   const activeNazoratBaseRows = useMemo(() => {
     if (nazoratSection === 'orders') {
       if (nazoratOrderSection === 'duplicates') return nazoratView === 'errors' ? duplicateMismatchRows : duplicateOrderRows;
-      if (nazoratPermSection === 'orders') return permOrderDisplayRows;
-      if (nazoratPermSection === 'transfer') return transferRows;
       return nazoratView === 'errors' ? orderMismatchRows : orderControlRows;
     }
-    if (nazoratSection === 'returns') {
-      if (nazoratReturnSection === 'return_order') return nazoratView === 'errors' ? returnMismatchRows : returnControlRows;
-      return pickDiffRowsByCategory(returnArchiveDiff, nazoratReturnDiffSection, nazoratView);
-    }
-    if (nazoratSection === 'cash') {
-      return nazoratView === 'errors' ? nazoratCashRowsErrors : nazoratCashRowsAll;
-    }
-    return pickDiffRowsByCategory(orderArchiveDiff, nazoratGapSection, nazoratView);
-  }, [
-    nazoratSection,
-    nazoratOrderSection,
-    nazoratPermSection,
-    nazoratReturnSection,
-    nazoratReturnDiffSection,
-    nazoratGapSection,
-    nazoratView,
-    orderMismatchRows,
-    orderControlRows,
-    permOrderDisplayRows,
-    transferRows,
-    duplicateMismatchRows,
-    duplicateOrderRows,
-    returnMismatchRows,
-    returnControlRows,
-    nazoratCashRowsAll,
-    nazoratCashRowsErrors,
-    orderArchiveDiff,
-    returnArchiveDiff,
-    pickDiffRowsByCategory,
-  ]);
+    return nazoratView === 'errors' ? returnMismatchRows : returnControlRows;
+  }, [nazoratSection, nazoratOrderSection, nazoratView, orderMismatchRows, orderControlRows, duplicateMismatchRows, duplicateOrderRows, returnMismatchRows, returnControlRows]);
   useEffect(() => {
     setNazoratFilterState((prev) => ensureUniversalFilterState(activeNazoratColumns, prev));
   }, [activeNazoratColumns]);
@@ -9159,78 +6632,84 @@ function Reports({
     });
   };
 
-  const nazoratExportMeta = useMemo(() => {
+  const exportNazorat = () => {
     if (nazoratSection === 'orders') {
       if (nazoratOrderSection === 'duplicates') {
-        return { fileName: `Dublikat_zakazlar_${todayIso}.xlsx`, sheetName: 'Dublikat_zakazlar' };
+        exportAoaExcel({
+          fileName: `Dublikat_zakazlar_${todayIso}.xlsx`,
+          sheetName: 'Dublikat_zakazlar',
+          headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakazlar soni', 'Suv soni', 'Summa UZS', 'Dostavchik', 'Zakazlar', 'Holat'],
+          columnTypes: ['date', 'text', 'text', 'number', 'number', 'number', 'text', 'text', 'text'],
+          rows: nazoratFilteredRows.map((r) => [
+            r.date,
+            r.customerId,
+            r.customer,
+            r.docsCount,
+            r.qty,
+            r.sumUZS,
+            r.driversText,
+            r.docsText,
+            r.status,
+          ]),
+        });
+        return;
       }
-      if (nazoratPermSection === 'orders') {
-        return { fileName: `Permesheniya_zakaz_${todayIso}.xlsx`, sheetName: 'Permesheniya_Zakaz' };
-      }
-      if (nazoratPermSection === 'transfer') {
-        return { fileName: `Permesheniya_qabul_${todayIso}.xlsx`, sheetName: 'Permesheniya_Qabul' };
-      }
-      return { fileName: `Permesheniya_hato_${todayIso}.xlsx`, sheetName: 'Permesheniya_Hato' };
+      exportAoaExcel({
+        fileName: `Zakaz_nazorati_${todayIso}.xlsx`,
+        sheetName: 'Zakaz_nazorati',
+        headers: ['Sana', 'Dostavchik', 'Sklad', 'Zakaz suv soni', 'Permesheniya (obshiyga)', 'Farq', 'Holat'],
+        columnTypes: ['date', 'text', 'text', 'number', 'number', 'number', 'text'],
+        rows: nazoratFilteredRows.map((r) => [
+          r.date,
+          r.driver,
+          r.warehouse,
+          r.orderQty,
+          r.transferQty,
+          r.diff,
+          r.status,
+        ]),
+      });
+      return;
     }
-    if (nazoratSection === 'returns') {
-      if (nazoratReturnSection === 'return_order') {
-        return { fileName: `Vozvrat_nazorati_${todayIso}.xlsx`, sheetName: 'Vozvrat_nazorati' };
-      }
-      if (nazoratReturnDiffSection === 'product') {
-        return { fileName: `Vozvrat_vozvrat_mahsulot_hatolari_${todayIso}.xlsx`, sheetName: 'VozvratVozvratMahsulot' };
-      }
-      if (nazoratReturnDiffSection === 'qty') {
-        return { fileName: `Vozvrat_vozvrat_son_hatolari_${todayIso}.xlsx`, sheetName: 'VozvratVozvratSon' };
-      }
-      return { fileName: `Vozvrat_vozvrat_mijoz_hatolari_${todayIso}.xlsx`, sheetName: 'VozvratVozvratMijoz' };
-    }
-    if (nazoratSection === 'cash') {
-      return { fileName: `Pul_nazorati_${todayIso}.xlsx`, sheetName: 'PulNazorati' };
-    }
-    if (nazoratGapSection === 'product') {
-      return { fileName: `Zakaz_farqi_mahsulot_hatolari_${todayIso}.xlsx`, sheetName: 'ZakazFarqiMahsulot' };
-    }
-    if (nazoratGapSection === 'qty') {
-      return { fileName: `Zakaz_farqi_son_hatolari_${todayIso}.xlsx`, sheetName: 'ZakazFarqiSon' };
-    }
-    return { fileName: `Zakaz_farqi_mijoz_hatolari_${todayIso}.xlsx`, sheetName: 'ZakazFarqiMijoz' };
-  }, [nazoratSection, nazoratOrderSection, nazoratPermSection, nazoratReturnSection, nazoratReturnDiffSection, nazoratGapSection, todayIso]);
-
-  const exportNazorat = () => {
     exportAoaExcel({
-      fileName: nazoratExportMeta.fileName,
-      sheetName: nazoratExportMeta.sheetName,
-      headers: ['No', ...activeNazoratColumns.map((c) => c.label)],
-      columnTypes: ['number', ...activeNazoratColumns.map((c) => c.type || 'text')],
-      rows: nazoratFilteredRows.map((r, i) => [i + 1, ...activeNazoratColumns.map((c) => r?.[c.key] ?? '')]),
+      fileName: `Vozvrat_nazorati_${todayIso}.xlsx`,
+      sheetName: 'Vozvrat_nazorati',
+      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Vozvrat zakaz', 'Vozvrat suv soni', 'Dostavchik', 'Sklad', 'Izoh', 'Status'],
+      columnTypes: ['date', 'text', 'text', 'text', 'number', 'text', 'text', 'text', 'text'],
+      rows: nazoratFilteredRows.map((r) => [
+        r.date,
+        r.customerId,
+        r.customer,
+        r.returnNo,
+        r.qty,
+        r.driver,
+        r.warehouse,
+        r.note,
+        r.status,
+      ]),
     });
   };
 
   return (
-    <div className="ani" style={{display:'flex',flexDirection:'column',gap:showNazorat ? 6 : 14, minHeight:showNazorat ? '100%' : 0}}>
-      {showReport && (
-        <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
-          <button className="btn btn-gr btn-sm" onClick={exportReports}>Hisobot Excel</button>
-        </div>
-      )}
+    <div className="ani" style={{display:'flex',flexDirection:'column',gap:showNazorat ? 10 : 14, minHeight:showNazorat ? '100%' : 0}}>
+      <div style={{display:'flex',justifyContent:'flex-end',gap:8}}>
+        {showReport && <button className="btn btn-gr btn-sm" onClick={exportReports}>Hisobot Excel</button>}
+        {showNazorat && <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>}
+      </div>
       {showReport && (
       <div className="g4">
-        {allowMonthlyWaterCard && (
-          <StatCard
-            l={`Oylik sotilgan suv (${currentMonth})  |  ${companyLabelByKey(company)}`}
-            v={`${fmt(monthWaterQty)} ta`}
-            s={`Zakaz: ${fmt(monthWaterStats.soldQty)}  |  Vozvrat: -${fmt(monthWaterStats.returnedQty)}  |  Netto: ${fmt(monthWaterSum)} so'm`}
-            c="var(--bl)"
-          />
-        )}
-        {allowPlanRemainderCard && (
-          <StatCard
-            l="BUGUNGI PLAN QOLDIQ"
-            v={`${fmt(basePlanForDisplay)} ta`}
-            s={`Keyingi ish kuni (${nextWorkDate ? toIsoDate(nextWorkDate) : '-'}) rejasi: ${fmt(basePlanForDisplay)}  |  operatorga: ${fmt(currentPlanTarget)}  |  oy qoldiq: ${fmt(remainingMonthPlanQty)}  |  ish kun: ${fmt(remainingWorkDays)}`}
-            c="var(--gr)"
-          />
-        )}
+        <StatCard
+          l={`SUV (${currentMonth})  |  ${companyLabelByKey(company)}`}
+          v={`${fmt(monthWaterQty)} ta`}
+          s={`${fmt(monthWaterSum)} so'm`}
+          c="var(--bl)"
+        />
+        <StatCard
+          l="BUGUNGI PLAN QOLDIQ"
+          v={`${fmt(basePlanForDisplay)} ta`}
+          s={`Keyingi ish kuni (${nextWorkDate ? toIsoDate(nextWorkDate) : '-'}) rejasi: ${fmt(basePlanForDisplay)}  |  operatorga: ${fmt(currentPlanTarget)}  |  oy qoldiq: ${fmt(remainingMonthPlanQty)}  |  ish kun: ${fmt(remainingWorkDays)}`}
+          c="var(--gr)"
+        />
         <StatCard
           l="QARZDORLIK ISHLOVI"
           v={`${debtWorkedCount} ta`}
@@ -9261,12 +6740,12 @@ function Reports({
                 <th style={{textAlign:'right'}}>Qarz mijoz</th>
                 <th style={{textAlign:'right'}}>Qarz summa</th>
                 <th>Qaysi sanaga zakaz</th>
-                {showDailyPlanColumn && <th style={{textAlign:'right'}}>Kunlik plan</th>}
+                <th style={{textAlign:'right'}}>Kunlik plan</th>
               </tr>
             </thead>
             <tbody>
               {dailyRows.length===0 ? (
-                <tr><td colSpan={showDailyPlanColumn ? 9 : 8} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Bugungi natija yo'q</td></tr>
+                <tr><td colSpan={9} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Bugungi natija yo'q</td></tr>
               ) : (
                 <>
                   {dailyRows.map((r, i) => (
@@ -9280,9 +6759,7 @@ function Reports({
                         <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.debtCount)}</td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--rd)'}}>{fmt(r.debtSum)}</td>
                         <td style={{fontSize:11,color:'var(--t2)'}}>-</td>
-                        {showDailyPlanColumn && (
-                          <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
-                        )}
+                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(currentPlanTarget)}</td>
                       </tr>
                       {(r.dateEntries || []).map((d, j) => (
                         <tr key={`rep_${i}_${j}_${d.date}`} style={{background:'rgba(88,166,255,.05)'}}>
@@ -9294,7 +6771,7 @@ function Reports({
                           <td style={{textAlign:'right',color:'var(--t4)'}}>-</td>
                           <td style={{textAlign:'right',color:'var(--t4)'}}>-</td>
                           <td style={{fontFamily:'var(--mono)',fontSize:11}}>{d.date}</td>
-                          {showDailyPlanColumn && <td style={{textAlign:'right',color:'var(--t4)'}}>-</td>}
+                          <td style={{textAlign:'right',color:'var(--t4)'}}>-</td>
                         </tr>
                       ))}
                     </Fragment>
@@ -9308,11 +6785,9 @@ function Reports({
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700}}>{fmt(dailyTotals.debtCount)}</td>
                     <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--rd)'}}>{fmt(dailyTotals.debtSum)}</td>
                     <td style={{fontWeight:700,color:'var(--t3)'}}>-</td>
-                    {showDailyPlanColumn && (
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>
-                        {fmt(canSeeAll ? currentPlanTarget * Math.max(1, dailyRows.length) : currentPlanTarget)}
-                      </td>
-                    )}
+                    <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:700,color:'var(--yl)'}}>
+                      {fmt(canSeeAll ? currentPlanTarget * Math.max(1, dailyRows.length) : currentPlanTarget)}
+                    </td>
                   </tr>
                 </>
               )}
@@ -9323,206 +6798,101 @@ function Reports({
       )}
 
       {showNazorat && (
-      <div style={{display:'grid',gap:6,minHeight:0,flex:1}}>
-        <div style={{display:'grid',gap:6}}>
-          <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',minWidth:0,flex:'1 1 auto'}}>
-              <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
-                <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
-                <button className={`tab${nazoratSection==='returns'?' on':''}`} onClick={()=>setNazoratSection('returns')}>Vozvrat nazorati</button>
-                <button className={`tab${nazoratSection==='gap'?' on':''}`} onClick={()=>setNazoratSection('gap')}>Zakaz farqi</button>
-                <button className={`tab${nazoratSection==='cash'?' on':''}`} onClick={()=>setNazoratSection('cash')}>Pul nazorati</button>
-              </div>
-              {nazoratSection === 'orders' && (
-                <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
-                  <button className={`tab${nazoratOrderSection==='transfer'?' on':''}`} onClick={()=>setNazoratOrderSection('transfer')}>Permesheniya nazorati</button>
-                  <button className={`tab${nazoratOrderSection==='duplicates'?' on':''}`} onClick={()=>setNazoratOrderSection('duplicates')}>Dublikat zakazlar</button>
-                </div>
-              )}
-              {nazoratSection === 'returns' && (
-                <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
-                  <button className={`tab${nazoratReturnSection==='return_order'?' on':''}`} onClick={()=>setNazoratReturnSection('return_order')}>Vozvrat & Zakaz</button>
-                  <button className={`tab${nazoratReturnSection==='return_return'?' on':''}`} onClick={()=>setNazoratReturnSection('return_return')}>Vozvrat & Vozvrat</button>
-                </div>
-              )}
-              {nazoratSection === 'gap' && (
-                <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
-                  <button className={`tab${nazoratGapSection==='customer'?' on':''}`} onClick={()=>setNazoratGapSection('customer')}>Mijoz hatosi</button>
-                  <button className={`tab${nazoratGapSection==='product'?' on':''}`} onClick={()=>setNazoratGapSection('product')}>Mahsulot hatosi</button>
-                  <button className={`tab${nazoratGapSection==='qty'?' on':''}`} onClick={()=>setNazoratGapSection('qty')}>Son hatosi</button>
-                </div>
-              )}
-              {nazoratSection === 'cash' && (
-                <div className="tabs" style={{display:'inline-flex'}}>
-                  <button className={`tab${nazoratCashSection==='payment'?' on':''}`} onClick={()=>setNazoratCashSection('payment')}>Kirim nazorati</button>
-                </div>
-              )}
+      <div style={{display:'grid',gap:8,minHeight:0,flex:1}}>
+        <div style={{display:'flex',justifyContent:'space-between',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <div style={{display:'grid',gap:6}}>
+            <div className="tabs" style={{display:'inline-flex'}}>
+              <button className={`tab${nazoratSection==='orders'?' on':''}`} onClick={()=>setNazoratSection('orders')}>Zakaz nazorati</button>
+              <button className={`tab${nazoratSection==='returns'?' on':''}`} onClick={()=>setNazoratSection('returns')}>Vozvrat nazorati</button>
             </div>
-            <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',justifyContent:'flex-end'}}>
-              <button className="btn btn-bl btn-sm" onClick={exportNazorat}>Nazorat Excel</button>
-              <div style={{position:'relative'}}>
-                <button className="btn btn-gh btn-sm" onClick={()=>setNazoratFilterOpen((v)=>!v)}>
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-                  </svg>
-                  Filtr ({nazoratFilterCount})
-                </button>
-                <UniversalFilterPanel
-                  open={nazoratFilterOpen}
-                  title={nazoratSection === 'orders'
-                    ? (nazoratOrderSection === 'duplicates'
-                      ? 'Dublikat zakazlar filtri'
-                      : (nazoratPermSection === 'orders'
-                        ? 'Permesheniya: Zakaz filtri'
-                        : (nazoratPermSection === 'transfer' ? 'Permesheniya: Permesheniya filtri' : 'Permesheniya: Hato filtri')))
-                    : (nazoratSection === 'returns'
-                      ? (nazoratReturnSection === 'return_order' ? 'Vozvrat & Zakaz filtri' : 'Vozvrat & Vozvrat filtri')
-                      : (nazoratSection === 'cash' ? "Pul nazorati filtri" : 'Zakaz farqi filtri'))}
-                  columns={activeNazoratColumns}
-                  rows={activeNazoratBaseRows}
-                  state={nazoratFilterState}
-                  setState={setNazoratFilterState}
-                  onClose={()=>setNazoratFilterOpen(false)}
-                  width={620}
-                />
+            {nazoratSection === 'orders' && (
+              <div className="tabs" style={{display:'inline-flex',width:'fit-content'}}>
+                <button className={`tab${nazoratOrderSection==='transfer'?' on':''}`} onClick={()=>setNazoratOrderSection('transfer')}>Permesheniya nazorati</button>
+                <button className={`tab${nazoratOrderSection==='duplicates'?' on':''}`} onClick={()=>setNazoratOrderSection('duplicates')}>Dublikat zakazlar</button>
               </div>
-              <div className="tabs" style={{display:'inline-flex'}}>
-                <button className={`tab${nazoratView==='errors'?' on':''}`} onClick={()=>setNazoratView('errors')}>Hatolilar</button>
-                <button className={`tab${nazoratView==='all'?' on':''}`} onClick={()=>setNazoratView('all')}>Barchasi</button>
-              </div>
+            )}
+          </div>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <div style={{position:'relative'}}>
+              <button className="btn btn-gh btn-sm" onClick={()=>setNazoratFilterOpen((v)=>!v)}>
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                </svg>
+                Filtr ({nazoratFilterCount})
+              </button>
+              <UniversalFilterPanel
+                open={nazoratFilterOpen}
+                title={nazoratSection === 'orders'
+                  ? (nazoratOrderSection === 'duplicates' ? 'Dublikat zakazlar filtri' : 'Zakaz nazorati filtri')
+                  : 'Vozvrat nazorati filtri'}
+                columns={activeNazoratColumns}
+                rows={activeNazoratBaseRows}
+                state={nazoratFilterState}
+                setState={setNazoratFilterState}
+                onClose={()=>setNazoratFilterOpen(false)}
+                width={620}
+              />
+            </div>
+            <div className="tabs" style={{display:'inline-flex'}}>
+              <button className={`tab${nazoratView==='errors'?' on':''}`} onClick={()=>setNazoratView('errors')}>Hatolilar</button>
+              <button className={`tab${nazoratView==='all'?' on':''}`} onClick={()=>setNazoratView('all')}>Barchasi</button>
             </div>
           </div>
-          {nazoratSection === 'returns' && nazoratReturnSection === 'return_return' && (
-            <div style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',flexWrap:'wrap',width:'100%'}}>
-              <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
-                <button className={`tab${nazoratReturnDiffSection==='customer'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('customer')}>Mijoz hatosi</button>
-                <button className={`tab${nazoratReturnDiffSection==='product'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('product')}>Mahsulot hatosi</button>
-                <button className={`tab${nazoratReturnDiffSection==='qty'?' on':''}`} onClick={()=>setNazoratReturnDiffSection('qty')}>Son hatosi</button>
-              </div>
-            </div>
-          )}
-          {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' && (
-            <div style={{display:'flex',justifyContent:'flex-end',gap:8,alignItems:'center',flexWrap:'wrap',width:'100%'}}>
-              <div className="tabs" style={{display:'inline-flex',flexWrap:'wrap'}}>
-                <button className={`tab${nazoratPermSection==='errors'?' on':''}`} onClick={()=>setNazoratPermSection('errors')}>Hato</button>
-                <button className={`tab${nazoratPermSection==='orders'?' on':''}`} onClick={()=>setNazoratPermSection('orders')}>Zakaz</button>
-                <button className={`tab${nazoratPermSection==='transfer'?' on':''}`} onClick={()=>setNazoratPermSection('transfer')}>Permesheniya</button>
-              </div>
-            </div>
-          )}
         </div>
 
         {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' && (
           <div style={{fontSize:11,color:'var(--t3)'}}>
-            {nazoratPermSection === 'errors'
-              ? 'Hato: Zakaz va Permesheniya sana + dostavchik + biriktirilgan sklad bo‘yicha solishtiriladi. Teng bo‘lsa OK, farq bo‘lsa "Mos emas", topilmasa mos oynadan topilmadi holati chiqadi.'
-              : (nazoratPermSection === 'orders'
-                ? 'Zakaz: public.view_item_basket dan faqat "Основной склад" + suv mahsulotlari ("Murodbaxsh 18.9L", "БОНУС Murodbaxsh 18.9L") olinadi. Sana + dostavchik bo‘yicha yig‘iladi.'
-                : 'Permesheniya: public.view_warehouse_transfer dan T(На склад) = "Основной склад" va suv mahsulotlari olinadi. Dostavchik uchun biriktirilgan sklad + sana bo‘yicha yig‘iladi.')}
+            Faqat "Основной склад"dan urilgan zakazlar hisobga olinadi. Dostavchik-sklad biriktirish: Nastroyka &gt; Biriktirish bo'limida.
           </div>
         )}
         {nazoratSection === 'orders' && nazoratOrderSection === 'duplicates' && (
           <div style={{fontSize:11,color:'var(--t3)'}}>
-            Chegara: {controlDateRangeLabel}. Shu sana va shu mijoz uchun zakaz ID (soNum) 2 xil yoki undan ko'p bo'lsa dublikat deb ko'rsatiladi.
+            Shu sana va shu mijoz uchun zakaz ID (soNum) 2 xil yoki undan ko'p bo'lsa dublikat deb ko'rsatiladi.
           </div>
         )}
         {nazoratSection === 'returns' && (
           <div style={{fontSize:11,color:'var(--t3)'}}>
-            {nazoratReturnSection === 'return_order'
-              ? `Chegara: ${controlDateRangeLabel}. Vozvrat & Zakaz: shu sana va shu mijoz bo'yicha zakaz bo'lsa "Zakazi bor", bo'lmasa "Zakazi yo'q".`
-              : `Chegara: ${controlDateRangeLabel}. Vozvrat & Vozvrat: item_basket vozvratlari arxivdagi qaytgan mahsulot bilan sana+mijoz bo'yicha solishtiriladi.`}
-          </div>
-        )}
-        {nazoratSection === 'gap' && (
-          <div style={{fontSize:11,color:'var(--t3)'}}>
-            Chegara: {controlDateRangeLabel}. Zakaz farqi: item_basket zakazlari arxivdagi berilgan mahsulot bilan sana+mijoz bo'yicha solishtiriladi.
-          </div>
-        )}
-        {nazoratSection === 'cash' && (
-          <div style={{fontSize:11,color:'var(--t3)'}}>
-            Chegara: {controlDateRangeLabel}. Arxivdagi naqt/karta to'lovlar Dostavchik uchun Nastroyka &gt; Biriktirishdagi kassa bilan solishtiriladi.
+            Vozvrat tekshiruvi: shu sana va shu mijoz bo'yicha zakaz bo'lsa "Zakazi bor", bo'lmasa "Zakazi yo'q".
           </div>
         )}
 
-        <div className="card" style={{overflow:'hidden',minHeight:0,flex:1,height:'calc(100vh - 132px)'}}>
-          <div style={{overflowX:'scroll',overflowY:'auto',height:'100%',scrollbarGutter:'stable both-edges'}}>
+        <div className="card" style={{overflow:'hidden',minHeight:0,flex:1,height:'calc(100vh - 176px)'}}>
+          <div style={{overflow:'auto',height:'100%'}}>
             {nazoratSection === 'orders' && nazoratOrderSection === 'transfer' ? (
-              <table className="tbl" style={{width:'max(100%, 1420px)',minWidth:1420,tableLayout:'fixed'}}>
+              <table className="tbl">
                 <thead>
-                  {nazoratPermSection === 'errors' ? (
-                    <tr>
-                      <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
-                      <th>Sana</th>
-                      <th>Dostavchik</th>
-                      <th>Biriktirilgan sklad</th>
-                      <th style={{textAlign:'right'}}>Zakaz suv soni</th>
-                      <th style={{textAlign:'right'}}>Permesheniya soni</th>
-                      <th style={{textAlign:'right'}}>Farq</th>
-                      <th style={{width:260,minWidth:260,maxWidth:260,whiteSpace:'nowrap'}}>Holat</th>
-                    </tr>
-                  ) : nazoratPermSection === 'orders' ? (
-                    <tr>
-                      <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
-                      <th>Sana</th>
-                      <th>Dostavchik</th>
-                      <th>Biriktirilgan sklad</th>
-                      <th style={{textAlign:'right'}}>Zakaz suv soni</th>
-                      <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Holat</th>
-                    </tr>
-                  ) : (
-                    <tr>
-                      <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
-                      <th>Sana</th>
-                      <th>Dostavchik</th>
-                      <th>Biriktirilgan sklad</th>
-                      <th style={{textAlign:'right'}}>Permesheniya soni</th>
-                      <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Holat</th>
-                    </tr>
-                  )}
+                  <tr>
+                    <th>No</th>
+                    <th>Sana</th>
+                    <th>Dostavchik</th>
+                    <th>Sklad</th>
+                    <th style={{textAlign:'right'}}>Zakaz suv soni</th>
+                    <th style={{textAlign:'right'}}>Permesheniya (obshiyga)</th>
+                    <th style={{textAlign:'right'}}>Farq</th>
+                    <th>Holat</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {nazoratFilteredRows.length === 0 ? (
-                    <tr><td colSpan={nazoratPermSection === 'errors' ? 8 : 6} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
+                    <tr><td colSpan={8} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
                   ) : (
                     <>
-                      {nazoratPermSection === 'errors' && nazoratFilteredRows.map((r, i) => (
-                        <tr key={`nord_err_${i}_${r.date}_${r.driver}`} style={r.status === 'OK' ? undefined : {background:'rgba(248,81,73,.07)'}}>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
+                      {nazoratFilteredRows.map((r, i) => (
+                        <tr key={`nord_${i}_${r.driver}_${r.date}`} style={r.status === 'OK' ? undefined : {background:'rgba(248,81,73,.07)'}}>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                           <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
-                          <td>{r.driver || '-'}</td>
-                          <td>{r.warehouse || '-'}</td>
+                          <td>{r.driver}</td>
+                          <td>{r.warehouse}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.diff===0?'var(--gr)':'var(--rd)'}}>{fmt(r.diff)}</td>
-                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',background:r.status === 'OK' ? 'var(--s1)' : 'rgba(248,81,73,.08)',width:260,minWidth:260,maxWidth:260,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
+                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
                         </tr>
                       ))}
-                      {nazoratPermSection === 'orders' && nazoratFilteredRows.map((r, i) => (
-                        <tr key={`nord_ord_${i}_${r.driver}_${r.date}`}>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
-                          <td>{r.driver || '-'}</td>
-                          <td>{r.warehouse || '-'}</td>
-                          <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.orderQty)}</td>
-                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status || 'OK'}</td>
-                        </tr>
-                      ))}
-                      {nazoratPermSection === 'transfer' && nazoratFilteredRows.map((r, i) => (
-                        <tr key={`nord_tr_${i}_${r.driver}_${r.date}`}>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
-                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
-                          <td>{r.driver || '-'}</td>
-                          <td>{r.warehouse || '-'}</td>
-                          <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.transferQty)}</td>
-                          <td style={{fontSize:11,color:r.status === 'OK' ? 'var(--gr)' : 'var(--rd)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status || 'OK'}</td>
-                        </tr>
-                      ))}
-                      {nazoratPermSection === 'errors' && nazoratView === 'all' && (
+                      {nazoratView === 'all' && (
                         <tr style={{background:'var(--s2)'}}>
                           <td style={{fontWeight:800}}>#</td>
-                          <td style={{fontWeight:800}}>ITOG</td>
-                          <td />
-                          <td />
+                          <td colSpan={3} style={{fontWeight:800}}>ITOG</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--gr)'}}>{fmt(orderDisplayTotals.orderQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:'var(--bl)'}}>{fmt(orderDisplayTotals.transferQty)}</td>
                           <td style={{textAlign:'right',fontFamily:'var(--mono)',fontWeight:800,color:orderDisplayTotals.orderQty-orderDisplayTotals.transferQty===0?'var(--gr)':'var(--rd)'}}>
@@ -9536,10 +6906,10 @@ function Reports({
                 </tbody>
               </table>
             ) : nazoratSection === 'orders' ? (
-              <table className="tbl" style={{width:'max(100%, 1300px)',minWidth:1300,tableLayout:'fixed'}}>
+              <table className="tbl">
                 <thead>
                   <tr>
-                    <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
+                    <th>No</th>
                     <th>Sana</th>
                     <th>Mijoz ID</th>
                     <th>Mijoz</th>
@@ -9548,7 +6918,7 @@ function Reports({
                     <th style={{textAlign:'right'}}>Summa UZS</th>
                     <th>Dostavchik</th>
                     <th>Zakazlar</th>
-                    <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Holat</th>
+                    <th>Holat</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -9556,7 +6926,7 @@ function Reports({
                     <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Dublikat topilmadi' : "Ma'lumot topilmadi"}</td></tr>
                   ) : nazoratFilteredRows.map((r, i) => (
                     <tr key={`ndup_${i}_${r.customerId}_${r.date}`} style={r.docsCount > 1 ? {background:'rgba(248,81,73,.08)'} : undefined}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                       <td>{r.customer}</td>
@@ -9565,25 +6935,25 @@ function Reports({
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
                       <td style={{maxWidth:190}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.driversText || '-'}</span></td>
                       <td style={{maxWidth:230}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.docsText || '-'}</span></td>
-                      <td style={{fontSize:11,color:r.docsCount > 1 ? 'var(--rd)' : 'var(--gr)',background:r.docsCount > 1 ? 'rgba(248,81,73,.08)' : 'var(--s1)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
+                      <td style={{fontSize:11,color:r.docsCount > 1 ? 'var(--rd)' : 'var(--gr)'}}>{r.status}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            ) : nazoratSection === 'returns' && nazoratReturnSection === 'return_order' ? (
-              <table className="tbl" style={{width:'max(100%, 1520px)',minWidth:1520,tableLayout:'fixed'}}>
+            ) : (
+              <table className="tbl">
                 <thead>
                   <tr>
-                    <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
-                    <th style={{width:110,minWidth:110,maxWidth:110}}>Sana</th>
-                    <th style={{width:110,minWidth:110,maxWidth:110}}>Mijoz ID</th>
-                    <th style={{width:320,minWidth:320,maxWidth:320}}>Mijoz</th>
-                    <th style={{width:220,minWidth:220,maxWidth:220}}>Vozvrat zakaz</th>
-                    <th style={{textAlign:'right',width:130,minWidth:130,maxWidth:130}}>Vozvrat suv soni</th>
-                    <th style={{width:150,minWidth:150,maxWidth:150}}>Dostavchik</th>
-                    <th style={{width:170,minWidth:170,maxWidth:170}}>Sklad</th>
-                    <th style={{width:220,minWidth:220,maxWidth:220}}>Izoh</th>
-                    <th style={{width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap'}}>Status</th>
+                    <th>No</th>
+                    <th>Sana</th>
+                    <th>Mijoz ID</th>
+                    <th>Mijoz</th>
+                    <th>Vozvrat zakaz</th>
+                    <th style={{textAlign:'right'}}>Vozvrat suv soni</th>
+                    <th>Dostavchik</th>
+                    <th>Sklad</th>
+                    <th>Izoh</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -9591,124 +6961,18 @@ function Reports({
                     <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>{nazoratView==='errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}</td></tr>
                   ) : nazoratFilteredRows.map((r, i) => (
                     <tr key={`nret_${i}_${r.customerId}_${r.date}`} style={r.hasOrder ? undefined : {background:'rgba(248,81,73,.08)'}}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
-                      <td style={{maxWidth:320}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.customer || '-'}</span></td>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,maxWidth:220}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.returnNo || '-'}</span></td>
+                      <td>{r.customer}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.returnNo || '-'}</td>
                       <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--or)'}}>{fmt(r.qty)}</td>
-                      <td style={{maxWidth:150}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.driver || '-'}</span></td>
-                      <td style={{maxWidth:170}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.warehouse || '-'}</span></td>
-                      <td style={{maxWidth:220}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
-                      <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)',background:r.hasOrder ? 'var(--s1)' : 'rgba(248,81,73,.08)',width:220,minWidth:220,maxWidth:220,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{r.status}</td>
+                      <td>{r.driver}</td>
+                      <td>{r.warehouse || '-'}</td>
+                      <td style={{maxWidth:260}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '-'}</span></td>
+                      <td style={{fontSize:11,color:r.hasOrder ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
-            ) : (
-              <table
-                className="tbl"
-                style={{
-                  width: nazoratSection === 'cash'
-                    ? 'max(100%, 2500px)'
-                    : `max(100%, ${Math.max(1600, 240 + activeNazoratColumns.length * 160)}px)`,
-                  minWidth: nazoratSection === 'cash'
-                    ? 2500
-                    : Math.max(1600, 240 + activeNazoratColumns.length * 160),
-                  tableLayout:'fixed',
-                }}
-              >
-                <thead>
-                  <tr>
-                    <th style={{width:52,minWidth:52,maxWidth:52}}>No</th>
-                    {activeNazoratColumns.map((c) => (
-                      <th
-                        key={`nh_${c.key}`}
-                        style={
-                          c.key === 'status'
-                            ? { width:260, minWidth:260, maxWidth:260, whiteSpace:'nowrap' }
-                            : (
-                              c.type === 'number'
-                                ? { textAlign:'right', width:130, minWidth:130, maxWidth:130 }
-                                : (c.type === 'date'
-                                    ? { width:110, minWidth:110, maxWidth:110 }
-                                    : (c.key === 'customer'
-                                    ? { width:260, minWidth:260, maxWidth:260 }
-                                    : { width:180, minWidth:180, maxWidth:180 }))
-                            )
-                        }
-                      >
-                        {c.label}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {nazoratFilteredRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={activeNazoratColumns.length + 1} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>
-                        {nazoratView === 'errors' ? 'Hatolik topilmadi' : "Ma'lumot topilmadi"}
-                      </td>
-                    </tr>
-                  ) : nazoratFilteredRows.map((r, i) => {
-                    const isWarn = String(r?.status || '').trim().toUpperCase() !== 'OK';
-                    return (
-                      <tr key={`ngen_${i}_${r.customerId || ''}_${r.date || ''}`} style={isWarn ? {background:'rgba(248,81,73,.08)'} : undefined}>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:52,minWidth:52,maxWidth:52}}>{i + 1}</td>
-                        {activeNazoratColumns.map((c) => {
-                          const rawVal = r?.[c.key];
-                          const baseStyle = {};
-                          if (c.type === 'number') {
-                            baseStyle.textAlign = 'right';
-                            baseStyle.fontFamily = 'var(--mono)';
-                            baseStyle.width = 130;
-                            baseStyle.minWidth = 130;
-                            baseStyle.maxWidth = 130;
-                            baseStyle.whiteSpace = 'nowrap';
-                            baseStyle.overflow = 'hidden';
-                            baseStyle.textOverflow = 'ellipsis';
-                          } else if (c.type === 'date') {
-                            baseStyle.fontFamily = 'var(--mono)';
-                            baseStyle.fontSize = 11;
-                            baseStyle.width = 110;
-                            baseStyle.minWidth = 110;
-                            baseStyle.maxWidth = 110;
-                            baseStyle.whiteSpace = 'nowrap';
-                            baseStyle.overflow = 'hidden';
-                            baseStyle.textOverflow = 'ellipsis';
-                          } else {
-                            const textColWidth = c.key === 'customer' ? 260 : 180;
-                            baseStyle.width = textColWidth;
-                            baseStyle.minWidth = textColWidth;
-                            baseStyle.maxWidth = textColWidth;
-                            baseStyle.whiteSpace = 'nowrap';
-                            baseStyle.overflow = 'hidden';
-                            baseStyle.textOverflow = 'ellipsis';
-                          }
-                          if (c.key === 'status') {
-                            baseStyle.fontSize = 11;
-                            baseStyle.color = isWarn ? 'var(--rd)' : 'var(--gr)';
-                            baseStyle.background = isWarn ? 'rgba(248,81,73,.08)' : undefined;
-                            baseStyle.width = 260;
-                            baseStyle.minWidth = 260;
-                            baseStyle.maxWidth = 260;
-                            baseStyle.whiteSpace = 'nowrap';
-                            baseStyle.overflow = 'hidden';
-                            baseStyle.textOverflow = 'ellipsis';
-                          }
-                          if (c.key === 'diffQty') {
-                            baseStyle.color = Math.abs(Number(rawVal || 0)) > 0.0001 ? 'var(--rd)' : 'var(--gr)';
-                          }
-                          const value = c.type === 'number' ? fmt(rawVal || 0) : (String(rawVal ?? '').trim() || '-');
-                          return (
-                            <td key={`nc_${i}_${c.key}`} style={baseStyle}>
-                              {value}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
                 </tbody>
               </table>
             )}
@@ -9725,7 +6989,6 @@ function LeftOrdersPage({
   company='murodbaxsh',
   currentUser='Admin',
   currentAccess=null,
-  rawQziSheetRows=[],
   rawReasonSheetRows=[],
   rawArchiveSheetRows=[],
   loading=false,
@@ -9739,29 +7002,20 @@ function LeftOrdersPage({
   const [filterState, setFilterState] = useState({});
   const [selectedSO, setSelectedSO] = useState(null);
   const compareDate = targetDate || getLeftoverCompareDate(new Date());
-  const scopedCustomerIds = useMemo(
-    () => new Set((D.customers || []).map((c) => normalizeIdKey(c?.id)).filter(Boolean)),
-    [D.customers]
-  );
   const analysis = useMemo(() => buildLeftoverAnalysis({
     rawOrders: D.rawOrders || [],
-    rawQziRows: rawQziSheetRows || [],
     rawReasonRows: rawReasonSheetRows || [],
     rawArchiveRows: rawArchiveSheetRows || [],
     targetDate: compareDate,
     currentUser,
     canSeeAll,
-    allowedCustomerIds: canSeeAll ? null : scopedCustomerIds,
-    includeAllQziRows: true,
-  }), [D.rawOrders, D.customers, rawQziSheetRows, rawReasonSheetRows, rawArchiveSheetRows, compareDate, currentUser, canSeeAll, scopedCustomerIds]);
+  }), [D.rawOrders, rawReasonSheetRows, rawArchiveSheetRows, compareDate, currentUser, canSeeAll]);
   const reasonRows = analysis.reasonRows || [];
   const missingRows = analysis.missingRows || [];
   const reasonDetailedRows = analysis.reasonDetailedRows || [];
   const productGapRows = analysis.productGapRows || [];
-  const usingQziSource = analysis.source === 'qzi';
 
   const leftColumns = useMemo(() => ([
-    { key:'no', label:'No', type:'number' },
     { key:'date', label:'Sana', type:'date' },
     { key:'customerId', label:'Mijoz ID', type:'text' },
     { key:'customer', label:'Mijoz', type:'text' },
@@ -9774,7 +7028,6 @@ function LeftOrdersPage({
     { key:'statusText', label:'Holat', type:'text' },
   ]), []);
   const reasonColumns = useMemo(() => ([
-    { key:'no', label:'No', type:'number' },
     { key:'date', label:'Sana', type:'date' },
     { key:'customerId', label:'Mijoz ID', type:'text' },
     { key:'customer', label:'Mijoz', type:'text' },
@@ -9789,7 +7042,6 @@ function LeftOrdersPage({
     { key:'orderStatus', label:'Status', type:'text' },
   ]), []);
   const gapColumns = useMemo(() => ([
-    { key:'no', label:'No', type:'number' },
     { key:'date', label:'Sana', type:'date' },
     { key:'customerId', label:'Mijoz ID', type:'text' },
     { key:'customer', label:'Mijoz', type:'text' },
@@ -9817,9 +7069,9 @@ function LeftOrdersPage({
       exportAoaExcel({
         fileName: `Qolib_ketgan_zakazlar_${compareDate || toIsoDate(new Date())}.xlsx`,
         sheetName: 'QolibKetganZakazlar',
-        headers: ['No', 'Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Soni', 'Summa', 'Zakaz izohi', 'Sabab', 'Holat'],
-        columnTypes: ['number', 'date', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'text', 'text'],
-        rows: filteredRows.map((r) => [r.no, r.date, r.customerId, r.customer, r.orderId, r.driver, r.qty, r.sumUZS, r.note, r.reason, r.statusText]),
+        headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Soni', 'Summa', 'Zakaz izohi', 'Sabab', 'Holat'],
+        columnTypes: ['date', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'text', 'text'],
+        rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.driver, r.qty, r.sumUZS, r.note, r.reason, r.statusText]),
       });
       return;
     }
@@ -9827,18 +7079,18 @@ function LeftOrdersPage({
       exportAoaExcel({
         fileName: `Qolib_ketgan_zakazlar_sababi_${toIsoDate(new Date())}.xlsx`,
         sheetName: 'QolibKetganSabab',
-        headers: ['No', 'Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Sabab izohi', 'Mahsulot', 'Soni', 'Summa', 'Zakaz izohi', 'Arxiv soni', 'Status'],
-        columnTypes: ['number', 'date', 'text', 'text', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'number', 'text'],
-        rows: filteredRows.map((r) => [r.no, r.date, r.customerId, r.customer, r.orderId, r.driver, r.reason, r.product, r.qty, r.sumUZS, r.orderNote, r.archiveQty, r.orderStatus || r.statusText]),
+        headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Sabab izohi', 'Mahsulot', 'Soni', 'Summa', 'Zakaz izohi', 'Arxiv soni', 'Status'],
+        columnTypes: ['date', 'text', 'text', 'text', 'text', 'text', 'text', 'number', 'number', 'text', 'number', 'text'],
+        rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.driver, r.reason, r.product, r.qty, r.sumUZS, r.orderNote, r.archiveQty, r.orderStatus || r.statusText]),
       });
       return;
     }
     exportAoaExcel({
       fileName: `Mahsulot_farqi_${compareDate || toIsoDate(new Date())}.xlsx`,
       sheetName: 'MahsulotFarqi',
-      headers: ['No', 'Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Zakaz soni', 'Arxiv soni', 'Farq', 'Mahsulot farqi', 'Zakaz izohi', 'Holat'],
-      columnTypes: ['number', 'date', 'text', 'text', 'text', 'text', 'number', 'number', 'number', 'text', 'text', 'text'],
-      rows: filteredRows.map((r) => [r.no, r.date, r.customerId, r.customer, r.orderId, r.driver, r.orderedQty, r.deliveredQty, r.diffQty, r.productDiffText, r.note, r.statusText]),
+      headers: ['Sana', 'Mijoz ID', 'Mijoz', 'Zakaz ID', 'Dostavchik', 'Zakaz soni', 'Arxiv soni', 'Farq', 'Mahsulot farqi', 'Zakaz izohi', 'Holat'],
+      columnTypes: ['date', 'text', 'text', 'text', 'text', 'number', 'number', 'number', 'text', 'text', 'text'],
+      rows: filteredRows.map((r) => [r.date, r.customerId, r.customer, r.orderId, r.driver, r.orderedQty, r.deliveredQty, r.diffQty, r.productDiffText, r.note, r.statusText]),
     });
   }, [tab, filteredRows, compareDate]);
 
@@ -9849,12 +7101,12 @@ function LeftOrdersPage({
           <div className="tabs" style={{display:'inline-flex'}}>
             <button className={`tab${tab==='left'?' on':''}`} onClick={()=>setTab('left')}>Qolib ketgan zakazlar</button>
             <button className={`tab${tab==='reason'?' on':''}`} onClick={()=>setTab('reason')}>Qolib ketgan zakazlar sababi</button>
+            <button className={`tab${tab==='gap'?' on':''}`} onClick={()=>setTab('gap')}>Mahsulot berilmagan</button>
           </div>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Kompaniya: {companyLabelByKey(company)}</span>
-          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>
-            Sana: {usingQziSource ? "Barchasi (Q_Z_I)" : (compareDate || '-')}
-          </span>
+          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Sana: {compareDate || '-'}</span>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Qolib ketgan: {missingRows.length}</span>
+          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Mahsulot farqi: {productGapRows.length}</span>
           <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Sabablar: {reasonRows.length}</span>
         </div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
@@ -9868,7 +7120,7 @@ function LeftOrdersPage({
             </button>
             <UniversalFilterPanel
               open={filterOpen}
-              title={tab === 'left' ? 'Qolib ketgan zakazlar filtri' : tab === 'reason' ? 'Qolib ketgan zakazlar sababi filtri' : 'Zakaz farqi filtri'}
+              title={tab === 'left' ? 'Qolib ketgan zakazlar filtri' : tab === 'reason' ? 'Qolib ketgan zakazlar sababi filtri' : 'Mahsulot berilmagan filtri'}
               columns={activeColumns}
               rows={activeBaseRows}
               state={filterState}
@@ -9893,7 +7145,6 @@ function LeftOrdersPage({
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>No</th>
                   <th>Sana</th>
                   <th>Mijoz ID</th>
                   <th>Mijoz</th>
@@ -9908,16 +7159,13 @@ function LeftOrdersPage({
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
-                  <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>
-                    {usingQziSource ? "Q_Z_I listida yozuv topilmadi" : 'Kechagi qolib ketgan zakaz topilmadi'}
-                  </td></tr>
+                  <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Kechagi qolib ketgan zakaz topilmadi</td></tr>
                 ) : filteredRows.map((r, i) => (
                   <tr
                     key={`left_${i}_${r.orderId}_${r.date}`}
                     style={{background:r.reason ? 'rgba(63,185,80,.06)' : 'rgba(248,81,73,.08)', cursor:r.soGroup ? 'pointer' : 'default'}}
                     onClick={() => r.soGroup && setSelectedSO(r.soGroup)}
                   >
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || (i + 1)}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                     <td>{r.customer}</td>
@@ -9936,7 +7184,6 @@ function LeftOrdersPage({
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>No</th>
                   <th>Sana</th>
                   <th>Mijoz ID</th>
                   <th>Mijoz</th>
@@ -9953,14 +7200,13 @@ function LeftOrdersPage({
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
-                  <tr><td colSpan={13} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Sabab yozuvlari topilmadi</td></tr>
+                  <tr><td colSpan={12} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Sabab yozuvlari topilmadi</td></tr>
                 ) : filteredRows.map((r, i) => (
                   <tr
                     key={`reason_${i}_${r.uid}_${r.orderId}`}
                     style={{cursor:r.soGroup ? 'pointer' : 'default'}}
                     onClick={() => r.soGroup && setSelectedSO(r.soGroup)}
                   >
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || (i + 1)}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                     <td>{r.customer || '-'}</td>
@@ -9981,7 +7227,6 @@ function LeftOrdersPage({
             <table className="tbl">
               <thead>
                 <tr>
-                  <th>No</th>
                   <th>Sana</th>
                   <th>Mijoz ID</th>
                   <th>Mijoz</th>
@@ -9997,14 +7242,13 @@ function LeftOrdersPage({
               </thead>
               <tbody>
                 {filteredRows.length === 0 ? (
-                  <tr><td colSpan={12} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Mahsulot farqi topilmadi</td></tr>
+                  <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Mahsulot farqi topilmadi</td></tr>
                 ) : filteredRows.map((r, i) => (
                   <tr
                     key={`gap_${i}_${r.orderId}_${r.date}`}
                     style={{background:'rgba(255,193,7,.08)', cursor:r.soGroup ? 'pointer' : 'default'}}
                     onClick={() => r.soGroup && setSelectedSO(r.soGroup)}
                   >
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.no || (i + 1)}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.date || '-'}</td>
                     <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.customerId}</td>
                     <td>{r.customer || '-'}</td>
@@ -10321,1135 +7565,362 @@ function PlanPage({
   );
 }
 
-const isBonusWaterProduct = (product) => {
-  const p = normProduct(product);
-  if (!p) return false;
-  if (!isWaterProduct(p)) return false;
-  return p.includes('bonus') || p.includes('бонус');
-};
-const normalizeNickToken = (v) =>
-  normalizeMatchText(String(v || '').replace(/@/g, ''))
-    .replace(/\s+/g, '')
-    .trim();
-const monthKeyFromLooseText = (v) => {
-  const s = String(v || '').trim();
-  const m = s.match(/(20\d{2})[.\-/](\d{1,2})/);
-  if (!m) return '';
-  const mm = String(Math.max(1, Math.min(12, Number(m[2]) || 1))).padStart(2, '0');
-  return `${m[1]}-${mm}`;
-};
-const formatMonthShort = (mk) => {
-  const m = String(mk || '').match(/^(\d{4})-(\d{2})$/);
-  return m ? `${m[2]}.${m[1]}` : (mk || '-');
-};
-const BLOGGER_COL = {
-  NAME: 1,          // B
-  NICK: 2,          // C
-  PHONE: 3,         // D
-  CONTRACT_TERM: 4, // E
-  CONTRACT_DATE: 5, // F
-  PLAN_WATER: 6,    // G
-  PLAN_STORY: 7,    // H
-  PLAN_REEL: 8,     // I
-  STATUS: 9,        // J
-  FACT_START: 34,   // AI
-  FACT_STEP: 3,     // [story, reel, ignored]
-};
-const parseBloggerMonthLabel = (...vals) => {
-  for (const v of vals) {
-    const mk = monthKeyFromLooseText(v);
-    if (mk) return mk;
-  }
-  return '';
-};
-const BLOGGER_CACHE_KEY = 'aq-blogger-sheet-cache-v2';
-const parseBloggerSheetRows = (rows = []) => {
-  if (!Array.isArray(rows) || rows.length < 3) return { items: [], months: [] };
-  const top0 = Array.isArray(rows[0]) ? rows[0] : [];
-  const top1 = Array.isArray(rows[1]) ? rows[1] : [];
-  const dataRows = rows.slice(2);
-  const colCount = rows.reduce((mx, r) => Math.max(mx, Array.isArray(r) ? r.length : 0), 0);
-  const monthTriples = [];
-  let activeMonth = '';
-  for (let col = BLOGGER_COL.FACT_START; col < colCount; col += BLOGGER_COL.FACT_STEP) {
-    let mk = '';
-    for (let off = 0; off <= 8 && !mk; off += 1) {
-      mk = parseBloggerMonthLabel(
-        top0[col - off], top1[col - off],
-        top0[col + off], top1[col + off],
-        top0[col + 1 - off], top1[col + 1 - off],
-        top0[col + 1 + off], top1[col + 1 + off]
-      );
-    }
-    if (mk) activeMonth = mk;
-    if (!activeMonth) continue;
-    monthTriples.push({ month: activeMonth, colStory: col, colReel: col + 1 });
-  }
-  const months = new Set(monthTriples.map((x) => x.month));
-  const items = dataRows
-    .map((r) => (Array.isArray(r) ? r : []))
-    .map((row) => {
-      const name = String(row[BLOGGER_COL.NAME] || '').trim();
-      const nickRaw = String(row[BLOGGER_COL.NICK] || '').trim();
-      if (!name && !nickRaw) return null;
-      const monthly = {};
-      monthTriples.forEach(({ month, colStory, colReel }) => {
-        if (!month) return;
-        const story = Math.max(0, toNum(row[colStory]));
-        const reel = Math.max(0, toNum(row[colReel]));
-        if (!monthly[month]) monthly[month] = { story: 0, reel: 0, customers: 0, water: 0 };
-        monthly[month].story += story;
-        monthly[month].reel += reel;
-      });
-      return {
-        name: name || '-',
-        nick: nickRaw,
-        nickNorm: normalizeNickToken(nickRaw),
-        phone: String(row[BLOGGER_COL.PHONE] || '').trim(),
-        status: String(row[BLOGGER_COL.STATUS] || '').trim(),
-        contractTerm: String(row[BLOGGER_COL.CONTRACT_TERM] || '').trim(),
-        contractDate: toIsoDate(row[BLOGGER_COL.CONTRACT_DATE]),
-        planWater: Math.max(0, toNum(row[BLOGGER_COL.PLAN_WATER])),
-        planStory: Math.max(0, toNum(row[BLOGGER_COL.PLAN_STORY])),
-        planReel: Math.max(0, toNum(row[BLOGGER_COL.PLAN_REEL])),
-        monthly,
-      };
-    })
-    .filter(Boolean);
-  return {
-    items,
-    months: Array.from(months).sort((a, b) => a.localeCompare(b)),
-  };
-};
+function TelegramBotPage({
+  baseUrl,
+  setBaseUrl,
+  adminKey,
+  setAdminKey,
+  canConfigure = true,
+}) {
+  const [tab, setTab] = useState('users');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [q, setQ] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [userRows, setUserRows] = useState([]);
+  const [notMineRows, setNotMineRows] = useState([]);
+  const [orderRows, setOrderRows] = useState([]);
+  const normalizeTgUserId = (value) => String(value || '').trim().replace(/[^0-9]/g, '');
 
-function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murodbaxsh', mode = 'test' }) {
-  const [bloggerSheetRows, setBloggerSheetRows] = useState([]);
-  const [bloggerLoading, setBloggerLoading] = useState(false);
-  const [bloggerError, setBloggerError] = useState('');
-  const [bloggerSection, setBloggerSection] = useState('current');
-  const [bloggerWorkMode, setBloggerWorkMode] = useState('worked');
-  const [bloggerSearch, setBloggerSearch] = useState('');
-  const [bloggerFilterOpen, setBloggerFilterOpen] = useState(false);
-  const [bloggerFilterState, setBloggerFilterState] = useState({});
-  const showBloggerAnalytics = mode === 'bloggers';
-  const showCoreAnalytics = !showBloggerAnalytics;
-  const todayIso = useMemo(() => toIsoDate(new Date()), []);
-  const yesterdayIso = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return toIsoDate(d);
-  }, []);
-  const monthNow = useMemo(() => monthKey(new Date()) || '', []);
-  useEffect(() => {
-    if (!showBloggerAnalytics) {
-      setBloggerSheetRows([]);
-      setBloggerLoading(false);
-      setBloggerError('');
-      return undefined;
-    }
-    const cached = S.get(BLOGGER_CACHE_KEY, null);
-    if (Array.isArray(cached?.rows) && cached.rows.length > 2) {
-      setBloggerSheetRows(cached.rows);
-    }
-    let dead = false;
-    (async () => {
-      setBloggerLoading(true);
-      setBloggerError('');
-      try {
-        const rows = await Promise.any([
-          fetchSheetCsvByName(BLOGGER_SHEET_ID, BLOGGER_SHEET_NAME, 'Blogerlar', 3500),
-          fetchSheetCsv(BLOGGER_SHEET_ID, BLOGGER_SHEET_GID, 'Blogerlar', 3500),
-          fetchSheetOpenSheet(BLOGGER_SHEET_ID, BLOGGER_SHEET_NAME, 'Blogerlar', 4500),
-        ]);
-        if (!dead) {
-          const safeRows = Array.isArray(rows) ? rows : [];
-          setBloggerSheetRows(safeRows);
-          if (safeRows.length > 2) {
-            S.set(BLOGGER_CACHE_KEY, { rows: safeRows, ts: Date.now() });
-          }
-        }
-      } catch (e) {
-        if (!dead) {
-          if (!Array.isArray(cached?.rows) || cached.rows.length < 3) {
-            setBloggerSheetRows([]);
-            setBloggerError(String(e?.message || e || "Blogerlar varaqi yuklanmadi"));
-          }
-        }
-      } finally {
-        if (!dead) setBloggerLoading(false);
-      }
-    })();
-    return () => { dead = true; };
-  }, [showBloggerAnalytics]);
-  const last30StartIso = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    return toIsoDate(d);
-  }, []);
-  const customersById = useMemo(() => {
-    const m = new Map();
-    (D?.customers || []).forEach((c) => {
-      const id = String(c?.id || '').trim();
-      if (!id) return;
-      m.set(id, c);
-    });
-    return m;
-  }, [D?.customers]);
-  const waterOrderRows = useMemo(
-    () => (D?.rawOrders || []).filter((o) =>
-      isOrderDoc(o?.docType) &&
-      isMonthlyWaterSalesRow(o)
-    ),
-    [D?.rawOrders]
-  );
-  const waterDeliveredRows = useMemo(
-    () => waterOrderRows.filter((o) => isDeliveredStatus(o?.status)),
-    [waterOrderRows]
-  );
-  const bloggerParsed = useMemo(() => parseBloggerSheetRows(bloggerSheetRows), [bloggerSheetRows]);
-  const bloggerRows = bloggerParsed.items || [];
-  const bloggerMonths = bloggerParsed.months || [];
-  const bloggerLatestMonth = useMemo(
-    () => (bloggerMonths.length ? bloggerMonths[bloggerMonths.length - 1] : (monthNow || '')),
-    [bloggerMonths, monthNow]
-  );
-  const bonusDeliveredRows = useMemo(
-    () => waterDeliveredRows.filter((o) => isBonusWaterProduct(o?.product)),
-    [waterDeliveredRows]
-  );
-  const sumQty = useCallback((rows = []) => rows.reduce((s, r) => s + Math.abs(toNum(r?.qty)), 0), []);
-  const sumUzs = useCallback((rows = []) => rows.reduce((s, r) => {
-    const cur = String(r?.currency || '').toUpperCase();
-    if (cur === 'USD') return s;
-    return s + Math.abs(toNum(r?.sum));
-  }, 0), []);
-  const todayEnteredRows = useMemo(
-    () => waterOrderRows.filter((o) => toIsoDate(o?.orderDate) === todayIso),
-    [waterOrderRows, todayIso]
-  );
-  const todayDeliveredRows = useMemo(
-    () => waterDeliveredRows.filter((o) => toIsoDate(o?.orderDate) === todayIso),
-    [waterDeliveredRows, todayIso]
-  );
-  const yesterdayDeliveredRows = useMemo(
-    () => waterDeliveredRows.filter((o) => toIsoDate(o?.orderDate) === yesterdayIso),
-    [waterDeliveredRows, yesterdayIso]
-  );
-  const monthDeliveredRows = useMemo(
-    () => waterDeliveredRows.filter((o) => monthKey(o?.orderDate) === monthNow),
-    [waterDeliveredRows, monthNow]
-  );
-  const monthEnteredRows = useMemo(
-    () => waterOrderRows.filter((o) => monthKey(o?.orderDate) === monthNow),
-    [waterOrderRows, monthNow]
-  );
-  const monthPlanWater = useMemo(() => {
-    const rows = normalizePlanRows(planRows || []);
-    const row = rows.find((r) => r?.month === monthNow);
-    return Math.max(0, Number(row?.waterPlan || 0));
-  }, [planRows, monthNow]);
-  const monthDeliveredQty = useMemo(() => sumQty(monthDeliveredRows), [monthDeliveredRows, sumQty]);
-  const monthEnteredQty = useMemo(() => sumQty(monthEnteredRows), [monthEnteredRows, sumQty]);
-  const planPercent = monthPlanWater > 0 ? Math.min(999, (monthDeliveredQty / monthPlanWater) * 100) : 0;
-  const now = useMemo(() => new Date(), []);
-  const daysInMonth = useMemo(() => new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(), [now]);
-  const dayOfMonth = now.getDate();
-  const remainingDays = Math.max(0, daysInMonth - dayOfMonth);
-  const avgDailyDelivered = dayOfMonth > 0 ? (monthDeliveredQty / dayOfMonth) : 0;
-  const forecastMonthQty = Math.round(monthDeliveredQty + avgDailyDelivered * remainingDays);
-  const forecastPlanGap = Math.round(monthPlanWater - forecastMonthQty);
-  const activeCustomers30 = useMemo(() => {
-    const set = new Set();
-    monthDeliveredRows
-      .concat(waterDeliveredRows.filter((o) => {
-        const d = toIsoDate(o?.orderDate);
-        return d && d >= last30StartIso;
-      }))
-      .forEach((o) => {
-        const id = String(o?.mId || '').trim();
-        if (id) set.add(id);
-      });
-    return set;
-  }, [monthDeliveredRows, waterDeliveredRows, last30StartIso]);
-  const repeatRate30 = useMemo(() => {
-    const byCustomer = new Map();
-    waterDeliveredRows.forEach((o) => {
-      const d = toIsoDate(o?.orderDate);
-      if (!d || d < last30StartIso) return;
-      const id = String(o?.mId || '').trim();
-      if (!id) return;
-      const so = String(o?.soNum || '').trim();
-      if (!so) return;
-      if (!byCustomer.has(id)) byCustomer.set(id, new Set());
-      byCustomer.get(id).add(so);
-    });
-    const active = Array.from(byCustomer.values()).filter((s) => s.size > 0).length;
-    if (!active) return 0;
-    const repeat = Array.from(byCustomer.values()).filter((s) => s.size >= 2).length;
-    return (repeat / active) * 100;
-  }, [waterDeliveredRows, last30StartIso]);
-  const nonDebtActiveCustomers = useMemo(() => (
-    (D?.customers || []).filter((c) =>
-      !isExcludedZCategory(c?.source) &&
-      !isNameInactiveByPrefix(c?.name || '') &&
-      !!c?.hasOrders &&
-      !c?.isDebtor
-    )
-  ), [D?.customers]);
-  const nonDebtActiveIds = useMemo(() => {
-    const s = new Set();
-    nonDebtActiveCustomers.forEach((c) => {
-      const id = String(c?.id || '').trim();
-      if (id) s.add(id);
-    });
-    return s;
-  }, [nonDebtActiveCustomers]);
-  const staleCustomers = useMemo(() => (
-    nonDebtActiveCustomers
-      .filter((c) => Number(c?.daysAgo ?? 999) > 30)
-      .sort((a, b) => Number(b?.daysAgo || 0) - Number(a?.daysAgo || 0))
-  ), [nonDebtActiveCustomers]);
-  const freshCustomers = useMemo(() => (
-    nonDebtActiveCustomers
-      .filter((c) => Number(c?.daysAgo ?? 999) <= 30)
-      .sort((a, b) => Number(a?.daysAgo ?? 999) - Number(b?.daysAgo ?? 999))
-  ), [nonDebtActiveCustomers]);
-  const debtCustomers = useMemo(() => (
-    (D?.debtorsByBalance || [])
-      .filter((c) => !isExcludedZCategory(c?.source))
-      .sort((a, b) => Math.abs(toNum(b?.balanceUZS)) - Math.abs(toNum(a?.balanceUZS)))
-  ), [D?.debtorsByBalance]);
-  const debtCustomerCount = debtCustomers.length;
-  const operatorRows = useMemo(() => {
-    const byDriver = new Map();
-    monthDeliveredRows.forEach((o) => {
-      const driver = String(o?.delivPerson || o?.agent || '-').trim() || '-';
-      const so = String(o?.soNum || '').trim();
-      const cid = String(o?.mId || '').trim();
-      if (!byDriver.has(driver)) {
-        byDriver.set(driver, {
-          driver,
-          qty: 0,
-          sumUZS: 0,
-          orders: new Set(),
-          customers: new Set(),
-        });
-      }
-      const row = byDriver.get(driver);
-      row.qty += Math.abs(toNum(o?.qty));
-      if (String(o?.currency || '').toUpperCase() !== 'USD') row.sumUZS += Math.abs(toNum(o?.sum));
-      if (so) row.orders.add(so);
-      if (cid) row.customers.add(cid);
-    });
-    return Array.from(byDriver.values())
-      .map((r) => ({
-        driver: r.driver,
-        qty: r.qty,
-        sumUZS: r.sumUZS,
-        orderCount: r.orders.size,
-        customerCount: r.customers.size,
-        avgPerOrder: r.orders.size ? (r.qty / r.orders.size) : 0,
-      }))
-      .sort((a, b) => b.qty - a.qty);
-  }, [monthDeliveredRows]);
-  const districtRows = useMemo(() => {
-    const byDistrict = new Map();
-    monthDeliveredRows.forEach((o) => {
-      const cid = String(o?.mId || '').trim();
-      const c = customersById.get(cid);
-      const district = String(c?.district || "Noma'lum").trim() || "Noma'lum";
-      if (!byDistrict.has(district)) byDistrict.set(district, { district, qty: 0, customers: new Set() });
-      const row = byDistrict.get(district);
-      row.qty += Math.abs(toNum(o?.qty));
-      if (cid) row.customers.add(cid);
-    });
-    return Array.from(byDistrict.values())
-      .map((r) => ({ district: r.district, qty: r.qty, customers: r.customers.size }))
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 12);
-  }, [monthDeliveredRows, customersById]);
-  const productRows = useMemo(() => {
-    const byProduct = new Map();
-    monthDeliveredRows.forEach((o) => {
-      const p = String(o?.product || "Noma'lum mahsulot").trim() || "Noma'lum mahsulot";
-      byProduct.set(p, (byProduct.get(p) || 0) + Math.abs(toNum(o?.qty)));
-    });
-    return Array.from(byProduct.entries())
-      .map(([product, qty]) => ({ product, qty }))
-      .sort((a, b) => b.qty - a.qty)
-      .slice(0, 12);
-  }, [monthDeliveredRows]);
-  const bloggerNameByNick = useMemo(() => {
-    const m = new Map();
-    bloggerRows.forEach((r) => {
-      const key = normalizeNickToken(r?.nickNorm || r?.nick);
-      if (!key) return;
-      if (!m.has(key)) m.set(key, String(r?.name || r?.nick || key));
-    });
-    return m;
-  }, [bloggerRows]);
-  const bloggerMapping = useMemo(() => {
-    const nickList = Array.from(bloggerNameByNick.keys());
-    const customerNickMap = new Map();
-    const customersByNick = new Map();
-    nickList.forEach((n) => customersByNick.set(n, new Set()));
+  const normalizedBase = useMemo(() => normalizeBotArchiveUrl(baseUrl), [baseUrl]);
 
-    (D?.customers || []).forEach((c) => {
-      const cid = String(c?.id || '').trim();
-      if (!cid) return;
-      const hay = normalizeNickToken(c?.source || '');
-      if (!hay) return;
-      const found = nickList.find((nick) => nick && hay.includes(nick));
-      if (!found) return;
-      customerNickMap.set(cid, found);
-      if (!customersByNick.has(found)) customersByNick.set(found, new Set());
-      customersByNick.get(found).add(cid);
-    });
-    return { customerNickMap, customersByNick };
-  }, [D?.customers, bloggerNameByNick]);
-  const bloggerCustomerIds = useMemo(
-    () => new Set(Array.from(bloggerMapping.customerNickMap.keys())),
-    [bloggerMapping]
-  );
-  const firstDeliveredMonthByCustomer = useMemo(() => {
-    const m = new Map();
-    waterOrderRows.forEach((o) => {
-      const cid = String(o?.mId || '').trim();
-      const mk = monthKey(o?.orderDate);
-      if (!cid || !mk) return;
-      const prev = m.get(cid);
-      if (!prev || mk < prev) m.set(cid, mk);
-    });
-    return m;
-  }, [waterOrderRows]);
-  const bonusByMonth = useMemo(() => {
-    const by = new Map();
-    bonusDeliveredRows.forEach((o) => {
-      const mk = monthKey(o?.orderDate);
-      if (!mk) return;
-      const cid = String(o?.mId || '').trim();
-      const qty = Math.abs(toNum(o?.qty));
-      if (!qty) return;
-      if (!by.has(mk)) by.set(mk, { month: mk, total: 0, active: 0, blogger: 0 });
-      const row = by.get(mk);
-      row.total += qty;
-      if (cid && nonDebtActiveIds.has(cid)) row.active += qty;
-      if (cid && bloggerCustomerIds.has(cid)) row.blogger += qty;
-    });
-    return by;
-  }, [bonusDeliveredRows, nonDebtActiveIds, bloggerCustomerIds]);
-  const bonusMonthRows = useMemo(() => {
-    const fallbackMonth = monthNow || monthKey(new Date()) || '';
-    const baseMonth = fallbackMonth || (Array.from(bonusByMonth.keys()).sort((a, b) => a.localeCompare(b)).pop() || '');
-    if (!baseMonth) return [];
-    const out = [];
-    for (let i = 5; i >= 0; i -= 1) {
-      const mk = shiftMonthKey(baseMonth, -i);
-      out.push(bonusByMonth.get(mk) || { month: mk, total: 0, active: 0, blogger: 0 });
+  const fetchAdmin = useCallback(async (path) => {
+    const base = normalizeBotArchiveUrl(baseUrl);
+    const url = `${base}${path}${path.includes('?') ? '&' : '?'}limit=200`;
+    const headers = {};
+    if (String(adminKey || '').trim()) headers['x-admin-key'] = String(adminKey || '').trim();
+
+    const res = await fetch(url, { headers });
+    const text = await res.text();
+    let parsed = {};
+    try { parsed = text ? JSON.parse(text) : {}; } catch { parsed = {}; }
+    if (!res.ok || parsed?.ok === false) {
+      const msg = parsed?.error || parsed?.description || `HTTP ${res.status}`;
+      throw new Error(msg);
     }
-    return out;
-  }, [bonusByMonth, monthNow]);
-  const bonusSummary = useMemo(() => {
-    let total = 0;
-    let active = 0;
-    let blogger = 0;
-    bonusDeliveredRows.forEach((o) => {
-      const cid = String(o?.mId || '').trim();
-      const qty = Math.abs(toNum(o?.qty));
-      if (!qty) return;
-      total += qty;
-      if (cid && nonDebtActiveIds.has(cid)) active += qty;
-      if (cid && bloggerCustomerIds.has(cid)) blogger += qty;
-    });
-    return { total, active, blogger };
-  }, [bonusDeliveredRows, nonDebtActiveIds, bloggerCustomerIds]);
-  const bloggerAgreementRows = useMemo(() => {
-    const isWorking = (status) => {
-      const s = normalizeMatchText(status);
-      if (!s) return true;
-      if (s.includes('ishlamadi')) return false;
-      if (s.includes('ishladi')) return true;
-      return !(
-        s.includes('tugadi') ||
-        s.includes("to'xta") ||
-        s.includes('toxta') ||
-        s.includes('stop')
-      );
-    };
-    return bloggerRows.map((r) => {
-      const mk = bloggerLatestMonth;
-      const monthFact = (mk && r?.monthly?.[mk]) ? r.monthly[mk] : {};
-      const storyFact = Math.max(0, toNum(monthFact?.story));
-      const reelFact = Math.max(0, toNum(monthFact?.reel));
-      const customerFact = Math.max(0, toNum(monthFact?.customers));
-      const waterFact = Math.max(0, toNum(monthFact?.water));
-      const planStory = Math.max(0, toNum(r?.planStory));
-      const planReel = Math.max(0, toNum(r?.planReel));
-      const storyOk = planStory <= 0 || storyFact >= planStory;
-      const reelOk = planReel <= 0 || reelFact >= planReel;
-      const isActiveDeal = isWorking(r?.status);
-      const onTrack = isActiveDeal ? (storyOk && reelOk) : true;
-      const nickNorm = normalizeNickToken(r?.nickNorm || r?.nick);
-      const linkedSet = bloggerMapping.customersByNick.get(nickNorm) || new Set();
-      return {
-        ...r,
-        nickNorm,
-        storyFact,
-        reelFact,
-        customerFact,
-        waterFact,
-        planStory,
-        planReel,
-        linkedCustomerCount: linkedSet.size,
-        isActiveDeal,
-        onTrack,
-      };
-    }).sort((a, b) => {
-      if (Number(a.onTrack) !== Number(b.onTrack)) return Number(a.onTrack) - Number(b.onTrack);
-      return String(a.name || '').localeCompare(String(b.name || ''), 'ru');
-    });
-  }, [bloggerRows, bloggerLatestMonth, bloggerMapping]);
-  const bloggerAgreementSummary = useMemo(() => {
-    const active = bloggerAgreementRows.filter((r) => r.isActiveDeal);
-    const onTrack = active.filter((r) => r.onTrack).length;
-    const waterFact = active.reduce((s, r) => s + Math.max(0, toNum(r?.waterFact)), 0);
-    const customerFact = active.reduce((s, r) => s + Math.max(0, toNum(r?.customerFact)), 0);
-    return {
-      total: bloggerAgreementRows.length,
-      active: active.length,
-      onTrack,
-      risk: Math.max(0, active.length - onTrack),
-      waterFact,
-      customerFact,
-    };
-  }, [bloggerAgreementRows]);
-  const bloggerMonthExecutionRows = useMemo(() => {
-    const monthSet = new Set();
-    bloggerRows.forEach((r) => {
-      Object.keys(r?.monthly || {}).forEach((mk) => {
-        if (mk) monthSet.add(mk);
+    return parsed;
+  }, [baseUrl, adminKey]);
+
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [profilesResp, accountsResp, notMineResp, ordersResp] = await Promise.all([
+        fetchAdmin('/admin/profiles'),
+        fetchAdmin('/admin/accounts'),
+        fetchAdmin('/admin/not-mine'),
+        fetchAdmin('/admin/orders'),
+      ]);
+
+      const profileItems = Array.isArray(profilesResp?.items) ? profilesResp.items : [];
+      const accountItems = Array.isArray(accountsResp?.items) ? accountsResp.items : [];
+      const notMineItems = Array.isArray(notMineResp?.items) ? notMineResp.items : [];
+      const orderItems = Array.isArray(ordersResp?.items) ? ordersResp.items : [];
+
+      const accountsByUser = new Map();
+      accountItems.forEach((item) => {
+        const keyUserId = normalizeTgUserId(String(item?.key || '').split(':')[1] || '');
+        const value = item?.value;
+        const list = Array.isArray(value) ? value : [];
+        const uid = normalizeTgUserId(list?.[0]?.tg_user_id || keyUserId || '');
+        if (!uid) return;
+        accountsByUser.set(uid, list);
       });
-    });
-    const months = Array.from(monthSet).sort((a, b) => a.localeCompare(b));
-    return months.map((mk) => {
-      let planStory = 0;
-      let planReel = 0;
-      let factStory = 0;
-      let factReel = 0;
-      let factCustomers = 0;
-      let factWater = 0;
-      let activeCount = 0;
-      bloggerRows.forEach((r) => {
-        const st = normText(r?.status);
-        const isActive = !(st.includes('ishlamadi') || st.includes('tugadi') || st.includes("to'xta") || st.includes('toxta') || st.includes('stop'));
-        if (!isActive) return;
-        activeCount += 1;
-        planStory += Math.max(0, toNum(r?.planStory));
-        planReel += Math.max(0, toNum(r?.planReel));
-        const m = r?.monthly?.[mk] || {};
-        factStory += Math.max(0, toNum(m?.story));
-        factReel += Math.max(0, toNum(m?.reel));
-        factCustomers += Math.max(0, toNum(m?.customers));
-        factWater += Math.max(0, toNum(m?.water));
-      });
-      const storyOk = planStory <= 0 ? true : factStory >= planStory;
-      const reelOk = planReel <= 0 ? true : factReel >= planReel;
-      return {
-        month: mk,
-        activeCount,
-        planStory,
-        planReel,
-        factStory,
-        factReel,
-        factCustomers,
-        factWater,
-        status: storyOk && reelOk ? 'Kelishuvda' : 'Ortda',
-      };
-    }).sort((a, b) => String(b.month).localeCompare(String(a.month)));
-  }, [bloggerRows]);
-  const bloggerGrowthRows = useMemo(() => {
-    const by = new Map();
-    bloggerMapping.customerNickMap.forEach((nick, cid) => {
-      const mk = firstDeliveredMonthByCustomer.get(cid);
-      if (!mk) return;
-      const key = `${mk}|${nick}`;
-      by.set(key, (by.get(key) || 0) + 1);
-    });
-    return Array.from(by.entries())
-      .map(([key, count]) => {
-        const [month, nick] = key.split('|');
-        return { month, nick, name: bloggerNameByNick.get(nick) || nick || '-', count };
-      })
-      .sort((a, b) => {
-        if (a.month !== b.month) return String(b.month).localeCompare(String(a.month));
-        return Number(b.count) - Number(a.count);
-      })
-      .slice(0, 24);
-  }, [bloggerMapping, firstDeliveredMonthByCustomer, bloggerNameByNick]);
-  const bloggerCustomerCountByMonthNick = useMemo(() => {
-    const m = new Map();
-    bloggerGrowthRows.forEach((r) => {
-      const mk = String(r?.month || '').trim();
-      const nick = normalizeNickToken(r?.nick || '');
-      if (!mk || !nick) return;
-      m.set(`${mk}|${nick}`, Number(r?.count || 0));
-    });
-    return m;
-  }, [bloggerGrowthRows]);
-  const bloggerArchiveRows = useMemo(() => {
-    const out = [];
-    bloggerAgreementRows.forEach((r) => {
-      Object.entries(r?.monthly || {}).forEach(([mk, fact]) => {
-        if (!mk) return;
-        const storyFact = Math.max(0, toNum(fact?.story));
-        const reelFact = Math.max(0, toNum(fact?.reel));
-        const planStory = Math.max(0, toNum(r?.planStory));
-        const planReel = Math.max(0, toNum(r?.planReel));
-        const onTrack = (planStory <= 0 || storyFact >= planStory) && (planReel <= 0 || reelFact >= planReel);
-        const monthCustomers = Number(bloggerCustomerCountByMonthNick.get(`${mk}|${normalizeNickToken(r?.nickNorm || r?.nick)}`) || 0);
-        out.push({
-          month: mk,
-          name: r.name,
-          nick: r.nick,
-          status: r.status,
-          isActiveDeal: r.isActiveDeal,
-          planStory,
-          planReel,
-          storyFact,
-          reelFact,
-          linkedCustomerCount: monthCustomers,
-          onTrack,
+
+      const userMap = new Map();
+      profileItems.forEach((item) => {
+        const p = item?.value && typeof item.value === 'object' ? item.value : {};
+        const uid = normalizeTgUserId(p.tg_user_id || String(item?.key || '').split(':')[1] || '');
+        if (!uid) return;
+        const acc = accountsByUser.get(uid) || [];
+        userMap.set(uid, {
+          tg_user_id: uid,
+          username: String(p.username || ''),
+          full_name: [p.first_name, p.last_name].filter(Boolean).join(' ').trim(),
+          first_name: String(p.first_name || ''),
+          last_name: String(p.last_name || ''),
+          chat_id: String(p.chat_id || ''),
+          language_code: String(p.language_code || ''),
+          last_seen_at: String(p.last_seen_at || ''),
+          last_customer_id: String(p.last_customer_id || ''),
+          accounts_count: Number(p.accounts_count || acc.length || 0),
+          accounts: acc,
         });
       });
-    });
-    return out.sort((a, b) => (a.month === b.month ? String(a.name || '').localeCompare(String(b.name || ''), 'ru') : String(b.month || '').localeCompare(String(a.month || ''))));
-  }, [bloggerAgreementRows, bloggerCustomerCountByMonthNick]);
-  const bloggerCurrentFilterColumns = useMemo(() => ([
-    { key:'name', label:'Bloger', type:'text' },
-    { key:'nick', label:'Insta nik', type:'text' },
-    { key:'status', label:'Status', type:'text' },
-    { key:'contractTerm', label:'Kelishuv', type:'text' },
-    { key:'contractDate', label:'Kelishuv sana', type:'date' },
-    { key:'planStory', label:'Reja storis', type:'number' },
-    { key:'planReel', label:'Reja rils', type:'number' },
-    { key:'storyFact', label:'Joylangan storis', type:'number' },
-    { key:'reelFact', label:'Joylangan rils', type:'number' },
-    { key:'linkedCustomerCount', label:'Biriktirilgan mijoz', type:'number' },
-    { key:'onTrack', label:'Holat', type:'text', getValue:(r)=>r.onTrack?'Kelishuvda':'Ortda' },
-  ]), []);
-  const bloggerArchiveFilterColumns = useMemo(() => ([
-    { key:'month', label:'Oy', type:'date' },
-    { key:'name', label:'Bloger', type:'text' },
-    { key:'nick', label:'Insta nik', type:'text' },
-    { key:'status', label:'Status', type:'text' },
-    { key:'planStory', label:'Reja storis', type:'number' },
-    { key:'planReel', label:'Reja rils', type:'number' },
-    { key:'storyFact', label:'Joylangan storis', type:'number' },
-    { key:'reelFact', label:'Joylangan rils', type:'number' },
-    { key:'linkedCustomerCount', label:'Kelgan mijoz', type:'number' },
-    { key:'onTrack', label:'Holat', type:'text', getValue:(r)=>r.onTrack?'Kelishuvda':'Ortda' },
-  ]), []);
-  const bloggerActiveFilterColumns = bloggerSection === 'archive' ? bloggerArchiveFilterColumns : bloggerCurrentFilterColumns;
-  useEffect(() => {
-    setBloggerFilterState((prev) => ensureUniversalFilterState(bloggerActiveFilterColumns, prev));
-  }, [bloggerActiveFilterColumns]);
-  const bloggerRowsByMode = useMemo(() => {
-    const src = bloggerSection === 'archive' ? bloggerArchiveRows : bloggerAgreementRows;
-    return src.filter((r) => {
-      if (bloggerWorkMode === 'worked') return !!r.isActiveDeal;
-      if (bloggerWorkMode === 'not_worked') return !r.isActiveDeal;
-      return true;
-    });
-  }, [bloggerSection, bloggerArchiveRows, bloggerAgreementRows, bloggerWorkMode]);
-  const bloggerVisibleRows = useMemo(() => {
-    let rows = bloggerRowsByMode;
-    const q = String(bloggerSearch || '').trim().toLowerCase();
-    if (q) {
-      rows = rows.filter((r) =>
-        String(r?.name || '').toLowerCase().includes(q) ||
-        String(r?.nick || '').toLowerCase().includes(q) ||
-        String(r?.status || '').toLowerCase().includes(q) ||
-        String(r?.month || '').toLowerCase().includes(q)
-      );
+
+      accountsByUser.forEach((acc, uid) => {
+        if (userMap.has(uid)) return;
+        userMap.set(uid, {
+          tg_user_id: uid,
+          username: '',
+          full_name: '',
+          first_name: '',
+          last_name: '',
+          chat_id: '',
+          language_code: '',
+          last_seen_at: '',
+          last_customer_id: '',
+          accounts_count: acc.length,
+          accounts: acc,
+        });
+      });
+
+      const users = Array.from(userMap.values())
+        .map((row) => ({
+          ...row,
+          account_ids: (row.accounts || []).map((x) => String(x.customer_id || '')).filter(Boolean),
+          account_contracts: (row.accounts || []).map((x) => String(x.contract_no || '')).filter(Boolean),
+        }))
+        .sort((a, b) => String(b.last_seen_at || '').localeCompare(String(a.last_seen_at || '')));
+
+      const notMine = notMineItems
+        .map((item) => (item?.value && typeof item.value === 'object' ? item.value : null))
+        .filter(Boolean)
+        .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+
+      const orders = orderItems
+        .map((item) => (item?.value && typeof item.value === 'object' ? item.value : null))
+        .filter(Boolean)
+        .sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));
+
+      setUserRows(users);
+      setNotMineRows(notMine);
+      setOrderRows(orders);
+    } catch (e) {
+      setError(String(e?.message || e || 'Yuklash xatosi'));
+    } finally {
+      setLoading(false);
     }
-    return applyUniversalFilters(rows, bloggerActiveFilterColumns, bloggerFilterState);
-  }, [bloggerRowsByMode, bloggerSearch, bloggerActiveFilterColumns, bloggerFilterState]);
-  const bloggerFilterCount = useMemo(() => countUniversalFilters(bloggerFilterState), [bloggerFilterState]);
-  const exportBloggers = useCallback(() => {
-    const isArchive = bloggerSection === 'archive';
-    const rows = bloggerVisibleRows || [];
+  }, [fetchAdmin]);
+
+  useEffect(() => {
+    loadAll();
+  }, [loadAll]);
+
+  const rowDate = useCallback((row) => {
+    const v = String(row?.created_at || row?.last_seen_at || row?.confirmed_at || row?.scheduled_at || '').trim();
+    if (!v) return '';
+    return v.slice(0, 10);
+  }, []);
+
+  const textPass = useCallback((row) => {
+    if (!String(q || '').trim()) return true;
+    return JSON.stringify(row || {}).toLowerCase().includes(String(q || '').trim().toLowerCase());
+  }, [q]);
+
+  const datePass = useCallback((row) => {
+    const d = rowDate(row);
+    if (fromDate && (!d || d < fromDate)) return false;
+    if (toDate && (!d || d > toDate)) return false;
+    return true;
+  }, [rowDate, fromDate, toDate]);
+
+  const usersFiltered = useMemo(
+    () => (userRows || []).filter((r) => textPass(r) && datePass(r)),
+    [userRows, textPass, datePass]
+  );
+  const notMineFiltered = useMemo(
+    () => (notMineRows || []).filter((r) => textPass(r) && datePass(r)),
+    [notMineRows, textPass, datePass]
+  );
+  const ordersFiltered = useMemo(
+    () => (orderRows || []).filter((r) => textPass(r) && datePass(r)),
+    [orderRows, textPass, datePass]
+  );
+
+  const exportCurrent = () => {
+    const stamp = new Date().toISOString().slice(0, 10);
+    if (tab === 'users') {
+      exportAoaExcel({
+        fileName: `Telegram_Bot_Users_${stamp}.xlsx`,
+        sheetName: 'Users',
+        headers: ['TG User ID', 'Username', 'FIO', 'Hisoblar soni', 'Hisoblar', 'Kontragentlar', 'Oxirgi ID', 'Oxirgi kirish'],
+        rows: usersFiltered.map((r) => [
+          r.tg_user_id || '',
+          r.username || '',
+          r.full_name || '',
+          r.accounts_count || 0,
+          (r.account_ids || []).join(' | '),
+          (r.account_contracts || []).join(' | '),
+          r.last_customer_id || '',
+          r.last_seen_at || '',
+        ]),
+      });
+      return;
+    }
+
+    if (tab === 'not_mine') {
+      exportAoaExcel({
+        fileName: `Telegram_Bot_NotMine_${stamp}.xlsx`,
+        sheetName: 'NotMine',
+        headers: ['Sana', 'TG User ID', 'Username', 'Mijoz ID', 'Kontragent', 'Sabab'],
+        rows: notMineFiltered.map((r) => [
+          r.created_at || '',
+          r.tg_user_id || '',
+          r.username || '',
+          r.customer_id || '',
+          r.contract_no || '',
+          r.reason || '',
+        ]),
+      });
+      return;
+    }
+
     exportAoaExcel({
-      fileName: `Blogerlar_${isArchive ? 'Arxiv' : 'Asosiy'}_${new Date().toISOString().slice(0,10)}.xlsx`,
-      sheetName: isArchive ? 'BlogerlarArxiv' : 'BlogerlarAsosiy',
-      headers: isArchive
-        ? ['Oy', 'Bloger', 'Insta nik', 'Status', 'Reja storis', 'Reja rils', 'Joylangan storis', 'Joylangan rils', 'Kelgan mijoz', 'Holat']
-        : ['Bloger', 'Insta nik', 'Status', 'Reja storis', 'Reja rils', 'Joylangan storis', 'Joylangan rils', 'Biriktirilgan mijoz', 'Holat'],
-      columnTypes: isArchive
-        ? ['text', 'text', 'text', 'text', 'number', 'number', 'number', 'number', 'number', 'text']
-        : ['text', 'text', 'text', 'number', 'number', 'number', 'number', 'number', 'text'],
-      rows: isArchive
-        ? rows.map((r) => [formatMonthShort(r.month), r.name, r.nick || '-', r.status || '-', r.planStory, r.planReel, r.storyFact, r.reelFact, r.linkedCustomerCount || 0, r.onTrack ? 'Kelishuvda' : 'Ortda'])
-        : rows.map((r) => [r.name, r.nick || '-', r.status || '-', r.planStory, r.planReel, r.storyFact, r.reelFact, r.linkedCustomerCount || 0, r.onTrack ? 'Kelishuvda' : 'Ortda']),
+      fileName: `Telegram_Bot_Orders_${stamp}.xlsx`,
+      sheetName: 'Orders',
+      headers: ['Sana', 'Order ID', 'TG User ID', 'Username', 'Mijoz ID', 'Kontragent', 'Manzil', 'Tolov turi', 'Yetkazish vaqti'],
+      rows: ordersFiltered.map((r) => [
+        r.created_at || '',
+        r.order_id || '',
+        r.tg_user_id || '',
+        r.username || '',
+        r.customer_id || '',
+        r.contract_no || '',
+        r.address || '',
+        r.payment_type || '',
+        r.scheduled_at || '',
+      ]),
     });
-  }, [bloggerSection, bloggerVisibleRows]);
-  const recommendations = useMemo(() => {
-    const out = [];
-    if (monthPlanWater > 0 && forecastPlanGap > 0) {
-      out.push(`Oy planidan taxminan ${fmt(forecastPlanGap)} ta kam qolish riski bor. Qolgan ${remainingDays} kun uchun kunlik tempni oshirish kerak.`);
-    }
-    if (repeatRate30 < 35) {
-      out.push(`Qayta buyurtma ulushi past (${repeatRate30.toFixed(1)}%). Obzvon va takroriy mijoz kampaniyasini kuchaytirish tavsiya.`);
-    }
-    if (staleCustomers.length > 0) {
-      out.push(`${fmt(staleCustomers.length)} ta qarzsiz mijoz 1 oydan beri buyurtma bermagan. Aktivatsiya ro'yxatini alohida ishlash kerak.`);
-    }
-    if (debtCustomerCount > 0) {
-      out.push(`${fmt(debtCustomerCount)} ta qarzdor mijoz bor. Yetkazishdan oldin to'lov intizomi nazoratini kuchaytiring.`);
-    }
-    if (!out.length) out.push('Asosiy ko‘rsatkichlar yaxshi. Hozirgi tempni saqlab, operatorlar orasida eng yaxshi amaliyotni ulashing.');
-    return out;
-  }, [monthPlanWater, forecastPlanGap, remainingDays, repeatRate30, staleCustomers.length, debtCustomerCount]);
-
-  if (showCoreAnalytics) {
-    return (
-      <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
-        <div className="card" style={{padding:12}}>
-          <div style={{fontWeight:700,marginBottom:8}}>Tavsiyalar</div>
-          <div style={{display:'grid',gap:8}}>
-            {recommendations.map((msg, i) => (
-              <div key={`rec_only_${i}`} style={{fontSize:12,color:'var(--t2)',background:'var(--s2)',border:'1px solid var(--b2)',borderRadius:8,padding:'8px 10px'}}>
-                {i + 1}. {msg}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (showBloggerAnalytics) {
-    return (
-      <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
-        <div className="card" style={{padding:'10px 12px',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
-          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-            <div style={{fontWeight:700}}>Blogerlar nazorati</div>
-            <div className="tabs" style={{display:'inline-flex'}}>
-              <button className={`tab${bloggerSection==='current'?' on':''}`} onClick={()=>setBloggerSection('current')}>Bloger</button>
-              <button className={`tab${bloggerSection==='archive'?' on':''}`} onClick={()=>setBloggerSection('archive')}>Arxiv</button>
-            </div>
-          </div>
-          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <span className="tag">Oy: {formatMonthShort(bloggerLatestMonth)}</span>
-            <span className="tag">Jami: <strong style={{color:'var(--t1)'}}>{fmt(bloggerAgreementSummary.total)}</strong></span>
-            <span className="tag">Ishlidi: <strong style={{color:'var(--bl)'}}>{fmt(bloggerAgreementSummary.active)}</strong></span>
-            <span className="tag">Ortda: <strong style={{color:'var(--rd)'}}>{fmt(bloggerAgreementSummary.risk)}</strong></span>
-            <a className="btn btn-gh btn-sm" href={BLOGGER_SHEET_URL} target="_blank" rel="noreferrer">Sheet</a>
-          </div>
-        </div>
-        <div className="card" style={{padding:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          <div className="sb" style={{flex:'1 1 340px',minWidth:220}}>
-            <span style={{color:'var(--t3)'}}>Qidiruv</span>
-            <input placeholder="Bloger, nik, status..." value={bloggerSearch} onChange={(e)=>setBloggerSearch(e.target.value)} />
-          </div>
-          <div style={{position:'relative'}}>
-            <button className="btn btn-gh btn-sm" onClick={()=>setBloggerFilterOpen((v)=>!v)}>
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-              </svg>
-              Filtr ({bloggerFilterCount})
-            </button>
-            <UniversalFilterPanel
-              open={bloggerFilterOpen}
-              title={bloggerSection === 'archive' ? "Bloger arxiv filtri" : "Bloger filtri"}
-              columns={bloggerActiveFilterColumns}
-              rows={bloggerRowsByMode}
-              state={bloggerFilterState}
-              setState={setBloggerFilterState}
-              onClose={()=>setBloggerFilterOpen(false)}
-              width={620}
-            />
-          </div>
-          <button className="btn btn-gr btn-sm" onClick={exportBloggers}>Excel</button>
-          <div className="tabs" style={{display:'inline-flex'}}>
-            <button className={`tab${bloggerWorkMode==='worked'?' on':''}`} onClick={()=>setBloggerWorkMode('worked')}>Ishlidi</button>
-            <button className={`tab${bloggerWorkMode==='not_worked'?' on':''}`} onClick={()=>setBloggerWorkMode('not_worked')}>Ishlamidi</button>
-            <button className={`tab${bloggerWorkMode==='all'?' on':''}`} onClick={()=>setBloggerWorkMode('all')}>Barchasi</button>
-          </div>
-        </div>
-        <div className="card" style={{padding:0,overflow:'hidden',flex:1,minHeight:0}}>
-          <div style={{overflow:'auto',maxHeight:'100%'}}>
-            {bloggerLoading ? (
-              <div style={{padding:16,color:'var(--t3)',fontSize:12}}>Blogerlar varaqi yuklanmoqda...</div>
-            ) : bloggerError ? (
-              <div style={{padding:16,color:'var(--rd)',fontSize:12}}>{bloggerError}</div>
-            ) : (
-              <table className="tbl">
-                <thead>
-                  {bloggerSection === 'archive' ? (
-                    <tr>
-                      <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                      <th>Oy</th>
-                      <th>Bloger</th>
-                      <th>Insta nik</th>
-                      <th>Status</th>
-                      <th style={{textAlign:'right'}}>Reja storis</th>
-                      <th style={{textAlign:'right'}}>Reja rils</th>
-                      <th style={{textAlign:'right'}}>Joylangan storis</th>
-                      <th style={{textAlign:'right'}}>Joylangan rils</th>
-                      <th style={{textAlign:'right'}}>Kelgan mijoz</th>
-                      <th>Holat</th>
-                    </tr>
-                  ) : (
-                    <tr>
-                      <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                      <th>Bloger</th>
-                      <th>Insta nik</th>
-                      <th>Status</th>
-                      <th>Kelishuv</th>
-                      <th style={{textAlign:'right'}}>Reja storis</th>
-                      <th style={{textAlign:'right'}}>Reja rils</th>
-                      <th style={{textAlign:'right'}}>Joylangan storis</th>
-                      <th style={{textAlign:'right'}}>Joylangan rils</th>
-                      <th style={{textAlign:'right'}}>Biriktirilgan mijoz</th>
-                      <th>Holat</th>
-                    </tr>
-                  )}
-                </thead>
-                <tbody>
-                  {bloggerVisibleRows.length === 0 ? (
-                    <tr><td colSpan={11} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr>
-                  ) : bloggerVisibleRows.map((r, i) => (
-                    bloggerSection === 'archive' ? (
-                      <tr key={`blogger_ar_${r.month}_${r.nick || r.name}_${i}`}>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>{formatMonthShort(r.month)}</td>
-                        <td>{r.name}</td>
-                        <td style={{fontFamily:'var(--mono)'}}>{r.nick || '-'}</td>
-                        <td>{r.status || '-'}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planReel)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.storyFact)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--pu)'}}>{fmt(r.reelFact)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.linkedCustomerCount || 0)}</td>
-                        <td style={{color:r.onTrack ? 'var(--gr)' : 'var(--rd)'}}>{r.onTrack ? 'Kelishuvda' : 'Ortda'}</td>
-                      </tr>
-                    ) : (
-                      <tr key={`blogger_cur_${r.nickNorm || r.name}_${i}`}>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
-                        <td>{r.name}</td>
-                        <td style={{fontFamily:'var(--mono)'}}>{r.nick || '-'}</td>
-                        <td>{r.status || '-'}</td>
-                        <td style={{fontFamily:'var(--mono)',fontSize:11}}>
-                          {r.contractTerm || '-'}{r.contractDate ? ` | ${fmtD(r.contractDate)}` : ''}
-                        </td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planReel)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.storyFact)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--pu)'}}>{fmt(r.reelFact)}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.linkedCustomerCount || 0)}</td>
-                        <td style={{color:r.onTrack ? 'var(--gr)' : 'var(--rd)'}}>{r.onTrack ? 'Kelishuvda' : 'Ortda'}</td>
-                      </tr>
-                    )
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="ani" style={{display:'grid',gap:10,minHeight:'100%'}}>
-      <div className="card" style={{padding:12,display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
-        <div>
-          <div style={{fontWeight:800,fontSize:15}}>{showBloggerAnalytics ? 'Blogerlar Analitikasi' : 'Test Analitika (Beta)'}</div>
-          <div style={{fontSize:12,color:'var(--t3)',marginTop:4}}>
-            Kompaniya: {companyLabelByKey(company)} | Foydalanuvchi: {currentUser}
+    <div className="ani" style={{display:'flex',flexDirection:'column',gap:12}}>
+      <div className="card" style={{padding:12,display:'grid',gap:10}}>
+        <div style={{fontWeight:700}}>Telegram Bot Arxivi</div>
+        <div className="g2">
+          <div>
+            <div style={{fontSize:11,color:'var(--t3)',marginBottom:5}}>Worker URL</div>
+            <input
+              className="input"
+              value={baseUrl}
+              onChange={(e)=>setBaseUrl(e.target.value)}
+              placeholder={BOT_ARCHIVE_DEFAULT}
+              disabled={!canConfigure}
+            />
+          </div>
+          <div>
+            <div style={{fontSize:11,color:'var(--t3)',marginBottom:5}}>Admin key</div>
+            <input
+              className="input"
+              value={adminKey}
+              onChange={(e)=>setAdminKey(e.target.value)}
+              placeholder="ADMIN_READ_KEY"
+              disabled={!canConfigure}
+            />
           </div>
         </div>
-        <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Oy: {monthNow || '-'}</span>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <button className="btn btn-bl btn-sm" onClick={loadAll} disabled={loading}>{loading ? 'Yuklanmoqda...' : 'Yangilash'}</button>
+          <button className="btn btn-gr btn-sm" onClick={exportCurrent}>Export Excel</button>
+          <span className="tag" style={{background:'var(--s3)',color:'var(--t2)'}}>{normalizedBase}</span>
+        </div>
+        {error && <div style={{fontSize:12,color:'var(--rd)'}}>Xato: {error}</div>}
       </div>
 
-      {showCoreAnalytics && (
-      <>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(6,minmax(150px,1fr))',gap:10}}>
-        <StatCard l="Bugun (kiritilgan)" v={`${fmt(sumQty(todayEnteredRows))} ta`} s={`${fmt(sumUzs(todayEnteredRows))} so'm`} c="var(--bl)" />
-        <StatCard l="Bugun (yetkazilgan)" v={`${fmt(sumQty(todayDeliveredRows))} ta`} s={`${fmt(sumUzs(todayDeliveredRows))} so'm`} c="var(--gr)" />
-        <StatCard l="Kecha (yetkazilgan)" v={`${fmt(sumQty(yesterdayDeliveredRows))} ta`} s={`${fmt(sumUzs(yesterdayDeliveredRows))} so'm`} c="var(--yl)" />
-        <StatCard l="Oy fakt (yetkazilgan)" v={`${fmt(monthDeliveredQty)} ta`} s={`Kiritilgan: ${fmt(monthEnteredQty)} ta`} c="var(--bl)" />
-        <StatCard l="Oy plan bajarilishi" v={`${planPercent.toFixed(1)} %`} s={`Plan: ${fmt(monthPlanWater)} ta`} c={planPercent >= 100 ? 'var(--gr)' : 'var(--or)'} />
-        <StatCard l="Oy prognoz" v={`${fmt(forecastMonthQty)} ta`} s={forecastPlanGap > 0 ? `Plan yetmaydi: ${fmt(forecastPlanGap)} ta` : 'Plan yopiladi'} c={forecastPlanGap > 0 ? 'var(--rd)' : 'var(--gr)'} />
-      </div>
+      <div className="card" style={{padding:12,display:'grid',gap:10}}>
+        <div className="tabs" style={{display:'inline-flex'}}>
+          <button className={`tab${tab==='users'?' on':''}`} onClick={()=>setTab('users')}>Foydalanuvchilar ({usersFiltered.length})</button>
+          <button className={`tab${tab==='not_mine'?' on':''}`} onClick={()=>setTab('not_mine')}>Bu menikimas ({notMineFiltered.length})</button>
+          <button className={`tab${tab==='orders'?' on':''}`} onClick={()=>setTab('orders')}>Bot zakazlar ({ordersFiltered.length})</button>
+        </div>
+        <div className="g3">
+          <input className="input" placeholder="Qidiruv..." value={q} onChange={(e)=>setQ(e.target.value)} />
+          <input className="input" type="date" value={fromDate} onChange={(e)=>setFromDate(e.target.value)} />
+          <input className="input" type="date" value={toDate} onChange={(e)=>setToDate(e.target.value)} />
+        </div>
 
-      <div style={{display:'grid',gridTemplateColumns:'1.4fr 1fr',gap:10,minHeight:0}}>
-        <div className="card" style={{padding:0,overflow:'hidden',minHeight:0}}>
-          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Operator Samaradorligi (oy)</div>
-          <div style={{overflow:'auto',maxHeight:'34vh'}}>
+        <div style={{overflow:'auto',maxHeight:'62vh',border:'1px solid var(--b2)',borderRadius:10}}>
+          {tab === 'users' && (
             <table className="tbl">
               <thead>
                 <tr>
-                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                  <th>Operator</th>
-                  <th style={{textAlign:'right'}}>Suv (ta)</th>
-                  <th style={{textAlign:'right'}}>Zakaz</th>
-                  <th style={{textAlign:'right'}}>Mijoz</th>
-                  <th style={{textAlign:'right'}}>1 zakazga</th>
-                  <th style={{textAlign:'right'}}>Summa</th>
+                  <th>TG User ID</th>
+                  <th>Username</th>
+                  <th>F.I.O</th>
+                  <th>Hisoblar</th>
+                  <th>Kontragentlar</th>
+                  <th>Oxirgi ID</th>
+                  <th>Oxirgi kirish</th>
                 </tr>
               </thead>
               <tbody>
-                {operatorRows.length === 0 ? (
-                  <tr><td colSpan={7} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
-                ) : operatorRows.map((r, i) => (
-                  <tr key={`t_op_${r.driver}_${i}`}>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
-                    <td>{r.driver}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.qty)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.orderCount)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.customerCount)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{r.avgPerOrder.toFixed(1)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.sumUZS)}</td>
+                {usersFiltered.length === 0 ? (
+                  <tr><td colSpan={7} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr>
+                ) : usersFiltered.map((r, i) => (
+                  <tr key={`${r.tg_user_id || 'u'}-${i}`}>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.tg_user_id || '-'}</td>
+                    <td>{r.username ? `@${r.username}` : '-'}</td>
+                    <td>{r.full_name || '-'}</td>
+                    <td style={{textAlign:'right'}}>{r.accounts_count || 0}</td>
+                    <td style={{maxWidth:320,whiteSpace:'normal'}}>{(r.account_contracts || []).join(' | ') || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.last_customer_id || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.last_seen_at || '-'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
+          )}
 
-        <div style={{display:'grid',gap:10,minHeight:0}}>
-          <div className="card" style={{padding:12}}>
-            <div style={{fontWeight:700,marginBottom:8}}>Asosiy Signallar</div>
-            <div style={{display:'grid',gap:6,fontSize:12,color:'var(--t2)'}}>
-              <div>30 kun aktiv mijoz: <strong style={{color:'var(--t1)'}}>{fmt(activeCustomers30.size)}</strong></div>
-              <div>Repeat rate (30 kun): <strong style={{color:repeatRate30 >= 40 ? 'var(--gr)' : 'var(--or)'}}>{repeatRate30.toFixed(1)}%</strong></div>
-              <div>1 oydan ko'p jim (qarzsiz): <strong style={{color:staleCustomers.length ? 'var(--rd)' : 'var(--gr)'}}>{fmt(staleCustomers.length)}</strong></div>
-              <div>Qarzdor mijozlar: <strong style={{color:debtCustomerCount ? 'var(--rd)' : 'var(--gr)'}}>{fmt(debtCustomerCount)}</strong></div>
-            </div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginTop:10}}>
-              <div style={{background:'var(--s2)',border:'1px solid var(--b2)',borderRadius:8,padding:8}}>
-                <div style={{fontSize:12,fontWeight:700,marginBottom:6}}>Aktiv (qarzsiz)</div>
-                <div style={{display:'grid',gap:4,maxHeight:'15vh',overflow:'auto'}}>
-                  {freshCustomers.length === 0 ? (
-                    <div style={{fontSize:11,color:'var(--t3)'}}>Ro'yxat bo'sh</div>
-                  ) : freshCustomers.slice(0, 10).map((c) => (
-                    <div key={`test_fresh_${c.id}`} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,fontSize:11}}>
-                      <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</span>
-                      <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>{Number(c.daysAgo || 0)}k</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div style={{background:'var(--s2)',border:'1px solid var(--b2)',borderRadius:8,padding:8}}>
-                <div style={{fontSize:12,fontWeight:700,marginBottom:6}}>1 oy+ olmaganlar</div>
-                <div style={{display:'grid',gap:4,maxHeight:'15vh',overflow:'auto'}}>
-                  {staleCustomers.length === 0 ? (
-                    <div style={{fontSize:11,color:'var(--t3)'}}>Yo'q</div>
-                  ) : staleCustomers.slice(0, 10).map((c) => (
-                    <div key={`test_stale_${c.id}`} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:6,fontSize:11}}>
-                      <span style={{minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</span>
-                      <span className="tag" style={{background:'var(--rd2)',color:'var(--rd)'}}>{Number(c.daysAgo || 0)}k</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="card" style={{padding:12}}>
-            <div style={{fontWeight:700,marginBottom:8}}>Tavsiyalar</div>
-            <div style={{display:'grid',gap:8}}>
-              {recommendations.map((msg, i) => (
-                <div key={`rec_${i}`} style={{fontSize:12,color:'var(--t2)',background:'var(--s2)',border:'1px solid var(--b2)',borderRadius:8,padding:'8px 10px'}}>
-                  {i + 1}. {msg}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="card" style={{padding:12}}>
-            <div style={{fontWeight:700,marginBottom:8}}>Bonus Suv (umumiy)</div>
-            <div style={{display:'grid',gap:6,fontSize:12,color:'var(--t2)'}}>
-              <div>Jami bonus suv: <strong style={{color:'var(--bl)'}}>{fmt(bonusSummary.total)} ta</strong></div>
-              <div>Aktiv mijozlarga bonus: <strong style={{color:'var(--gr)'}}>{fmt(bonusSummary.active)} ta</strong></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,minHeight:0}}>
-        <div className="card" style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Rayon Kesimi (oy, top)</div>
-          <div style={{overflow:'auto',maxHeight:'28vh'}}>
+          {tab === 'not_mine' && (
             <table className="tbl">
               <thead>
                 <tr>
-                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                  <th>Rayon</th>
-                  <th style={{textAlign:'right'}}>Suv (ta)</th>
-                  <th style={{textAlign:'right'}}>Mijoz</th>
+                  <th>Sana</th>
+                  <th>TG User ID</th>
+                  <th>Username</th>
+                  <th>Mijoz ID</th>
+                  <th>Kontragent</th>
+                  <th>Sabab</th>
                 </tr>
               </thead>
               <tbody>
-                {districtRows.length === 0 ? (
-                  <tr><td colSpan={4} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
-                ) : districtRows.map((r, i) => (
-                  <tr key={`t_dist_${r.district}_${i}`}>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
-                    <td>{r.district}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.qty)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.customers)}</td>
+                {notMineFiltered.length === 0 ? (
+                  <tr><td colSpan={6} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr>
+                ) : notMineFiltered.map((r, i) => (
+                  <tr key={`${r.id || 'nm'}-${i}`}>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.created_at || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.tg_user_id || '-'}</td>
+                    <td>{r.username ? `@${r.username}` : '-'}</td>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.customer_id || '-'}</td>
+                    <td>{r.contract_no || '-'}</td>
+                    <td style={{whiteSpace:'normal',maxWidth:260}}>{r.reason || '-'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-        <div className="card" style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Mahsulot Kesimi (oy, top)</div>
-          <div style={{overflow:'auto',maxHeight:'28vh'}}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                  <th>Mahsulot</th>
-                  <th style={{textAlign:'right'}}>Suv (ta)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productRows.length === 0 ? (
-                  <tr><td colSpan={3} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
-                ) : productRows.map((r, i) => (
-                  <tr key={`t_prod_${r.product}_${i}`}>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
-                    <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.product}</span></td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.qty)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      </>
-      )}
+          )}
 
-      {showBloggerAnalytics && (
-      <>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,minHeight:0}}>
-        <div className="card" style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Bonus suv (oylar kesimi)</div>
-          <div style={{overflow:'auto',maxHeight:'30vh'}}>
+          {tab === 'orders' && (
             <table className="tbl">
               <thead>
                 <tr>
-                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                  <th>Oy</th>
-                  <th style={{textAlign:'right'}}>Jami bonus</th>
-                  <th style={{textAlign:'right'}}>Aktiv</th>
-                  <th style={{textAlign:'right'}}>Bloger</th>
+                  <th>Sana</th>
+                  <th>Order ID</th>
+                  <th>TG User ID</th>
+                  <th>Username</th>
+                  <th>Mijoz ID</th>
+                  <th>Kontragent</th>
+                  <th>Manzil</th>
+                  <th>To'lov</th>
+                  <th>Yetkazish</th>
                 </tr>
               </thead>
               <tbody>
-                {bonusMonthRows.length === 0 ? (
-                  <tr><td colSpan={5} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
-                ) : bonusMonthRows.map((r, i) => (
-                  <tr key={`bonus_m_${r.month}`}>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
-                    <td style={{fontFamily:'var(--mono)'}}>{formatMonthShort(r.month)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.total)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.active)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.blogger)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="card" style={{padding:0,overflow:'hidden'}}>
-          <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Bloger bo'yicha qo'shilgan mijozlar (oylar)</div>
-          <div style={{overflow:'auto',maxHeight:'30vh'}}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                  <th>Oy</th>
-                  <th>Bloger</th>
-                  <th style={{textAlign:'right'}}>Mijoz soni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bloggerGrowthRows.length === 0 ? (
-                  <tr><td colSpan={4} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
-                ) : bloggerGrowthRows.map((r, i) => (
-                  <tr key={`blog_growth_${r.month}_${r.nick}_${i}`}>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
-                    <td style={{fontFamily:'var(--mono)'}}>{formatMonthShort(r.month)}</td>
-                    <td>{r.name}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.count)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div className="card" style={{padding:0,overflow:'hidden'}}>
-        <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap'}}>
-          <div style={{fontWeight:700}}>Blogerlar: Kelishuvlar nazorati</div>
-          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-            <span className="tag">Sheet: {BLOGGER_SHEET_NAME}</span>
-            <span className="tag">Oy: {formatMonthShort(bloggerLatestMonth)}</span>
-            <a className="btn btn-gh btn-sm" href={BLOGGER_SHEET_URL} target="_blank" rel="noreferrer">Ochish</a>
-          </div>
-        </div>
-        <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',display:'flex',gap:8,flexWrap:'wrap'}}>
-          <span className="tag">Jami: <strong style={{color:'var(--t1)'}}>{fmt(bloggerAgreementSummary.total)}</strong></span>
-          <span className="tag">Aktiv kelishuv: <strong style={{color:'var(--bl)'}}>{fmt(bloggerAgreementSummary.active)}</strong></span>
-          <span className="tag">Kelishuvda: <strong style={{color:'var(--gr)'}}>{fmt(bloggerAgreementSummary.onTrack)}</strong></span>
-          <span className="tag">Riskda: <strong style={{color:'var(--rd)'}}>{fmt(bloggerAgreementSummary.risk)}</strong></span>
-          <span className="tag">Biriktirilgan mijoz: <strong style={{color:'var(--yl)'}}>{fmt(bloggerCustomerIds.size)}</strong></span>
-          <span className="tag">Oy mijozi: <strong style={{color:'var(--gr)'}}>{fmt(bloggerAgreementSummary.customerFact)}</strong></span>
-          <span className="tag">Oy suvi: <strong style={{color:'var(--bl)'}}>{fmt(bloggerAgreementSummary.waterFact)} ta</strong></span>
-        </div>
-        <div style={{overflow:'auto',maxHeight:'34vh'}}>
-          {bloggerLoading ? (
-            <div style={{padding:16,color:'var(--t3)',fontSize:12}}>Blogerlar varaqi yuklanmoqda...</div>
-          ) : bloggerError ? (
-            <div style={{padding:16,color:'var(--rd)',fontSize:12}}>{bloggerError}</div>
-          ) : (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                  <th>Bloger</th>
-                  <th>Insta nik</th>
-                  <th>Status</th>
-                  <th style={{textAlign:'right'}}>Reja S/R</th>
-                  <th style={{textAlign:'right'}}>Fakt S/R</th>
-                  <th style={{textAlign:'right'}}>Kelgan mijoz</th>
-                  <th style={{textAlign:'right'}}>Suv (oy)</th>
-                  <th style={{textAlign:'right'}}>Biriktirilgan</th>
-                  <th>Holat</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bloggerAgreementRows.length === 0 ? (
-                  <tr><td colSpan={10} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Blogerlar varag'idan ma'lumot topilmadi</td></tr>
-                ) : bloggerAgreementRows.map((r, i) => (
-                  <tr key={`blogger_agree_${r.nickNorm || r.name}_${i}`}>
-                    <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
-                    <td>{r.name}</td>
-                    <td style={{fontFamily:'var(--mono)'}}>{r.nick || '-'}</td>
-                    <td>{r.status || '-'}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}/{fmt(r.planReel)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.storyFact)}/{fmt(r.reelFact)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.customerFact)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.waterFact)}</td>
-                    <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--yl)'}}>{fmt(r.linkedCustomerCount)}</td>
-                    <td style={{color:r.onTrack ? 'var(--gr)' : 'var(--rd)'}}>
-                      {r.isActiveDeal ? (r.onTrack ? "Kelishuvda" : "Kelishuvdan ortda") : "Faol emas"}
-                    </td>
+                {ordersFiltered.length === 0 ? (
+                  <tr><td colSpan={9} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr>
+                ) : ordersFiltered.map((r, i) => (
+                  <tr key={`${r.order_id || 'ord'}-${i}`}>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.created_at || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.order_id || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.tg_user_id || '-'}</td>
+                    <td>{r.username ? `@${r.username}` : '-'}</td>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.customer_id || '-'}</td>
+                    <td>{r.contract_no || '-'}</td>
+                    <td style={{whiteSpace:'normal',maxWidth:220}}>{r.address || '-'}</td>
+                    <td>{r.payment_type || '-'}</td>
+                    <td style={{fontFamily:'var(--mono)'}}>{r.scheduled_at || '-'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -11457,51 +7928,14 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
           )}
         </div>
       </div>
-      <div className="card" style={{padding:0,overflow:'hidden'}}>
-        <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Blogerlar: Oylar bo'yicha kelishuv bajarilishi</div>
-        <div style={{overflow:'auto',maxHeight:'30vh'}}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                <th>Oy</th>
-                <th style={{textAlign:'right'}}>Aktiv bloger</th>
-                <th style={{textAlign:'right'}}>Reja S/R</th>
-                <th style={{textAlign:'right'}}>Fakt S/R</th>
-                <th style={{textAlign:'right'}}>Mijoz</th>
-                <th style={{textAlign:'right'}}>Suv</th>
-                <th>Holat</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bloggerMonthExecutionRows.length === 0 ? (
-                <tr><td colSpan={8} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Oylik kelishuv ma'lumoti topilmadi</td></tr>
-              ) : bloggerMonthExecutionRows.map((r, i) => (
-                <tr key={`blog_month_exec_${r.month}_${i}`}>
-                  <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)',width:54,minWidth:54,maxWidth:54}}>{i + 1}</td>
-                  <td style={{fontFamily:'var(--mono)'}}>{formatMonthShort(r.month)}</td>
-                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.activeCount)}</td>
-                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.planStory)}/{fmt(r.planReel)}</td>
-                  <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.factStory)}/{fmt(r.factReel)}</td>
-                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.factCustomers)}</td>
-                  <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.factWater)}</td>
-                  <td style={{color:r.status === 'Kelishuvda' ? 'var(--gr)' : 'var(--rd)'}}>{r.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      </>
-      )}
     </div>
   );
 }
 
 function SettingsPanel({
   users, setUsers, access, setAccess, currentUser, setCurrentUser,
-  webhookUrl, setWebhookUrl, userCreds, setUserCreds, onSwitchUser, isAdminSession=false, viewerAccess=null,
-  D=null, company='murodbaxsh', rawArchiveSheetRows = [], rawEmployeeSheetRows = [],
+  webhookUrl, setWebhookUrl, botArchiveUrl, setBotArchiveUrl, botArchiveAdminKey, setBotArchiveAdminKey, userCreds, setUserCreds, onSwitchUser, isAdminSession=false, viewerAccess=null,
+  D=null, company='murodbaxsh',
 }) {
   const [tab, setTab] = useState('staff');
   const [sel, setSel] = useState(currentUser || users[0] || 'Admin');
@@ -11511,7 +7945,7 @@ function SettingsPanel({
   const [editLogin, setEditLogin] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const pages = ['dash','cust','orders','left_orders','kassa','obzvon','doljniki','nazorat','reports','plan','test','bloggers','refresh','settings'];
+  const pages = ['dash','cust','orders','left_orders','kassa','obzvon','doljniki','nazorat','reports','plan','telegram_bot','refresh','settings'];
   const settingsSections = [
     { key:'settings_staff', label:"Hodimlar ruhsatlari" },
     { key:'settings_app', label:'Ilova sozlamalari' },
@@ -11538,146 +7972,31 @@ function SettingsPanel({
     () => `aq-driver-warehouse-map-${normalizeCompanyKey(company)}`,
     [company]
   );
-  const bindingCashStorageKey = useMemo(
-    () => `aq-driver-cash-map-${normalizeCompanyKey(company)}`,
-    [company]
-  );
-  const bindingCardCashStorageKey = useMemo(
-    () => `aq-driver-card-cash-map-${normalizeCompanyKey(company)}`,
-    [company]
-  );
   const [driverWarehouseMap, setDriverWarehouseMap] = useState(() => S.get(bindingStorageKey, {}));
-  const [driverCashMap, setDriverCashMap] = useState(() => S.get(bindingCashStorageKey, {}));
-  const [driverCardCashMap, setDriverCardCashMap] = useState(() => S.get(bindingCardCashStorageKey, {}));
-  const bindingEmployeeRows = useMemo(() => {
-    const src = (Array.isArray(rawEmployeeSheetRows) && rawEmployeeSheetRows.length)
-      ? rawEmployeeSheetRows
-      : (Array.isArray(D?.rawEmployeeSheetRows) ? D.rawEmployeeSheetRows : []);
-    return parseLeftoverEmployeesRows(src);
-  }, [rawEmployeeSheetRows, D?.rawEmployeeSheetRows]);
-  const bindingEmpNameById = useMemo(() => {
-    const m = {};
-    (bindingEmployeeRows || []).forEach((r) => {
-      const id = normalizeIdKey(r?.id);
-      if (id && r?.name && !m[id]) m[id] = String(r.name).trim();
-    });
-    return m;
-  }, [bindingEmployeeRows]);
-  const bindingEmpNameByEmail = useMemo(() => {
-    const m = {};
-    (bindingEmployeeRows || []).forEach((r) => {
-      const email = String(r?.email || '').trim().toLowerCase();
-      if (email && r?.name && !m[email]) m[email] = String(r.name).trim();
-    });
-    return m;
-  }, [bindingEmployeeRows]);
-  const normalizeBindingDriverName = useCallback((rawDriver) => {
-    const raw = String(rawDriver || '').trim();
-    if (!raw) return '';
-    const id = normalizeIdKey(raw);
-    if (id && bindingEmpNameById[id]) return bindingEmpNameById[id];
-    const email = raw.toLowerCase();
-    if (email && bindingEmpNameByEmail[email]) return bindingEmpNameByEmail[email];
-    return raw;
-  }, [bindingEmpNameById, bindingEmpNameByEmail]);
   useEffect(() => {
     setDriverWarehouseMap(S.get(bindingStorageKey, {}));
   }, [bindingStorageKey]);
   useEffect(() => {
-    setDriverCashMap(S.get(bindingCashStorageKey, {}));
-  }, [bindingCashStorageKey]);
-  useEffect(() => {
-    setDriverCardCashMap(S.get(bindingCardCashStorageKey, {}));
-  }, [bindingCardCashStorageKey]);
-  useEffect(() => {
     S.set(bindingStorageKey, driverWarehouseMap || {});
   }, [bindingStorageKey, driverWarehouseMap]);
-  useEffect(() => {
-    S.set(bindingCashStorageKey, driverCashMap || {});
-  }, [bindingCashStorageKey, driverCashMap]);
-  useEffect(() => {
-    S.set(bindingCardCashStorageKey, driverCardCashMap || {});
-  }, [bindingCardCashStorageKey, driverCardCashMap]);
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.dispatchEvent(new CustomEvent(BINDING_UPDATE_EVENT, {
-        detail: { source: 'settings', company: normalizeCompanyKey(company) },
-      }));
-    } catch {}
-  }, [company, driverWarehouseMap, driverCashMap, driverCardCashMap]);
   useEffect(() => {
     if (users.includes(sel)) return;
     setSel(users[0] || 'Admin');
   }, [users, sel]);
   const bindingDrivers = useMemo(() => {
-    const splitDriverTokens = (raw) => String(raw || '')
-      .split(/[;|/]/g)
-      .map((x) => String(x || '').trim())
-      .filter(Boolean)
-      .flatMap((chunk) => {
-        const commaParts = chunk.split(',').map((x) => String(x || '').trim()).filter(Boolean);
-        if (commaParts.length <= 1) return [chunk];
-        return commaParts;
-      })
-      .map((x) => x.replace(/^\d+\s*[-:,.]?\s*/g, '').trim())
-      .filter((x) => x && !/^\d+$/.test(x));
-    const canonicalKey = (v) => normalizeMatchText(v)
-      .replace(/^\d+\s*/g, '')
-      .replace(/[^a-z0-9а-я]/gi, '')
-      .trim();
-
-    const orderDrivers = (D?.rawOrders || [])
-      .filter((o) => isOrderDoc(o.docType) && !isCancelledStatus(o.status))
-      .flatMap((o) => splitDriverTokens(o.delivPerson || o.agent || ''))
-      .map((d) => normalizeBindingDriverName(d))
-      .filter(Boolean);
-    const archiveSrc = (Array.isArray(rawArchiveSheetRows) && rawArchiveSheetRows.length)
-      ? rawArchiveSheetRows
-      : (Array.isArray(D?.rawArchiveSheetRows) ? D.rawArchiveSheetRows : []);
-    const archiveDrivers = parseLeftoverArchiveRows(archiveSrc)
-      .flatMap((r) => splitDriverTokens(r?.driver || ''))
-      .map((d) => normalizeBindingDriverName(d))
-      .filter(Boolean);
-    const mappedDrivers = [
-      ...Object.keys(driverWarehouseMap || {}),
-      ...Object.keys(driverCashMap || {}),
-      ...Object.keys(driverCardCashMap || {}),
-    ]
-      .flatMap((d) => splitDriverTokens(d))
-      .map((d) => normalizeBindingDriverName(d))
-      .filter(Boolean);
-
-    const merged = new Map();
-    [...orderDrivers, ...archiveDrivers, ...mappedDrivers].forEach((name) => {
-      const cleaned = String(name || '').trim();
-      if (!cleaned || isVirtualDriverLabel(cleaned)) return;
-      const k = canonicalKey(cleaned);
-      if (!k) return;
-      const prev = merged.get(k);
-      if (!prev || String(cleaned).length > String(prev).length) {
-        merged.set(k, cleaned);
-      }
-    });
-
-    const uniq = Array.from(merged.values()).sort((a, b) => a.localeCompare(b, 'ru'));
+    const src = (D?.rawOrders || []).filter((o) =>
+      isWaterProduct(o.product) &&
+      isOrderDoc(o.docType) &&
+      !isCancelledStatus(o.status)
+    ).map((o) => String(o.delivPerson || o.agent || '').trim()).filter(Boolean);
+    const uniq = Array.from(new Set(src)).sort((a, b) => a.localeCompare(b, 'ru'));
     if (isAdminSession) return uniq;
     return uniq.filter((d) => d === currentUser);
-  }, [
-    D?.rawOrders,
-    D?.rawArchiveSheetRows,
-    rawArchiveSheetRows,
-    isAdminSession,
-    currentUser,
-    driverWarehouseMap,
-    driverCashMap,
-    driverCardCashMap,
-    normalizeBindingDriverName,
-  ]);
+  }, [D, isAdminSession, currentUser]);
   const bindingWarehouses = useMemo(() => {
     const allTransfers = Array.isArray(D?.warehouseTransfers) ? D.warehouseTransfers : [];
     const strict = allTransfers
-      .filter((r) => isWaterProduct(r.product) && isMainWarehouseLabel(r.toWarehouse) && !isVirtualWarehouseLabel(r.fromWarehouse) && !isVirtualWarehouseLabel(r.toWarehouse))
+      .filter((r) => isWaterProduct(r.product) && isMainWarehouseLabel(r.toWarehouse))
       .map((r) => String(r.fromWarehouse || '').trim())
       .filter(Boolean);
     const strictUnique = Array.from(new Set(strict)).sort((a, b) => a.localeCompare(b, 'ru'));
@@ -11685,15 +8004,8 @@ function SettingsPanel({
 
     const fallback = allTransfers
       .map((r) => String(r.fromWarehouse || '').trim())
-      .filter((w) => w && !isVirtualWarehouseLabel(w));
-    return Array.from(new Set(fallback)).sort((a, b) => a.localeCompare(b, 'ru'));
-  }, [D]);
-  const bindingCashboxes = useMemo(() => {
-    const allCash = Array.isArray(D?.cashbox) ? D.cashbox : [];
-    const list = allCash
-      .map((r) => String(r?.kassa || '').trim())
       .filter(Boolean);
-    return Array.from(new Set(list)).sort((a, b) => a.localeCompare(b, 'ru'));
+    return Array.from(new Set(fallback)).sort((a, b) => a.localeCompare(b, 'ru'));
   }, [D]);
   const canEditBinding = !!isAdminSession;
   const allowedSettingsTabs = useMemo(() => {
@@ -11828,14 +8140,7 @@ function SettingsPanel({
       fallback: true,
       children: obzvonNewPermSections.map((s) => ({ key: s.key, label: s.label, kind: 'visible', fallback: false })),
     },
-    {
-      key: 'doljniki',
-      label: 'Doljniki',
-      fallback: true,
-      children: [
-        { key: 'doljniki_kuler', label: 'Kuler nasiya', kind: 'visible', fallback: true },
-      ],
-    },
+    { key: 'doljniki', label: 'Doljniki', fallback: true, children: [] },
     {
       key: 'nazorat',
       label: 'Nazorat',
@@ -11846,7 +8151,7 @@ function SettingsPanel({
     },
     { key: 'reports', label: 'Hisobotlar', fallback: true, children: [] },
     { key: 'plan', label: 'Plan', fallback: true, children: [] },
-    { key: 'test', label: 'Test', fallback: true, children: [] },
+    { key: 'telegram_bot', label: 'Telegram Bot', fallback: false, children: [] },
     { key: 'refresh', label: 'Yangilash', fallback: true, children: [] },
     {
       key: 'settings',
@@ -11876,9 +8181,9 @@ function SettingsPanel({
 
       {tab==='binding' && (
         <div className="card" style={{padding:14}}>
-          <div style={{fontWeight:700,marginBottom:8}}>Dostavchik biriktirish</div>
+          <div style={{fontWeight:700,marginBottom:8}}>Dostavchik va sklad biriktirish</div>
           <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
-            Kompaniya: <strong style={{color:'var(--t1)'}}>{companyLabelByKey(company)}</strong>. Bu sozlama Nazorat bo'limidagi sklad va pul solishtiruvida ishlatiladi.
+            Kompaniya: <strong style={{color:'var(--t1)'}}>{companyLabelByKey(company)}</strong>. Bu sozlama Nazorat bo'limi solishtiruvida ishlatiladi.
           </div>
           <div style={{overflow:'auto',maxHeight:'56vh'}}>
             <table className="tbl">
@@ -11886,13 +8191,11 @@ function SettingsPanel({
                 <tr>
                   <th>Dostavchik</th>
                   <th>Sklad</th>
-                  <th>Naqt kassa</th>
-                  <th>Karta kassa</th>
                 </tr>
               </thead>
               <tbody>
                 {bindingDrivers.length === 0 ? (
-                  <tr><td colSpan={4} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Dostavchik topilmadi</td></tr>
+                  <tr><td colSpan={2} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Dostavchik topilmadi</td></tr>
                 ) : bindingDrivers.map((driver) => (
                   <tr key={driver}>
                     <td style={{fontWeight:600}}>{driver}</td>
@@ -11909,36 +8212,6 @@ function SettingsPanel({
                       >
                         <option value="">Sklad tanlanmagan</option>
                         {bindingWarehouses.map((w) => <option key={w} value={w}>{w}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <select
-                        className="select"
-                        style={{minWidth:220}}
-                        value={String(driverCashMap?.[driver] || '')}
-                        disabled={!canEditBinding}
-                        onChange={(e) => {
-                          const val = String(e.target.value || '').trim();
-                          setDriverCashMap((prev) => ({ ...(prev || {}), [driver]: val }));
-                        }}
-                      >
-                        <option value="">Naqt uchun kassa tanlanmagan</option>
-                        {bindingCashboxes.map((k) => <option key={`cash_${k}`} value={k}>{k}</option>)}
-                      </select>
-                    </td>
-                    <td>
-                      <select
-                        className="select"
-                        style={{minWidth:220}}
-                        value={String(driverCardCashMap?.[driver] || '')}
-                        disabled={!canEditBinding}
-                        onChange={(e) => {
-                          const val = String(e.target.value || '').trim();
-                          setDriverCardCashMap((prev) => ({ ...(prev || {}), [driver]: val }));
-                        }}
-                      >
-                        <option value="">Karta uchun kassa tanlanmagan</option>
-                        {bindingCashboxes.map((k) => <option key={`card_${k}`} value={k}>{k}</option>)}
                       </select>
                     </td>
                   </tr>
@@ -12198,7 +8471,24 @@ function SettingsPanel({
           <div style={{fontWeight:700,marginBottom:8}}>Access API URL</div>
           <input className="input" placeholder="https://your-access-api.workers.dev" value={webhookUrl} onChange={(e)=>setWebhookUrl(e.target.value)} />
           <div style={{fontSize:11,color:'var(--t3)',marginTop:8}}>Bu URL faqat login, parol va ruxsatlarni barcha kompyuterlarda bir xil saqlash uchun ishlatiladi.</div>
-          <div style={{marginTop:14,padding:10,border:'1px dashed var(--b1)',borderRadius:8,color:'var(--t3)',fontSize:12}}>Kelajak sozlamalari uchun joy.</div>
+          <div style={{marginTop:14,padding:10,border:'1px dashed var(--b1)',borderRadius:8,color:'var(--t3)',fontSize:12}}>
+            Telegram Bot arxivi URL:
+            <input
+              className="input"
+              style={{marginTop:8}}
+              placeholder={BOT_ARCHIVE_DEFAULT}
+              value={botArchiveUrl}
+              onChange={(e)=>setBotArchiveUrl(e.target.value)}
+            />
+            <div style={{fontSize:11,color:'var(--t3)',marginTop:8}}>Admin key:</div>
+            <input
+              className="input"
+              style={{marginTop:5}}
+              placeholder="ADMIN_READ_KEY"
+              value={botArchiveAdminKey}
+              onChange={(e)=>setBotArchiveAdminKey(e.target.value)}
+            />
+          </div>
         </div>
       )}
 
@@ -12259,7 +8549,7 @@ function SettingsPanel({
   );
 }
 
-function LoginScreen({ users=[], onLogin, onResetCreds, loading=false }) {
+function LoginScreen({ users=[], onLogin, onResetCreds }) {
   const [user, setUser] = useState(users[0] || 'Admin');
   const [pass, setPass] = useState('');
   const [err, setErr] = useState('');
@@ -12269,7 +8559,6 @@ function LoginScreen({ users=[], onLogin, onResetCreds, loading=false }) {
   }, [users, user]);
 
   const submit = () => {
-    if (loading) return;
     const ok = onLogin?.(user, pass);
     if (!ok) {
       setErr('Login yoki parol xato');
@@ -12291,20 +8580,9 @@ function LoginScreen({ users=[], onLogin, onResetCreds, loading=false }) {
         <div className="mbdy" style={{display:'flex',flexDirection:'column',gap:10}}>
           <div>
             <div style={{fontSize:11,color:'var(--t3)',marginBottom:5}}>Foydalanuvchi</div>
-            <select
-              className="select"
-              style={{width:'100%'}}
-              value={user}
-              onChange={(e)=>setUser(e.target.value)}
-              disabled={loading}
-            >
+            <select className="select" style={{width:'100%'}} value={user} onChange={(e)=>setUser(e.target.value)}>
               {users.map((u)=><option key={u} value={u}>{u}</option>)}
             </select>
-            {loading && (
-              <div style={{fontSize:11,color:'var(--bl)',marginTop:5}}>
-                Loginlar yangilanmoqda...
-              </div>
-            )}
           </div>
           <div>
             <div style={{fontSize:11,color:'var(--t3)',marginBottom:5}}>Parol</div>
@@ -12321,555 +8599,7 @@ function LoginScreen({ users=[], onLogin, onResetCreds, loading=false }) {
             </div>
           </div>
           {err && <div style={{fontSize:12,color:'var(--rd)'}}>{err}</div>}
-          <button className="btn btn-bl" onClick={submit} style={{justifyContent:'center'}} disabled={loading}>
-            {loading ? 'Yuklanmoqda...' : 'Kirish'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TelegramCustomerPortal({
-  D,
-  dataReady = false,
-  loading = false,
-  loadError = '',
-  onRetry,
-  operators = [],
-}) {
-  const [typedId, setTypedId] = useState('');
-  const [lookupId, setLookupId] = useState('');
-  const [selectedKey, setSelectedKey] = useState('');
-  const [confirmedKey, setConfirmedKey] = useState('');
-  const [activeTab, setActiveTab] = useState('sverka');
-  const [showHelp, setShowHelp] = useState(false);
-  const [orderProduct, setOrderProduct] = useState(TG_BOT_ORDER_PRODUCTS[0] || 'Murodbaxsh 18.9L');
-  const [orderQty, setOrderQty] = useState('1');
-  const [orderNote, setOrderNote] = useState('');
-  const [orderFeedback, setOrderFeedback] = useState('');
-  const [prefillDone, setPrefillDone] = useState(false);
-
-  const tgUser = useMemo(() => {
-    if (typeof window === 'undefined') return {};
-    const user = window.Telegram?.WebApp?.initDataUnsafe?.user || {};
-    return {
-      id: String(user?.id || '').trim(),
-      username: String(user?.username || '').trim(),
-      firstName: String(user?.first_name || '').trim(),
-      lastName: String(user?.last_name || '').trim(),
-    };
-  }, []);
-  const urlPrefill = useMemo(() => {
-    if (typeof window === 'undefined') return { id: '', contractNo: '', fullName: '', address: '', section: '' };
-    try {
-      const u = new URL(window.location.href || '');
-      return {
-        id: normId(u.searchParams.get('customer_id') || ''),
-        contractNo: String(u.searchParams.get('contract_no') || '').trim(),
-        fullName: String(u.searchParams.get('full_name') || '').trim(),
-        address: String(u.searchParams.get('address') || '').trim(),
-        section: String(u.searchParams.get('section') || '').trim().toLowerCase(),
-      };
-    } catch {
-      return { id: '', contractNo: '', fullName: '', address: '', section: '' };
-    }
-  }, []);
-
-  const normalizedLookupId = useMemo(() => normId(lookupId), [lookupId]);
-  const options = useMemo(() => {
-    if (!normalizedLookupId) return [];
-    const customers = Array.isArray(D?.customers) ? D.customers : [];
-    const ids = new Set();
-    customers.forEach((c) => {
-      if (normId(c?.id) === normalizedLookupId) ids.add(normId(c?.id));
-    });
-    const contacts = Array.isArray(D?.contacts) ? D.contacts : [];
-    contacts.forEach((c) => {
-      if (normId(c?.eskiId) === normalizedLookupId && normId(c?.id)) {
-        ids.add(normId(c.id));
-      }
-    });
-    return customers
-      .filter((c) => ids.has(normId(c?.id)))
-      .map((c, idx) => ({
-        ...c,
-        __key: `${normId(c?.id)}__${idx}__${String(c?.name || '').trim()}__${String(c?.address || '').trim()}`,
-      }));
-  }, [D?.customers, D?.contacts, normalizedLookupId]);
-
-  useEffect(() => {
-    if (!options.length) {
-      setSelectedKey('');
-      return;
-    }
-    const has = options.some((x) => x.__key === selectedKey);
-    if (!has) setSelectedKey(options[0].__key);
-  }, [options, selectedKey]);
-
-  useEffect(() => {
-    if (!confirmedKey) return;
-    const has = options.some((x) => x.__key === confirmedKey);
-    if (!has) setConfirmedKey('');
-  }, [options, confirmedKey]);
-  useEffect(() => {
-    if (!urlPrefill.id) return;
-    setTypedId((prev) => (prev ? prev : urlPrefill.id));
-    setLookupId((prev) => (prev ? prev : urlPrefill.id));
-  }, [urlPrefill.id]);
-  useEffect(() => {
-    if (!urlPrefill.section) return;
-    if (urlPrefill.section === 'zakaz') setActiveTab('zakaz');
-    else if (urlPrefill.section === 'sverka') setActiveTab('sverka');
-  }, [urlPrefill.section]);
-  useEffect(() => {
-    if (prefillDone) return;
-    if (!urlPrefill.id || !options.length) return;
-    const byId = options.filter((x) => normId(x?.id) === urlPrefill.id);
-    if (!byId.length) return;
-
-    const qName = normalizeMatchText(urlPrefill.contractNo || urlPrefill.fullName);
-    const qAddr = normalizeMatchText(urlPrefill.address);
-    const picked =
-      byId.find((x) => {
-        const nameTxt = normalizeMatchText(x?.name || '');
-        const addrTxt = normalizeMatchText(x?.address || '');
-        return (qName && (nameTxt.includes(qName) || qName.includes(nameTxt))) || (qAddr && addrTxt.includes(qAddr));
-      }) || byId[0];
-
-    setSelectedKey(picked.__key);
-    setConfirmedKey(picked.__key);
-    setShowHelp(false);
-    setOrderFeedback('');
-    setPrefillDone(true);
-  }, [prefillDone, urlPrefill.id, urlPrefill.contractNo, urlPrefill.fullName, urlPrefill.address, options]);
-
-  const selectedCustomer = useMemo(
-    () => options.find((x) => x.__key === selectedKey) || null,
-    [options, selectedKey]
-  );
-  const confirmedCustomer = useMemo(
-    () => options.find((x) => x.__key === confirmedKey) || null,
-    [options, confirmedKey]
-  );
-
-  const sverkaRows = useMemo(() => {
-    if (!confirmedCustomer) return [];
-    return buildSverka(confirmedCustomer, D?.ordersByMId || {}, D?.cashByMId || {});
-  }, [confirmedCustomer, D?.ordersByMId, D?.cashByMId]);
-
-  const zakazRows = useMemo(() => {
-    if (!confirmedCustomer) return [];
-    const rows = (D?.ordersByMId?.[confirmedCustomer.id] || []).filter(
-      (o) => isWaterProduct(o.product) && isOrderDoc(o.docType)
-    );
-    return [...rows].sort((a, b) => {
-      const da = toDate(a?.orderDate);
-      const db = toDate(b?.orderDate);
-      return (db?.getTime?.() || 0) - (da?.getTime?.() || 0);
-    });
-  }, [confirmedCustomer, D?.ordersByMId]);
-
-  const helperText = useMemo(() => {
-    if (!confirmedCustomer && !selectedCustomer) return "ID kiriting va o'zingizni tasdiqlang.";
-    const c = confirmedCustomer || selectedCustomer;
-    return `ID: ${c?.id || '-'} | Kontragent: ${c?.name || '-'} | Manzil: ${c?.address || '-'}`;
-  }, [confirmedCustomer, selectedCustomer]);
-
-  const openOperatorChat = useCallback(
-    (rawUsername) => {
-      const username = String(rawUsername || '').trim().replace(/^@/, '');
-      if (!username) return;
-      const c = confirmedCustomer || selectedCustomer;
-      const msg = [
-        "Assalomu alaykum, men botdagi ilovadan yozyapman.",
-        `Mening ID: ${normId(lookupId || typedId) || '-'}`,
-        c ? `Kontragent: ${c.name || '-'}` : '',
-      ]
-        .filter(Boolean)
-        .join('\n');
-      const link = `https://t.me/${username}?text=${encodeURIComponent(msg)}`;
-      const tg = typeof window !== 'undefined' ? window.Telegram?.WebApp : null;
-      try {
-        if (tg?.openTelegramLink) tg.openTelegramLink(link);
-        else window.open(link, '_blank', 'noopener,noreferrer');
-      } catch {
-        window.open(link, '_blank', 'noopener,noreferrer');
-      }
-    },
-    [lookupId, typedId, confirmedCustomer, selectedCustomer]
-  );
-  const pushMiniEventToBot = useCallback((payload) => {
-    if (typeof window === 'undefined') return;
-    const tg = window.Telegram?.WebApp;
-    if (!tg?.sendData) return;
-    try {
-      tg.sendData(JSON.stringify(payload || {}));
-    } catch {}
-  }, []);
-
-  const onFind = useCallback(() => {
-    const normalized = normId(typedId);
-    if (!normalized) return;
-    setLookupId(normalized);
-    setConfirmedKey('');
-    setActiveTab('sverka');
-    setShowHelp(false);
-    setOrderFeedback('');
-    pushMiniEventToBot({
-      type: 'id_submitted',
-      id: normalized,
-      tgUserId: tgUser.id || '',
-      tgUsername: tgUser.username ? `@${tgUser.username.replace(/^@/, '')}` : '',
-      at: new Date().toISOString(),
-    });
-  }, [typedId, tgUser.id, tgUser.username, pushMiniEventToBot]);
-
-  const markNotMine = useCallback(() => {
-    setConfirmedKey('');
-    setShowHelp(true);
-    setOrderFeedback('');
-    pushMiniEventToBot({
-      type: 'customer_not_mine',
-      lookupId: normId(lookupId || typedId),
-      at: new Date().toISOString(),
-    });
-  }, [lookupId, typedId, pushMiniEventToBot]);
-  const submitBotOrder = useCallback(() => {
-    if (!confirmedCustomer) return;
-    const qty = Math.max(0, Math.abs(toNum(orderQty)));
-    if (!qty) {
-      setOrderFeedback("Miqdor noto'g'ri. 1 yoki undan katta son kiriting.");
-      return;
-    }
-    const row = appendTelegramBotOrder({
-      customerId: confirmedCustomer.id,
-      customerName: confirmedCustomer.name,
-      customerAddress: confirmedCustomer.address,
-      customerPhone: confirmedCustomer.phone,
-      district: confirmedCustomer.district,
-      product: orderProduct,
-      qty,
-      note: orderNote,
-      telegramUserId: tgUser.id,
-      telegramUsername: tgUser.username ? `@${tgUser.username.replace(/^@/, '')}` : '',
-      telegramFirstName: tgUser.firstName,
-      telegramLastName: tgUser.lastName,
-      status: 'Yangi',
-    });
-    if (!row) {
-      setOrderFeedback("Zakazni saqlab bo'lmadi. Qayta urinib ko'ring.");
-      return;
-    }
-    pushMiniEventToBot({
-      type: 'bot_order_created',
-      at: new Date().toISOString(),
-      order: row,
-    });
-    setOrderNote('');
-    setOrderQty('1');
-    setOrderFeedback(`Zakaz yuborildi: ${row.id}`);
-  }, [confirmedCustomer, orderProduct, orderQty, orderNote, tgUser, pushMiniEventToBot]);
-
-  const portalFrameStyle = {
-    minHeight: '100vh',
-    background: 'var(--bg)',
-    color: 'var(--t1)',
-    display: 'grid',
-    placeItems: 'center',
-    padding: 14,
-  };
-
-  return (
-    <div style={portalFrameStyle}>
-      <div style={{ width: '100%', maxWidth: 980, border: '1px solid var(--b2)', borderRadius: 14, background: 'var(--s1)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--b2)', background: 'linear-gradient(135deg,var(--s2),var(--s1))' }}>
-          <div style={{ fontWeight: 800, fontSize: 18 }}>Mijoz kabineti</div>
-          <div style={{ marginTop: 5, fontSize: 12, color: 'var(--t3)' }}>{helperText}</div>
-        </div>
-
-        <div style={{ padding: 16, display: 'grid', gap: 12 }}>
-          {!dataReady && loading && (
-            <div className="card" style={{ padding: 14 }}>
-              Ma'lumot yuklanmoqda...
-            </div>
-          )}
-          {!!loadError && (
-            <div className="card" style={{ padding: 14, border: '1px solid var(--rd)', background: 'var(--rd2)' }}>
-              <div style={{ color: 'var(--rd)', fontWeight: 700 }}>Yuklash xatosi: {loadError}</div>
-              <div style={{ marginTop: 10 }}>
-                <button className="btn btn-bl btn-sm" onClick={() => onRetry?.()}>Qayta yuklash</button>
-              </div>
-            </div>
-          )}
-
-          {!confirmedCustomer && (
-            <div className="card" style={{ padding: 14, display: 'grid', gap: 10 }}>
-              <div style={{ fontSize: 12, color: 'var(--t3)' }}>ID ni kiriting</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  className="input"
-                  placeholder="Masalan: 12345"
-                  value={typedId}
-                  onChange={(e) => setTypedId(e.target.value)}
-                  onKeyDown={(e) => (e.key === 'Enter' ? onFind() : null)}
-                />
-                <button className="btn btn-bl" onClick={onFind}>Tekshirish</button>
-              </div>
-
-              {normalizedLookupId && options.length === 0 && dataReady && (
-                <div style={{ color: 'var(--rd)', fontSize: 12 }}>
-                  Bu ID bo'yicha kontragent topilmadi.
-                </div>
-              )}
-
-              {options.length > 0 && (
-                <div style={{ display: 'grid', gap: 8 }}>
-                  <div style={{ fontSize: 12, color: 'var(--t3)' }}>
-                    Kontragentni tanlang va tasdiqlang:
-                  </div>
-                  <div style={{ display: 'grid', gap: 8 }}>
-                    {options.map((c) => (
-                      <label
-                        key={c.__key}
-                        style={{
-                          border: c.__key === selectedKey ? '1px solid var(--bl)' : '1px solid var(--b2)',
-                          borderRadius: 10,
-                          padding: 10,
-                          display: 'grid',
-                          gridTemplateColumns: '18px minmax(0,1fr)',
-                          gap: 8,
-                          alignItems: 'start',
-                          background: c.__key === selectedKey ? 'var(--bl3)' : 'var(--s2)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <input
-                          type="radio"
-                          checked={c.__key === selectedKey}
-                          onChange={() => setSelectedKey(c.__key)}
-                          style={{ marginTop: 2 }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: 700 }}>{c.name || '-'}</div>
-                          <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>
-                            ID: {c.id || '-'} | Tel: {c.phone || '-'} | Rayon: {c.district || '-'}
-                          </div>
-                          <div style={{ fontSize: 12, color: 'var(--t2)', marginTop: 2 }}>
-                            Manzil: {c.address || '-'}
-                          </div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button
-                      className="btn btn-bl"
-                      disabled={!selectedCustomer}
-                      onClick={() => {
-                        if (!selectedCustomer) return;
-                        setConfirmedKey(selectedCustomer.__key);
-                        setActiveTab('sverka');
-                        setShowHelp(false);
-                        setOrderFeedback('');
-                        pushMiniEventToBot({
-                          type: 'customer_confirmed',
-                          id: selectedCustomer.id || '',
-                          name: selectedCustomer.name || '',
-                          address: selectedCustomer.address || '',
-                          at: new Date().toISOString(),
-                        });
-                      }}
-                    >
-                      Tasdiqlash
-                    </button>
-                    <button className="btn btn-gh" onClick={markNotMine}>Meniki emas</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {showHelp && (
-            <div className="card" style={{ padding: 14, border: '1px solid var(--yl)', background: 'var(--yl2)' }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>ID noto'g'ri bo'lsa operatorga yozing</div>
-              <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 8 }}>
-                Quyidagi operatorlardan biriga Telegram orqali yozing:
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {(operators || []).map((op) => (
-                  <button key={op} className="btn btn-sm btn-gh" onClick={() => openOperatorChat(op)}>
-                    {op}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {confirmedCustomer && (
-            <>
-              <div className="card" style={{ padding: 12, display: 'grid', gap: 6 }}>
-                <div style={{ fontSize: 16, fontWeight: 800 }}>{confirmedCustomer.name || '-'}</div>
-                <div style={{ fontSize: 12, color: 'var(--t3)' }}>
-                  ID: {confirmedCustomer.id || '-'} | Tel: {confirmedCustomer.phone || '-'} | Rayon: {confirmedCustomer.district || '-'}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--t2)' }}>Manzil: {confirmedCustomer.address || '-'}</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-                  <button className="btn btn-sm btn-gh" onClick={markNotMine}>Meniki emas</button>
-                  <button className="btn btn-sm btn-gh" onClick={() => setConfirmedKey('')}>Boshqa ID</button>
-                </div>
-              </div>
-
-              <div className="tabs" style={{ display: 'inline-flex', width: 'fit-content' }}>
-                <button className={`tab${activeTab === 'sverka' ? ' on' : ''}`} onClick={() => setActiveTab('sverka')}>
-                  {E.sv} Sverka
-                </button>
-                <button className={`tab${activeTab === 'order_create' ? ' on' : ''}`} onClick={() => setActiveTab('order_create')}>
-                  {E.order} Zakaz urish
-                </button>
-                <button className={`tab${activeTab === 'zakaz' ? ' on' : ''}`} onClick={() => setActiveTab('zakaz')}>
-                  Oldingi zakazlar
-                </button>
-              </div>
-
-              {activeTab === 'sverka' && (
-                <div style={{ overflow: 'auto', maxHeight: '58vh', border: '1px solid var(--b2)', borderRadius: 10 }}>
-                  <table className="tbl" style={{ minWidth: 820 }}>
-                    <thead>
-                      <tr>
-                        <th>Sana</th>
-                        <th>Tur</th>
-                        <th>Mahsulot</th>
-                        <th style={{ textAlign: 'right' }}>Miqdor</th>
-                        <th style={{ textAlign: 'right' }}>Summa</th>
-                        <th style={{ textAlign: 'right' }}>To'lov</th>
-                        <th style={{ textAlign: 'right' }}>Balans</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sverkaRows.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
-                            Sverka ma'lumoti topilmadi
-                          </td>
-                        </tr>
-                      ) : (
-                        sverkaRows.map((row, idx) => (
-                          <tr key={`sv_${idx}`}>
-                            <td>{row.sana || '-'}</td>
-                            <td>{row._type === 'payment' ? "To'lov" : row._isVoz ? 'Vozvrat' : 'Zakaz'}</td>
-                            <td style={{ maxWidth: 260 }}>
-                              <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {row.produkt || '-'}
-                              </span>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>
-                              {row.qty != null ? `${row._isVoz ? '-' : ''}${Math.abs(row.qty)}` : '-'}
-                            </td>
-                            <td style={{ textAlign: 'right' }}>{row.summa ? fmt(row.summa) : '-'}</td>
-                            <td style={{ textAlign: 'right' }}>{row.tolov ? fmt(row.tolov) : '-'}</td>
-                            <td style={{ textAlign: 'right' }}>{fmt(row.balansUZS || 0)}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {activeTab === 'zakaz' && (
-                <div style={{ overflow: 'auto', maxHeight: '58vh', border: '1px solid var(--b2)', borderRadius: 10 }}>
-                  <table className="tbl" style={{ minWidth: 760 }}>
-                    <thead>
-                      <tr>
-                        <th>Zakaz no</th>
-                        <th>Sana</th>
-                        <th>Mahsulot</th>
-                        <th style={{ textAlign: 'right' }}>Soni</th>
-                        <th style={{ textAlign: 'right' }}>Summa</th>
-                        <th>Holat</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {zakazRows.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
-                            Zakazlar topilmadi
-                          </td>
-                        </tr>
-                      ) : (
-                        zakazRows.map((o, idx) => (
-                          <tr key={`zak_${idx}`}>
-                            <td>{o.soNum || '-'}</td>
-                            <td>{fmtD(o.orderDate)}</td>
-                            <td>{o.product || '-'}</td>
-                            <td style={{ textAlign: 'right' }}>{Math.abs(o.qty || 0)}</td>
-                            <td style={{ textAlign: 'right' }}>{o.sum ? fmt(o.sum) : '-'}</td>
-                            <td>{o.status || '-'}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {activeTab === 'order_create' && (
-                <div className="card" style={{ padding: 14, display: 'grid', gap: 10 }}>
-                  <div style={{ fontWeight: 700 }}>Bot orqali yangi zakaz</div>
-                  <div style={{ fontSize: 12, color: 'var(--t3)' }}>
-                    Zakaz yuborilgandan keyin u “Zakazlar → Bot zakazlar” bo‘limida ko‘rinadi.
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px,1fr))', gap: 8 }}>
-                    <div>
-                      <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 5 }}>Mahsulot</div>
-                      <select className="select" value={orderProduct} onChange={(e) => setOrderProduct(e.target.value)}>
-                        {TG_BOT_ORDER_PRODUCTS.map((p) => <option key={`tg_p_${p}`} value={p}>{p}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 5 }}>Soni</div>
-                      <input
-                        className="input"
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={orderQty}
-                        onChange={(e) => setOrderQty(e.target.value)}
-                        placeholder="Masalan: 3"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 5 }}>Izoh</div>
-                    <textarea
-                      className="input"
-                      rows={3}
-                      value={orderNote}
-                      onChange={(e) => setOrderNote(e.target.value)}
-                      placeholder="Masalan: kirishda qo‘ng‘iroq qiling"
-                      style={{ resize: 'vertical' }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button className="btn btn-bl btn-sm" onClick={submitBotOrder}>Zakaz yuborish</button>
-                    <button
-                      className="btn btn-gh btn-sm"
-                      onClick={() => openOperatorChat((operators || [])[0] || '')}
-                      disabled={!(operators || []).length}
-                    >
-                      Operatorga yozish
-                    </button>
-                  </div>
-                  {!!orderFeedback && (
-                    <div style={{ fontSize: 12, color: /yuborildi/i.test(orderFeedback) ? 'var(--gr)' : 'var(--rd)' }}>
-                      {orderFeedback}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
+          <button className="btn btn-bl" onClick={submit} style={{justifyContent:'center'}}>Kirish</button>
         </div>
       </div>
     </div>
@@ -12880,52 +8610,24 @@ const NAV = [
   { id:'dash',    label:'Dashboard',  icon:E.home },
   { id:'cust',    label:'Mijozlar',   icon:E.users, badge:'d' },
   { id:'orders',  label:'Zakazlar',   icon:E.order },
-  { id:'left_orders', label:'Qolib ketgan zakazlar', icon:'\u23F3' },
+  { id:'left_orders', label:'Qolib ketgan zakazlar', icon:'⏳' },
   { id:'kassa',   label:'Kassa',      icon:E.pay },
   { id:'obzvon',  label:'Obzvon',     icon:E.phone, badge:'o' },
   { id:'doljniki',label:'Doljniki',   icon:E.doc, badge:'dz' },
   { id:'nazorat', label:'Nazorat',    icon:E.report },
   { id:'reports', label:'Hisobotlar', icon:E.report },
   { id:'plan',    label:'Plan',       icon:E.plan },
-  { id:'test',    label:'Test',       icon:E.test },
-  { id:'bloggers',label:'Blogerlar',  icon:E.blogger },
+  { id:'telegram_bot', label:'Telegram Bot', icon:'TG' },
 ];
-const APP_PAGE_IDS = new Set([...NAV.map((n) => n.id), 'settings']);
-const normalizeAppPageId = (v) => {
-  const id = String(v || '').trim();
-  return APP_PAGE_IDS.has(id) ? id : '';
-};
-const readPageFromUrl = () => {
-  if (typeof window === 'undefined') return '';
-  try {
-    const u = new URL(window.location.href || '');
-    const fromSearch = u.searchParams.get('page') || '';
-    const hashRaw = String(u.hash || '').replace(/^#/, '');
-    let fromHash = '';
-    if (hashRaw) {
-      if (hashRaw.includes('=')) {
-        const hp = new URLSearchParams(hashRaw.startsWith('?') ? hashRaw.slice(1) : hashRaw);
-        fromHash = hp.get('page') || '';
-      } else {
-        fromHash = hashRaw;
-      }
-    }
-    return normalizeAppPageId(fromHash || fromSearch || '');
-  } catch {
-    return '';
-  }
-};
 
 export default function App() {
-  const [page,setPage]     = useState(() => readPageFromUrl() || 'dash');
+  const [page,setPage]     = useState('dash');
   const [data,setData]     = useState(null);
   const [obzvonRecords,setObzvonRecords] = useState(() => S.get('aq-obzvon-records', []));
   const [obzvonAllRows,setObzvonAllRows] = useState(() => S.get('aq-obzvon-all-rows', []));
   const [obzvonAllNewRows,setObzvonAllNewRows] = useState(() => S.get('aq-obzvon-all-new-rows', []));
-  const [leftoverQziSheetRows, setLeftoverQziSheetRows] = useState([]);
   const [leftoverReasonSheetRows, setLeftoverReasonSheetRows] = useState([]);
   const [leftoverArchiveSheetRows, setLeftoverArchiveSheetRows] = useState([]);
-  const [leftoverEmployeeSheetRows, setLeftoverEmployeeSheetRows] = useState([]);
   const [leftoverSheetLoading, setLeftoverSheetLoading] = useState(false);
   const [leftoverSheetError, setLeftoverSheetError] = useState('');
   const [leftoverTargetDate, setLeftoverTargetDate] = useState(() => getLeftoverCompareDate(new Date()));
@@ -12947,28 +8649,16 @@ export default function App() {
   const [obzvonWebhook,setObzvonWebhook] = useState(() =>
     normalizeAccessApiUrl(S.get(ACCESS_SYNC_URL_KEY, OBZVON_WEBHOOK_DEFAULT))
   );
+  const [botArchiveBaseUrl, setBotArchiveBaseUrl] = useState(() =>
+    normalizeBotArchiveUrl(S.get(BOT_ARCHIVE_URL_KEY, BOT_ARCHIVE_DEFAULT))
+  );
+  const [botArchiveAdminKey, setBotArchiveAdminKey] = useState(() =>
+    String(S.get(BOT_ARCHIVE_ADMIN_KEY, '') || '')
+  );
   const accessApiUrl = useMemo(
     () => normalizeAccessApiUrl(obzvonWebhook),
     [obzvonWebhook]
   );
-  const isTelegramClientMode = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      const tg = window.Telegram?.WebApp;
-      const hasTelegramInit = Boolean(tg?.initData || tg?.initDataUnsafe?.user);
-      const u = new URL(window.location.href || '');
-      const forcedByQuery = u.searchParams.get('tg') === '1';
-      const hashRaw = String(u.hash || '').replace(/^#/, '');
-      const forcedByHash = hashRaw.includes('tg=1');
-      const hasTgHashParams = /tgwebapp/i.test(hashRaw);
-      const hasTgParams = ['tgWebAppData', 'tgWebAppVersion', 'tgWebAppPlatform', 'tgWebAppThemeParams']
-        .some((k) => u.searchParams.has(k));
-      const hasTelegramUA = /telegram/i.test(String(window.navigator?.userAgent || ''));
-      return hasTelegramInit || forcedByQuery || forcedByHash || hasTgParams || hasTgHashParams || hasTelegramUA;
-    } catch {
-      return false;
-    }
-  }, []);
   const [showUp,setUp]     = useState(false);
   const [notif,setNotif]   = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
@@ -12982,71 +8672,11 @@ export default function App() {
   const [autoLoad,setAutoLoad] = useState({ loading:false, progress:'', error:'' });
   const [remoteAccessLoaded, setRemoteAccessLoaded] = useState(false);
   const [obzvonAllLoaded, setObzvonAllLoaded] = useState(false);
-  const [bindingSyncTick, setBindingSyncTick] = useState(0);
   const skipCloudPushRef = useRef(false);
   const remoteAccessConfigRef = useRef(null);
   const obzvonAllNewRowsRef = useRef(obzvonAllNewRows || []);
   const pendingObzvonNewRowsRef = useRef([]);
   const obzvonExportBusyRef = useRef(false);
-  useEffect(() => {
-    if (!isTelegramClientMode || typeof window === 'undefined') return;
-    const tg = window.Telegram?.WebApp;
-    try {
-      tg?.ready?.();
-      tg?.expand?.();
-    } catch {}
-  }, [isTelegramClientMode]);
-  const buildPageUrl = useCallback((targetPage) => {
-    const nextPage = normalizeAppPageId(targetPage);
-    if (!nextPage || typeof window === 'undefined') return '';
-    try {
-      const u = new URL(window.location.href || '');
-      u.hash = `page=${encodeURIComponent(nextPage)}`;
-      return u.toString();
-    } catch {
-      return '';
-    }
-  }, []);
-  const openPageInNewTab = useCallback((targetPage) => {
-    const nextUrl = buildPageUrl(targetPage);
-    if (!nextUrl || typeof window === 'undefined') return;
-    window.open(nextUrl, '_blank', 'noopener,noreferrer');
-  }, [buildPageUrl]);
-  const switchPageByClick = useCallback((targetPage, e = null) => {
-    const nextPage = normalizeAppPageId(targetPage);
-    if (!nextPage) return;
-    const openNewTab = !!(e && (e.button === 1 || e.ctrlKey || e.metaKey));
-    if (openNewTab) {
-      e.preventDefault?.();
-      e.stopPropagation?.();
-      openPageInNewTab(nextPage);
-      return;
-    }
-    setPage(nextPage);
-  }, [openPageInNewTab]);
-  useEffect(() => {
-    const nextUrl = buildPageUrl(page);
-    if (!nextUrl || typeof window === 'undefined') return;
-    if (window.location.href !== nextUrl) {
-      window.history.replaceState(null, '', nextUrl);
-    }
-  }, [page, buildPageUrl]);
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const onHashChange = () => {
-      const fromUrl = readPageFromUrl();
-      if (!fromUrl) return;
-      setPage((prev) => (prev === fromUrl ? prev : fromUrl));
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const onBindingUpdated = () => setBindingSyncTick((v) => v + 1);
-    window.addEventListener(BINDING_UPDATE_EVENT, onBindingUpdated);
-    return () => window.removeEventListener(BINDING_UPDATE_EVENT, onBindingUpdated);
-  }, []);
   const buildDefaultCreds = useCallback((baseUsers) => {
     const m = {};
     (baseUsers || []).forEach((u) => { m[u] = u; });
@@ -13065,67 +8695,6 @@ export default function App() {
     });
     return merged;
   }, [users, userCreds, buildDefaultCreds]);
-  const sanitizeBindingMap = useCallback((rawMap) => {
-    const out = {};
-    if (!rawMap || typeof rawMap !== 'object') return out;
-    Object.entries(rawMap).forEach(([rawKey, rawVal]) => {
-      const key = String(rawKey || '').trim();
-      const val = String(rawVal || '').trim();
-      if (!key || !val) return;
-      out[key] = val;
-    });
-    return out;
-  }, []);
-  const readAllBindingMaps = useCallback(() => {
-    const out = {};
-    (COMPANY_OPTIONS || []).forEach((item) => {
-      const companyKey = normalizeCompanyKey(item?.key || item);
-      out[companyKey] = {
-        warehouseMap: sanitizeBindingMap(S.get(`aq-driver-warehouse-map-${companyKey}`, {})),
-        cashMap: sanitizeBindingMap(S.get(`aq-driver-cash-map-${companyKey}`, {})),
-        cardCashMap: sanitizeBindingMap(S.get(`aq-driver-card-cash-map-${companyKey}`, {})),
-      };
-    });
-    return out;
-  }, [sanitizeBindingMap]);
-  const applyRemoteBindingMaps = useCallback((rawPayload) => {
-    if (!rawPayload || typeof rawPayload !== 'object') return false;
-    let changed = false;
-    Object.entries(rawPayload).forEach(([rawCompany, rawMaps]) => {
-      const companyKey = normalizeCompanyKey(rawCompany);
-      const maps = (rawMaps && typeof rawMaps === 'object') ? rawMaps : {};
-      const nextWarehouse = sanitizeBindingMap(maps.warehouseMap ?? maps.warehouse ?? {});
-      const nextCash = sanitizeBindingMap(maps.cashMap ?? maps.cash ?? {});
-      const nextCardCash = sanitizeBindingMap(maps.cardCashMap ?? maps.cardCash ?? maps.card ?? {});
-
-      const warehouseStorageKey = `aq-driver-warehouse-map-${companyKey}`;
-      const cashStorageKey = `aq-driver-cash-map-${companyKey}`;
-      const cardCashStorageKey = `aq-driver-card-cash-map-${companyKey}`;
-
-      const prevWarehouse = sanitizeBindingMap(S.get(warehouseStorageKey, {}));
-      const prevCash = sanitizeBindingMap(S.get(cashStorageKey, {}));
-      const prevCardCash = sanitizeBindingMap(S.get(cardCashStorageKey, {}));
-
-      if (JSON.stringify(prevWarehouse) !== JSON.stringify(nextWarehouse)) {
-        S.set(warehouseStorageKey, nextWarehouse);
-        changed = true;
-      }
-      if (JSON.stringify(prevCash) !== JSON.stringify(nextCash)) {
-        S.set(cashStorageKey, nextCash);
-        changed = true;
-      }
-      if (JSON.stringify(prevCardCash) !== JSON.stringify(nextCardCash)) {
-        S.set(cardCashStorageKey, nextCardCash);
-        changed = true;
-      }
-    });
-    if (changed && typeof window !== 'undefined') {
-      try {
-        window.dispatchEvent(new CustomEvent(BINDING_UPDATE_EVENT, { detail: { source: 'remote' } }));
-      } catch {}
-    }
-    return changed;
-  }, [sanitizeBindingMap]);
   const applyRemoteAccessConfig = useCallback((payload) => {
     let cfg = payload;
     if (typeof cfg === 'string') {
@@ -13142,16 +8711,12 @@ export default function App() {
 
     const rawAccess = cfg.access && typeof cfg.access === 'object' ? cfg.access : {};
     const rawCreds = cfg.userCreds && typeof cfg.userCreds === 'object' ? cfg.userCreds : {};
-    const rawBindingMaps = (cfg.bindingMaps && typeof cfg.bindingMaps === 'object')
-      ? cfg.bindingMaps
-      : ((cfg.bindingsByCompany && typeof cfg.bindingsByCompany === 'object') ? cfg.bindingsByCompany : {});
     const remoteUpdatedAt = toDate(cfg.updatedAt)?.getTime() || 0;
     const localUpdatedAt = Number(S.get(ACCESS_UPDATED_AT_KEY, 0)) || 0;
     // Juda eski remote payload lokalni bosib yubormasin.
     if (remoteUpdatedAt && localUpdatedAt && remoteUpdatedAt < localUpdatedAt - 1000) {
       return true;
     }
-    applyRemoteBindingMaps(rawBindingMaps);
 
     const nextAccess = {};
     const nextCreds = {};
@@ -13191,7 +8756,7 @@ export default function App() {
     S.set('aq-user-creds', nextCreds);
     S.set(ACCESS_UPDATED_AT_KEY, remoteUpdatedAt || Date.now());
     return true;
-  }, [users, access, userCreds, applyRemoteBindingMaps]);
+  }, [users, access, userCreds]);
 
   const loadRemoteAccessConfig = useCallback(async () => {
     if (!accessApiUrl) {
@@ -13550,16 +9115,12 @@ export default function App() {
     setLeftoverSheetLoading(true);
     setLeftoverSheetError('');
     try {
-      const [qziSheet, reasonSheet, archiveSheet, employeeSheet] = await Promise.all([
-        loadOne(LEFTOVER_QZI_GID, 'Q_Z_I', 'Q_Z_I').catch(() => []),
+      const [reasonSheet, archiveSheet] = await Promise.all([
         loadOne(LEFTOVER_REASON_GID, 'Qolib_ketgan_zakazlar_Arxiv', 'Qolib_ketgan_zakazlar_Arxiv'),
         loadOne(LEFTOVER_ARCHIVE_GID, 'Arxiv', 'Arxiv'),
-        loadOne(LEFTOVER_EMPLOYEES_GID, 'XODIMLAR', 'XODIMLAR').catch(() => []),
       ]);
-      setLeftoverQziSheetRows(Array.isArray(qziSheet) ? qziSheet : []);
       setLeftoverReasonSheetRows(Array.isArray(reasonSheet) ? reasonSheet : []);
       setLeftoverArchiveSheetRows(Array.isArray(archiveSheet) ? archiveSheet : []);
-      setLeftoverEmployeeSheetRows(Array.isArray(employeeSheet) ? employeeSheet : []);
     } catch (e) {
       setLeftoverSheetError(String(e?.message || e || 'Qolib ketgan zakazlar sheet xatosi'));
     } finally {
@@ -13675,16 +9236,11 @@ export default function App() {
           if (idx > 0) rowsToSend = rowsWithStableId.slice(0, idx);
           else if (idx === 0) rowsToSend = [];
         } else {
-          // Sheet bo'sh yoki reset qilingan bo'lsa, local mapga qaramay to'liq qayta yuboramiz.
-          if (Number(lastInfo.lastStableId || 0) <= 0) {
-            rowsToSend = rowsWithStableId;
-          } else {
-            rowsToSend = rowsWithStableId.filter((r) => {
-              const rid = String(r.rid || r._rid || '').trim();
-              const ts = String(r.updatedAt || '').trim() || '0';
-              return String(exportedMap[rid] || '') !== ts;
-            });
-          }
+          rowsToSend = rowsWithStableId.filter((r) => {
+            const rid = String(r.rid || r._rid || '').trim();
+            const ts = String(r.updatedAt || '').trim() || '0';
+            return String(exportedMap[rid] || '') !== ts;
+          });
         }
       }
       if (!rowsToSend.length) {
@@ -13808,6 +9364,17 @@ export default function App() {
     S.set(ACCESS_SYNC_URL_KEY, normalized || '');
     S.set('aq-obzvon-webhook', normalized || '');
   }, [obzvonWebhook]);
+  useEffect(() => {
+    const normalized = normalizeBotArchiveUrl(botArchiveBaseUrl);
+    if (normalized !== String(botArchiveBaseUrl || '').trim()) {
+      setBotArchiveBaseUrl(normalized);
+      return;
+    }
+    S.set(BOT_ARCHIVE_URL_KEY, normalized || '');
+  }, [botArchiveBaseUrl]);
+  useEffect(() => {
+    S.set(BOT_ARCHIVE_ADMIN_KEY, String(botArchiveAdminKey || '').trim());
+  }, [botArchiveAdminKey]);
   useEffect(() => { S.set('aq-main-url', mainSheetUrl || ''); }, [mainSheetUrl]);
   useEffect(() => { S.set('aq-obzvon-url', obzvonSheetUrl || ''); }, [obzvonSheetUrl]);
   useEffect(() => {
@@ -13838,11 +9405,6 @@ export default function App() {
     if (changed) setObzvonRecords(next);
   }, [obzvonRecords]);
   useEffect(() => {
-    if (isLoggedIn) return;
-    if (remoteAccessLoaded) return;
-    loadRemoteAccessConfig();
-  }, [isLoggedIn, remoteAccessLoaded, loadRemoteAccessConfig]);
-  useEffect(() => {
     if (!isLoggedIn) return;
     setRemoteAccessLoaded(false);
     loadRemoteAccessConfig();
@@ -13866,7 +9428,6 @@ export default function App() {
       users,
       access,
       userCreds,
-      bindingMaps: readAllBindingMaps(),
       updatedAt: new Date(nowTs).toISOString(),
       updatedBy: sessionUser,
     };
@@ -13874,7 +9435,7 @@ export default function App() {
       pushRemoteAccessConfig(payload);
     }, 350);
     return () => clearTimeout(t);
-  }, [users, access, userCreds, bindingSyncTick, isLoggedIn, sessionUser, remoteAccessLoaded, pushRemoteAccessConfig, readAllBindingMaps]);
+  }, [users, access, userCreds, isLoggedIn, sessionUser, remoteAccessLoaded, pushRemoteAccessConfig]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -14077,11 +9638,7 @@ export default function App() {
   const activeCompany = canSwitchCompany ? normalizeCompanyKey(companyFilter) : lockedCompany;
   const scopeOwn = currentAccess.scope === 'own';
   const ownIds = useMemo(
-    () => new Set(
-      Object.entries(rawD.assignmentById || {})
-        .filter(([, op]) => normalizeUserKey(op) === normalizeUserKey(effectiveUser))
-        .map(([id]) => id)
-    ),
+    () => new Set(Object.entries(rawD.assignmentById || {}).filter(([, op]) => op === effectiveUser).map(([id]) => id)),
     [rawD.assignmentById, effectiveUser]
   );
   const scopedD = useMemo(() => {
@@ -14204,15 +9761,12 @@ export default function App() {
   const visibleNav = NAV.filter((n) => canViewPage(n.id));
   const leftoverAlertAnalysis = useMemo(() => buildLeftoverAnalysis({
     rawOrders: D.rawOrders || [],
-    rawQziRows: leftoverQziSheetRows || [],
     rawReasonRows: leftoverReasonSheetRows || [],
     rawArchiveRows: leftoverArchiveSheetRows || [],
     targetDate: leftoverTargetDate,
     currentUser: effectiveUser,
     canSeeAll: (currentAccess?.scope || 'all') === 'all',
-    allowedCustomerIds: (currentAccess?.scope || 'all') === 'all' ? null : companyCustomerIds,
-    includeAllQziRows: false,
-  }), [D.rawOrders, leftoverQziSheetRows, leftoverReasonSheetRows, leftoverArchiveSheetRows, leftoverTargetDate, effectiveUser, currentAccess, companyCustomerIds]);
+  }), [D.rawOrders, leftoverReasonSheetRows, leftoverArchiveSheetRows, leftoverTargetDate, effectiveUser, currentAccess]);
   const companyLeftMissingRows = leftoverAlertAnalysis.missingRows || [];
   const companyLeftProductGapRows = leftoverAlertAnalysis.productGapRows || [];
   const pageMeta = NAV.find((n)=>n.id===page) || { id:'settings', icon:E.settings, label:'Nastroyka' };
@@ -14464,7 +10018,7 @@ export default function App() {
           id: `tgt_${cid}`,
           customerId: cid,
           title: String(c.name || '').trim() || `ID ${cid}`,
-          subtitle: 'эя TUGATILDI" lekin qoldiq 0 emas',
+          subtitle: '"Я TUGATILDI" lekin qoldiq 0 emas',
           meta: [
             `Balans UZS: ${balanceUZS > 0 ? '+' : ''}${fmt(balanceUZS)} so'm`,
             `Balans USD: ${balanceUSD > 0 ? '+' : ''}${fmt(balanceUSD)}`,
@@ -14479,7 +10033,7 @@ export default function App() {
           id: `eskiclose_${cid}`,
           customerId: cid,
           title: String(c.name || '').trim() || `ID ${cid}`,
-          subtitle: 'эя Eski" mijoz toza: yopish mumkin',
+          subtitle: '"Я Eski" mijoz toza: yopish mumkin',
           meta: [
             `Balans UZS: ${fmt(balanceUZS)} so'm`,
             `Balans USD: ${fmt(balanceUSD)}`,
@@ -14546,7 +10100,7 @@ export default function App() {
     if (customerStatusAlerts.tugatildi.length) {
       topics.push({
         key: 'tugatildi_control',
-        title: 'эя TUGATILDI" nazorati',
+        title: '"Я TUGATILDI" nazorati',
         subtitle: 'Balans/idish/kuler 0 bo\'lmaganlar',
         items: customerStatusAlerts.tugatildi,
       });
@@ -14554,7 +10108,7 @@ export default function App() {
     if (customerStatusAlerts.eskiClose.length) {
       topics.push({
         key: 'eski_close',
-        title: 'эя Eski" yopish',
+        title: '"Я Eski" yopish',
         subtitle: 'Hammasi 0 bo\'lgan mijozlar',
         items: customerStatusAlerts.eskiClose,
       });
@@ -14787,32 +10341,11 @@ export default function App() {
     setPage(fallback);
   }, [visibleNav, page, canViewPage]);
 
-  if (isTelegramClientMode) {
-    return (
-      <>
-        <style>{CSS}</style>
-        <TelegramCustomerPortal
-          D={D}
-          dataReady={!!data}
-          loading={!!autoLoad.loading}
-          loadError={autoLoad.error || ''}
-          onRetry={loadFromConfig}
-          operators={TELEGRAM_HELP_OPERATORS}
-        />
-      </>
-    );
-  }
-
   if (!isLoggedIn) {
     return (
       <>
         <style>{CSS}</style>
-        <LoginScreen
-          users={users}
-          onLogin={authenticate}
-          onResetCreds={resetLoginCreds}
-          loading={!remoteAccessLoaded}
-        />
+        <LoginScreen users={users} onLogin={authenticate} onResetCreds={resetLoginCreds} />
       </>
     );
   }
@@ -14835,14 +10368,7 @@ export default function App() {
             {visibleNav.map((n) => {
               const bc = n.badge==='o'?obzvonCnt:n.badge==='d'?debtorCnt:n.badge==='dz'?doljnikiCnt:0;
               return (
-                <div
-                  key={n.id}
-                  className={`nav-i${page===n.id?' on':''}`}
-                  onClick={(e)=>switchPageByClick(n.id, e)}
-                  onAuxClick={(e)=>{ if (e.button === 1) switchPageByClick(n.id, e); }}
-                  onMouseDown={(e)=>{ if (e.button === 1) e.preventDefault(); }}
-                  title="Ochish | Ctrl+bosish yoki g'ildirakcha bosish: yangi oynada"
-                >
+                <div key={n.id} className={`nav-i${page===n.id?' on':''}`} onClick={()=>setPage(n.id)}>
                   <span style={{fontSize:17,flexShrink:0}}>{n.icon}</span>
                   {side && <span style={{flex:1,whiteSpace:'nowrap'}}>{n.label}</span>}
                   {side&&bc>0 && (
@@ -14862,17 +10388,12 @@ export default function App() {
                 {side && <span>Yangilash</span>}
               </div>
             )}
-              {(currentAccess.visible?.settings ?? true) && (
-                <div
-                  className="nav-i"
-                  onClick={(e)=>switchPageByClick('settings', e)}
-                  onAuxClick={(e)=>{ if (e.button === 1) switchPageByClick('settings', e); }}
-                  onMouseDown={(e)=>{ if (e.button === 1) e.preventDefault(); }}
-                >
-                  <span style={{fontSize:17,flexShrink:0}}>{E.settings}</span>
-                  {side && <span>Nastroyka</span>}
-                </div>
-              )}
+            {(currentAccess.visible?.settings ?? true) && (
+              <div className="nav-i" onClick={()=>setPage('settings')}>
+                <span style={{fontSize:17,flexShrink:0}}>{E.settings}</span>
+                {side && <span>Nastroyka</span>}
+              </div>
+            )}
           </div>
         </div>
 
@@ -14903,7 +10424,7 @@ export default function App() {
                 {E.bell}
                 Bildirishnoma
                 {alertTotalCount > 0 && (
-                  <span style={{position:'absolute',top:-9,right:-8,minWidth:22,height:22,padding:'0 7px',borderRadius:999,background:'linear-gradient(180deg, #ff6b6b 0%, #e63946 100%)',border:'2px solid #0a1322',boxShadow:'0 6px 16px rgba(230,57,70,.38)',color:'#fff',fontSize:11,fontWeight:900,display:'inline-flex',alignItems:'center',justifyContent:'center',zIndex:4,lineHeight:1,letterSpacing:'.2px'}}>
+                  <span style={{position:'absolute',top:-11,right:-10,minWidth:20,height:20,padding:'0 6px',borderRadius:999,background:'var(--rd)',border:'2px solid var(--s1)',color:'#fff',fontSize:10,fontWeight:800,display:'inline-flex',alignItems:'center',justifyContent:'center',zIndex:3,lineHeight:1}}>
                     {alertTotalCount}
                   </span>
                 )}
@@ -14937,7 +10458,7 @@ export default function App() {
             </div>
           </div>
 
-          <div data-filter-boundary="1" style={{flex:1,overflow:page==='nazorat'?'hidden':'auto',padding:page==='nazorat'?8:12,display:'flex',flexDirection:'column'}}>
+          <div data-filter-boundary="1" style={{flex:1,overflow:'auto',padding:page==='nazorat'?8:12,display:'flex',flexDirection:'column'}}>
             {!data && page!=='doljniki' ? (
               <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <div style={{textAlign:'center',maxWidth:440}}>
@@ -14970,20 +10491,13 @@ export default function App() {
               <>
                 {page==='dash'    && canViewPage('dash') && <Dashboard D={D}/>}
                 {page==='cust'    && canViewPage('cust') && <Customers D={D} currentUser={effectiveUser} currentAccess={currentAccess} assignmentById={D.assignmentById || {}} company={activeCompany}/>}
-                {page==='orders'  && canViewPage('orders') && (
-                  <Orders
-                    D={D}
-                    rawArchiveSheetRows={leftoverArchiveSheetRows}
-                    rawEmployeeSheetRows={leftoverEmployeeSheetRows}
-                  />
-                )}
+                {page==='orders'  && canViewPage('orders') && <Orders    D={D}/>}
                 {page==='left_orders' && canViewPage('left_orders') && (
                   <LeftOrdersPage
                     D={D}
                     company={activeCompany}
                     currentUser={effectiveUser}
                     currentAccess={currentAccess}
-                    rawQziSheetRows={leftoverQziSheetRows}
                     rawReasonSheetRows={leftoverReasonSheetRows}
                     rawArchiveSheetRows={leftoverArchiveSheetRows}
                     loading={leftoverSheetLoading}
@@ -15021,7 +10535,6 @@ export default function App() {
                     onAddToObzvon={addObzvonRows}
                     currentUser={effectiveUser}
                     company={activeCompany}
-                    currentAccess={currentAccess}
                   />
                 )}
                 {page==='reports' && canViewPage('reports') && (
@@ -15035,8 +10548,6 @@ export default function App() {
                     planRows={planRows}
                     planOffDays={planOffDays}
                     obzvonNewRows={companyObzvonAllNewRows}
-                    rawArchiveSheetRows={leftoverArchiveSheetRows}
-                    rawEmployeeSheetRows={leftoverEmployeeSheetRows}
                     mode="reports"
                   />
                 )}
@@ -15051,8 +10562,6 @@ export default function App() {
                     planRows={planRows}
                     planOffDays={planOffDays}
                     obzvonNewRows={companyObzvonAllNewRows}
-                    rawArchiveSheetRows={leftoverArchiveSheetRows}
-                    rawEmployeeSheetRows={leftoverEmployeeSheetRows}
                     mode="nazorat"
                   />
                 )}
@@ -15068,25 +10577,16 @@ export default function App() {
                     setPlanOffDays={setPlanOffDays}
                   />
                 )}
-                {page==='test' && canViewPage('test') && (
-                  <TestLabPage
-                    D={D}
-                    planRows={planRows}
-                    currentUser={effectiveUser}
-                    company={activeCompany}
-                    mode="test"
+                {page==='telegram_bot' && canViewPage('telegram_bot') && (
+                  <TelegramBotPage
+                    baseUrl={botArchiveBaseUrl}
+                    setBaseUrl={setBotArchiveBaseUrl}
+                    adminKey={botArchiveAdminKey}
+                    setAdminKey={setBotArchiveAdminKey}
+                    canConfigure={Boolean(currentAccess.visible?.settings_app ?? (sessionUser === 'Admin'))}
                   />
                 )}
-                {page==='bloggers' && canViewPage('bloggers') && (
-                  <TestLabPage
-                    D={D}
-                    planRows={planRows}
-                    currentUser={effectiveUser}
-                    company={activeCompany}
-                    mode="bloggers"
-                  />
-                )}
-                {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} D={D} company={activeCompany} rawArchiveSheetRows={leftoverArchiveSheetRows} rawEmployeeSheetRows={leftoverEmployeeSheetRows} />}
+                {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} botArchiveUrl={botArchiveBaseUrl} setBotArchiveUrl={setBotArchiveBaseUrl} botArchiveAdminKey={botArchiveAdminKey} setBotArchiveAdminKey={setBotArchiveAdminKey} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} D={D} company={activeCompany} />}
               </>
             )}
           </div>
@@ -15257,9 +10757,6 @@ export default function App() {
     </>
   );
 }
-
-
-
 
 
 
