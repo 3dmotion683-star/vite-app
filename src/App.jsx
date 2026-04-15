@@ -12960,10 +12960,11 @@ export default function App() {
       const forcedByQuery = u.searchParams.get('tg') === '1';
       const hashRaw = String(u.hash || '').replace(/^#/, '');
       const forcedByHash = hashRaw.includes('tg=1');
+      const hasTgHashParams = /tgwebapp/i.test(hashRaw);
       const hasTgParams = ['tgWebAppData', 'tgWebAppVersion', 'tgWebAppPlatform', 'tgWebAppThemeParams']
         .some((k) => u.searchParams.has(k));
       const hasTelegramUA = /telegram/i.test(String(window.navigator?.userAgent || ''));
-      return hasTelegramInit || forcedByQuery || forcedByHash || hasTgParams || hasTelegramUA;
+      return hasTelegramInit || forcedByQuery || forcedByHash || hasTgParams || hasTgHashParams || hasTelegramUA;
     } catch {
       return false;
     }
