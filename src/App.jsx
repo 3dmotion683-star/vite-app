@@ -206,11 +206,15 @@ const E = {
   sv: '\u{1F4CB}',
 };
 const TELEGRAM_HELP_OPERATORS = String(
-  import.meta.env.VITE_TG_OPERATORS || '@durdona_murodbaxsh,@Dilfuza_Murodbaxsh_suv,@Dilya_Murodbaxsh'
+  import.meta.env.VITE_TG_OPERATORS || '@Dilfuza_Murodbaxsh_suv,@Dilya_Murodbaxsh'
 )
   .split(',')
   .map((v) => String(v || '').trim())
   .filter(Boolean);
+const TG_BOT_ORDER_STORAGE_KEY = 'aq-tg-bot-orders-v1';
+const TG_BOT_ORDER_EVENT = 'aq-tg-bot-orders-updated';
+const TG_BOT_ORDER_STATUSES = ['Yangi', 'Qabul qilindi', 'Jarayonda', 'Bajarildi', "Bekor qilingan"];
+const TG_BOT_ORDER_PRODUCTS = ['Murodbaxsh 18.9L', 'БОНУС Murodbaxsh 18.9L'];
 const FILTER_CHECK_LABEL_STYLE = {
   display: 'grid',
   gridTemplateColumns: '14px minmax(0,1fr)',
@@ -3625,6 +3629,80 @@ const S = {
   get: (k,d) => { try { const v=localStorage.getItem(k); return v?JSON.parse(v):d; } catch { return d; } },
   set: (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); } catch {} },
 };
+const readTelegramBotOrders = () => {
+  const raw = S.get(TG_BOT_ORDER_STORAGE_KEY, []);
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((r) => ({
+      id: String(r?.id || '').trim(),
+      source: 'telegram_bot',
+      createdAt: String(r?.createdAt || '').trim() || new Date().toISOString(),
+      updatedAt: String(r?.updatedAt || '').trim() || String(r?.createdAt || '').trim() || new Date().toISOString(),
+      status: TG_BOT_ORDER_STATUSES.includes(String(r?.status || '').trim()) ? String(r.status).trim() : 'Yangi',
+      customerId: normId(r?.customerId),
+      customerName: String(r?.customerName || '').trim(),
+      customerAddress: String(r?.customerAddress || '').trim(),
+      customerPhone: String(r?.customerPhone || '').trim(),
+      district: String(r?.district || '').trim(),
+      product: String(r?.product || '').trim() || 'Murodbaxsh 18.9L',
+      qty: Math.max(0, Math.abs(toNum(r?.qty))),
+      note: String(r?.note || '').trim(),
+      telegramUserId: String(r?.telegramUserId || '').trim(),
+      telegramUsername: String(r?.telegramUsername || '').trim(),
+      telegramFirstName: String(r?.telegramFirstName || '').trim(),
+      telegramLastName: String(r?.telegramLastName || '').trim(),
+      history: Array.isArray(r?.history) ? r.history : [],
+    }))
+    .filter((r) => r.id && r.customerId)
+    .sort((a, b) => {
+      const ta = parseDateTimeLoose(a.createdAt)?.getTime() || 0;
+      const tb = parseDateTimeLoose(b.createdAt)?.getTime() || 0;
+      return tb - ta;
+    });
+};
+const writeTelegramBotOrders = (rows = []) => {
+  const list = Array.isArray(rows) ? rows : [];
+  S.set(TG_BOT_ORDER_STORAGE_KEY, list);
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new CustomEvent(TG_BOT_ORDER_EVENT, { detail: { count: list.length, at: Date.now() } }));
+    } catch {}
+  }
+};
+const appendTelegramBotOrder = (order = {}) => {
+  const nowIso = new Date().toISOString();
+  const id = String(order?.id || `TG-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`).trim();
+  if (!id) return null;
+  const nextRow = {
+    id,
+    source: 'telegram_bot',
+    createdAt: String(order?.createdAt || nowIso).trim(),
+    updatedAt: String(order?.updatedAt || nowIso).trim(),
+    status: TG_BOT_ORDER_STATUSES.includes(String(order?.status || '').trim()) ? String(order.status).trim() : 'Yangi',
+    customerId: normId(order?.customerId),
+    customerName: String(order?.customerName || '').trim(),
+    customerAddress: String(order?.customerAddress || '').trim(),
+    customerPhone: String(order?.customerPhone || '').trim(),
+    district: String(order?.district || '').trim(),
+    product: String(order?.product || '').trim() || TG_BOT_ORDER_PRODUCTS[0],
+    qty: Math.max(0, Math.abs(toNum(order?.qty))),
+    note: String(order?.note || '').trim(),
+    telegramUserId: String(order?.telegramUserId || '').trim(),
+    telegramUsername: String(order?.telegramUsername || '').trim(),
+    telegramFirstName: String(order?.telegramFirstName || '').trim(),
+    telegramLastName: String(order?.telegramLastName || '').trim(),
+    history: Array.isArray(order?.history) ? order.history : [],
+  };
+  if (!nextRow.customerId || !nextRow.qty) return null;
+  nextRow.history = [
+    ...nextRow.history,
+    { at: nowIso, status: nextRow.status, by: 'telegram_bot' },
+  ];
+  const prev = readTelegramBotOrders();
+  const merged = [nextRow, ...prev.filter((r) => String(r?.id || '').trim() !== nextRow.id)];
+  writeTelegramBotOrders(merged);
+  return nextRow;
+};
 const BINDING_UPDATE_EVENT = 'aq-binding-maps-updated';
 const DEFAULT_USERS = ['Dildora', 'Dilfuza', 'Admin'];
 const DEFAULT_USER_CREDS = { Dildora:'Dildora', Dilfuza:'Dilfuza', Admin:'12345' };
@@ -4909,6 +4987,8 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
   const [mapTrackOpen, setMapTrackOpen] = useState(false);
   const [mapTrackDriver, setMapTrackDriver] = useState('');
   const [mapTrackFocusKey, setMapTrackFocusKey] = useState('');
+  const [botStatusFilter, setBotStatusFilter] = useState('all');
+  const [botOrdersTick, setBotOrdersTick] = useState(0);
 
   const districtById = useMemo(() => {
     const m = {};
@@ -4949,6 +5029,47 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
     if (email && employeeNameByEmail[email]) return employeeNameByEmail[email];
     return raw;
   }, [employeeNameById, employeeNameByEmail]);
+  const botOrders = useMemo(() => readTelegramBotOrders(), [botOrdersTick]);
+  useEffect(() => {
+    const onBotOrders = () => setBotOrdersTick((v) => v + 1);
+    const onStorage = (e) => {
+      if (e?.key && e.key !== TG_BOT_ORDER_STORAGE_KEY) return;
+      onBotOrders();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener(TG_BOT_ORDER_EVENT, onBotOrders);
+      window.addEventListener('storage', onStorage);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(TG_BOT_ORDER_EVENT, onBotOrders);
+        window.removeEventListener('storage', onStorage);
+      }
+    };
+  }, []);
+  const setBotOrderStatus = useCallback((id, nextStatus) => {
+    const safeStatus = TG_BOT_ORDER_STATUSES.includes(String(nextStatus || '').trim())
+      ? String(nextStatus).trim()
+      : 'Yangi';
+    const rows = readTelegramBotOrders();
+    const nextRows = rows.map((r) => {
+      if (String(r?.id || '').trim() !== String(id || '').trim()) return r;
+      const history = Array.isArray(r.history) ? r.history.slice() : [];
+      history.push({
+        at: new Date().toISOString(),
+        status: safeStatus,
+        by: 'app_operator',
+      });
+      return {
+        ...r,
+        status: safeStatus,
+        updatedAt: new Date().toISOString(),
+        history,
+      };
+    });
+    writeTelegramBotOrders(nextRows);
+    setBotOrdersTick((v) => v + 1);
+  }, []);
   const soGroups = useMemo(() => {
     const groups = {};
     (rawOrders || []).forEach((o) => {
@@ -5300,8 +5421,57 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
     setMapTrackDriver('');
     setMapTrackFocusKey('');
   }, [dataMode]);
+  useEffect(() => {
+    if (dataMode !== 'bot') return;
+    if (viewMode !== 'list') setViewMode('list');
+    setSelectedSO(null);
+    setMapSelected(null);
+  }, [dataMode, viewMode]);
+
+  const botList = useMemo(() => {
+    if (dataMode !== 'bot') return [];
+    const q = String(search || '').trim().toLowerCase();
+    let rows = botOrders;
+    if (botStatusFilter !== 'all') rows = rows.filter((r) => String(r?.status || '').trim() === botStatusFilter);
+    if (!q) return rows;
+    return rows.filter((r) => [
+      r.id,
+      r.customerId,
+      r.customerName,
+      r.customerAddress,
+      r.customerPhone,
+      r.product,
+      r.note,
+      r.telegramUsername,
+      r.telegramFirstName,
+      r.telegramLastName,
+      r.status,
+    ].some((x) => String(x || '').toLowerCase().includes(q)));
+  }, [dataMode, botOrders, botStatusFilter, search]);
 
   const exportOrders = () => {
+    if (dataMode === 'bot') {
+      exportAoaExcel({
+        fileName: `Bot_zakazlar_${new Date().toISOString().slice(0,10)}.xlsx`,
+        sheetName: 'BotZakazlar',
+        headers: ['ID', 'Yaratilgan', 'Status', 'Mijoz ID', 'Kontragent', 'Telefon', 'Rayon', 'Manzil', 'Mahsulot', 'Soni', 'Izoh', 'Telegram'],
+        rows: botList.map((r) => [
+          r.id,
+          fmtD(r.createdAt),
+          r.status,
+          r.customerId,
+          r.customerName,
+          r.customerPhone,
+          r.district,
+          r.customerAddress,
+          r.product,
+          r.qty,
+          r.note,
+          r.telegramUsername || [r.telegramFirstName, r.telegramLastName].filter(Boolean).join(' '),
+        ]),
+      });
+      return;
+    }
     exportAoaExcel({
       fileName: `Zakazlar_${dataMode}_${new Date().toISOString().slice(0,10)}.xlsx`,
       sheetName: dataMode === 'real' ? 'ZakazlarReal' : 'ZakazlarSistem',
@@ -5332,42 +5502,59 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
         <div className="tabs" style={{display:'inline-flex'}}>
           <button className={`tab${dataMode==='system'?' on':''}`} onClick={()=>setDataMode('system')}>Sistem</button>
           <button className={`tab${dataMode==='real'?' on':''}`} onClick={()=>setDataMode('real')}>Real</button>
+          <button className={`tab${dataMode==='bot'?' on':''}`} onClick={()=>setDataMode('bot')}>Bot zakazlar</button>
         </div>
-        <div className="tabs">
-          {[['zakaz','Zakaz'],['vozvrat','Vozvrat'],['all','Barchasi']].map(([t,l]) => (
-            <button key={t} className={`tab${fType===t?' on':''}`} onClick={()=>setT(t)}>{l}</button>
-          ))}
-        </div>
+        {dataMode !== 'bot' && (
+          <div className="tabs">
+            {[['zakaz','Zakaz'],['vozvrat','Vozvrat'],['all','Barchasi']].map(([t,l]) => (
+              <button key={t} className={`tab${fType===t?' on':''}`} onClick={()=>setT(t)}>{l}</button>
+            ))}
+          </div>
+        )}
       </div>
       {viewMode === 'list' && (
         <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
           <div className="sb" style={{flex:'1 1 560px',minWidth:240,maxWidth:'none'}}>
             <span style={{color:'var(--t3)'}}>Qidiruv</span>
-            <input placeholder="Mijoz, zakaz no..." value={search} onChange={(e)=>setS(e.target.value)} />
+            <input placeholder={dataMode==='bot' ? 'ID, kontragent, telefon, izoh...' : 'Mijoz, zakaz no...'} value={search} onChange={(e)=>setS(e.target.value)} />
           </div>
-          <div className="tabs" style={{display:'inline-flex'}}>
-            <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
-            <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
+          {dataMode !== 'bot' ? (
+            <>
+              <div className="tabs" style={{display:'inline-flex'}}>
+                <button className={`tab${viewMode==='list'?' on':''}`} onClick={()=>setViewMode('list')}>Spiska</button>
+                <button className={`tab${viewMode==='map'?' on':''}`} onClick={()=>setViewMode('map')}>Maps</button>
+              </div>
+              <div style={{position:'relative'}}>
+                <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
+                  </svg>
+                  Filtr{universalFilterCount>0?` (${universalFilterCount})`:''}
+                </button>
+                <UniversalFilterPanel
+                  open={uFilterOpen}
+                  title={dataMode === 'real' ? "Real zakazlar filtri" : "Sistem zakazlar filtri"}
+                  columns={orderFilterColumns}
+                  rows={base}
+                  state={uFilterState}
+                  setState={setUFilterState}
+                  onClose={()=>setUFilterOpen(false)}
+                  width={620}
+                />
+              </div>
+            </>
+          ) : (
+            <div className="tabs" style={{display:'inline-flex'}}>
+              <button className={`tab${botStatusFilter==='all'?' on':''}`} onClick={()=>setBotStatusFilter('all')}>Barchasi</button>
+              {TG_BOT_ORDER_STATUSES.map((st) => (
+                <button key={`bot_st_${st}`} className={`tab${botStatusFilter===st?' on':''}`} onClick={()=>setBotStatusFilter(st)}>{st}</button>
+              ))}
+            </div>
+          )}
+          <div style={{display:'inline-flex',gap:8,alignItems:'center'}}>
+            {dataMode === 'bot' && <span className="tag" style={{background:'var(--s2)',color:'var(--t2)'}}>Bot zakaz: {botList.length} ta</span>}
+            <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>
           </div>
-          <div style={{position:'relative'}}>
-            <button className="btn btn-gh btn-sm" onClick={()=>setUFilterOpen((v)=>!v)}>
-              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M3 4h18l-7 8v6l-4 2v-8L3 4z"/>
-              </svg>
-              Filtr{universalFilterCount>0?` (${universalFilterCount})`:''}
-            </button>
-            <UniversalFilterPanel
-              open={uFilterOpen}
-              title={dataMode === 'real' ? "Real zakazlar filtri" : "Sistem zakazlar filtri"}
-              columns={orderFilterColumns}
-              rows={base}
-              state={uFilterState}
-              setState={setUFilterState}
-              onClose={()=>setUFilterOpen(false)}
-              width={620}
-            />
-          </div>
-          <button className="btn btn-gr btn-sm" onClick={exportOrders}>Excel</button>
         </div>
       )}
 
@@ -5378,7 +5565,12 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
               <thead>
                 <tr>
                   <th>No</th>
-                  {dataMode === 'real' ? (
+                  {dataMode === 'bot' ? (
+                    <>
+                      <th>Yaratilgan</th><th>Status</th><th>Mijoz ID</th><th>Kontragent</th><th>Telefon</th>
+                      <th>Mahsulot</th><th style={{textAlign:'center'}}>Soni</th><th>Izoh</th><th>Telegram</th>
+                    </>
+                  ) : dataMode === 'real' ? (
                     <>
                       <th>Mijoz ID</th><th>Kontragent</th><th>Sana</th>
                       <th>Dostavchik</th><th style={{textAlign:'center'}}>Dona</th>
@@ -5399,12 +5591,40 @@ function Orders({ D, rawArchiveSheetRows = [], rawEmployeeSheetRows = [] }) {
                 </tr>
               </thead>
               <tbody>
-                {list.length===0
-                  ? <tr><td colSpan={dataMode === 'real' ? 10 : 13} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
-                  : list.slice(0,600).map((g,i) => (
-                    <tr key={i} onClick={()=>setSelectedSO(g)}>
+                {(dataMode === 'bot' ? botList : list).length===0
+                  ? <tr><td colSpan={dataMode === 'bot' ? 10 : (dataMode === 'real' ? 10 : 13)} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
+                  : (dataMode === 'bot' ? botList : list).slice(0,600).map((g,i) => (
+                    <tr key={i} onClick={()=>{ if (dataMode !== 'bot') setSelectedSO(g); }}>
                       <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
-                      {dataMode === 'real' ? (
+                      {dataMode === 'bot' ? (
+                        <>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(g.createdAt)}</td>
+                          <td>
+                            <select
+                              className="select"
+                              value={String(g.status || 'Yangi')}
+                              onChange={(e) => setBotOrderStatus(g.id, e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{minWidth:130}}
+                            >
+                              {TG_BOT_ORDER_STATUSES.map((st) => <option key={`bot_st_sel_${st}`} value={st}>{st}</option>)}
+                            </select>
+                          </td>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.customerId || '-'}</td>
+                          <td style={{maxWidth:220,fontWeight:600}}>
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:216,fontSize:12}}>{g.customerName || '-'}</span>
+                          </td>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11}}>{g.customerPhone || '-'}</td>
+                          <td style={{maxWidth:190}}>
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:186,fontSize:12}}>{g.product || '-'}</span>
+                          </td>
+                          <td style={{textAlign:'center',fontWeight:700,color:'var(--bl)'}}>{fmt(g.qty || 0)}</td>
+                          <td style={{maxWidth:260}}>
+                            <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:256,fontSize:11,color:'var(--t2)'}}>{g.note || '-'}</span>
+                          </td>
+                          <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.telegramUsername || [g.telegramFirstName, g.telegramLastName].filter(Boolean).join(' ') || '-'}</td>
+                        </>
+                      ) : dataMode === 'real' ? (
                         <>
                           <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{g.mId || '-'}</td>
                           <td style={{maxWidth:240,fontWeight:600}}>
@@ -12124,7 +12344,21 @@ function TelegramCustomerPortal({
   const [confirmedKey, setConfirmedKey] = useState('');
   const [activeTab, setActiveTab] = useState('sverka');
   const [showHelp, setShowHelp] = useState(false);
-  const [requestText, setRequestText] = useState('');
+  const [orderProduct, setOrderProduct] = useState(TG_BOT_ORDER_PRODUCTS[0] || 'Murodbaxsh 18.9L');
+  const [orderQty, setOrderQty] = useState('1');
+  const [orderNote, setOrderNote] = useState('');
+  const [orderFeedback, setOrderFeedback] = useState('');
+
+  const tgUser = useMemo(() => {
+    if (typeof window === 'undefined') return {};
+    const user = window.Telegram?.WebApp?.initDataUnsafe?.user || {};
+    return {
+      id: String(user?.id || '').trim(),
+      username: String(user?.username || '').trim(),
+      firstName: String(user?.first_name || '').trim(),
+      lastName: String(user?.last_name || '').trim(),
+    };
+  }, []);
 
   const normalizedLookupId = useMemo(() => normId(lookupId), [lookupId]);
   const options = useMemo(() => {
@@ -12204,7 +12438,6 @@ function TelegramCustomerPortal({
         "Assalomu alaykum, men botdagi ilovadan yozyapman.",
         `Mening ID: ${normId(lookupId || typedId) || '-'}`,
         c ? `Kontragent: ${c.name || '-'}` : '',
-        requestText ? `Talab/taklif: ${requestText}` : '',
       ]
         .filter(Boolean)
         .join('\n');
@@ -12217,7 +12450,7 @@ function TelegramCustomerPortal({
         window.open(link, '_blank', 'noopener,noreferrer');
       }
     },
-    [lookupId, typedId, confirmedCustomer, selectedCustomer, requestText]
+    [lookupId, typedId, confirmedCustomer, selectedCustomer]
   );
   const pushMiniEventToBot = useCallback((payload) => {
     if (typeof window === 'undefined') return;
@@ -12235,17 +12468,54 @@ function TelegramCustomerPortal({
     setConfirmedKey('');
     setActiveTab('sverka');
     setShowHelp(false);
+    setOrderFeedback('');
   }, [typedId]);
 
   const markNotMine = useCallback(() => {
     setConfirmedKey('');
     setShowHelp(true);
+    setOrderFeedback('');
     pushMiniEventToBot({
       type: 'customer_not_mine',
       lookupId: normId(lookupId || typedId),
       at: new Date().toISOString(),
     });
   }, [lookupId, typedId, pushMiniEventToBot]);
+  const submitBotOrder = useCallback(() => {
+    if (!confirmedCustomer) return;
+    const qty = Math.max(0, Math.abs(toNum(orderQty)));
+    if (!qty) {
+      setOrderFeedback("Miqdor noto'g'ri. 1 yoki undan katta son kiriting.");
+      return;
+    }
+    const row = appendTelegramBotOrder({
+      customerId: confirmedCustomer.id,
+      customerName: confirmedCustomer.name,
+      customerAddress: confirmedCustomer.address,
+      customerPhone: confirmedCustomer.phone,
+      district: confirmedCustomer.district,
+      product: orderProduct,
+      qty,
+      note: orderNote,
+      telegramUserId: tgUser.id,
+      telegramUsername: tgUser.username ? `@${tgUser.username.replace(/^@/, '')}` : '',
+      telegramFirstName: tgUser.firstName,
+      telegramLastName: tgUser.lastName,
+      status: 'Yangi',
+    });
+    if (!row) {
+      setOrderFeedback("Zakazni saqlab bo'lmadi. Qayta urinib ko'ring.");
+      return;
+    }
+    pushMiniEventToBot({
+      type: 'bot_order_created',
+      at: new Date().toISOString(),
+      order: row,
+    });
+    setOrderNote('');
+    setOrderQty('1');
+    setOrderFeedback(`Zakaz yuborildi: ${row.id}`);
+  }, [confirmedCustomer, orderProduct, orderQty, orderNote, tgUser, pushMiniEventToBot]);
 
   const portalFrameStyle = {
     minHeight: '100vh',
@@ -12347,6 +12617,7 @@ function TelegramCustomerPortal({
                         setConfirmedKey(selectedCustomer.__key);
                         setActiveTab('sverka');
                         setShowHelp(false);
+                        setOrderFeedback('');
                         pushMiniEventToBot({
                           type: 'customer_confirmed',
                           id: selectedCustomer.id || '',
@@ -12358,7 +12629,7 @@ function TelegramCustomerPortal({
                     >
                       Tasdiqlash
                     </button>
-                    <button className="btn btn-gh" onClick={markNotMine}>Bu menikimas</button>
+                    <button className="btn btn-gh" onClick={markNotMine}>Meniki emas</button>
                   </div>
                 </div>
               )}
@@ -12390,7 +12661,7 @@ function TelegramCustomerPortal({
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--t2)' }}>Manzil: {confirmedCustomer.address || '-'}</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-                  <button className="btn btn-sm btn-gh" onClick={markNotMine}>Bu menikimas</button>
+                  <button className="btn btn-sm btn-gh" onClick={markNotMine}>Meniki emas</button>
                   <button className="btn btn-sm btn-gh" onClick={() => setConfirmedKey('')}>Boshqa ID</button>
                 </div>
               </div>
@@ -12399,11 +12670,11 @@ function TelegramCustomerPortal({
                 <button className={`tab${activeTab === 'sverka' ? ' on' : ''}`} onClick={() => setActiveTab('sverka')}>
                   {E.sv} Sverka
                 </button>
-                <button className={`tab${activeTab === 'zakaz' ? ' on' : ''}`} onClick={() => setActiveTab('zakaz')}>
-                  {E.order} Zakaz
+                <button className={`tab${activeTab === 'order_create' ? ' on' : ''}`} onClick={() => setActiveTab('order_create')}>
+                  {E.order} Zakaz urish
                 </button>
-                <button className={`tab${activeTab === 'talab' ? ' on' : ''}`} onClick={() => setActiveTab('talab')}>
-                  Talab va taklif
+                <button className={`tab${activeTab === 'zakaz' ? ' on' : ''}`} onClick={() => setActiveTab('zakaz')}>
+                  Oldingi zakazlar
                 </button>
               </div>
 
@@ -12489,27 +12760,58 @@ function TelegramCustomerPortal({
                 </div>
               )}
 
-              {activeTab === 'talab' && (
+              {activeTab === 'order_create' && (
                 <div className="card" style={{ padding: 14, display: 'grid', gap: 10 }}>
-                  <div style={{ fontWeight: 700 }}>Talab va taklif</div>
+                  <div style={{ fontWeight: 700 }}>Bot orqali yangi zakaz</div>
                   <div style={{ fontSize: 12, color: 'var(--t3)' }}>
-                    Taklifingizni yozing va operatorga yuboring.
+                    Zakaz yuborilgandan keyin u “Zakazlar → Bot zakazlar” bo‘limida ko‘rinadi.
                   </div>
-                  <textarea
-                    className="input"
-                    rows={4}
-                    value={requestText}
-                    onChange={(e) => setRequestText(e.target.value)}
-                    placeholder="Masalan: manzilni yangilash, zakaz bo'yicha savol..."
-                    style={{ resize: 'vertical' }}
-                  />
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px,1fr))', gap: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 5 }}>Mahsulot</div>
+                      <select className="select" value={orderProduct} onChange={(e) => setOrderProduct(e.target.value)}>
+                        {TG_BOT_ORDER_PRODUCTS.map((p) => <option key={`tg_p_${p}`} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 5 }}>Soni</div>
+                      <input
+                        className="input"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={orderQty}
+                        onChange={(e) => setOrderQty(e.target.value)}
+                        placeholder="Masalan: 3"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 5 }}>Izoh</div>
+                    <textarea
+                      className="input"
+                      rows={3}
+                      value={orderNote}
+                      onChange={(e) => setOrderNote(e.target.value)}
+                      placeholder="Masalan: kirishda qo‘ng‘iroq qiling"
+                      style={{ resize: 'vertical' }}
+                    />
+                  </div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {(operators || []).map((op) => (
-                      <button key={`talab_${op}`} className="btn btn-bl btn-sm" onClick={() => openOperatorChat(op)}>
-                        {op} ga yuborish
-                      </button>
-                    ))}
+                    <button className="btn btn-bl btn-sm" onClick={submitBotOrder}>Zakaz yuborish</button>
+                    <button
+                      className="btn btn-gh btn-sm"
+                      onClick={() => openOperatorChat((operators || [])[0] || '')}
+                      disabled={!(operators || []).length}
+                    >
+                      Operatorga yozish
+                    </button>
                   </div>
+                  {!!orderFeedback && (
+                    <div style={{ fontSize: 12, color: /yuborildi/i.test(orderFeedback) ? 'var(--gr)' : 'var(--rd)' }}>
+                      {orderFeedback}
+                    </div>
+                  )}
                 </div>
               )}
             </>
@@ -12604,7 +12906,10 @@ export default function App() {
       const forcedByQuery = u.searchParams.get('tg') === '1';
       const hashRaw = String(u.hash || '').replace(/^#/, '');
       const forcedByHash = hashRaw.includes('tg=1');
-      return hasTelegramInit || forcedByQuery || forcedByHash;
+      const hasTgParams = ['tgWebAppData', 'tgWebAppVersion', 'tgWebAppPlatform', 'tgWebAppThemeParams']
+        .some((k) => u.searchParams.has(k));
+      const hasTelegramUA = /telegram/i.test(String(window.navigator?.userAgent || ''));
+      return hasTelegramInit || forcedByQuery || forcedByHash || hasTgParams || hasTelegramUA;
     } catch {
       return false;
     }
