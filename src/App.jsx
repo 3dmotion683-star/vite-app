@@ -205,6 +205,12 @@ const E = {
   tara: '\u{1F9F4}',
   sv: '\u{1F4CB}',
 };
+const TELEGRAM_HELP_OPERATORS = String(
+  import.meta.env.VITE_TG_OPERATORS || '@durdona_murodbaxsh,@Dilfuza_Murodbaxsh_suv,@Dilya_Murodbaxsh'
+)
+  .split(',')
+  .map((v) => String(v || '').trim())
+  .filter(Boolean);
 const FILTER_CHECK_LABEL_STYLE = {
   display: 'grid',
   gridTemplateColumns: '14px minmax(0,1fr)',
@@ -12103,6 +12109,416 @@ function LoginScreen({ users=[], onLogin, onResetCreds, loading=false }) {
     </div>
   );
 }
+
+function TelegramCustomerPortal({
+  D,
+  dataReady = false,
+  loading = false,
+  loadError = '',
+  onRetry,
+  operators = [],
+}) {
+  const [typedId, setTypedId] = useState('');
+  const [lookupId, setLookupId] = useState('');
+  const [selectedKey, setSelectedKey] = useState('');
+  const [confirmedKey, setConfirmedKey] = useState('');
+  const [activeTab, setActiveTab] = useState('sverka');
+  const [showHelp, setShowHelp] = useState(false);
+  const [requestText, setRequestText] = useState('');
+
+  const normalizedLookupId = useMemo(() => normId(lookupId), [lookupId]);
+  const options = useMemo(() => {
+    if (!normalizedLookupId) return [];
+    const customers = Array.isArray(D?.customers) ? D.customers : [];
+    const ids = new Set();
+    customers.forEach((c) => {
+      if (normId(c?.id) === normalizedLookupId) ids.add(normId(c?.id));
+    });
+    const contacts = Array.isArray(D?.contacts) ? D.contacts : [];
+    contacts.forEach((c) => {
+      if (normId(c?.eskiId) === normalizedLookupId && normId(c?.id)) {
+        ids.add(normId(c.id));
+      }
+    });
+    return customers
+      .filter((c) => ids.has(normId(c?.id)))
+      .map((c, idx) => ({
+        ...c,
+        __key: `${normId(c?.id)}__${idx}__${String(c?.name || '').trim()}__${String(c?.address || '').trim()}`,
+      }));
+  }, [D?.customers, D?.contacts, normalizedLookupId]);
+
+  useEffect(() => {
+    if (!options.length) {
+      setSelectedKey('');
+      return;
+    }
+    const has = options.some((x) => x.__key === selectedKey);
+    if (!has) setSelectedKey(options[0].__key);
+  }, [options, selectedKey]);
+
+  useEffect(() => {
+    if (!confirmedKey) return;
+    const has = options.some((x) => x.__key === confirmedKey);
+    if (!has) setConfirmedKey('');
+  }, [options, confirmedKey]);
+
+  const selectedCustomer = useMemo(
+    () => options.find((x) => x.__key === selectedKey) || null,
+    [options, selectedKey]
+  );
+  const confirmedCustomer = useMemo(
+    () => options.find((x) => x.__key === confirmedKey) || null,
+    [options, confirmedKey]
+  );
+
+  const sverkaRows = useMemo(() => {
+    if (!confirmedCustomer) return [];
+    return buildSverka(confirmedCustomer, D?.ordersByMId || {}, D?.cashByMId || {});
+  }, [confirmedCustomer, D?.ordersByMId, D?.cashByMId]);
+
+  const zakazRows = useMemo(() => {
+    if (!confirmedCustomer) return [];
+    const rows = (D?.ordersByMId?.[confirmedCustomer.id] || []).filter(
+      (o) => isWaterProduct(o.product) && isOrderDoc(o.docType)
+    );
+    return [...rows].sort((a, b) => {
+      const da = toDate(a?.orderDate);
+      const db = toDate(b?.orderDate);
+      return (db?.getTime?.() || 0) - (da?.getTime?.() || 0);
+    });
+  }, [confirmedCustomer, D?.ordersByMId]);
+
+  const helperText = useMemo(() => {
+    if (!confirmedCustomer && !selectedCustomer) return "ID kiriting va o'zingizni tasdiqlang.";
+    const c = confirmedCustomer || selectedCustomer;
+    return `ID: ${c?.id || '-'} | Kontragent: ${c?.name || '-'} | Manzil: ${c?.address || '-'}`;
+  }, [confirmedCustomer, selectedCustomer]);
+
+  const openOperatorChat = useCallback(
+    (rawUsername) => {
+      const username = String(rawUsername || '').trim().replace(/^@/, '');
+      if (!username) return;
+      const c = confirmedCustomer || selectedCustomer;
+      const msg = [
+        "Assalomu alaykum, men botdagi ilovadan yozyapman.",
+        `Mening ID: ${normId(lookupId || typedId) || '-'}`,
+        c ? `Kontragent: ${c.name || '-'}` : '',
+        requestText ? `Talab/taklif: ${requestText}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
+      const link = `https://t.me/${username}?text=${encodeURIComponent(msg)}`;
+      const tg = typeof window !== 'undefined' ? window.Telegram?.WebApp : null;
+      try {
+        if (tg?.openTelegramLink) tg.openTelegramLink(link);
+        else window.open(link, '_blank', 'noopener,noreferrer');
+      } catch {
+        window.open(link, '_blank', 'noopener,noreferrer');
+      }
+    },
+    [lookupId, typedId, confirmedCustomer, selectedCustomer, requestText]
+  );
+  const pushMiniEventToBot = useCallback((payload) => {
+    if (typeof window === 'undefined') return;
+    const tg = window.Telegram?.WebApp;
+    if (!tg?.sendData) return;
+    try {
+      tg.sendData(JSON.stringify(payload || {}));
+    } catch {}
+  }, []);
+
+  const onFind = useCallback(() => {
+    const normalized = normId(typedId);
+    if (!normalized) return;
+    setLookupId(normalized);
+    setConfirmedKey('');
+    setActiveTab('sverka');
+    setShowHelp(false);
+  }, [typedId]);
+
+  const markNotMine = useCallback(() => {
+    setConfirmedKey('');
+    setShowHelp(true);
+    pushMiniEventToBot({
+      type: 'customer_not_mine',
+      lookupId: normId(lookupId || typedId),
+      at: new Date().toISOString(),
+    });
+  }, [lookupId, typedId, pushMiniEventToBot]);
+
+  const portalFrameStyle = {
+    minHeight: '100vh',
+    background: 'var(--bg)',
+    color: 'var(--t1)',
+    display: 'grid',
+    placeItems: 'center',
+    padding: 14,
+  };
+
+  return (
+    <div style={portalFrameStyle}>
+      <div style={{ width: '100%', maxWidth: 980, border: '1px solid var(--b2)', borderRadius: 14, background: 'var(--s1)', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--b2)', background: 'linear-gradient(135deg,var(--s2),var(--s1))' }}>
+          <div style={{ fontWeight: 800, fontSize: 18 }}>Mijoz kabineti</div>
+          <div style={{ marginTop: 5, fontSize: 12, color: 'var(--t3)' }}>{helperText}</div>
+        </div>
+
+        <div style={{ padding: 16, display: 'grid', gap: 12 }}>
+          {!dataReady && loading && (
+            <div className="card" style={{ padding: 14 }}>
+              Ma'lumot yuklanmoqda...
+            </div>
+          )}
+          {!!loadError && (
+            <div className="card" style={{ padding: 14, border: '1px solid var(--rd)', background: 'var(--rd2)' }}>
+              <div style={{ color: 'var(--rd)', fontWeight: 700 }}>Yuklash xatosi: {loadError}</div>
+              <div style={{ marginTop: 10 }}>
+                <button className="btn btn-bl btn-sm" onClick={() => onRetry?.()}>Qayta yuklash</button>
+              </div>
+            </div>
+          )}
+
+          {!confirmedCustomer && (
+            <div className="card" style={{ padding: 14, display: 'grid', gap: 10 }}>
+              <div style={{ fontSize: 12, color: 'var(--t3)' }}>ID ni kiriting</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  className="input"
+                  placeholder="Masalan: 12345"
+                  value={typedId}
+                  onChange={(e) => setTypedId(e.target.value)}
+                  onKeyDown={(e) => (e.key === 'Enter' ? onFind() : null)}
+                />
+                <button className="btn btn-bl" onClick={onFind}>Tekshirish</button>
+              </div>
+
+              {normalizedLookupId && options.length === 0 && dataReady && (
+                <div style={{ color: 'var(--rd)', fontSize: 12 }}>
+                  Bu ID bo'yicha kontragent topilmadi.
+                </div>
+              )}
+
+              {options.length > 0 && (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  <div style={{ fontSize: 12, color: 'var(--t3)' }}>
+                    Kontragentni tanlang va tasdiqlang:
+                  </div>
+                  <div style={{ display: 'grid', gap: 8 }}>
+                    {options.map((c) => (
+                      <label
+                        key={c.__key}
+                        style={{
+                          border: c.__key === selectedKey ? '1px solid var(--bl)' : '1px solid var(--b2)',
+                          borderRadius: 10,
+                          padding: 10,
+                          display: 'grid',
+                          gridTemplateColumns: '18px minmax(0,1fr)',
+                          gap: 8,
+                          alignItems: 'start',
+                          background: c.__key === selectedKey ? 'var(--bl3)' : 'var(--s2)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <input
+                          type="radio"
+                          checked={c.__key === selectedKey}
+                          onChange={() => setSelectedKey(c.__key)}
+                          style={{ marginTop: 2 }}
+                        />
+                        <div>
+                          <div style={{ fontWeight: 700 }}>{c.name || '-'}</div>
+                          <div style={{ fontSize: 12, color: 'var(--t3)', marginTop: 3 }}>
+                            ID: {c.id || '-'} | Tel: {c.phone || '-'} | Rayon: {c.district || '-'}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--t2)', marginTop: 2 }}>
+                            Manzil: {c.address || '-'}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      className="btn btn-bl"
+                      disabled={!selectedCustomer}
+                      onClick={() => {
+                        if (!selectedCustomer) return;
+                        setConfirmedKey(selectedCustomer.__key);
+                        setActiveTab('sverka');
+                        setShowHelp(false);
+                        pushMiniEventToBot({
+                          type: 'customer_confirmed',
+                          id: selectedCustomer.id || '',
+                          name: selectedCustomer.name || '',
+                          address: selectedCustomer.address || '',
+                          at: new Date().toISOString(),
+                        });
+                      }}
+                    >
+                      Tasdiqlash
+                    </button>
+                    <button className="btn btn-gh" onClick={markNotMine}>Bu menikimas</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {showHelp && (
+            <div className="card" style={{ padding: 14, border: '1px solid var(--yl)', background: 'var(--yl2)' }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>ID noto'g'ri bo'lsa operatorga yozing</div>
+              <div style={{ fontSize: 12, color: 'var(--t3)', marginBottom: 8 }}>
+                Quyidagi operatorlardan biriga Telegram orqali yozing:
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {(operators || []).map((op) => (
+                  <button key={op} className="btn btn-sm btn-gh" onClick={() => openOperatorChat(op)}>
+                    {op}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {confirmedCustomer && (
+            <>
+              <div className="card" style={{ padding: 12, display: 'grid', gap: 6 }}>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>{confirmedCustomer.name || '-'}</div>
+                <div style={{ fontSize: 12, color: 'var(--t3)' }}>
+                  ID: {confirmedCustomer.id || '-'} | Tel: {confirmedCustomer.phone || '-'} | Rayon: {confirmedCustomer.district || '-'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--t2)' }}>Manzil: {confirmedCustomer.address || '-'}</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                  <button className="btn btn-sm btn-gh" onClick={markNotMine}>Bu menikimas</button>
+                  <button className="btn btn-sm btn-gh" onClick={() => setConfirmedKey('')}>Boshqa ID</button>
+                </div>
+              </div>
+
+              <div className="tabs" style={{ display: 'inline-flex', width: 'fit-content' }}>
+                <button className={`tab${activeTab === 'sverka' ? ' on' : ''}`} onClick={() => setActiveTab('sverka')}>
+                  {E.sv} Sverka
+                </button>
+                <button className={`tab${activeTab === 'zakaz' ? ' on' : ''}`} onClick={() => setActiveTab('zakaz')}>
+                  {E.order} Zakaz
+                </button>
+                <button className={`tab${activeTab === 'talab' ? ' on' : ''}`} onClick={() => setActiveTab('talab')}>
+                  Talab va taklif
+                </button>
+              </div>
+
+              {activeTab === 'sverka' && (
+                <div style={{ overflow: 'auto', maxHeight: '58vh', border: '1px solid var(--b2)', borderRadius: 10 }}>
+                  <table className="tbl" style={{ minWidth: 820 }}>
+                    <thead>
+                      <tr>
+                        <th>Sana</th>
+                        <th>Tur</th>
+                        <th>Mahsulot</th>
+                        <th style={{ textAlign: 'right' }}>Miqdor</th>
+                        <th style={{ textAlign: 'right' }}>Summa</th>
+                        <th style={{ textAlign: 'right' }}>To'lov</th>
+                        <th style={{ textAlign: 'right' }}>Balans</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sverkaRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
+                            Sverka ma'lumoti topilmadi
+                          </td>
+                        </tr>
+                      ) : (
+                        sverkaRows.map((row, idx) => (
+                          <tr key={`sv_${idx}`}>
+                            <td>{row.sana || '-'}</td>
+                            <td>{row._type === 'payment' ? "To'lov" : row._isVoz ? 'Vozvrat' : 'Zakaz'}</td>
+                            <td style={{ maxWidth: 260 }}>
+                              <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {row.produkt || '-'}
+                              </span>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>
+                              {row.qty != null ? `${row._isVoz ? '-' : ''}${Math.abs(row.qty)}` : '-'}
+                            </td>
+                            <td style={{ textAlign: 'right' }}>{row.summa ? fmt(row.summa) : '-'}</td>
+                            <td style={{ textAlign: 'right' }}>{row.tolov ? fmt(row.tolov) : '-'}</td>
+                            <td style={{ textAlign: 'right' }}>{fmt(row.balansUZS || 0)}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {activeTab === 'zakaz' && (
+                <div style={{ overflow: 'auto', maxHeight: '58vh', border: '1px solid var(--b2)', borderRadius: 10 }}>
+                  <table className="tbl" style={{ minWidth: 760 }}>
+                    <thead>
+                      <tr>
+                        <th>Zakaz no</th>
+                        <th>Sana</th>
+                        <th>Mahsulot</th>
+                        <th style={{ textAlign: 'right' }}>Soni</th>
+                        <th style={{ textAlign: 'right' }}>Summa</th>
+                        <th>Holat</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {zakazRows.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} style={{ textAlign: 'center', padding: 30, color: 'var(--t3)' }}>
+                            Zakazlar topilmadi
+                          </td>
+                        </tr>
+                      ) : (
+                        zakazRows.map((o, idx) => (
+                          <tr key={`zak_${idx}`}>
+                            <td>{o.soNum || '-'}</td>
+                            <td>{fmtD(o.orderDate)}</td>
+                            <td>{o.product || '-'}</td>
+                            <td style={{ textAlign: 'right' }}>{Math.abs(o.qty || 0)}</td>
+                            <td style={{ textAlign: 'right' }}>{o.sum ? fmt(o.sum) : '-'}</td>
+                            <td>{o.status || '-'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {activeTab === 'talab' && (
+                <div className="card" style={{ padding: 14, display: 'grid', gap: 10 }}>
+                  <div style={{ fontWeight: 700 }}>Talab va taklif</div>
+                  <div style={{ fontSize: 12, color: 'var(--t3)' }}>
+                    Taklifingizni yozing va operatorga yuboring.
+                  </div>
+                  <textarea
+                    className="input"
+                    rows={4}
+                    value={requestText}
+                    onChange={(e) => setRequestText(e.target.value)}
+                    placeholder="Masalan: manzilni yangilash, zakaz bo'yicha savol..."
+                    style={{ resize: 'vertical' }}
+                  />
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {(operators || []).map((op) => (
+                      <button key={`talab_${op}`} className="btn btn-bl btn-sm" onClick={() => openOperatorChat(op)}>
+                        {op} ga yuborish
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 /* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў ROOT APP Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const NAV = [
   { id:'dash',    label:'Dashboard',  icon:E.home },
@@ -12179,6 +12595,20 @@ export default function App() {
     () => normalizeAccessApiUrl(obzvonWebhook),
     [obzvonWebhook]
   );
+  const isTelegramClientMode = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const tg = window.Telegram?.WebApp;
+      const hasTelegramInit = Boolean(tg?.initData || tg?.initDataUnsafe?.user);
+      const u = new URL(window.location.href || '');
+      const forcedByQuery = u.searchParams.get('tg') === '1';
+      const hashRaw = String(u.hash || '').replace(/^#/, '');
+      const forcedByHash = hashRaw.includes('tg=1');
+      return hasTelegramInit || forcedByQuery || forcedByHash;
+    } catch {
+      return false;
+    }
+  }, []);
   const [showUp,setUp]     = useState(false);
   const [notif,setNotif]   = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
@@ -12198,6 +12628,14 @@ export default function App() {
   const obzvonAllNewRowsRef = useRef(obzvonAllNewRows || []);
   const pendingObzvonNewRowsRef = useRef([]);
   const obzvonExportBusyRef = useRef(false);
+  useEffect(() => {
+    if (!isTelegramClientMode || typeof window === 'undefined') return;
+    const tg = window.Telegram?.WebApp;
+    try {
+      tg?.ready?.();
+      tg?.expand?.();
+    } catch {}
+  }, [isTelegramClientMode]);
   const buildPageUrl = useCallback((targetPage) => {
     const nextPage = normalizeAppPageId(targetPage);
     if (!nextPage || typeof window === 'undefined') return '';
@@ -13988,6 +14426,22 @@ export default function App() {
     const fallback = visibleNav[0]?.id || (canViewPage('settings') ? 'settings' : 'dash');
     setPage(fallback);
   }, [visibleNav, page, canViewPage]);
+
+  if (isTelegramClientMode) {
+    return (
+      <>
+        <style>{CSS}</style>
+        <TelegramCustomerPortal
+          D={D}
+          dataReady={!!data}
+          loading={!!autoLoad.loading}
+          loadError={autoLoad.error || ''}
+          onRetry={loadFromConfig}
+          operators={TELEGRAM_HELP_OPERATORS}
+        />
+      </>
+    );
+  }
 
   if (!isLoggedIn) {
     return (
