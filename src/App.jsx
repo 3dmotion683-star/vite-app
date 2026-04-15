@@ -12348,6 +12348,7 @@ function TelegramCustomerPortal({
   const [orderQty, setOrderQty] = useState('1');
   const [orderNote, setOrderNote] = useState('');
   const [orderFeedback, setOrderFeedback] = useState('');
+  const [prefillDone, setPrefillDone] = useState(false);
 
   const tgUser = useMemo(() => {
     if (typeof window === 'undefined') return {};
@@ -12358,6 +12359,21 @@ function TelegramCustomerPortal({
       firstName: String(user?.first_name || '').trim(),
       lastName: String(user?.last_name || '').trim(),
     };
+  }, []);
+  const urlPrefill = useMemo(() => {
+    if (typeof window === 'undefined') return { id: '', contractNo: '', fullName: '', address: '', section: '' };
+    try {
+      const u = new URL(window.location.href || '');
+      return {
+        id: normId(u.searchParams.get('customer_id') || ''),
+        contractNo: String(u.searchParams.get('contract_no') || '').trim(),
+        fullName: String(u.searchParams.get('full_name') || '').trim(),
+        address: String(u.searchParams.get('address') || '').trim(),
+        section: String(u.searchParams.get('section') || '').trim().toLowerCase(),
+      };
+    } catch {
+      return { id: '', contractNo: '', fullName: '', address: '', section: '' };
+    }
   }, []);
 
   const normalizedLookupId = useMemo(() => normId(lookupId), [lookupId]);
@@ -12396,6 +12412,37 @@ function TelegramCustomerPortal({
     const has = options.some((x) => x.__key === confirmedKey);
     if (!has) setConfirmedKey('');
   }, [options, confirmedKey]);
+  useEffect(() => {
+    if (!urlPrefill.id) return;
+    setTypedId((prev) => (prev ? prev : urlPrefill.id));
+    setLookupId((prev) => (prev ? prev : urlPrefill.id));
+  }, [urlPrefill.id]);
+  useEffect(() => {
+    if (!urlPrefill.section) return;
+    if (urlPrefill.section === 'zakaz') setActiveTab('zakaz');
+    else if (urlPrefill.section === 'sverka') setActiveTab('sverka');
+  }, [urlPrefill.section]);
+  useEffect(() => {
+    if (prefillDone) return;
+    if (!urlPrefill.id || !options.length) return;
+    const byId = options.filter((x) => normId(x?.id) === urlPrefill.id);
+    if (!byId.length) return;
+
+    const qName = normalizeMatchText(urlPrefill.contractNo || urlPrefill.fullName);
+    const qAddr = normalizeMatchText(urlPrefill.address);
+    const picked =
+      byId.find((x) => {
+        const nameTxt = normalizeMatchText(x?.name || '');
+        const addrTxt = normalizeMatchText(x?.address || '');
+        return (qName && (nameTxt.includes(qName) || qName.includes(nameTxt))) || (qAddr && addrTxt.includes(qAddr));
+      }) || byId[0];
+
+    setSelectedKey(picked.__key);
+    setConfirmedKey(picked.__key);
+    setShowHelp(false);
+    setOrderFeedback('');
+    setPrefillDone(true);
+  }, [prefillDone, urlPrefill.id, urlPrefill.contractNo, urlPrefill.fullName, urlPrefill.address, options]);
 
   const selectedCustomer = useMemo(
     () => options.find((x) => x.__key === selectedKey) || null,
@@ -12469,7 +12516,14 @@ function TelegramCustomerPortal({
     setActiveTab('sverka');
     setShowHelp(false);
     setOrderFeedback('');
-  }, [typedId]);
+    pushMiniEventToBot({
+      type: 'id_submitted',
+      id: normalized,
+      tgUserId: tgUser.id || '',
+      tgUsername: tgUser.username ? `@${tgUser.username.replace(/^@/, '')}` : '',
+      at: new Date().toISOString(),
+    });
+  }, [typedId, tgUser.id, tgUser.username, pushMiniEventToBot]);
 
   const markNotMine = useCallback(() => {
     setConfirmedKey('');
