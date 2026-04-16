@@ -12481,9 +12481,8 @@ function TelegramCustomerPortal({
   const [prefillDone, setPrefillDone] = useState(false);
   const [serverPrefill, setServerPrefill] = useState({ id: '', contractNo: '', fullName: '', address: '', section: '' });
   const [remoteLinkTried, setRemoteLinkTried] = useState(false);
-
-  const tgUser = useMemo(() => {
-    if (typeof window === 'undefined') return {};
+  const readTelegramUser = useCallback(() => {
+    if (typeof window === 'undefined') return { id: '', username: '', firstName: '', lastName: '' };
     const user = window.Telegram?.WebApp?.initDataUnsafe?.user || {};
     return {
       id: String(user?.id || '').trim(),
@@ -12492,6 +12491,34 @@ function TelegramCustomerPortal({
       lastName: String(user?.last_name || '').trim(),
     };
   }, []);
+  const [tgUser, setTgUser] = useState(() => readTelegramUser());
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    let tries = 0;
+    const sync = () => {
+      const next = readTelegramUser();
+      setTgUser((prev) => {
+        if (
+          String(prev?.id || '') === String(next?.id || '') &&
+          String(prev?.username || '') === String(next?.username || '') &&
+          String(prev?.firstName || '') === String(next?.firstName || '') &&
+          String(prev?.lastName || '') === String(next?.lastName || '')
+        ) {
+          return prev;
+        }
+        return next;
+      });
+      return Boolean(next?.id);
+    };
+    if (sync()) return undefined;
+    const timer = window.setInterval(() => {
+      tries += 1;
+      if (sync() || tries >= 40) {
+        window.clearInterval(timer);
+      }
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [readTelegramUser]);
   const urlPrefill = useMemo(() => {
     if (typeof window === 'undefined') return { id: '', contractNo: '', fullName: '', address: '', section: '' };
     try {
