@@ -215,6 +215,14 @@ const TG_BOT_ORDER_STORAGE_KEY = 'aq-tg-bot-orders-v1';
 const TG_BOT_ORDER_EVENT = 'aq-tg-bot-orders-updated';
 const TG_BOT_ORDER_STATUSES = ['Yangi', 'Qabul qilindi', 'Jarayonda', 'Bajarildi', "Bekor qilingan"];
 const TG_BOT_ORDER_PRODUCTS = ['Murodbaxsh 18.9L', 'БОНУС Murodbaxsh 18.9L'];
+const TG_BOT_AUDIT_STORAGE_KEY = 'aq-tg-bot-audit-v1';
+const TG_BOT_AUDIT_EVENT = 'aq-tg-bot-audit-updated';
+const TG_BOT_API_BASE = String(
+  import.meta.env.VITE_TG_BOT_API_URL ||
+  import.meta.env.VITE_TG_BOT_API ||
+  'https://suv-telegram-bot.3dmotion683.workers.dev'
+).trim().replace(/\/+$/, '');
+const TG_BOT_SYNC_TOKEN = String(import.meta.env.VITE_TG_BOT_SYNC_TOKEN || '').trim();
 const FILTER_CHECK_LABEL_STYLE = {
   display: 'grid',
   gridTemplateColumns: '14px minmax(0,1fr)',
@@ -3703,6 +3711,127 @@ const appendTelegramBotOrder = (order = {}) => {
   writeTelegramBotOrders(merged);
   return nextRow;
 };
+const normalizeTelegramAuditKind = (kind) => {
+  const k = String(kind || '').trim().toLowerCase();
+  return ['start', 'error', 'demand'].includes(k) ? k : 'start';
+};
+const normalizeTelegramAuditRow = (kind, row = {}) => {
+  const safeKind = normalizeTelegramAuditKind(kind || row?.kind);
+  const at = String(row?.at || row?.createdAt || row?.time || new Date().toISOString()).trim() || new Date().toISOString();
+  const id = String(row?.id || '').trim() || `${safeKind}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const usernameRaw = String(row?.username || row?.telegramUsername || row?.tg_username || '').trim();
+  return {
+    id,
+    kind: safeKind,
+    at,
+    event: String(row?.event || row?.type || '').trim() || 'event',
+    source: String(row?.source || '').trim() || 'app',
+    tgUserId: String(row?.tgUserId || row?.telegramUserId || row?.tg_user_id || row?.user_id || '').trim(),
+    chatId: String(row?.chatId || row?.chat_id || '').trim(),
+    username: usernameRaw ? (usernameRaw.startsWith('@') ? usernameRaw : `@${usernameRaw.replace(/^@/, '')}`) : '',
+    firstName: String(row?.firstName || row?.telegramFirstName || row?.first_name || '').trim(),
+    lastName: String(row?.lastName || row?.telegramLastName || row?.last_name || '').trim(),
+    submittedId: normId(row?.submittedId || row?.submitted_id || row?.id_input || row?.lookupId || row?.id || ''),
+    customerId: normId(row?.customerId || row?.customer_id || ''),
+    contractNo: String(row?.contractNo || row?.contract_no || '').trim(),
+    fullName: String(row?.fullName || row?.full_name || row?.customerName || row?.customer_name || '').trim(),
+    text: String(row?.text || row?.message || row?.note || '').trim(),
+    error: String(row?.error || row?.reason || '').trim(),
+  };
+};
+const readTelegramBotAudit = () => {
+  const raw = S.get(TG_BOT_AUDIT_STORAGE_KEY, { start: [], error: [], demand: [] });
+  const out = { start: [], error: [], demand: [] };
+  ['start', 'error', 'demand'].forEach((kind) => {
+    const arr = Array.isArray(raw?.[kind]) ? raw[kind] : [];
+    out[kind] = arr
+      .map((r) => normalizeTelegramAuditRow(kind, r))
+      .sort((a, b) => {
+        const ta = parseDateTimeLoose(a.at)?.getTime() || 0;
+        const tb = parseDateTimeLoose(b.at)?.getTime() || 0;
+        return tb - ta;
+      });
+  });
+  return out;
+};
+const writeTelegramBotAudit = (rowsByKind = {}) => {
+  const payload = { start: [], error: [], demand: [] };
+  ['start', 'error', 'demand'].forEach((kind) => {
+    const arr = Array.isArray(rowsByKind?.[kind]) ? rowsByKind[kind] : [];
+    payload[kind] = arr.map((r) => normalizeTelegramAuditRow(kind, r)).slice(0, 2000);
+  });
+  S.set(TG_BOT_AUDIT_STORAGE_KEY, payload);
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new CustomEvent(TG_BOT_AUDIT_EVENT, { detail: { at: Date.now() } }));
+    } catch {}
+  }
+};
+const appendTelegramBotAudit = (kind, row = {}) => {
+  const safeKind = normalizeTelegramAuditKind(kind);
+  const current = readTelegramBotAudit();
+  const normalized = normalizeTelegramAuditRow(safeKind, row);
+  const existing = Array.isArray(current[safeKind]) ? current[safeKind] : [];
+  const merged = [normalized, ...existing.filter((x) => String(x?.id || '') !== normalized.id)].slice(0, 2000);
+  writeTelegramBotAudit({ ...current, [safeKind]: merged });
+  return normalized;
+};
+const mapPayloadTypeToAuditKind = (payloadType) => {
+  const t = String(payloadType || '').trim().toLowerCase();
+  if (t.includes('not_mine') || t.includes('error')) return 'error';
+  if (t.includes('demand') || t.includes('taklif')) return 'demand';
+  return 'start';
+};
+const fetchTelegramBotAuditRows = async (kind, limit = 500) => {
+  const safeKind = normalizeTelegramAuditKind(kind);
+  const base = String(TG_BOT_API_BASE || '').trim().replace(/\/+$/, '');
+  if (!base) return [];
+  const url = `${base}/audit?kind=${encodeURIComponent(safeKind)}&limit=${encodeURIComponent(limit)}`;
+  const r = await fetch(url, { cache: 'no-store' });
+  const txt = await r.text();
+  let js = {};
+  try { js = txt ? JSON.parse(txt) : {}; } catch {}
+  if (!r.ok || js?.ok === false) {
+    throw new Error(String(js?.error || `HTTP ${r.status}`));
+  }
+  const rows = Array.isArray(js?.rows) ? js.rows : [];
+  return rows
+    .map((row) => normalizeTelegramAuditRow(safeKind, row))
+    .sort((a, b) => {
+      const ta = parseDateTimeLoose(a.at)?.getTime() || 0;
+      const tb = parseDateTimeLoose(b.at)?.getTime() || 0;
+      return tb - ta;
+    });
+};
+const syncCustomersToTelegramBot = async (customers = []) => {
+  const base = String(TG_BOT_API_BASE || '').trim().replace(/\/+$/, '');
+  if (!base) return { ok: false, reason: 'no_api_base' };
+  const rows = (Array.isArray(customers) ? customers : [])
+    .map((c) => ({
+      customer_id: normId(c?.id),
+      full_name: String(c?.name || '').trim(),
+      contract_no: String(c?.name || '').trim(),
+      address: String(c?.address || '').trim(),
+      phone: String(c?.phone || '').trim(),
+      is_active: isNameInactiveByPrefix(c?.name || '') ? 0 : 1,
+    }))
+    .filter((r) => r.customer_id);
+  if (!rows.length) return { ok: false, reason: 'empty_rows' };
+  const headers = { 'content-type': 'application/json' };
+  if (TG_BOT_SYNC_TOKEN) headers['x-sync-token'] = TG_BOT_SYNC_TOKEN;
+  const r = await fetch(`${base}/customers-sync`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ rows }),
+  });
+  const txt = await r.text();
+  let js = {};
+  try { js = txt ? JSON.parse(txt) : {}; } catch {}
+  if (!r.ok || js?.ok === false) {
+    throw new Error(String(js?.error || `sync HTTP ${r.status}`));
+  }
+  return { ok: true, ...js };
+};
 const BINDING_UPDATE_EVENT = 'aq-binding-maps-updated';
 const DEFAULT_USERS = ['Dildora', 'Dilfuza', 'Admin'];
 const DEFAULT_USER_CREDS = { Dildora:'Dildora', Dilfuza:'Dilfuza', Admin:'12345' };
@@ -3721,7 +3850,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, tg_bot:false, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3730,7 +3859,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, tg_bot:false, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3739,7 +3868,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'all',
     role: 'admin',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, test:true, bloggers:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, tg_bot:true, test:true, bloggers:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
     ui: { theme:'dark' },
     company: { canSwitch:true, default:'murodbaxsh' },
   },
@@ -3764,7 +3893,7 @@ function normalizeAccessConfig(user, cfg) {
         activeScope:'own',
         role:'operator',
         customerTabs:{ ...DEFAULT_OWN_CUSTOMER_TABS },
-        visible:{ ...DEFAULT_VISIBLE_PAGES, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+        visible:{ ...DEFAULT_VISIBLE_PAGES, tg_bot:false, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
         ui:{ theme:'dark' },
         company:{ canSwitch:false, default:'murodbaxsh' },
       };
@@ -11846,6 +11975,7 @@ function SettingsPanel({
     },
     { key: 'reports', label: 'Hisobotlar', fallback: true, children: [] },
     { key: 'plan', label: 'Plan', fallback: true, children: [] },
+    { key: 'tg_bot', label: 'Telegram bot', fallback: false, children: [] },
     { key: 'test', label: 'Test', fallback: true, children: [] },
     { key: 'refresh', label: 'Yangilash', fallback: true, children: [] },
     {
@@ -12349,6 +12479,8 @@ function TelegramCustomerPortal({
   const [orderNote, setOrderNote] = useState('');
   const [orderFeedback, setOrderFeedback] = useState('');
   const [prefillDone, setPrefillDone] = useState(false);
+  const [serverPrefill, setServerPrefill] = useState({ id: '', contractNo: '', fullName: '', address: '', section: '' });
+  const [remoteLinkTried, setRemoteLinkTried] = useState(false);
 
   const tgUser = useMemo(() => {
     if (typeof window === 'undefined') return {};
@@ -12375,6 +12507,16 @@ function TelegramCustomerPortal({
       return { id: '', contractNo: '', fullName: '', address: '', section: '' };
     }
   }, []);
+  const effectivePrefill = useMemo(() => {
+    const id = normId(urlPrefill.id || serverPrefill.id);
+    return {
+      id,
+      contractNo: String(urlPrefill.contractNo || serverPrefill.contractNo || '').trim(),
+      fullName: String(urlPrefill.fullName || serverPrefill.fullName || '').trim(),
+      address: String(urlPrefill.address || serverPrefill.address || '').trim(),
+      section: String(urlPrefill.section || serverPrefill.section || '').trim().toLowerCase(),
+    };
+  }, [urlPrefill, serverPrefill]);
 
   const normalizedLookupId = useMemo(() => normId(lookupId), [lookupId]);
   const options = useMemo(() => {
@@ -12413,23 +12555,23 @@ function TelegramCustomerPortal({
     if (!has) setConfirmedKey('');
   }, [options, confirmedKey]);
   useEffect(() => {
-    if (!urlPrefill.id) return;
-    setTypedId((prev) => (prev ? prev : urlPrefill.id));
-    setLookupId((prev) => (prev ? prev : urlPrefill.id));
-  }, [urlPrefill.id]);
+    if (!effectivePrefill.id) return;
+    setTypedId((prev) => (prev ? prev : effectivePrefill.id));
+    setLookupId((prev) => (prev ? prev : effectivePrefill.id));
+  }, [effectivePrefill.id]);
   useEffect(() => {
-    if (!urlPrefill.section) return;
-    if (urlPrefill.section === 'zakaz') setActiveTab('zakaz');
-    else if (urlPrefill.section === 'sverka') setActiveTab('sverka');
-  }, [urlPrefill.section]);
+    if (!effectivePrefill.section) return;
+    if (effectivePrefill.section === 'zakaz') setActiveTab('zakaz');
+    else if (effectivePrefill.section === 'sverka') setActiveTab('sverka');
+  }, [effectivePrefill.section]);
   useEffect(() => {
     if (prefillDone) return;
-    if (!urlPrefill.id || !options.length) return;
-    const byId = options.filter((x) => normId(x?.id) === urlPrefill.id);
+    if (!effectivePrefill.id || !options.length) return;
+    const byId = options.filter((x) => normId(x?.id) === effectivePrefill.id);
     if (!byId.length) return;
 
-    const qName = normalizeMatchText(urlPrefill.contractNo || urlPrefill.fullName);
-    const qAddr = normalizeMatchText(urlPrefill.address);
+    const qName = normalizeMatchText(effectivePrefill.contractNo || effectivePrefill.fullName);
+    const qAddr = normalizeMatchText(effectivePrefill.address);
     const picked =
       byId.find((x) => {
         const nameTxt = normalizeMatchText(x?.name || '');
@@ -12442,7 +12584,39 @@ function TelegramCustomerPortal({
     setShowHelp(false);
     setOrderFeedback('');
     setPrefillDone(true);
-  }, [prefillDone, urlPrefill.id, urlPrefill.contractNo, urlPrefill.fullName, urlPrefill.address, options]);
+  }, [prefillDone, effectivePrefill.id, effectivePrefill.contractNo, effectivePrefill.fullName, effectivePrefill.address, options]);
+  useEffect(() => {
+    if (remoteLinkTried) return;
+    if (effectivePrefill.id) return;
+    if (!tgUser?.id) return;
+    if (!TG_BOT_API_BASE) return;
+    setRemoteLinkTried(true);
+    const ctrl = new AbortController();
+    const url = `${TG_BOT_API_BASE}/link?tg_user_id=${encodeURIComponent(String(tgUser.id || '').trim())}`;
+    fetch(url, { cache: 'no-store', signal: ctrl.signal })
+      .then(async (r) => {
+        const txt = await r.text();
+        let js = {};
+        try { js = txt ? JSON.parse(txt) : {}; } catch {}
+        if (!r.ok || js?.ok === false) return null;
+        return js;
+      })
+      .then((js) => {
+        if (!js?.linked) return;
+        const linked = js.linked || {};
+        const linkedId = normId(linked.customer_id || linked.id || '');
+        if (!linkedId) return;
+        setServerPrefill({
+          id: linkedId,
+          contractNo: String(linked.contract_no || '').trim(),
+          fullName: String(linked.full_name || '').trim(),
+          address: String(linked.address || '').trim(),
+          section: 'sverka',
+        });
+      })
+      .catch(() => {});
+    return () => ctrl.abort();
+  }, [remoteLinkTried, effectivePrefill.id, tgUser?.id]);
 
   const selectedCustomer = useMemo(
     () => options.find((x) => x.__key === selectedKey) || null,
@@ -12500,13 +12674,30 @@ function TelegramCustomerPortal({
     [lookupId, typedId, confirmedCustomer, selectedCustomer]
   );
   const pushMiniEventToBot = useCallback((payload) => {
+    const safePayload = payload && typeof payload === 'object' ? payload : {};
+    const kind = mapPayloadTypeToAuditKind(safePayload.type);
+    appendTelegramBotAudit(kind, {
+      at: safePayload.at || new Date().toISOString(),
+      event: safePayload.type || 'event',
+      source: 'webapp',
+      tgUserId: tgUser.id || '',
+      username: tgUser.username ? `@${tgUser.username.replace(/^@/, '')}` : '',
+      firstName: tgUser.firstName || '',
+      lastName: tgUser.lastName || '',
+      submittedId: normId(safePayload.id || safePayload.lookupId || ''),
+      customerId: normId(safePayload.customerId || safePayload?.order?.customerId || ''),
+      contractNo: String(safePayload.contractNo || '').trim(),
+      fullName: String(safePayload.name || safePayload.fullName || '').trim(),
+      text: String(safePayload.text || safePayload.note || safePayload?.order?.note || '').trim(),
+      error: String(safePayload.error || '').trim(),
+    });
     if (typeof window === 'undefined') return;
     const tg = window.Telegram?.WebApp;
     if (!tg?.sendData) return;
     try {
-      tg.sendData(JSON.stringify(payload || {}));
+      tg.sendData(JSON.stringify(safePayload));
     } catch {}
-  }, []);
+  }, [tgUser.id, tgUser.username, tgUser.firstName, tgUser.lastName]);
 
   const onFind = useCallback(() => {
     const normalized = normId(typedId);
@@ -12875,6 +13066,182 @@ function TelegramCustomerPortal({
     </div>
   );
 }
+
+function TelegramBotMonitorPage() {
+  const [tab, setTab] = useState('start');
+  const [q, setQ] = useState('');
+  const [rowsByKind, setRowsByKind] = useState(() => readTelegramBotAudit());
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [sourceLabel, setSourceLabel] = useState('Lokal');
+
+  const loadFromServer = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const [startRows, errorRows, demandRows] = await Promise.all([
+        fetchTelegramBotAuditRows('start', 1200),
+        fetchTelegramBotAuditRows('error', 1200),
+        fetchTelegramBotAuditRows('demand', 1200),
+      ]);
+      const local = readTelegramBotAudit();
+      const mergeRows = (kind, serverRows = [], localRows = []) => {
+        const map = new Map();
+        [...(serverRows || []), ...(localRows || [])].forEach((r) => {
+          const normalized = normalizeTelegramAuditRow(kind, r);
+          const key = String(normalized?.id || '').trim() || `${normalized.kind}-${normalized.at}-${normalized.tgUserId}`;
+          if (!key) return;
+          if (!map.has(key)) map.set(key, normalized);
+        });
+        return Array.from(map.values()).sort((a, b) => {
+          const ta = parseDateTimeLoose(a.at)?.getTime() || 0;
+          const tb = parseDateTimeLoose(b.at)?.getTime() || 0;
+          return tb - ta;
+        });
+      };
+      const next = {
+        start: mergeRows('start', startRows, local.start || []),
+        error: mergeRows('error', errorRows, local.error || []),
+        demand: mergeRows('demand', demandRows, local.demand || []),
+      };
+      setRowsByKind(next);
+      writeTelegramBotAudit(next);
+      setSourceLabel('Server + lokal');
+    } catch (e) {
+      const fallback = readTelegramBotAudit();
+      setRowsByKind(fallback);
+      setLoadError(`Serverdan olishda xato: ${String(e?.message || e || 'unknown')}`);
+      setSourceLabel('Lokal');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFromServer();
+  }, [loadFromServer]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onAudit = () => {
+      setRowsByKind(readTelegramBotAudit());
+    };
+    window.addEventListener(TG_BOT_AUDIT_EVENT, onAudit);
+    return () => window.removeEventListener(TG_BOT_AUDIT_EVENT, onAudit);
+  }, []);
+
+  const counts = useMemo(() => ({
+    start: (rowsByKind.start || []).length,
+    error: (rowsByKind.error || []).length,
+    demand: (rowsByKind.demand || []).length,
+  }), [rowsByKind]);
+
+  const activeRows = useMemo(() => {
+    const rows = Array.isArray(rowsByKind?.[tab]) ? rowsByKind[tab] : [];
+    const query = String(q || '').trim().toLowerCase();
+    if (!query) return rows;
+    return rows.filter((r) => [
+      r.event,
+      r.tgUserId,
+      r.username,
+      r.firstName,
+      r.lastName,
+      r.submittedId,
+      r.customerId,
+      r.contractNo,
+      r.fullName,
+      r.text,
+      r.error,
+      r.source,
+      r.at,
+    ].some((x) => String(x || '').toLowerCase().includes(query)));
+  }, [rowsByKind, tab, q]);
+
+  return (
+    <div className="ani" style={{display:'flex',flexDirection:'column',gap:12,height:'100%'}}>
+      <div style={{display:'flex',gap:8,alignItems:'center',justifyContent:'space-between',flexWrap:'wrap'}}>
+        <div style={{fontWeight:800,fontSize:16}}>Telegram bot monitoring</div>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <span className="tag" style={{background:'var(--s2)',color:'var(--t3)'}}>Manba: {sourceLabel}</span>
+          <button className="btn btn-gh btn-sm" onClick={loadFromServer} disabled={loading}>
+            {loading ? 'Yuklanmoqda...' : 'Yangilash'}
+          </button>
+        </div>
+      </div>
+
+      {!!loadError && (
+        <div className="card" style={{padding:10,border:'1px solid var(--rd)',background:'var(--rd2)',color:'var(--rd)'}}>
+          {loadError}
+        </div>
+      )}
+
+      <div className="g3">
+        <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Start</div><div style={{fontSize:28,fontWeight:800,color:'var(--bl)'}}>{fmt(counts.start)}</div></div>
+        <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Error</div><div style={{fontSize:28,fontWeight:800,color:'var(--rd)'}}>{fmt(counts.error)}</div></div>
+        <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Talab va taklif</div><div style={{fontSize:28,fontWeight:800,color:'var(--gr)'}}>{fmt(counts.demand)}</div></div>
+      </div>
+
+      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+        <div className="tabs" style={{display:'inline-flex'}}>
+          <button className={`tab${tab==='start'?' on':''}`} onClick={()=>setTab('start')}>Start</button>
+          <button className={`tab${tab==='error'?' on':''}`} onClick={()=>setTab('error')}>Error</button>
+          <button className={`tab${tab==='demand'?' on':''}`} onClick={()=>setTab('demand')}>Talab va taklif</button>
+        </div>
+        <div className="sb" style={{flex:'1 1 420px',minWidth:220,maxWidth:'none'}}>
+          <span style={{color:'var(--t3)'}}>Qidiruv</span>
+          <input value={q} onChange={(e)=>setQ(e.target.value)} placeholder="ID, username, event..." />
+        </div>
+      </div>
+
+      <div className="card" style={{overflow:'hidden',flex:1,minHeight:0}}>
+        <div style={{overflow:'auto',height:'100%'}}>
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Vaqt</th>
+                <th>Event</th>
+                <th>TG ID</th>
+                <th>Username</th>
+                <th>Yuborilgan ID</th>
+                <th>Mijoz ID</th>
+                <th>Kontragent</th>
+                {tab === 'demand' ? <th>Talab/taklif</th> : <th>{tab === 'error' ? 'Xato' : 'Izoh'}</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {activeRows.length === 0 ? (
+                <tr>
+                  <td colSpan={9} style={{textAlign:'center',padding:30,color:'var(--t3)'}}>Ma'lumot topilmadi</td>
+                </tr>
+              ) : activeRows.slice(0, 1500).map((r, idx) => (
+                <tr key={`${r.id || 'row'}_${idx}`}>
+                  <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{idx + 1}</td>
+                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtDT(r.at)}</td>
+                  <td>{r.event || '-'}</td>
+                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.tgUserId || '-'}</td>
+                  <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--bl)'}}>{r.username || '-'}</td>
+                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.submittedId || '-'}</td>
+                  <td style={{fontFamily:'var(--mono)',fontSize:11}}>{r.customerId || '-'}</td>
+                  <td style={{maxWidth:260}}>
+                    <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      {r.contractNo || r.fullName || '-'}
+                    </span>
+                  </td>
+                  <td style={{maxWidth:360,color:tab==='error'?'var(--rd)':'var(--t2)'}}>
+                    <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                      {tab === 'error' ? (r.error || r.text || '-') : (r.text || r.error || '-')}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
 /* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў ROOT APP Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
 const NAV = [
   { id:'dash',    label:'Dashboard',  icon:E.home },
@@ -12887,6 +13254,7 @@ const NAV = [
   { id:'nazorat', label:'Nazorat',    icon:E.report },
   { id:'reports', label:'Hisobotlar', icon:E.report },
   { id:'plan',    label:'Plan',       icon:E.plan },
+  { id:'tg_bot',  label:'Telegram bot', icon:'\u{1F916}' },
   { id:'test',    label:'Test',       icon:E.test },
   { id:'bloggers',label:'Blogerlar',  icon:E.blogger },
 ];
@@ -12988,6 +13356,7 @@ export default function App() {
   const obzvonAllNewRowsRef = useRef(obzvonAllNewRows || []);
   const pendingObzvonNewRowsRef = useRef([]);
   const obzvonExportBusyRef = useRef(false);
+  const tgCustomerSyncKeyRef = useRef('');
   useEffect(() => {
     if (!isTelegramClientMode || typeof window === 'undefined') return;
     const tg = window.Telegram?.WebApp;
@@ -14099,6 +14468,20 @@ export default function App() {
     }
   }, [canSwitchCompany, companyFilter, lockedCompany]);
   const D = useMemo(() => filterDataByCompany(scopedD, activeCompany), [scopedD, activeCompany]);
+  useEffect(() => {
+    if (!TG_BOT_API_BASE) return;
+    if (sessionUser !== 'Admin') return;
+    const customers = Array.isArray(rawD?.customers) ? rawD.customers : [];
+    if (!customers.length) return;
+    const firstId = normId(customers[0]?.id || '');
+    const lastId = normId(customers[customers.length - 1]?.id || '');
+    const sig = `${customers.length}:${firstId}:${lastId}`;
+    if (tgCustomerSyncKeyRef.current === sig) return;
+    tgCustomerSyncKeyRef.current = sig;
+    syncCustomersToTelegramBot(customers).catch((e) => {
+      console.warn('tg customer sync failed', e);
+    });
+  }, [sessionUser, rawD?.customers]);
   const nazoratData = useMemo(
     () => (currentAccess.visible?.nazorat_perm_handler ? companyWideData : D),
     [currentAccess, companyWideData, D]
@@ -14938,7 +15321,7 @@ export default function App() {
           </div>
 
           <div data-filter-boundary="1" style={{flex:1,overflow:page==='nazorat'?'hidden':'auto',padding:page==='nazorat'?8:12,display:'flex',flexDirection:'column'}}>
-            {!data && page!=='doljniki' ? (
+            {!data && page!=='doljniki' && page!=='tg_bot' ? (
               <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <div style={{textAlign:'center',maxWidth:440}}>
                   {autoLoad.loading ? (
@@ -15067,6 +15450,9 @@ export default function App() {
                     planOffDays={planOffDays}
                     setPlanOffDays={setPlanOffDays}
                   />
+                )}
+                {page==='tg_bot' && canViewPage('tg_bot') && (
+                  <TelegramBotMonitorPage />
                 )}
                 {page==='test' && canViewPage('test') && (
                   <TestLabPage
