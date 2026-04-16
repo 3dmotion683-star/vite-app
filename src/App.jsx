@@ -12537,6 +12537,7 @@ function TelegramCustomerPortal({
   const [serverPrefill, setServerPrefill] = useState({ id: '', contractNo: '', fullName: '', address: '', section: '' });
   const [remoteLinkTried, setRemoteLinkTried] = useState(false);
   const [remoteLinkLoading, setRemoteLinkLoading] = useState(false);
+  const [autoBootDelayDone, setAutoBootDelayDone] = useState(false);
   const readTelegramUser = useCallback(() => {
     if (typeof window === 'undefined') return { id: '', username: '', firstName: '', lastName: '' };
     const user = window.Telegram?.WebApp?.initDataUnsafe?.user || {};
@@ -12608,6 +12609,11 @@ function TelegramCustomerPortal({
     [tgUser?.id, effectivePrefill?.tgUserId]
   );
   useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const t = window.setTimeout(() => setAutoBootDelayDone(true), 4500);
+    return () => window.clearTimeout(t);
+  }, []);
+  useEffect(() => {
     if (!tgLookupUserId) return;
     if (effectivePrefill.id) return;
     const cached = getTelegramBotLinkCache(tgLookupUserId);
@@ -12661,6 +12667,13 @@ function TelegramCustomerPortal({
     });
     return matched;
   }, [D?.customers, D?.contacts, normalizedLookupId, effectivePrefill.id, effectivePrefill.contractNo, effectivePrefill.fullName, effectivePrefill.address]);
+  const waitingAutoLink = useMemo(() => {
+    if (effectivePrefill.id) return false;
+    if (remoteLinkLoading) return true;
+    if (!tgLookupUserId && !autoBootDelayDone) return true;
+    if (tgLookupUserId && !remoteLinkTried) return true;
+    return false;
+  }, [effectivePrefill.id, remoteLinkLoading, tgLookupUserId, autoBootDelayDone, remoteLinkTried]);
 
   useEffect(() => {
     if (!options.length) {
@@ -12921,7 +12934,7 @@ function TelegramCustomerPortal({
 
           {!confirmedCustomer && (
             <div className="card" style={{ padding: 14, display: 'grid', gap: 10 }}>
-              {remoteLinkLoading ? (
+              {waitingAutoLink ? (
                 <div style={{ fontSize: 12, color: 'var(--bl)' }}>Profil tekshirilmoqda...</div>
               ) : (
                 <>
