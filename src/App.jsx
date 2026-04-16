@@ -12520,30 +12520,37 @@ function TelegramCustomerPortal({
     return () => window.clearInterval(timer);
   }, [readTelegramUser]);
   const urlPrefill = useMemo(() => {
-    if (typeof window === 'undefined') return { id: '', contractNo: '', fullName: '', address: '', section: '' };
+    if (typeof window === 'undefined') return { id: '', tgUserId: '', contractNo: '', fullName: '', address: '', section: '' };
     try {
       const u = new URL(window.location.href || '');
       return {
         id: normId(u.searchParams.get('customer_id') || ''),
+        tgUserId: String(u.searchParams.get('tg_user_id') || '').replace(/[^\d]/g, '').trim(),
         contractNo: String(u.searchParams.get('contract_no') || '').trim(),
         fullName: String(u.searchParams.get('full_name') || '').trim(),
         address: String(u.searchParams.get('address') || '').trim(),
         section: String(u.searchParams.get('section') || '').trim().toLowerCase(),
       };
     } catch {
-      return { id: '', contractNo: '', fullName: '', address: '', section: '' };
+      return { id: '', tgUserId: '', contractNo: '', fullName: '', address: '', section: '' };
     }
   }, []);
   const effectivePrefill = useMemo(() => {
     const id = normId(urlPrefill.id || serverPrefill.id);
+    const tgUserId = String(urlPrefill.tgUserId || '').replace(/[^\d]/g, '').trim();
     return {
       id,
+      tgUserId,
       contractNo: String(urlPrefill.contractNo || serverPrefill.contractNo || '').trim(),
       fullName: String(urlPrefill.fullName || serverPrefill.fullName || '').trim(),
       address: String(urlPrefill.address || serverPrefill.address || '').trim(),
       section: String(urlPrefill.section || serverPrefill.section || '').trim().toLowerCase(),
     };
   }, [urlPrefill, serverPrefill]);
+  const tgLookupUserId = useMemo(
+    () => String(tgUser?.id || effectivePrefill?.tgUserId || '').replace(/[^\d]/g, '').trim(),
+    [tgUser?.id, effectivePrefill?.tgUserId]
+  );
 
   const normalizedLookupId = useMemo(() => normId(lookupId), [lookupId]);
   const options = useMemo(() => {
@@ -12615,11 +12622,11 @@ function TelegramCustomerPortal({
   useEffect(() => {
     if (remoteLinkTried) return;
     if (effectivePrefill.id) return;
-    if (!tgUser?.id) return;
+    if (!tgLookupUserId) return;
     if (!TG_BOT_API_BASE) return;
     setRemoteLinkTried(true);
     const ctrl = new AbortController();
-    const url = `${TG_BOT_API_BASE}/link?tg_user_id=${encodeURIComponent(String(tgUser.id || '').trim())}`;
+    const url = `${TG_BOT_API_BASE}/link?tg_user_id=${encodeURIComponent(tgLookupUserId)}`;
     fetch(url, { cache: 'no-store', signal: ctrl.signal })
       .then(async (r) => {
         const txt = await r.text();
@@ -12643,7 +12650,7 @@ function TelegramCustomerPortal({
       })
       .catch(() => {});
     return () => ctrl.abort();
-  }, [remoteLinkTried, effectivePrefill.id, tgUser?.id]);
+  }, [remoteLinkTried, effectivePrefill.id, tgLookupUserId]);
 
   const selectedCustomer = useMemo(
     () => options.find((x) => x.__key === selectedKey) || null,
@@ -12707,7 +12714,7 @@ function TelegramCustomerPortal({
       at: safePayload.at || new Date().toISOString(),
       event: safePayload.type || 'event',
       source: 'webapp',
-      tgUserId: tgUser.id || '',
+      tgUserId: tgLookupUserId || '',
       username: tgUser.username ? `@${tgUser.username.replace(/^@/, '')}` : '',
       firstName: tgUser.firstName || '',
       lastName: tgUser.lastName || '',
@@ -12724,7 +12731,7 @@ function TelegramCustomerPortal({
     try {
       tg.sendData(JSON.stringify(safePayload));
     } catch {}
-  }, [tgUser.id, tgUser.username, tgUser.firstName, tgUser.lastName]);
+  }, [tgLookupUserId, tgUser.username, tgUser.firstName, tgUser.lastName]);
 
   const onFind = useCallback(() => {
     const normalized = normId(typedId);
@@ -12737,11 +12744,11 @@ function TelegramCustomerPortal({
     pushMiniEventToBot({
       type: 'id_submitted',
       id: normalized,
-      tgUserId: tgUser.id || '',
+      tgUserId: tgLookupUserId || '',
       tgUsername: tgUser.username ? `@${tgUser.username.replace(/^@/, '')}` : '',
       at: new Date().toISOString(),
     });
-  }, [typedId, tgUser.id, tgUser.username, pushMiniEventToBot]);
+  }, [typedId, tgLookupUserId, tgUser.username, pushMiniEventToBot]);
 
   const markNotMine = useCallback(() => {
     setConfirmedKey('');
@@ -12769,7 +12776,7 @@ function TelegramCustomerPortal({
       product: orderProduct,
       qty,
       note: orderNote,
-      telegramUserId: tgUser.id,
+      telegramUserId: tgLookupUserId || tgUser.id,
       telegramUsername: tgUser.username ? `@${tgUser.username.replace(/^@/, '')}` : '',
       telegramFirstName: tgUser.firstName,
       telegramLastName: tgUser.lastName,
