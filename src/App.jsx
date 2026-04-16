@@ -173,6 +173,21 @@ const fmt  = (n) => new Intl.NumberFormat('uz-UZ').format(Math.round(n || 0));
 const fmtM = (n) =>
   n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' :
   n >= 1e3 ? (n / 1e3).toFixed(0) + 'K' : fmt(n);
+const fmtDT = (v) => {
+  const d = parseDateTimeLoose(v);
+  if (!d) return String(v || '-');
+  try {
+    return new Intl.DateTimeFormat('uz-UZ', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(d);
+  } catch {
+    return String(v || '-');
+  }
+};
 const E = {
   upload: '\u{1F4C2}',
   excel: '\u{1F4CA}',
@@ -217,6 +232,7 @@ const TG_BOT_ORDER_STATUSES = ['Yangi', 'Qabul qilindi', 'Jarayonda', 'Bajarildi
 const TG_BOT_ORDER_PRODUCTS = ['Murodbaxsh 18.9L', 'БОНУС Murodbaxsh 18.9L'];
 const TG_BOT_AUDIT_STORAGE_KEY = 'aq-tg-bot-audit-v1';
 const TG_BOT_AUDIT_EVENT = 'aq-tg-bot-audit-updated';
+const TG_BOT_LINK_CACHE_KEY = 'aq-tg-bot-link-cache-v1';
 const TG_BOT_API_BASE = String(
   import.meta.env.VITE_TG_BOT_API_URL ||
   import.meta.env.VITE_TG_BOT_API ||
@@ -3775,6 +3791,45 @@ const appendTelegramBotAudit = (kind, row = {}) => {
   const merged = [normalized, ...existing.filter((x) => String(x?.id || '') !== normalized.id)].slice(0, 2000);
   writeTelegramBotAudit({ ...current, [safeKind]: merged });
   return normalized;
+};
+const readTelegramBotLinkCache = () => {
+  const raw = S.get(TG_BOT_LINK_CACHE_KEY, {});
+  if (!raw || typeof raw !== 'object') return {};
+  return raw;
+};
+const writeTelegramBotLinkCache = (payload = {}) => {
+  const safe = payload && typeof payload === 'object' ? payload : {};
+  S.set(TG_BOT_LINK_CACHE_KEY, safe);
+};
+const putTelegramBotLinkCache = (tgUserId, linked = {}) => {
+  const id = String(tgUserId || '').replace(/[^\d]/g, '').trim();
+  if (!id) return;
+  const customerId = normId(linked?.customer_id || linked?.id || '');
+  if (!customerId) return;
+  const prev = readTelegramBotLinkCache();
+  prev[id] = {
+    customer_id: customerId,
+    contract_no: String(linked?.contract_no || '').trim(),
+    full_name: String(linked?.full_name || '').trim(),
+    address: String(linked?.address || '').trim(),
+    updated_at: new Date().toISOString(),
+  };
+  writeTelegramBotLinkCache(prev);
+};
+const getTelegramBotLinkCache = (tgUserId) => {
+  const id = String(tgUserId || '').replace(/[^\d]/g, '').trim();
+  if (!id) return null;
+  const map = readTelegramBotLinkCache();
+  const row = map?.[id];
+  if (!row || typeof row !== 'object') return null;
+  const customerId = normId(row?.customer_id || row?.id || '');
+  if (!customerId) return null;
+  return {
+    customer_id: customerId,
+    contract_no: String(row?.contract_no || '').trim(),
+    full_name: String(row?.full_name || '').trim(),
+    address: String(row?.address || '').trim(),
+  };
 };
 const mapPayloadTypeToAuditKind = (payloadType) => {
   const t = String(payloadType || '').trim().toLowerCase();
@@ -12481,6 +12536,7 @@ function TelegramCustomerPortal({
   const [prefillDone, setPrefillDone] = useState(false);
   const [serverPrefill, setServerPrefill] = useState({ id: '', contractNo: '', fullName: '', address: '', section: '' });
   const [remoteLinkTried, setRemoteLinkTried] = useState(false);
+  const [remoteLinkLoading, setRemoteLinkLoading] = useState(false);
   const readTelegramUser = useCallback(() => {
     if (typeof window === 'undefined') return { id: '', username: '', firstName: '', lastName: '' };
     const user = window.Telegram?.WebApp?.initDataUnsafe?.user || {};
@@ -12551,10 +12607,34 @@ function TelegramCustomerPortal({
     () => String(tgUser?.id || effectivePrefill?.tgUserId || '').replace(/[^\d]/g, '').trim(),
     [tgUser?.id, effectivePrefill?.tgUserId]
   );
+  useEffect(() => {
+    if (!tgLookupUserId) return;
+    if (effectivePrefill.id) return;
+    const cached = getTelegramBotLinkCache(tgLookupUserId);
+    if (!cached?.customer_id) return;
+    setServerPrefill((prev) => ({
+      id: normId(prev?.id || cached.customer_id),
+      contractNo: String(prev?.contractNo || cached.contract_no || '').trim(),
+      fullName: String(prev?.fullName || cached.full_name || '').trim(),
+      address: String(prev?.address || cached.address || '').trim(),
+      section: String(prev?.section || 'sverka').trim().toLowerCase(),
+    }));
+  }, [tgLookupUserId, effectivePrefill.id]);
 
   const normalizedLookupId = useMemo(() => normId(lookupId), [lookupId]);
   const options = useMemo(() => {
-    if (!normalizedLookupId) return [];
+    const prefillOpts = [];
+    if (effectivePrefill.id) {
+      prefillOpts.push({
+        id: effectivePrefill.id,
+        name: effectivePrefill.contractNo || effectivePrefill.fullName || `ID ${effectivePrefill.id}`,
+        address: effectivePrefill.address || '',
+        phone: '',
+        district: '',
+        __key: `${effectivePrefill.id}__prefill`,
+      });
+    }
+    if (!normalizedLookupId) return prefillOpts;
     const customers = Array.isArray(D?.customers) ? D.customers : [];
     const ids = new Set();
     customers.forEach((c) => {
@@ -12566,13 +12646,21 @@ function TelegramCustomerPortal({
         ids.add(normId(c.id));
       }
     });
-    return customers
+    const matched = customers
       .filter((c) => ids.has(normId(c?.id)))
       .map((c, idx) => ({
         ...c,
         __key: `${normId(c?.id)}__${idx}__${String(c?.name || '').trim()}__${String(c?.address || '').trim()}`,
       }));
-  }, [D?.customers, D?.contacts, normalizedLookupId]);
+    const exists = new Set(
+      matched.map((x) => `${normId(x?.id)}|${normalizeMatchText(x?.name || '')}|${normalizeMatchText(x?.address || '')}`)
+    );
+    prefillOpts.forEach((x) => {
+      const key = `${normId(x?.id)}|${normalizeMatchText(x?.name || '')}|${normalizeMatchText(x?.address || '')}`;
+      if (!exists.has(key)) matched.unshift(x);
+    });
+    return matched;
+  }, [D?.customers, D?.contacts, normalizedLookupId, effectivePrefill.id, effectivePrefill.contractNo, effectivePrefill.fullName, effectivePrefill.address]);
 
   useEffect(() => {
     if (!options.length) {
@@ -12625,6 +12713,7 @@ function TelegramCustomerPortal({
     if (!tgLookupUserId) return;
     if (!TG_BOT_API_BASE) return;
     setRemoteLinkTried(true);
+    setRemoteLinkLoading(true);
     const ctrl = new AbortController();
     const url = `${TG_BOT_API_BASE}/link?tg_user_id=${encodeURIComponent(tgLookupUserId)}`;
     fetch(url, { cache: 'no-store', signal: ctrl.signal })
@@ -12640,6 +12729,7 @@ function TelegramCustomerPortal({
         const linked = js.linked || {};
         const linkedId = normId(linked.customer_id || linked.id || '');
         if (!linkedId) return;
+        putTelegramBotLinkCache(tgLookupUserId, linked);
         setServerPrefill({
           id: linkedId,
           contractNo: String(linked.contract_no || '').trim(),
@@ -12648,7 +12738,8 @@ function TelegramCustomerPortal({
           section: 'sverka',
         });
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setRemoteLinkLoading(false));
     return () => ctrl.abort();
   }, [remoteLinkTried, effectivePrefill.id, tgLookupUserId]);
 
@@ -12794,7 +12885,7 @@ function TelegramCustomerPortal({
     setOrderNote('');
     setOrderQty('1');
     setOrderFeedback(`Zakaz yuborildi: ${row.id}`);
-  }, [confirmedCustomer, orderProduct, orderQty, orderNote, tgUser, pushMiniEventToBot]);
+  }, [confirmedCustomer, orderProduct, orderQty, orderNote, tgUser, tgLookupUserId, pushMiniEventToBot]);
 
   const portalFrameStyle = {
     minHeight: '100vh',
@@ -12830,17 +12921,23 @@ function TelegramCustomerPortal({
 
           {!confirmedCustomer && (
             <div className="card" style={{ padding: 14, display: 'grid', gap: 10 }}>
-              <div style={{ fontSize: 12, color: 'var(--t3)' }}>ID ni kiriting</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  className="input"
-                  placeholder="Masalan: 12345"
-                  value={typedId}
-                  onChange={(e) => setTypedId(e.target.value)}
-                  onKeyDown={(e) => (e.key === 'Enter' ? onFind() : null)}
-                />
-                <button className="btn btn-bl" onClick={onFind}>Tekshirish</button>
-              </div>
+              {remoteLinkLoading ? (
+                <div style={{ fontSize: 12, color: 'var(--bl)' }}>Profil tekshirilmoqda...</div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 12, color: 'var(--t3)' }}>ID ni kiriting</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                      className="input"
+                      placeholder="Masalan: 12345"
+                      value={typedId}
+                      onChange={(e) => setTypedId(e.target.value)}
+                      onKeyDown={(e) => (e.key === 'Enter' ? onFind() : null)}
+                    />
+                    <button className="btn btn-bl" onClick={onFind}>Tekshirish</button>
+                  </div>
+                </>
+              )}
 
               {normalizedLookupId && options.length === 0 && dataReady && (
                 <div style={{ color: 'var(--rd)', fontSize: 12 }}>
@@ -12897,6 +12994,14 @@ function TelegramCustomerPortal({
                         setActiveTab('sverka');
                         setShowHelp(false);
                         setOrderFeedback('');
+                        if (tgLookupUserId) {
+                          putTelegramBotLinkCache(tgLookupUserId, {
+                            customer_id: selectedCustomer.id || '',
+                            contract_no: selectedCustomer.name || '',
+                            full_name: selectedCustomer.name || '',
+                            address: selectedCustomer.address || '',
+                          });
+                        }
                         pushMiniEventToBot({
                           type: 'customer_confirmed',
                           id: selectedCustomer.id || '',
