@@ -751,28 +751,49 @@ const fmtDateTime = (iso) => {
   if (!d) return '-';
   return `${fmtD(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
+const normalizeCompanyText = (v) => normText(v).replace(/[\s._-]+/g, '');
 const isAhmadteaTag = (v) => {
-  const s = normText(v).replace(/[\s._-]+/g, '');
+  const s = normalizeCompanyText(v);
   return s.includes('ahmadtea');
 };
-const isAhmadteaCustomer = (c) => {
-  if (!c) return false;
-  // Faqat AA kategoriyasi asosida ajratamiz.
-  return isAhmadteaTag(c.aaTag);
+const isAlpJamolTag = (v) => {
+  const s = normalizeCompanyText(v);
+  return s.includes('alpjamol');
 };
-const isMurodbaxshCustomer = (c) => {
-  return !isAhmadteaCustomer(c);
+const getCustomerCompanyKey = (c) => {
+  if (!c) return 'murodbaxsh';
+  const aaTag = String(c.aaTag || '').trim();
+  const source = String(c.source || '').trim();
+  const note = String(c.merchantNote || '').trim();
+  if (isAhmadteaTag(aaTag)) return 'ahmadtea';
+  if (isAlpJamolTag(aaTag) || isAlpJamolTag(source) || isAlpJamolTag(note)) return 'alp_jamol';
+  return 'murodbaxsh';
 };
+const isAhmadteaCustomer = (c) => getCustomerCompanyKey(c) === 'ahmadtea';
+const isAlpJamolCustomer = (c) => getCustomerCompanyKey(c) === 'alp_jamol';
+const isMurodbaxshCustomer = (c) => getCustomerCompanyKey(c) === 'murodbaxsh';
 const COMPANY_OPTIONS = [
   { key: 'murodbaxsh', label: 'Murodbaxsh' },
   { key: 'ahmadtea', label: 'Ahmadtea' },
+  { key: 'alp_jamol', label: 'Alp Jamol' },
 ];
-const normalizeCompanyKey = (v) => (String(v || '').trim().toLowerCase() === 'ahmadtea' ? 'ahmadtea' : 'murodbaxsh');
+const normalizeCompanyKey = (v) => {
+  const raw = String(v || '').trim().toLowerCase();
+  const compact = raw.replace(/[\s._-]+/g, '');
+  if (compact === 'ahmadtea') return 'ahmadtea';
+  if (compact === 'alpjamol') return 'alp_jamol';
+  return 'murodbaxsh';
+};
 const normalizeStoredCompanyKey = (v) => {
   const s = String(v || '').trim();
   return s ? normalizeCompanyKey(s) : '';
 };
-const companyLabelByKey = (v) => (normalizeCompanyKey(v) === 'ahmadtea' ? 'Ahmadtea' : 'Murodbaxsh');
+const companyLabelByKey = (v) => {
+  const k = normalizeCompanyKey(v);
+  if (k === 'ahmadtea') return 'Ahmadtea';
+  if (k === 'alp_jamol') return 'Alp Jamol';
+  return 'Murodbaxsh';
+};
 const normalizeIdKey = (v) => {
   const s = String(v ?? '').trim();
   if (!s) return '';
@@ -834,10 +855,10 @@ const filterDataByCustomerIds = (baseData, idSetInput) => {
 };
 const filterDataByCompany = (baseData, company = 'murodbaxsh') => {
   const source = baseData || {};
-  const useAhmadtea = company === 'ahmadtea';
+  const activeCompany = normalizeCompanyKey(company);
   const idSet = new Set(
     (source.customers || [])
-      .filter((c) => (useAhmadtea ? isAhmadteaCustomer(c) : isMurodbaxshCustomer(c)))
+      .filter((c) => getCustomerCompanyKey(c) === activeCompany)
       .map((c) => normalizeIdKey(c?.id))
       .filter(Boolean)
   );
@@ -3894,6 +3915,7 @@ const DEFAULT_CUSTOMER_TABS = {
   all: true,
   ahmadtea: true,
   murodbaxsh: true,
+  alp_jamol: true,
   activeAll: true,
   activeOwn: true,
   inactive: true,
@@ -4697,7 +4719,15 @@ function Dashboard({ D }) {
 }
 
 /* Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў MIJOZLAR Р В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ўР В Р вЂ Р Р†Р вЂљРЎС›Р РЋРІР‚в„ў */
-function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById={}, company='murodbaxsh' }) {
+function Customers({
+  D,
+  currentUser='Admin',
+  currentAccess=null,
+  assignmentById={},
+  company='murodbaxsh',
+  companyWideCustomers=[],
+  companyWideAssignmentById={},
+}) {
   const { customers } = D;
   const [segment, setSegment] = useState('all');
   const [search,setS]   = useState('');
@@ -4715,16 +4745,24 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     lastFrom: '', lastTo: '',
   });
 
-  const dists = [...new Set(customers.map((c)=>c.district).filter(Boolean))].sort();
-  const sources = [...new Set(customers.map((c)=>c.source).filter(Boolean))].sort();
-  const agents = [...new Set(customers.map((c)=>c.lastAgent).filter(Boolean))].sort();
+  const allCustomersForActive = useMemo(
+    () => (Array.isArray(companyWideCustomers) && companyWideCustomers.length ? companyWideCustomers : customers),
+    [companyWideCustomers, customers]
+  );
+  const assignmentSource = useMemo(
+    () => ((companyWideAssignmentById && Object.keys(companyWideAssignmentById).length) ? companyWideAssignmentById : assignmentById),
+    [companyWideAssignmentById, assignmentById]
+  );
+  const dists = [...new Set(allCustomersForActive.map((c)=>c.district).filter(Boolean))].sort();
+  const sources = [...new Set(allCustomersForActive.map((c)=>c.source).filter(Boolean))].sort();
+  const agents = [...new Set(allCustomersForActive.map((c)=>c.lastAgent).filter(Boolean))].sort();
   const ownIds = useMemo(
     () => new Set(
-      Object.entries(assignmentById || {})
+      Object.entries(assignmentSource || {})
         .filter(([, op]) => normalizeUserKey(op) === normalizeUserKey(currentUser))
         .map(([id]) => id)
     ),
-    [assignmentById, currentUser]
+    [assignmentSource, currentUser]
   );
   const tabVisible = {
     ...DEFAULT_CUSTOMER_TABS,
@@ -4737,6 +4775,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     if (tabVisible.all) items.push({ id:'all', label:`${E.all} Hamma mijozlar` });
     if (allowCompanyTabs && tabVisible.ahmadtea) items.push({ id:'aa_ahmadtea', label:'Ahmadtea' });
     if (allowCompanyTabs && tabVisible.murodbaxsh) items.push({ id:'aa_other', label:'Murodbaxsh' });
+    if (allowCompanyTabs && tabVisible.alp_jamol) items.push({ id:'aa_alp_jamol', label:'Alp Jamol' });
     if (tabVisible.activeAll) items.push({ id:'active_all', label:'Aktiv (hammasi)' });
     if (tabVisible.activeOwn) items.push({ id:'active_own', label:"Aktiv (o'zimniki)" });
     if (tabVisible.inactive) items.push({ id:'inactive', label:'Nofaol mijozlar' });
@@ -4748,8 +4787,8 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
   }, [availableTabs, segment]);
 
   const nonAhmadtea = useMemo(
-    () => customers.filter((c) => !isAhmadteaCustomer(c)),
-    [customers]
+    () => allCustomersForActive.filter((c) => !isAhmadteaCustomer(c)),
+    [allCustomersForActive]
   );
   const nonAhmadteaNonZ = useMemo(
     () => nonAhmadtea.filter((c) => !isExcludedZCategory(c.source) && !isExcludedMerchant(c.source || '')),
@@ -4766,11 +4805,14 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     if (segment === 'aa_other') {
       return customers.filter((c) => isMurodbaxshCustomer(c));
     }
+    if (segment === 'aa_alp_jamol') {
+      return customers.filter((c) => isAlpJamolCustomer(c));
+    }
     if (segment === 'active_all') {
       return activeBase;
     }
     if (segment === 'active_own') {
-      if (activeScope === 'all') return activeBase;
+      if (normalizeUserKey(currentUser) === 'admin' && ownIds.size === 0) return activeBase;
       return activeBase.filter((c) => ownIds.has(c.id));
     }
     if (segment === 'inactive') {
@@ -4781,7 +4823,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     }
     // Hamma mijozlar: public.view_merchants dagi hamma mijoz.
     return customers;
-  }, [customers, segment, activeBase, ownIds, activeScope, nonAhmadtea, nonAhmadteaNonZ]);
+  }, [customers, segment, activeBase, ownIds, activeScope, nonAhmadtea, nonAhmadteaNonZ, currentUser]);
 
   const toRange = (v, from, to) => {
     if (from !== '' && Number(v) < Number(from)) return false;
@@ -4794,7 +4836,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     { key:'name', label:'Kontragent', type:'text' },
     { key:'phone', label:'Telefon', type:'text' },
     { key:'district', label:'Rayon', type:'text' },
-    { key:'source', label:'Manba', type:'text' },
+    { key:'source', label:'Mijozlar aloqasi', type:'text' },
     { key:'balanceUZS', label:'Balans UZS', type:'number' },
     { key:'balanceUSD', label:'Balans USD', type:'number' },
     { key:'tara', label:'Idish', type:'number' },
@@ -4812,7 +4854,13 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
     let r = segmentCustomers;
     if (search) {
       const q = search.toLowerCase();
-      r = r.filter((c) => c.name.toLowerCase().includes(q)||c.phone.includes(q)||c.id.includes(q)||(c.district||'').toLowerCase().includes(q));
+      r = r.filter((c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.phone.includes(q) ||
+        c.id.includes(q) ||
+        (c.district||'').toLowerCase().includes(q) ||
+        (c.source||'').toLowerCase().includes(q)
+      );
     }
     // Hamma mijozlar bo'limi har doim to'liq ro'yxat bo'ladi.
     if (segment !== 'all') {
@@ -4991,6 +5039,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
                   <th onClick={()=>tog('name')} style={{minWidth:210}}>Kontragent <SI c="name"/></th>
                   <th style={{minWidth:115}}>Telefon</th>
                   <th onClick={()=>tog('district')} style={{minWidth:95}}>Rayon <SI c="district"/></th>
+                  <th onClick={()=>tog('source')} style={{minWidth:140}}>Mijozlar aloqasi <SI c="source"/></th>
                   <th onClick={()=>tog('balanceUZS')} style={{minWidth:110}}>Balans UZS <SI c="balanceUZS"/></th>
                   <th onClick={()=>tog('balanceUSD')} style={{minWidth:95}}>Balans USD <SI c="balanceUSD"/></th>
                   <th onClick={()=>tog('tara')} style={{minWidth:65}}>Idish <SI c="tara"/></th>
@@ -5003,7 +5052,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
               </thead>
               <tbody>
                 {list.length===0
-                  ? <tr><td colSpan={12} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
+                  ? <tr><td colSpan={13} style={{textAlign:'center',padding:40,color:'var(--t3)'}}>Topilmadi</td></tr>
                   : list.map((c,i) => (
                     <tr key={c.id||i} onClick={()=>setDet(c)}>
                       <td style={{fontFamily:'var(--mono)',fontSize:10.5,color:'var(--t3)'}}>{c.id}</td>
@@ -5013,6 +5062,11 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
                       </td>
                       <td><a href={`tel:${c.phone}`} onClick={(e)=>e.stopPropagation()} style={{color:'var(--bl)',textDecoration:'none',fontFamily:'var(--mono)',fontSize:11.5}}>{c.phone}</a></td>
                       <td style={{fontSize:12}}>{c.district||'-'}</td>
+                      <td style={{maxWidth:150}}>
+                        <span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11.5,color:'var(--t2)'}}>
+                          {c.source || '-'}
+                        </span>
+                      </td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11.5,fontWeight:700,color:balColor(c.balanceUZS)}}>{c.balanceUZS<0?'-':c.balanceUZS>0?'+':''}{fmt(Math.abs(c.balanceUZS))}</td>
                       <td style={{fontFamily:'var(--mono)',fontSize:11,fontWeight:700,color:balColor(c.balanceUSD)}}>{c.balanceUSD!==0?<>{c.balanceUSD<0?'-':c.balanceUSD>0?'+':''}{fmt(Math.abs(c.balanceUSD))}$</>:'-'}</td>
                       <td style={{textAlign:'center',fontWeight:700,color:c.tara<0?'var(--rd)':'var(--bl)'}}>{c.tara!==0?(c.tara<0?'-':'')+Math.abs(c.tara):'-'}</td>
@@ -5072,6 +5126,7 @@ function Customers({ D, currentUser='Admin', currentAccess=null, assignmentById=
                 <div style={{minWidth:260}}>
                   <div style={{fontWeight:700,fontSize:13}}>{mapSelected.name}</div>
                   <div style={{fontSize:11,color:'var(--t3)'}}>ID: {mapSelected.id} | {mapSelected.phone || '-'} | {mapSelected.district || '-'}</div>
+                  <div style={{fontSize:11,color:'var(--t3)'}}>Aloqa: {mapSelected.source || '-'}</div>
                   <div style={{fontSize:11,color:'var(--t3)',maxWidth:740,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{mapSelected.address || '-'}</div>
                 </div>
                 <div style={{display:'flex',gap:8}}>
@@ -6354,6 +6409,7 @@ function Obzvon({
     { key:'no', label:'No', type:'number' },
     { key:'id', label:'ID', type:'text' },
     { key:'name', label:'Mijoz', type:'text' },
+    { key:'source', label:'Mijozlar aloqasi', type:'text' },
     { key:'district', label:'Rayon', type:'text' },
     { key:'phone', label:'Telefon', type:'text' },
     { key:'ord1', label:'Oxirgi zakaz', type:'date' },
@@ -6365,6 +6421,7 @@ function Obzvon({
   const opFilterColumns = useMemo(() => ([
     { key:'id', label:'ID', type:'text' },
     { key:'name', label:'Mijoz', type:'text' },
+    { key:'source', label:'Mijozlar aloqasi', type:'text' },
     { key:'district', label:'Rayon', type:'text' },
     { key:'balance', label:'Balans', type:'number' },
     { key:'ord1', label:'Oxirgi zakaz', type:'date' },
@@ -6730,6 +6787,7 @@ function Obzvon({
       out.push({
         no: idx + 1,
         ...c,
+        source: c.source || '',
         ord1: used[0]?.orderDate || '',
         ord2: used[1]?.orderDate || '',
         tara: Number(c?.tara || 0),
@@ -6791,11 +6849,36 @@ function Obzvon({
     Object.keys(src).forEach((cid) => {
       const ords = (src[cid] || [])
         .filter((o) => isOrderDoc(o.docType))
+        .filter((o) => toDate(o.orderDate))
         .sort((a,b)=>(toDate(b.orderDate)-toDate(a.orderDate)));
+      const byOrderId = new Map();
+      ords.forEach((o, index) => {
+        const orderId = String(o.soNum || '').trim() || `__idx_${index}`;
+        const qty = Math.abs(toNum(o.qty));
+        const d = toDate(o.orderDate);
+        if (!d) return;
+        if (!byOrderId.has(orderId)) {
+          byOrderId.set(orderId, {
+            orderDate: o.orderDate,
+            orderDateObj: d,
+            qty,
+          });
+          return;
+        }
+        const prev = byOrderId.get(orderId);
+        const prevDateObj = toDate(prev.orderDateObj) || toDate(prev.orderDate);
+        if (!prevDateObj || d > prevDateObj) {
+          prev.orderDate = o.orderDate;
+          prev.orderDateObj = d;
+        }
+        prev.qty += qty;
+      });
+      const uniqOrders = Array.from(byOrderId.values())
+        .sort((a, b) => (toDate(b.orderDateObj || b.orderDate) - toDate(a.orderDateObj || a.orderDate)));
       out[cid] = {
-        ord1: ords[0]?.orderDate || '',
-        ord2: ords[1]?.orderDate || '',
-        lastQty: ords[0] ? Math.abs(ords[0].qty || 0) : 0,
+        ord1: uniqOrders[0]?.orderDate || '',
+        ord2: uniqOrders[1]?.orderDate || '',
+        lastQty: uniqOrders[0] ? Math.abs(uniqOrders[0].qty || 0) : 0,
       };
     });
     return out;
@@ -6811,6 +6894,7 @@ function Obzvon({
       return {
         id: c.id,
         name: c.name,
+        source: c.source || '',
         district: pickPreferredDistrict(c.district || ''),
         tara: c.tara,
         balance: c.balanceUZS,
@@ -6835,6 +6919,7 @@ function Obzvon({
       rows = rows.filter((r) =>
         String(r.id || '').includes(q) ||
         String(r.name || '').toLowerCase().includes(q) ||
+        String(r.source || '').toLowerCase().includes(q) ||
         String(r.district || '').toLowerCase().includes(q) ||
         String(r.ord1 || '').toLowerCase().includes(q) ||
         String(r.ord2 || '').toLowerCase().includes(q) ||
@@ -6897,9 +6982,9 @@ function Obzvon({
       exportAoaExcel({
         fileName: `Vaqti_kelgan_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'VaqtiKelgan',
-        headers: ['No', 'ID', 'Mijoz', 'Telefon', 'Oxirgi zakaz', 'Oldingi zakaz', 'Idish', 'Otgan kun', "Qongiroq meyori"],
-        columnTypes: ['number', 'text', 'text', 'text', 'date', 'date', 'number', 'number', 'number'],
-        rows: dueCandidates.map((r, i) => [i + 1, r.id, r.name, r.phone || '', fmtD(r.ord1), fmtD(r.ord2), Number(r.tara || 0), r.passed ?? '', r.shouldIn ?? '']),
+        headers: ['No', 'ID', 'Mijoz', 'Mijozlar aloqasi', 'Telefon', 'Oxirgi zakaz', 'Oldingi zakaz', 'Idish', 'Otgan kun', "Qongiroq meyori"],
+        columnTypes: ['number', 'text', 'text', 'text', 'text', 'date', 'date', 'number', 'number', 'number'],
+        rows: dueCandidates.map((r, i) => [i + 1, r.id, r.name, r.source || '', r.phone || '', fmtD(r.ord1), fmtD(r.ord2), Number(r.tara || 0), r.passed ?? '', r.shouldIn ?? '']),
       });
       return;
     }
@@ -6907,9 +6992,9 @@ function Obzvon({
       exportAoaExcel({
         fileName: `Ikki_oydan_otgan_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: '2OydanOtgan',
-        headers: ['No', 'ID', 'Mijoz', 'Telefon', 'Oxirgi zakaz', 'Oldingi zakaz', 'Idish', 'Otgan kun', "Qongiroq meyori"],
-        columnTypes: ['number', 'text', 'text', 'text', 'date', 'date', 'number', 'number', 'number'],
-        rows: staleCandidates.map((r, i) => [i + 1, r.id, r.name, r.phone || '', fmtD(r.ord1), fmtD(r.ord2), Number(r.tara || 0), r.passed ?? '', r.shouldIn ?? '']),
+        headers: ['No', 'ID', 'Mijoz', 'Mijozlar aloqasi', 'Telefon', 'Oxirgi zakaz', 'Oldingi zakaz', 'Idish', 'Otgan kun', "Qongiroq meyori"],
+        columnTypes: ['number', 'text', 'text', 'text', 'text', 'date', 'date', 'number', 'number', 'number'],
+        rows: staleCandidates.map((r, i) => [i + 1, r.id, r.name, r.source || '', r.phone || '', fmtD(r.ord1), fmtD(r.ord2), Number(r.tara || 0), r.passed ?? '', r.shouldIn ?? '']),
       });
       return;
     }
@@ -6917,9 +7002,9 @@ function Obzvon({
       exportAoaExcel({
         fileName: `Operator_jadvali_${new Date().toISOString().slice(0,10)}.xlsx`,
         sheetName: 'OperatorJadvali',
-        headers: ['ID', 'Mijoz', 'Rayon', 'Balans', 'Oxirgi zakaz sana', 'Oldingi zakaz sana', 'Zakaz soni', "Oxirgi qongiroq", 'Keyingi sana', 'Operator', 'Oxirgi izoh'],
-        columnTypes: ['text', 'text', 'text', 'number', 'date', 'date', 'number', 'date', 'date', 'text', 'text'],
-        rows: operatorTableRows.map((r) => [r.id, r.name, r.district || '', r.balance || 0, fmtD(r.ord1), fmtD(r.ord2), r.lastQty || 0, fmtD(r.lastCallDate), fmtD(r.nextDate), r.operator || '', r.lastNote || '']),
+        headers: ['ID', 'Mijoz', 'Mijozlar aloqasi', 'Rayon', 'Balans', 'Oxirgi zakaz sana', 'Oldingi zakaz sana', 'Zakaz soni', "Oxirgi qongiroq", 'Keyingi sana', 'Operator', 'Oxirgi izoh'],
+        columnTypes: ['text', 'text', 'text', 'text', 'number', 'date', 'date', 'number', 'date', 'date', 'text', 'text'],
+        rows: operatorTableRows.map((r) => [r.id, r.name, r.source || '', r.district || '', r.balance || 0, fmtD(r.ord1), fmtD(r.ord2), r.lastQty || 0, fmtD(r.lastCallDate), fmtD(r.nextDate), r.operator || '', r.lastNote || '']),
       });
     }
   };
@@ -7314,9 +7399,9 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
               <table className="tbl">
-                <thead><tr><th>No</th><th>Mijoz</th><th>ID</th><th>Oxirgi zakaz</th><th>Oldingi zakaz</th><th>Idish</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
+                <thead><tr><th>No</th><th>Mijoz</th><th>ID</th><th>Mijozlar aloqasi</th><th>Oxirgi zakaz</th><th>Oldingi zakaz</th><th>Idish</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
                 <tbody>
-                  {filteredDueCandidates.length===0 ? <tr><td colSpan={9} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Vaqti kelgan mijoz yo'q</td></tr> :
+                  {filteredDueCandidates.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>Vaqti kelgan mijoz yo'q</td></tr> :
                     filteredDueCandidates.map((c,i)=>(
                       <tr
                         key={i}
@@ -7332,6 +7417,7 @@ function Obzvon({
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                         <td style={{maxWidth:340}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{c.id}</td>
+                        <td style={{maxWidth:170}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.source || '-'}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.ord1)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.ord2)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmt(c.tara || 0)}</td>
@@ -7412,9 +7498,9 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
               <table className="tbl">
-                <thead><tr><th>No</th><th>Mijoz</th><th>ID</th><th>Oxirgi zakaz</th><th>Oldingi zakaz</th><th>Idish</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
+                <thead><tr><th>No</th><th>Mijoz</th><th>ID</th><th>Mijozlar aloqasi</th><th>Oxirgi zakaz</th><th>Oldingi zakaz</th><th>Idish</th><th>O'tgan kun</th><th>Qo'ng'iroq me'yori</th><th>Amal</th></tr></thead>
                 <tbody>
-                  {filteredStaleCandidates.length===0 ? <tr><td colSpan={9} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>2 oydan o'tgan mijoz yo'q</td></tr> :
+                  {filteredStaleCandidates.length===0 ? <tr><td colSpan={10} style={{textAlign:'center',padding:28,color:'var(--t3)'}}>2 oydan o'tgan mijoz yo'q</td></tr> :
                     filteredStaleCandidates.map((c,i)=>(
                       <tr
                         key={i}
@@ -7430,6 +7516,7 @@ function Obzvon({
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                         <td style={{maxWidth:340}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.name}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{c.id}</td>
+                        <td style={{maxWidth:170}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{c.source || '-'}</span></td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.ord1)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(c.ord2)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmt(c.tara || 0)}</td>
@@ -7514,9 +7601,9 @@ function Obzvon({
           <div className="card" style={{overflow:'hidden'}}>
             <div style={{overflow:'auto',maxHeight:'calc(100vh - 260px)'}}>
               <table className="tbl">
-                <thead><tr><th>No</th><th>ID</th><th>Mijoz</th><th>Rayon</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi zakaz</th><th>Oxirgidan oldingi zakaz</th><th style={{textAlign:'right'}}>Zakaz soni</th><th>Oxirgi qo'ng'iroq</th><th>Keyingi sana</th><th>Operator</th><th>Oxirgi izoh</th></tr></thead>
+                <thead><tr><th>No</th><th>ID</th><th>Mijoz</th><th>Mijozlar aloqasi</th><th>Rayon</th><th style={{textAlign:'right'}}>Balans</th><th>Oxirgi zakaz</th><th>Oxirgidan oldingi zakaz</th><th style={{textAlign:'right'}}>Zakaz soni</th><th>Oxirgi qo'ng'iroq</th><th>Keyingi sana</th><th>Operator</th><th>Oxirgi izoh</th></tr></thead>
                 <tbody>
-                  {operatorTableRows.length===0 ? <tr><td colSpan={12} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
+                  {operatorTableRows.length===0 ? <tr><td colSpan={13} style={{textAlign:'center',padding:26,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr> :
                     visibleOperatorRows.map((r, i) => (
                       <tr
                         key={i}
@@ -7529,6 +7616,7 @@ function Obzvon({
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
                         <td style={{maxWidth:360}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.name}</span></td>
+                        <td style={{maxWidth:170}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.source || '-'}</span></td>
                         <td style={{maxWidth:140}}><span style={{display:'block',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.district || '-'}</span></td>
                         <td style={{textAlign:'right',fontFamily:'var(--mono)',color:r.balance<0?'var(--rd)':r.balance>0?'var(--gr)':'var(--t3)'}}>{fmt(r.balance)}</td>
                         <td style={{fontFamily:'var(--mono)',fontSize:11}}>{fmtD(r.ord1)}</td>
@@ -8860,6 +8948,19 @@ function Reports({
         const customerId = String(o.mId || '').trim();
         const date = toIsoDate(o.orderDate);
         const hasOrder = orderSet.has(`${customerId}__${date}`);
+        const noteRaw = String(o.note || '').trim();
+        const catRaw = String(o.cat || '').trim();
+        let warehouseText = String(o.warehouse || '').trim();
+        let noteText = noteRaw || catRaw || '-';
+        if (!warehouseText) {
+          if (isLikelyWarehouseName(noteRaw)) {
+            warehouseText = noteRaw;
+            noteText = catRaw || '-';
+          } else if (isLikelyWarehouseName(catRaw)) {
+            warehouseText = catRaw;
+            noteText = noteRaw || '-';
+          }
+        }
         return {
           date,
           customerId,
@@ -8867,8 +8968,8 @@ function Reports({
           returnNo: String(o.soNum || '').trim(),
           qty: Math.abs(toNum(o.qty)),
           driver: resolveNazoratDriverName(o.delivPerson || o.agent || ''),
-          warehouse: String(o.warehouse || '').trim() || '-',
-          note: String(o.note || '').trim() || String(o.cat || '').trim() || '-',
+          warehouse: warehouseText || '-',
+          note: noteText || '-',
           hasOrder,
           status: hasOrder ? 'Zakazi bor' : "Zakazi yo'q",
         };
@@ -11711,6 +11812,7 @@ function SettingsPanel({
     { key:'all', label:'Hamma mijozlar' },
     { key:'ahmadtea', label:'Ahmadtea' },
     { key:'murodbaxsh', label:'Murodbaxsh' },
+    { key:'alp_jamol', label:'Alp Jamol' },
     { key:'activeAll', label:'Aktiv (hammasi)' },
     { key:'activeOwn', label:"Aktiv (o'zimniki)" },
     { key:'inactive', label:'Nofaol' },
@@ -14732,10 +14834,17 @@ export default function App() {
       ? { obzvon: true, reports: true, nazorat: true }
       : {}
   ), [activeCompany]);
+  const alpJamolAllowedPages = useMemo(
+    () => (activeCompany === 'alp_jamol'
+      ? new Set(['cust', 'orders', 'kassa', 'doljniki', 'settings'])
+      : null),
+    [activeCompany]
+  );
   const canViewPage = useCallback((id) => {
     if (companyBlockedPages[id]) return false;
+    if (alpJamolAllowedPages && !alpJamolAllowedPages.has(id)) return false;
     return (currentAccess.visible?.[id] ?? true);
-  }, [currentAccess, companyBlockedPages]);
+  }, [currentAccess, companyBlockedPages, alpJamolAllowedPages]);
   const visibleNav = NAV.filter((n) => canViewPage(n.id));
   const leftoverAlertAnalysis = useMemo(() => buildLeftoverAnalysis({
     rawOrders: D.rawOrders || [],
@@ -15504,7 +15613,7 @@ export default function App() {
             ) : (
               <>
                 {page==='dash'    && canViewPage('dash') && <Dashboard D={D}/>}
-                {page==='cust'    && canViewPage('cust') && <Customers D={D} currentUser={effectiveUser} currentAccess={currentAccess} assignmentById={D.assignmentById || {}} company={activeCompany}/>}
+                {page==='cust'    && canViewPage('cust') && <Customers D={D} currentUser={effectiveUser} currentAccess={currentAccess} assignmentById={D.assignmentById || {}} company={activeCompany} companyWideCustomers={companyWideData.customers || []} companyWideAssignmentById={companyWideData.assignmentById || rawD.assignmentById || {}}/>}
                 {page==='orders'  && canViewPage('orders') && (
                   <Orders
                     D={D}
@@ -15552,7 +15661,7 @@ export default function App() {
                     rows={doljniki}
                     otherRows={otherDoljniki}
                     D={D}
-                    kulerRows={D.kulerInstallments || []}
+                    kulerRows={companyWideData.kulerInstallments || []}
                     onAddToObzvon={addObzvonRows}
                     currentUser={effectiveUser}
                     company={activeCompany}
