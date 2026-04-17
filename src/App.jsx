@@ -14597,38 +14597,16 @@ export default function App() {
   const lockedCompany = normalizeCompanyKey(companyAccess.default || 'murodbaxsh');
   const activeCompany = canSwitchCompany ? normalizeCompanyKey(companyFilter) : lockedCompany;
   const scopeOwn = currentAccess.scope === 'own';
-  const ownIds = useMemo(() => {
-    const me = normalizeUserKey(effectiveUser);
-    const ids = new Set(
+  const ownIds = useMemo(
+    () => new Set(
       Object.entries(rawD.assignmentById || {})
-        .filter(([, op]) => normalizeUserKey(op) === me)
-        .map(([id]) => normalizeIdKey(id))
-        .filter(Boolean)
-    );
-
-    // Fallback: biriktirish jadvali bo'sh/yetishmasa operator bo'yicha avtomatik aniqlaymiz.
-    if (!ids.size && me) {
-      (rawD.rawOrders || []).forEach((o) => {
-        const byAgent = normalizeUserKey(o?.agent) === me;
-        const byDriver = normalizeUserKey(o?.delivPerson) === me;
-        const byOperator = normalizeUserKey(o?.operator) === me;
-        if (!(byAgent || byDriver || byOperator)) return;
-        const id = normalizeIdKey(o?.mId);
-        if (id) ids.add(id);
-      });
-      (rawD.rawCash || []).forEach((c) => {
-        if (normalizeUserKey(c?.operator) !== me) return;
-        const id = normalizeIdKey(c?.mId);
-        if (id) ids.add(id);
-      });
-    }
-
-    return ids;
-  }, [rawD.assignmentById, rawD.rawOrders, rawD.rawCash, effectiveUser]);
+        .filter(([, op]) => normalizeUserKey(op) === normalizeUserKey(effectiveUser))
+        .map(([id]) => id)
+    ),
+    [rawD.assignmentById, effectiveUser]
+  );
   const scopedD = useMemo(() => {
     if (!scopeOwn) return rawD;
-    // Agar own-scope yoqilgan bo'lsa-yu birorta ID topilmasa, bo'sh ekran bermaymiz.
-    if ((rawD.customers || []).length > 0 && ownIds.size === 0) return rawD;
     return filterDataByCustomerIds(rawD, ownIds);
   }, [rawD, scopeOwn, ownIds]);
   const companyWideData = useMemo(
