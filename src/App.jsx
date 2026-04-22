@@ -261,6 +261,14 @@ const UNIVERSAL_FILTER_MODES = [
   { value: 'to', label: 'Gacha' },
   { value: 'from', label: 'Keyin' },
 ];
+const UNIVERSAL_EMPTY_OPTION_VALUE = '__AQ_FILTER_EMPTY__';
+const universalOptionStorageValue = (value) => (
+  String(value ?? '') === '' ? UNIVERSAL_EMPTY_OPTION_VALUE : String(value ?? '')
+);
+const universalOptionDisplayValue = (value, type = 'text') => {
+  if (value !== UNIVERSAL_EMPTY_OPTION_VALUE) return String(value ?? '');
+  return type === 'date' ? "(Bo'sh sana)" : "(Bo'sh qiymat)";
+};
 const makeUniversalColState = () => ({
   mode: 'show',
   value: '',
@@ -295,7 +303,9 @@ const getUniversalColValue = (row, col) => {
 };
 const normalizeUniversalOptionValue = (value, type = 'text') => {
   if (type === 'number') {
-    const n = Number(value || 0);
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    const n = Number(raw);
     return Number.isFinite(n) ? String(n) : '';
   }
   if (type === 'date') {
@@ -317,12 +327,13 @@ const universalRowPasses = (row, columns = [], state = {}) => {
 
     const type = col.type || 'text';
     const raw = getUniversalColValue(row, col);
+    const normalizedRawValue = normalizeUniversalOptionValue(raw, type);
+    const normalizedOptionValue = universalOptionStorageValue(normalizedRawValue);
 
     if (type === 'number') {
       const n = Number(raw || 0);
-      const selectedNums = selected.map((x) => Number(x)).filter((x) => Number.isFinite(x));
       if (hasSelected) {
-        const inSet = selectedNums.includes(n);
+        const inSet = selected.includes(normalizedOptionValue);
         if (mode === 'hide' ? inSet : !inSet) return false;
         continue;
       }
@@ -336,14 +347,14 @@ const universalRowPasses = (row, columns = [], state = {}) => {
     }
 
     if (type === 'date') {
-      const d = toDate(raw);
-      if (!d) return false;
-      const dKey = d.toISOString().slice(0, 10);
       if (hasSelected) {
-        const inSet = selected.includes(dKey);
+        const inSet = selected.includes(normalizedOptionValue);
         if (mode === 'hide' ? inSet : !inSet) return false;
         continue;
       }
+      const d = toDate(raw);
+      if (!d) return false;
+      const dKey = d.toISOString().slice(0, 10);
       const t = toDate(rawInput);
       if (!t) continue;
       const tMs = t.getTime();
@@ -355,10 +366,13 @@ const universalRowPasses = (row, columns = [], state = {}) => {
       continue;
     }
 
-    const txt = String(raw ?? '').trim().toLowerCase();
+    const txt = String(normalizedRawValue || '').toLowerCase();
     if (hasSelected) {
+      const hasEmpty = selected.includes(UNIVERSAL_EMPTY_OPTION_VALUE);
       const normalizedSelected = selected.map((x) => String(x ?? '').trim().toLowerCase());
-      const inSet = normalizedSelected.includes(txt);
+      const inSet = normalizedOptionValue === UNIVERSAL_EMPTY_OPTION_VALUE
+        ? hasEmpty
+        : normalizedSelected.includes(String(normalizedOptionValue || '').toLowerCase());
       if (mode === 'hide' ? inSet : !inSet) return false;
       continue;
     }
@@ -387,14 +401,20 @@ function UniversalFilterPanel({
     const out = {};
     (columns || []).forEach((col) => {
       const set = new Set();
+      let hasEmpty = false;
       (rows || []).forEach((row) => {
         const raw = getUniversalColValue(row, col);
         const val = normalizeUniversalOptionValue(raw, col.type || 'text');
-        if (val !== '') set.add(val);
+        if (val === '') {
+          hasEmpty = true;
+          return;
+        }
+        set.add(val);
       });
       const arr = Array.from(set);
       if ((col.type || 'text') === 'number') arr.sort((a, b) => Number(a) - Number(b));
       else arr.sort((a, b) => a.localeCompare(b));
+      if (hasEmpty) arr.unshift(UNIVERSAL_EMPTY_OPTION_VALUE);
       out[col.key] = arr;
     });
     return out;
@@ -591,7 +611,8 @@ function UniversalFilterPanel({
           {columns.map((col) => {
             const st = safeState[col.key] || makeUniversalColState();
             const opts = optionsByKey[col.key] || [];
-            const shownOpts = opts.filter((o) => o.toLowerCase().includes(String(st.optionQuery || '').toLowerCase()));
+            const q = String(st.optionQuery || '').toLowerCase();
+            const shownOpts = opts.filter((o) => universalOptionDisplayValue(o, col.type || 'text').toLowerCase().includes(q));
             return (
               <div key={col.key} className="card" style={{padding:8,marginBottom:8,background:'var(--s3)',border:'1px solid var(--b1)'}}>
                 <div style={{fontSize:10.5,color:'var(--t3)',fontWeight:700,marginBottom:6}}>{col.label}</div>
@@ -626,6 +647,7 @@ function UniversalFilterPanel({
                     <div style={{maxHeight:120,overflow:'auto',overscrollBehavior:'contain'}}>
                       {shownOpts.map((opt) => {
                         const checked = (st.selected || []).includes(opt);
+                        const optLabel = universalOptionDisplayValue(opt, col.type || 'text');
                         return (
                           <label key={opt} style={FILTER_CHECK_LABEL_STYLE}>
                             <input
@@ -637,7 +659,7 @@ function UniversalFilterPanel({
                                   : (st.selected || []).filter((x)=>x!==opt),
                               })}
                             />
-                            <span style={{...FILTER_CHECK_TEXT_STYLE,color:checked?'var(--bl)':'var(--t2)'}}>{opt}</span>
+                            <span style={{...FILTER_CHECK_TEXT_STYLE,color:checked?'var(--bl)':'var(--t2)'}}>{optLabel}</span>
                           </label>
                         );
                       })}
@@ -6335,6 +6357,8 @@ function Obzvon({
   onAppendAllRows=()=>{},
   onUpsertNewRows=()=>{},
   onPublishAllNew=()=>{},
+  opFilterState=null,
+  setOpFilterState=null,
 }) {
   const { customers, rawOrders=[] } = D;
   const [tab, setTab] = useState('main');
@@ -6353,7 +6377,21 @@ function Obzvon({
   const [dueUniFilterOpen, setDueUniFilterOpen] = useState(false);
   const [dueUniFilterState, setDueUniFilterState] = useState({});
   const [opUniFilterOpen, setOpUniFilterOpen] = useState(false);
-  const [opUniFilterState, setOpUniFilterState] = useState({});
+  const [opUniFilterStateLocal, setOpUniFilterStateLocal] = useState({});
+  const useExternalOpFilterState = typeof setOpFilterState === 'function';
+  const opUniFilterState = useExternalOpFilterState
+    ? ((opFilterState && typeof opFilterState === 'object') ? opFilterState : {})
+    : opUniFilterStateLocal;
+  const setOpUniFilterState = useCallback((updater) => {
+    if (useExternalOpFilterState) {
+      setOpFilterState((prev) => {
+        const safePrev = (prev && typeof prev === 'object') ? prev : {};
+        return typeof updater === 'function' ? updater(safePrev) : updater;
+      });
+      return;
+    }
+    setOpUniFilterStateLocal(updater);
+  }, [useExternalOpFilterState, setOpFilterState]);
   const [opLimit, setOpLimit] = useState(500);
   const [pickTargetIdx, setPickTargetIdx] = useState(null);
   const [opSearch, setOpSearch] = useState('');
@@ -13544,6 +13582,7 @@ export default function App() {
   const [obzvonRecords,setObzvonRecords] = useState(() => S.get('aq-obzvon-records', []));
   const [obzvonAllRows,setObzvonAllRows] = useState(() => S.get('aq-obzvon-all-rows', []));
   const [obzvonAllNewRows,setObzvonAllNewRows] = useState(() => S.get('aq-obzvon-all-new-rows', []));
+  const [obzvonOpFilterState, setObzvonOpFilterState] = useState({});
   const [leftoverQziSheetRows, setLeftoverQziSheetRows] = useState([]);
   const [leftoverReasonSheetRows, setLeftoverReasonSheetRows] = useState([]);
   const [leftoverArchiveSheetRows, setLeftoverArchiveSheetRows] = useState([]);
@@ -14014,6 +14053,17 @@ export default function App() {
     } catch {}
     return false;
   }, [accessApiUrl, normalizeObzvonNewRow, hasObzvonRowPayload, mergeObzvonNewRows]);
+  const resetObzvonOperatorFilter = useCallback(() => {
+    setObzvonOpFilterState({});
+  }, []);
+  const loadObzvonAllRemoteWithFilterReset = useCallback(async () => {
+    resetObzvonOperatorFilter();
+    return loadObzvonAllRemote();
+  }, [resetObzvonOperatorFilter, loadObzvonAllRemote]);
+  const pullRemoteObzvonNewRowsWithFilterReset = useCallback(async () => {
+    resetObzvonOperatorFilter();
+    return pullRemoteObzvonNewRows();
+  }, [resetObzvonOperatorFilter, pullRemoteObzvonNewRows]);
 
   const pushRemoteObzvonNewRows = useCallback(async (rows = []) => {
     if (!accessApiUrl) return false;
@@ -14634,6 +14684,7 @@ export default function App() {
 
   const handleLoad = (result) => {
     setData(result);
+    resetObzvonOperatorFilter();
     setUp(false);
     notify(`OK: ${result.customers.length} mijoz  |  ${result.rawOrders.length} zakaz  |  ${result.cashbox.length} kassa`);
   };
@@ -14650,13 +14701,14 @@ export default function App() {
       const raw = await loadFromGoogleSheets(sheetId, SHEET_CONFIG.gids, (msg)=>setAutoLoad((p)=>({...p,progress:msg})), 'named');
       const d = processAll(raw);
       setData(d);
+      resetObzvonOperatorFilter();
       setAutoLoad({ loading:false, progress:'', error:'' });
       notify(`OK: ${d.customers.length} mijoz  |  ${d.rawOrders.length} zakaz`);
     } catch (e) {
       setAutoLoad({ loading:false, progress:'', error:e.message });
       notify('Xato: '+e.message, 'err');
     }
-  }, [mainSheetUrl]);
+  }, [mainSheetUrl, resetObzvonOperatorFilter]);
 
   const addObzvonRows = useCallback((rows) => {
     if (!rows?.length) return;
@@ -15649,11 +15701,13 @@ export default function App() {
                   setRecords={setCompanyScopedObzvonRecords}
                   allRows={companyObzvonAllRows}
                   newRows={companyObzvonAllNewRows}
-                  onReloadAll={loadObzvonAllRemote}
-                  onReloadAllNew={pullRemoteObzvonNewRows}
+                  onReloadAll={loadObzvonAllRemoteWithFilterReset}
+                  onReloadAllNew={pullRemoteObzvonNewRowsWithFilterReset}
                   onAppendAllRows={appendObzvonAllRemote}
                   onUpsertNewRows={upsertObzvonAllNewRows}
                   onPublishAllNew={publishObzvonNewRowsToGoogleSheet}
+                  opFilterState={obzvonOpFilterState}
+                  setOpFilterState={setObzvonOpFilterState}
                 />
               )}
                 {page==='doljniki'&& canViewPage('doljniki') && (
@@ -15904,12 +15958,6 @@ export default function App() {
     </>
   );
 }
-
-
-
-
-
-
 
 
 
