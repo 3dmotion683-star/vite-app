@@ -4571,8 +4571,8 @@ function Dashboard({ D }) {
     let netQty = 0;
     let netSum = 0;
     (wDelThisMonth || []).forEach((o) => {
-      const q = toNum(o?.qty);
-      const s = String(o?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(o?.sum);
+      const { qty: q, sum: s, ignored } = getDashboardLikeSalesValues(o);
+      if (ignored) return;
       if (q >= 0) soldQty += q;
       else returnedQty += Math.abs(q);
       netQty += q;
@@ -4616,8 +4616,10 @@ function Dashboard({ D }) {
     waterSalesRows.forEach((o) => {
       const k = monthKey(o.orderDate); if (!k) return;
       if (!m[k]) m[k]={key:k,qty:0,sumUZS:0};
-      m[k].qty += toNum(o?.qty);
-      if (String(o?.currency || '').toUpperCase() !== 'USD') m[k].sumUZS += toNum(o?.sum);
+      const { qty, sum, ignored } = getDashboardLikeSalesValues(o);
+      if (ignored) return;
+      m[k].qty += qty;
+      m[k].sumUZS += sum;
     });
     return Object.values(m).sort((a,b)=>a.key.localeCompare(b.key)).slice(-12);
   }, [waterSalesRows]);
@@ -4625,11 +4627,13 @@ function Dashboard({ D }) {
     const source = rayonMonth === 'all' ? waterSalesRows : waterSalesRows.filter((o) => monthKey(o.orderDate) === rayonMonth);
     const m = {};
     source.forEach((o) => {
+      const { qty, sum, ignored } = getDashboardLikeSalesValues(o);
+      if (ignored) return;
       const c = customers.find((x)=>x.id===o.mId);
       const d = c?.district || "Noma'lum";
       if (!m[d]) m[d] = { name:d, qty:0, sum:0, custs:new Set() };
-      m[d].qty += toNum(o?.qty);
-      m[d].sum += (String(o?.currency || '').toUpperCase()==='USD' ? 0 : toNum(o?.sum));
+      m[d].qty += qty;
+      m[d].sum += sum;
       if (o.mId) m[d].custs.add(o.mId);
     });
     return Object.values(m)
@@ -4642,10 +4646,12 @@ function Dashboard({ D }) {
       : waterSalesRows.filter((o) => monthKey(o.orderDate) === agentMonth);
     const m = {};
     source.forEach((o) => {
+      const { qty, sum, ignored } = getDashboardLikeSalesValues(o);
+      if (ignored) return;
       const a=o.agent||'-';
       if (!m[a]) m[a]={name:a,qty:0,sum:0};
-      m[a].qty += toNum(o?.qty);
-      m[a].sum += (String(o?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(o?.sum));
+      m[a].qty += qty;
+      m[a].sum += sum;
     });
     return Object.values(m).sort((a,b)=>b.sum-a.sum).slice(0,7);
   }, [waterSalesRows, agentMonth]);
@@ -11906,6 +11912,48 @@ const topicLabelByKey = (topicKey) => {
 };
 
 const isMissedCall = (note) => detectCat(note) === 'tel_kotarmadi';
+const normalizeSalesProductName = (raw) => normalizeMatchText(raw).replace(/\s+/g, ' ').trim();
+const isEmptyBottleProduct = (raw) => {
+  const p = normalizeSalesProductName(raw);
+  if (!p || !p.includes('18.9')) return false;
+  const hasBottleWord = p.includes('tara') || p.includes('тара');
+  const hasEmptyWord = p.includes('pust') || p.includes('пуст') || p.includes('empty');
+  return hasBottleWord && hasEmptyWord;
+};
+const isIgnoredMainWarehouseBottleReturn = (row) =>
+  isReturnDoc(row?.docType) &&
+  isMainWarehouseLabel(row?.warehouse) &&
+  isEmptyBottleProduct(row?.product);
+const getDashboardLikeSalesValues = (row) => {
+  if (!row || !isMonthlyWaterSalesRow(row)) return { qty: 0, sum: 0, ignored: true };
+  if (isIgnoredMainWarehouseBottleReturn(row)) return { qty: 0, sum: 0, ignored: true };
+  const qty = toNum(row?.qty);
+  const sum = String(row?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(row?.sum);
+  return {
+    qty: Number.isFinite(qty) ? qty : 0,
+    sum: Number.isFinite(sum) ? sum : 0,
+    ignored: false,
+  };
+};
+const hasObzvonSale = (r) => Boolean(String(r?.orderCount || '').trim() || String(r?.orderDate || '').trim());
+const isIgnoredObzvonOperator = (name) => {
+  const n = normalizeMatchText(name).replace(/\s+/g, '');
+  if (!n) return false;
+  return (
+    n.includes('admin') ||
+    n.includes('админ') ||
+    n.includes('test') ||
+    n.includes('sinov') ||
+    n.includes('demo')
+  );
+};
+const makeObzvonRowKey = (r) => String(r?.rid || '').trim() || [
+  String(r?.customerId || '').trim(),
+  toIsoDate(r?.callDate || ''),
+  String(r?.operator || '').trim(),
+  String(r?.topic || '').trim(),
+  String(r?.note || '').trim(),
+].join('__');
 
 /* ── Kichik UI komponentlar ── */
 function PBar({ value=0, max=100, color='var(--bl)', height=10 }) {
@@ -11950,7 +11998,15 @@ function TimeFilterBar({ timeMode, setTimeMode, selYear, setSelYear, selMonth, s
    SOTUV ANALIZI
    ════════════════════════════════════════════════════════════════════ */
 function SotuvAnaliz({ D }) {
-  const allOrders = useMemo(() => Array.isArray(D?.orders) ? D.orders : [], [D?.orders]);
+  const allOrders = useMemo(() => (
+    Array.isArray(D?.rawOrders)
+      ? D.rawOrders
+      : (Array.isArray(D?.orders) ? D.orders : [])
+  ), [D?.rawOrders, D?.orders]);
+  const salesRows = useMemo(
+    () => allOrders.filter((o) => isMonthlyWaterSalesRow(o)),
+    [allOrders]
+  );
   const [timeMode, setTimeMode] = useState('all');
   const [selYear, setSelYear] = useState('');
   const [selMonth, setSelMonth] = useState(() => toIsoDate(new Date()).slice(0, 7));
@@ -11964,23 +12020,69 @@ function SotuvAnaliz({ D }) {
     const p = String(raw || '').trim();
     return p || "Noma'lum";
   }, []);
-  const isMainWh = useCallback((o) => isMainWarehouseLabel(o?.warehouse), []);
-
   const latestYear = useMemo(() => {
-    const years = allOrders
+    const years = salesRows
       .map((o) => toIsoDate(o?.orderDate || o?.deliveryDate || '').slice(0, 4))
       .filter((y) => /^\d{4}$/.test(y));
     return years.length ? years.sort().at(-1) : String(new Date().getFullYear());
-  }, [allOrders]);
+  }, [salesRows]);
+  const latestMonth = useMemo(() => {
+    const months = salesRows
+      .map((o) => toIsoDate(o?.orderDate || o?.deliveryDate || '').slice(0, 7))
+      .filter((m) => /^\d{4}-\d{2}$/.test(m));
+    return months.length ? months.sort().at(-1) : toIsoDate(new Date()).slice(0, 7);
+  }, [salesRows]);
+  const latestDay = useMemo(() => {
+    const days = salesRows
+      .map((o) => toIsoDate(o?.orderDate || o?.deliveryDate || ''))
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+    return days.length ? days.sort().at(-1) : toIsoDate(new Date());
+  }, [salesRows]);
+  const availableYears = useMemo(
+    () => Array.from(new Set(
+      salesRows
+        .map((o) => toIsoDate(o?.orderDate || o?.deliveryDate || '').slice(0, 4))
+        .filter((y) => /^\d{4}$/.test(y))
+    )).sort(),
+    [salesRows]
+  );
+  const availableMonths = useMemo(
+    () => Array.from(new Set(
+      salesRows
+        .map((o) => toIsoDate(o?.orderDate || o?.deliveryDate || '').slice(0, 7))
+        .filter((m) => /^\d{4}-\d{2}$/.test(m))
+    )).sort(),
+    [salesRows]
+  );
+  const availableDays = useMemo(
+    () => Array.from(new Set(
+      salesRows
+        .map((o) => toIsoDate(o?.orderDate || o?.deliveryDate || ''))
+        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    )).sort(),
+    [salesRows]
+  );
   useEffect(() => {
-    if (!String(selYear || '').trim()) setSelYear(latestYear);
-  }, [latestYear, selYear]);
+    if (!availableYears.length) return;
+    const y = String(selYear || '').trim();
+    if (!y || !availableYears.includes(y)) setSelYear(latestYear);
+  }, [latestYear, selYear, availableYears]);
+  useEffect(() => {
+    if (!availableMonths.length) return;
+    const m = String(selMonth || '').trim();
+    if (!m || !availableMonths.includes(m)) setSelMonth(latestMonth);
+  }, [latestMonth, selMonth, availableMonths]);
+  useEffect(() => {
+    if (!availableDays.length) return;
+    const d = String(selDay || '').trim();
+    if (!d || !availableDays.includes(d)) setSelDay(latestDay);
+  }, [latestDay, selDay, availableDays]);
 
   const allProducts = useMemo(() => {
     const s = new Set();
-    allOrders.forEach((o) => s.add(getProductName(o?.product)));
+    salesRows.forEach((o) => s.add(getProductName(o?.product)));
     return Array.from(s).sort((a, b) => a.localeCompare(b));
-  }, [allOrders, getProductName]);
+  }, [salesRows, getProductName]);
 
   useEffect(() => {
     setProductChecked((prev) => {
@@ -12011,7 +12113,7 @@ function SotuvAnaliz({ D }) {
     setProductChecked(next);
   }, [allProducts]);
 
-  const timFiltered = useMemo(() => allOrders.filter((o) => {
+  const timFiltered = useMemo(() => salesRows.filter((o) => {
     const d = toIsoDate(o?.orderDate || o?.deliveryDate || '');
     if (timeMode === 'year') {
       const y = String(selYear || '').trim();
@@ -12020,7 +12122,7 @@ function SotuvAnaliz({ D }) {
     if (timeMode === 'month') return selMonth ? d.startsWith(selMonth) : true;
     if (timeMode === 'day') return selDay ? d === selDay : true;
     return true;
-  }), [allOrders, timeMode, selYear, selMonth, selDay]);
+  }), [salesRows, timeMode, selYear, selMonth, selDay]);
 
   const filtered = useMemo(() => {
     if (!activeProducts.size) return [];
@@ -12032,20 +12134,22 @@ function SotuvAnaliz({ D }) {
     filtered.forEach((o) => {
       const prod = getProductName(o?.product);
       if (!map[prod]) map[prod] = { name: prod, sotilgan: 0, qaytarilgan: 0, soldSum: 0, returnSum: 0 };
-      const qty = Math.abs(toNum(o?.qty));
-      const sum = Math.abs(toNum(o?.sum));
-      if (isReturnDoc(o?.docType) && !isMainWh(o)) {
-        map[prod].qaytarilgan += qty;
-        map[prod].returnSum += sum;
-      } else if (isOrderDoc(o?.docType)) {
+      const { qty, sum } = getDashboardLikeSalesValues(o);
+      if (qty < 0) {
+        map[prod].qaytarilgan += Math.abs(qty);
+        map[prod].returnSum += Math.abs(sum);
+      } else {
         map[prod].sotilgan += qty;
-        map[prod].soldSum += sum;
+        map[prod].soldSum += Math.max(0, sum);
       }
     });
-    return Object.values(map)
-      .map((p) => ({ ...p, net: p.sotilgan - p.qaytarilgan, netSum: p.soldSum - p.returnSum }))
+    return Object.values(map).map((p) => ({
+      ...p,
+      net: p.sotilgan - p.qaytarilgan,
+      netSum: p.soldSum - p.returnSum,
+    }))
       .sort((a, b) => b.net - a.net);
-  }, [filtered, isMainWh, getProductName]);
+  }, [filtered, getProductName]);
 
   const spreadData = useMemo(() => {
     if (spreadMode === 'only' || timeMode === 'day') return null;
@@ -12056,14 +12160,14 @@ function SotuvAnaliz({ D }) {
       const key = getKey(d);
       if (!key || key === '0000') return;
       if (!map[key]) map[key] = { period: key, Sotilgan: 0, Qaytarilgan: 0 };
-      const qty = Math.abs(toNum(o?.qty));
-      if (isReturnDoc(o?.docType) && !isMainWh(o)) map[key].Qaytarilgan += qty;
-      else if (isOrderDoc(o?.docType)) map[key].Sotilgan += qty;
+      const { qty } = getDashboardLikeSalesValues(o);
+      if (qty < 0) map[key].Qaytarilgan += Math.abs(qty);
+      else map[key].Sotilgan += qty;
     });
     return Object.values(map)
       .map((d) => ({ ...d, Net: d.Sotilgan - d.Qaytarilgan }))
       .sort((a, b) => a.period.localeCompare(b.period));
-  }, [filtered, spreadMode, timeMode, isMainWh]);
+  }, [filtered, spreadMode, timeMode]);
 
   const prodChartData = productStats.slice(0, 12).map((p) => ({ name: p.name, Sotilgan: p.sotilgan, Qaytarilgan: p.qaytarilgan }));
   const maxProd = Math.max(...productStats.map((p) => p.sotilgan), 1);
@@ -12071,6 +12175,7 @@ function SotuvAnaliz({ D }) {
   const totReturn = productStats.reduce((s, p) => s + p.qaytarilgan, 0);
   const totNet = totSold - totReturn;
   const totSoldSum = productStats.reduce((s, p) => s + p.soldSum, 0);
+  const totNetSum = productStats.reduce((s, p) => s + p.netSum, 0);
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -12086,7 +12191,7 @@ function SotuvAnaliz({ D }) {
             setSelMonth={setSelMonth}
             selDay={selDay}
             setSelDay={setSelDay}
-            extra={<span className="tag" style={{ background: 'var(--s3)', color: 'var(--t2)' }}>{filtered.length} ta buyurtma</span>}
+            extra={<span className="tag" style={{ background: 'var(--s3)', color: 'var(--t2)' }}>{filtered.length} ta qator</span>}
           />
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             {timeMode !== 'day' && (
@@ -12097,7 +12202,7 @@ function SotuvAnaliz({ D }) {
             )}
             <div style={{ position: 'relative' }}>
               <button className="btn btn-gh btn-sm" type="button" style={{ minWidth: 220, justifyContent: 'space-between' }} onClick={() => setProductFilterOpen((v) => !v)}>
-                <span>Mahsulot turlari</span>
+                <span>Mahsulot</span>
                 <span className="tag" style={{ background: 'var(--s3)', color: 'var(--t2)' }}>{activeProductsCount}/{allProducts.length || 0}</span>
               </button>
               {productFilterOpen && (
@@ -12125,8 +12230,8 @@ function SotuvAnaliz({ D }) {
       <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))'}}>
         <BigStat icon="✅" label="Sotilgan"     value={fmt(totSold)}   sub={`${fmt(totSoldSum)} so'm`} color="var(--gr)" />
         <BigStat icon="↩" label="Qaytarilgan"  value={fmt(totReturn)}  sub={totSold>0?`${Math.round(totReturn/totSold*100)}%`:''} color="var(--rd)" />
-        <BigStat icon="⚖" label="Net"           value={fmt(totNet)}    sub="Sotilgan − qaytarilgan" color="var(--bl)" />
-        <BigStat icon="💰" label="Tushum"  value={fmt(Math.round(totSoldSum/1000))+"K"} sub="so'm" color="var(--pu)" />
+        <BigStat icon="⚖" label="Net"           value={fmt(totNet)}    sub={`${fmt(totNetSum)} so'm`} color="var(--bl)" />
+        <BigStat icon="💰" label="Tushum"  value={fmt(Math.round(totSoldSum/1000))+"K"} sub="Sotuv summasi" color="var(--pu)" />
       </div>
 
       {/* Spread chart */}
@@ -12180,7 +12285,7 @@ function SotuvAnaliz({ D }) {
             <div style={{overflowX:'auto'}}>
               <table className="tbl" style={{width:'100%'}}>
                 <thead><tr>
-                  <th>Mahsulot</th><th>Sotilgan</th><th>Qaytarilgan</th><th>Net</th><th>Tushum</th>
+                  <th>Mahsulot</th><th>Sotilgan</th><th>Qaytarilgan</th><th>Net</th><th>Tushum</th><th>Net summa</th>
                   <th style={{width:100}}>Ulush</th>
                 </tr></thead>
                 <tbody>
@@ -12191,6 +12296,7 @@ function SotuvAnaliz({ D }) {
                       <td style={{color:'var(--rd)'}}>{fmt(p.qaytarilgan)}</td>
                       <td style={{color:'var(--bl)',fontWeight:700}}>{fmt(p.net)}</td>
                       <td>{fmt(Math.round(p.soldSum/1000))}K</td>
+                      <td style={{color:'var(--bl)'}}>{fmt(Math.round(p.netSum/1000))}K</td>
                       <td><PBar value={p.sotilgan} max={maxProd} color="var(--gr)" height={8} /></td>
                     </tr>
                   ))}
@@ -12232,35 +12338,114 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
     if (timeMode === 'day') return selDay ? d === selDay : true;
     return true;
   }), [allRows, timeMode, selYear, selMonth, selDay]);
+  const customerById = useMemo(() => {
+    const m = new Map();
+    (Array.isArray(D?.customers) ? D.customers : []).forEach((c) => {
+      const id = String(c?.id || '').trim();
+      if (id) m.set(id, c);
+    });
+    return m;
+  }, [D?.customers]);
+  const analyticsRows = useMemo(
+    () => filtered.filter((r) => !isIgnoredObzvonOperator(r?.operator)),
+    [filtered]
+  );
 
   const byOp = useMemo(() => {
     const map = {};
-    filtered.forEach((r) => {
+    analyticsRows.forEach((r) => {
       const op = String(r?.operator || '').trim() || "Noma'lum";
       if (!map[op]) map[op] = { name: op, Jami: 0, Sotildi: 0, TelKotarmadi: 0 };
       map[op].Jami += 1;
-      if (String(r?.orderCount || '').trim() || String(r?.orderDate || '').trim()) map[op].Sotildi += 1;
+      if (hasObzvonSale(r)) map[op].Sotildi += 1;
       if (isMissedCall(r?.note)) map[op].TelKotarmadi += 1;
     });
     return Object.values(map).sort((a, b) => b.Jami - a.Jami);
-  }, [filtered]);
+  }, [analyticsRows]);
 
   const byTopic = useMemo(() => {
     const map = {};
-    filtered.forEach((r) => {
+    analyticsRows.forEach((r) => {
       const key = normalizeTopicKey(r?.topic);
       const label = topicLabelByKey(key);
-      if (!map[key]) map[key] = { key, name: label, Jami: 0, Sotildi: 0, TelKotarmadi: 0 };
-      map[key].Jami += 1;
-      if (String(r?.orderCount || '').trim() || String(r?.orderDate || '').trim()) map[key].Sotildi += 1;
-      if (isMissedCall(r?.note)) map[key].TelKotarmadi += 1;
+      if (!map[key]) {
+        map[key] = {
+          key,
+          name: label,
+          Jami: 0,
+          Mijozlar: new Set(),
+          Sotildi: 0,
+          TelKotarmadi: 0,
+          DebtSum: 0,
+          _debtIds: new Set(),
+        };
+      }
+      const row = map[key];
+      row.Jami += 1;
+      const cid = String(r?.customerId || '').trim();
+      if (cid) row.Mijozlar.add(cid);
+      if (isMissedCall(r?.note)) row.TelKotarmadi += 1;
+      if (key === 'sotuv' || key === 'buyurtma_olish') {
+        if (hasObzvonSale(r)) row.Sotildi += 1;
+      }
+      if (key === 'qarzdorlik' && cid && !row._debtIds.has(cid)) {
+        row._debtIds.add(cid);
+        const bal = Number(customerById.get(cid)?.balanceUZS || 0);
+        if (bal < 0) row.DebtSum += Math.abs(bal);
+      }
+    });
+    return Object.values(map)
+      .map((r) => ({
+        ...r,
+        Mijoz: r.Mijozlar.size,
+      }))
+      .sort((a, b) => b.Jami - a.Jami);
+  }, [analyticsRows, customerById]);
+  const debtByOperator = useMemo(() => {
+    const map = {};
+    analyticsRows
+      .filter((r) => normalizeTopicKey(r?.topic) === 'qarzdorlik')
+      .forEach((r) => {
+        const op = String(r?.operator || '').trim() || "Noma'lum";
+        if (!map[op]) map[op] = { name: op, Jami: 0, Mijozlar: new Set(), DebtSum: 0, _ids: new Set() };
+        const row = map[op];
+        row.Jami += 1;
+        const cid = String(r?.customerId || '').trim();
+        if (!cid) return;
+        row.Mijozlar.add(cid);
+        if (row._ids.has(cid)) return;
+        row._ids.add(cid);
+        const bal = Number(customerById.get(cid)?.balanceUZS || 0);
+        if (bal < 0) row.DebtSum += Math.abs(bal);
+      });
+    return Object.values(map)
+      .map((r) => ({ ...r, Mijoz: r.Mijozlar.size }))
+      .sort((a, b) => b.Jami - a.Jami);
+  }, [analyticsRows, customerById]);
+  const operatorTopicMatrix = useMemo(() => {
+    const map = {};
+    analyticsRows.forEach((r) => {
+      const op = String(r?.operator || '').trim() || "Noma'lum";
+      const key = normalizeTopicKey(r?.topic);
+      const topic = topicLabelByKey(key);
+      const mKey = `${op}__${key}`;
+      if (!map[mKey]) map[mKey] = { operator: op, key, topic, Jami: 0, Sotildi: 0, TelKotarmadi: 0 };
+      map[mKey].Jami += 1;
+      if (key === 'sotuv' || key === 'buyurtma_olish') {
+        if (hasObzvonSale(r)) map[mKey].Sotildi += 1;
+      }
+      if (isMissedCall(r?.note)) map[mKey].TelKotarmadi += 1;
     });
     return Object.values(map).sort((a, b) => b.Jami - a.Jami);
-  }, [filtered]);
+  }, [analyticsRows]);
 
   const totTotal = byOp.reduce((s, o) => s + o.Jami, 0);
   const totSold = byOp.reduce((s, o) => s + o.Sotildi, 0);
   const totMissed = byOp.reduce((s, o) => s + o.TelKotarmadi, 0);
+  const debtTopicStats = useMemo(
+    () => byTopic.find((t) => t.key === 'qarzdorlik') || { Jami: 0, Mijoz: 0, DebtSum: 0, TelKotarmadi: 0 },
+    [byTopic]
+  );
 
   const archiveItems = useMemo(() => {
     const src = readObzArc(company);
@@ -12280,7 +12465,7 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
   const usingArchiveForNotes = archiveItems.length > 0;
 
   const rawMissedAnalysis = useMemo(() => {
-    const missedRows = filtered.filter((r) => isMissedCall(r?.note));
+    const missedRows = analyticsRows.filter((r) => isMissedCall(r?.note));
     return missedRows.map((r, i) => {
       const custId = String(r?.customerId || '').trim();
       const callTs = toDate(r?.callDate)?.getTime() || 0;
@@ -12288,6 +12473,7 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
       let orderedAfter = false;
       if (custId) {
         const later = allRows.filter((o) => {
+          if (isIgnoredObzvonOperator(o?.operator)) return false;
           const same = String(o?.customerId || '').trim() === custId;
           const laterTs = toDate(o?.callDate)?.getTime() || 0;
           return same && o !== r && laterTs > callTs;
@@ -12297,7 +12483,7 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
       }
       return { ...r, followedUp, orderedAfter, _i: i };
     });
-  }, [filtered, allRows]);
+  }, [analyticsRows, allRows]);
 
   const missedAnalysis = useMemo(() => {
     if (!archiveRows.length) return rawMissedAnalysis;
@@ -12331,12 +12517,12 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
       });
       return sums;
     }
-    filtered.forEach((r) => {
+    analyticsRows.forEach((r) => {
       const cat = detectCat(r?.note);
       if (Object.prototype.hasOwnProperty.call(sums, cat)) sums[cat] += 1;
     });
     return sums;
-  }, [archiveItems, filtered]);
+  }, [archiveItems, analyticsRows]);
 
   const noteFreq = useMemo(() => FIXED_CATS.map((c) => ({
     name: c.label,
@@ -12350,7 +12536,7 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
 
   const allFiltered = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return filtered.filter((r) => {
+    return analyticsRows.filter((r) => {
       if (!q) return true;
       return (
         String(r?.customer || '').toLowerCase().includes(q) ||
@@ -12359,7 +12545,7 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
         String(r?.topic || '').toLowerCase().includes(q)
       );
     });
-  }, [filtered, search]);
+  }, [analyticsRows, search]);
 
   const filterBar = (
     <div className="card" style={{ padding: '10px 14px' }}>
@@ -12380,8 +12566,11 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
           setSelMonth={setSelMonth}
           selDay={selDay}
           setSelDay={setSelDay}
-          extra={<span className="tag" style={{ background: 'var(--s3)', color: 'var(--t2)' }}>{filtered.length} ta</span>}
+          extra={<span className="tag" style={{ background: 'var(--s3)', color: 'var(--t2)' }}>{analyticsRows.length} ta</span>}
         />
+      </div>
+      <div style={{ marginTop: 8, fontSize: 11, color: 'var(--t3)' }}>
+        Eslatma: `admin/test` operatorlari statistikadan chiqarib tashlandi.
       </div>
     </div>
   );
@@ -12422,7 +12611,8 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
           <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))' }}>
             <BigStat icon="🎯" label="Maqsad turlari" value={String(byTopic.length)} sub="Alohida hisob" color="var(--pu)" />
             <BigStat icon="📞" label="Jami obzvon" value={String(totTotal)} sub="Tanlangan davr" color="var(--bl)" />
-            <BigStat icon="✅" label="Sotuvga aylangan" value={String(totSold)} sub={totTotal > 0 ? `${Math.round(totSold / totTotal * 100)}%` : '0%'} color="var(--gr)" />
+            <BigStat icon="💼" label="Qarzdorlik obzvoni" value={String(debtTopicStats.Jami || 0)} sub={`${fmt(debtTopicStats.Mijoz || 0)} ta mijoz`} color="var(--yl)" />
+            <BigStat icon="💰" label="Qarz bilan ishlangan" value={`${fmt(Math.round((debtTopicStats.DebtSum || 0) / 1000))}K`} sub="UZS" color="var(--rd)" />
           </div>
           {byTopic.length > 0 && (
             <div className="card" style={{ padding: '14px 16px' }}>
@@ -12434,21 +12624,67 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
                   <YAxis type="category" dataKey="name" width={140} style={{ fontSize: 11 }} stroke="var(--t3)" />
                   <Tooltip />
                   <Bar dataKey="Jami" fill="var(--bl)" radius={[0, 5, 5, 0]} />
-                  <Bar dataKey="Sotildi" fill="var(--gr)" radius={[0, 5, 5, 0]} />
+                  <Bar dataKey="Mijoz" fill="var(--gr)" radius={[0, 5, 5, 0]} />
                   <Bar dataKey="TelKotarmadi" fill="var(--rd)" radius={[0, 5, 5, 0]} />
                 </BarChart>
               </ResponsiveContainer>
               <div style={{ overflowX: 'auto', marginTop: 10 }}>
                 <table className="tbl" style={{ width: '100%' }}>
-                  <thead><tr><th>Maqsad</th><th>Jami</th><th>Sotildi</th><th>Tel ko'tarmadi</th><th>Konversiya</th></tr></thead>
+                  <thead><tr><th>Maqsad</th><th>Obzvon</th><th>Mijoz</th><th>Tel ko'tarmadi</th><th>Sotuvga aylangan</th><th>Qarz summasi</th></tr></thead>
                   <tbody>
                     {byTopic.map((t) => (
                       <tr key={t.key}>
                         <td style={{ fontWeight: 600 }}>{t.name}</td>
                         <td>{fmt(t.Jami)}</td>
-                        <td style={{ color: 'var(--gr)' }}>{fmt(t.Sotildi)}</td>
+                        <td style={{ color: 'var(--gr)' }}>{fmt(t.Mijoz || 0)}</td>
                         <td style={{ color: 'var(--rd)' }}>{fmt(t.TelKotarmadi)}</td>
-                        <td style={{ fontWeight: 700 }}>{t.Jami > 0 ? `${Math.round(t.Sotildi / t.Jami * 100)}%` : '0%'}</td>
+                        <td style={{ color: t.key === 'qarzdorlik' ? 'var(--t3)' : 'var(--gr)', fontWeight: 700 }}>
+                          {t.key === 'qarzdorlik' ? '—' : fmt(t.Sotildi)}
+                        </td>
+                        <td style={{ color: t.key === 'qarzdorlik' ? 'var(--rd)' : 'var(--t3)', fontWeight: 700 }}>
+                          {t.key === 'qarzdorlik' ? `${fmt(Math.round((t.DebtSum || 0) / 1000))}K` : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {debtByOperator.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Qarzdorlik maqsadi: operator kesimi</div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="tbl" style={{ width: '100%' }}>
+                  <thead><tr><th>Operator</th><th>Obzvon</th><th>Mijoz</th><th>Ishlangan qarz (UZS)</th></tr></thead>
+                  <tbody>
+                    {debtByOperator.map((r) => (
+                      <tr key={r.name}>
+                        <td style={{ fontWeight: 700 }}>{r.name}</td>
+                        <td>{fmt(r.Jami)}</td>
+                        <td>{fmt(r.Mijoz)}</td>
+                        <td style={{ color: 'var(--rd)', fontWeight: 700 }}>{fmt(r.DebtSum)} so'm</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {operatorTopicMatrix.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Operator + maqsad kesimi</div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="tbl" style={{ width: '100%' }}>
+                  <thead><tr><th>Operator</th><th>Maqsad</th><th>Obzvon</th><th>Tel ko'tarmadi</th><th>Sotuv</th></tr></thead>
+                  <tbody>
+                    {operatorTopicMatrix.slice(0, 120).map((r, idx) => (
+                      <tr key={`${r.operator}_${r.key}_${idx}`}>
+                        <td style={{ fontWeight: 700 }}>{r.operator}</td>
+                        <td>{r.topic}</td>
+                        <td>{fmt(r.Jami)}</td>
+                        <td style={{ color: 'var(--rd)' }}>{fmt(r.TelKotarmadi)}</td>
+                        <td style={{ color: 'var(--gr)' }}>{fmt(r.Sotildi)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -12501,7 +12737,7 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
             </div>
           )}
           <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' }}>
-            <BigStat icon="📵" label="Tel kotarmadi" value={String(missedAnalysis.length)} sub={`${filtered.length} ta obzvondan`} color="var(--rd)" />
+            <BigStat icon="📵" label="Tel kotarmadi" value={String(missedAnalysis.length)} sub={`${analyticsRows.length} ta obzvondan`} color="var(--rd)" />
             <BigStat icon="🔁" label="Qaytib aloqa qildi" value={String(followedCount)} sub="Keyinroq obzvon bor" color="var(--gr)" />
             <BigStat icon="⚠️" label="Aloqa qilinmagan" value={String(notFollowedCount)} sub="Hali ham yo'q" color="var(--yl)" />
             <BigStat icon="🛒" label="Sotib oldi" value={String(orderedAfterCount)} sub="Tel kotarmasdan keyin" color="var(--bl)" />
@@ -12597,77 +12833,261 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
    KORXONA HOLATI
    ════════════════════════════════════════════════════════════════════ */
 function KorxonaHolati({ D, company, obzvonRows=[] }) {
-  const allOrders   = useMemo(()=>Array.isArray(D?.orders)?D.orders:[],[D?.orders]);
-  const allCustomers= useMemo(()=>Array.isArray(D?.customers)?D.customers:[],[D?.customers]);
-  const allObzvon   = useMemo(()=>Array.isArray(obzvonRows)?obzvonRows:[], [obzvonRows]);
-  const today=toIsoDate(new Date()); const thisMonth=today.slice(0,7);
+  const allOrders = useMemo(() => (
+    Array.isArray(D?.rawOrders)
+      ? D.rawOrders
+      : (Array.isArray(D?.orders) ? D.orders : [])
+  ), [D?.rawOrders, D?.orders]);
+  const allCustomers = useMemo(() => Array.isArray(D?.customers) ? D.customers : [], [D?.customers]);
+  const allObzvon = useMemo(() => Array.isArray(obzvonRows) ? obzvonRows : [], [obzvonRows]);
+  const today = toIsoDate(new Date());
+  const thisMonth = today.slice(0, 7);
 
-  const monthOrders  = useMemo(()=>allOrders.filter(o=>isOrderDoc(o?.docType)&&toIsoDate(o?.orderDate||o?.deliveryDate||'').startsWith(thisMonth)),[allOrders,thisMonth]);
-  const monthReturns = useMemo(()=>allOrders.filter(o=>isReturnDoc(o?.docType)&&!isMainWarehouseLabel(o?.warehouse)&&toIsoDate(o?.orderDate||o?.deliveryDate||'').startsWith(thisMonth)),[allOrders,thisMonth]);
-  const monthSoldQty = useMemo(()=>monthOrders.reduce((s,o)=>s+Math.abs(toNum(o?.qty)),0),[monthOrders]);
-  const monthRetQty  = useMemo(()=>monthReturns.reduce((s,o)=>s+Math.abs(toNum(o?.qty)),0),[monthReturns]);
-  const monthSoldSum = useMemo(()=>monthOrders.reduce((s,o)=>s+Math.abs(toNum(o?.sum)),0),[monthOrders]);
-  const monthRetSum  = useMemo(()=>monthReturns.reduce((s,o)=>s+Math.abs(toNum(o?.sum)),0),[monthReturns]);
-  const monthObzvon  = useMemo(()=>allObzvon.filter(r=>toIsoDate(r?.callDate||'').startsWith(thisMonth)),[allObzvon,thisMonth]);
-  const monthMissed  = useMemo(()=>monthObzvon.filter(r=>isMissedCall(r?.note)),[monthObzvon]);
-  const missedNoFollowup = useMemo(()=>monthMissed.filter(r=>{
-    const custId=String(r?.customerId||'').trim(); if(!custId) return true;
+  const waterSalesRows = useMemo(
+    () => allOrders.filter((o) => isMonthlyWaterSalesRow(o)),
+    [allOrders]
+  );
+  const monthSalesRows = useMemo(
+    () => waterSalesRows.filter((o) => toIsoDate(o?.orderDate || o?.deliveryDate || '').startsWith(thisMonth)),
+    [waterSalesRows, thisMonth]
+  );
+  const monthSales = useMemo(() => {
+    let soldQty = 0;
+    let retQty = 0;
+    let netQty = 0;
+    let soldSum = 0;
+    let retSum = 0;
+    let netSum = 0;
+    monthSalesRows.forEach((o) => {
+      const { qty, sum } = getDashboardLikeSalesValues(o);
+      if (qty < 0) {
+        retQty += Math.abs(qty);
+        retSum += Math.abs(sum);
+      } else {
+        soldQty += qty;
+        soldSum += Math.max(0, sum);
+      }
+      netQty += qty;
+      netSum += sum;
+    });
+    return { soldQty, retQty, netQty, soldSum, retSum, netSum };
+  }, [monthSalesRows]);
+  const retPct = monthSales.soldQty > 0 ? Math.round((monthSales.retQty / monthSales.soldQty) * 100) : 0;
+
+  const monthObzvon = useMemo(
+    () => allObzvon
+      .filter((r) => toIsoDate(r?.callDate || '').startsWith(thisMonth))
+      .filter((r) => !isIgnoredObzvonOperator(r?.operator)),
+    [allObzvon, thisMonth]
+  );
+  const monthMissed = useMemo(() => monthObzvon.filter((r) => isMissedCall(r?.note)), [monthObzvon]);
+  const missedNoFollowup = useMemo(() => monthMissed.filter((r) => {
+    const custId = String(r?.customerId || '').trim();
+    if (!custId) return true;
     const rowTs = toDate(r?.callDate)?.getTime() || 0;
-    return !allObzvon.some((o)=>{
-      const same = String(o?.customerId||'').trim()===custId && o!==r;
-      if(!same) return false;
+    return !allObzvon.some((o) => {
+      if (isIgnoredObzvonOperator(o?.operator)) return false;
+      const same = String(o?.customerId || '').trim() === custId && o !== r;
+      if (!same) return false;
       const otherTs = toDate(o?.callDate)?.getTime() || 0;
       return otherTs > rowTs;
     });
-  }),[monthMissed,allObzvon]);
-  const debtorCount  = useMemo(()=>allCustomers.filter(c=>toNum(c?.balanceUZS)<0).length,[allCustomers]);
-  const retPct=monthSoldQty>0?Math.round(monthRetQty/monthSoldQty*100):0;
-  const netQty=monthSoldQty-monthRetQty; const netSum=monthSoldSum-monthRetSum;
+  }), [monthMissed, allObzvon]);
 
-  const topProducts = useMemo(()=>{
-    const map={}; monthOrders.forEach(o=>{const p=String(o?.product||''). trim()||"Noma'lum";if(!map[p])map[p]={name:p,'Sotilgan (dona)':0};map[p]['Sotilgan (dona)']+=Math.abs(toNum(o?.qty));});
-    return Object.values(map).sort((a,b)=>b['Sotilgan (dona)']-a['Sotilgan (dona)']).slice(0,10);
-  },[monthOrders]);
-  const topAgents = useMemo(()=>{
-    const map={}; monthOrders.forEach(o=>{const a=String(o?.agent||''). trim()||"Noma'lum";if(!map[a])map[a]={name:a,'Dona':0};map[a]['Dona']+=Math.abs(toNum(o?.qty));});
-    return Object.values(map).sort((a,b)=>b['Dona']-a['Dona']);
-  },[monthOrders]);
-  const monthlyTrend = useMemo(()=>{
-    const months=[]; for(let i=5;i>=0;i--){const d=new Date();d.setHours(0,0,0,0);d.setDate(1);d.setMonth(d.getMonth()-i);months.push(toIsoDate(d).slice(0,7));}
-    return months.map(m=>{
-      const ords=allOrders.filter(o=>isOrderDoc(o?.docType)&&toIsoDate(o?.orderDate||o?.deliveryDate||'').startsWith(m));
-      const rets=allOrders.filter(o=>isReturnDoc(o?.docType)&&!isMainWarehouseLabel(o?.warehouse)&&toIsoDate(o?.orderDate||o?.deliveryDate||'').startsWith(m));
-      const sold=ords.reduce((s,o)=>s+Math.abs(toNum(o?.qty)),0);
-      const ret =rets.reduce((s,o)=>s+Math.abs(toNum(o?.qty)),0);
-      return {period:m.slice(5),'Sotilgan':sold,'Qaytarilgan':ret,'Net':sold-ret};
+  const activeCustomers = useMemo(() => allCustomers.filter((c) =>
+    !isExcludedZCategory(c?.source) &&
+    !isNameInactiveByPrefix(c?.name || '') &&
+    !!c?.hasOrders
+  ), [allCustomers]);
+  const strongActive = useMemo(() => activeCustomers.filter((c) => Number(c?.daysAgo ?? 999) <= 14), [activeCustomers]);
+  const weakActive = useMemo(() => activeCustomers.filter((c) => Number(c?.daysAgo ?? 999) > 30), [activeCustomers]);
+  const activeHealthyPct = activeCustomers.length ? Math.round((strongActive.length / activeCustomers.length) * 100) : 0;
+  const weakPct = activeCustomers.length ? Math.round((weakActive.length / activeCustomers.length) * 100) : 0;
+
+  const callNeededCustomers = useMemo(
+    () => activeCustomers.filter((c) => Number(c?.daysAgo ?? 999) > 14),
+    [activeCustomers]
+  );
+  const calledThisMonthIds = useMemo(() => {
+    const s = new Set();
+    monthObzvon.forEach((r) => {
+      const id = String(r?.customerId || '').trim();
+      if (id) s.add(id);
     });
-  },[allOrders]);
+    return s;
+  }, [monthObzvon]);
+  const coveredCallCount = useMemo(
+    () => callNeededCustomers.filter((c) => calledThisMonthIds.has(String(c?.id || '').trim())).length,
+    [callNeededCustomers, calledThisMonthIds]
+  );
+  const pendingCallCount = Math.max(0, callNeededCustomers.length - coveredCallCount);
+  const callCoveragePct = callNeededCustomers.length ? Math.round((coveredCallCount / callNeededCustomers.length) * 100) : 100;
 
-  const problems = useMemo(()=>{
-    const list=[];
-    if(missedNoFollowup.length>0) list.push({sev:'high',title:`${missedNoFollowup.length} ta mijozga tel kotarmasdan qaytib aloqa qilinmagan`,desc:`Bu oyda ${monthMissed.length} ta "tel kotarmadi" yozuvi bor, shundan ${missedNoFollowup.length} tasiga hali obzvon yo'q.`,fix:"Obzvon analizi bo'limida ko'ring."});
-    if(retPct>=10) list.push({sev:'medium',title:`Qaytarish darajasi yuqori — ${retPct}%`,desc:`Bu oy ${fmt(monthRetQty)} dona qaytarilgan. Tara qaytarish chiqarib tashlangan.`,fix:"Qaytarishlar sababini tekshiring."});
-    if(debtorCount>0) list.push({sev:'medium',title:`${debtorCount} ta mijozda to'lanmagan qarz`,desc:"Salbiy balansli mijozlar topildi.",fix:"Mijozlar bo'limida ko'ring."});
-    if(netQty<monthSoldQty*0.8&&monthSoldQty>0) list.push({sev:'low',title:`Net sotuv ${Math.round(netQty/monthSoldQty*100)}% (qaytarish ta'siri)`,desc:`Sof sotilgan: ${fmt(netQty)} dona.`,fix:"Mahsulot sifatini tekshiring."});
+  const activeDebtors = useMemo(
+    () => activeCustomers.filter((c) => Number(c?.balanceUZS || 0) < 0),
+    [activeCustomers]
+  );
+  const debt15to30 = useMemo(
+    () => activeDebtors.filter((c) => {
+      const d = Number(c?.daysAgo ?? 0);
+      return d > 15 && d <= 30;
+    }),
+    [activeDebtors]
+  );
+  const debt30plus = useMemo(
+    () => activeDebtors.filter((c) => Number(c?.daysAgo ?? 0) > 30),
+    [activeDebtors]
+  );
+  const debtSumActive = useMemo(
+    () => activeDebtors.reduce((s, c) => s + Math.abs(Number(c?.balanceUZS || 0)), 0),
+    [activeDebtors]
+  );
+
+  const topProducts = useMemo(() => {
+    const map = {};
+    monthSalesRows.forEach((o) => {
+      const { qty } = getDashboardLikeSalesValues(o);
+      if (qty <= 0) return;
+      const p = String(o?.product || '').trim() || "Noma'lum";
+      if (!map[p]) map[p] = { name: p, 'Sotilgan (dona)': 0 };
+      map[p]['Sotilgan (dona)'] += qty;
+    });
+    return Object.values(map).sort((a, b) => b['Sotilgan (dona)'] - a['Sotilgan (dona)']).slice(0, 10);
+  }, [monthSalesRows]);
+  const topAgents = useMemo(() => {
+    const map = {};
+    monthSalesRows.forEach((o) => {
+      const { qty } = getDashboardLikeSalesValues(o);
+      if (qty <= 0) return;
+      const a = String(o?.agent || '').trim() || "Noma'lum";
+      if (!map[a]) map[a] = { name: a, Dona: 0 };
+      map[a].Dona += qty;
+    });
+    return Object.values(map).sort((a, b) => b.Dona - a.Dona);
+  }, [monthSalesRows]);
+  const monthlyTrend = useMemo(() => {
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(1);
+      d.setMonth(d.getMonth() - i);
+      months.push(toIsoDate(d).slice(0, 7));
+    }
+    return months.map((m) => {
+      let sold = 0;
+      let ret = 0;
+      let net = 0;
+      waterSalesRows
+        .filter((o) => toIsoDate(o?.orderDate || o?.deliveryDate || '').startsWith(m))
+        .forEach((o) => {
+          const { qty } = getDashboardLikeSalesValues(o);
+          if (qty < 0) ret += Math.abs(qty);
+          else sold += qty;
+          net += qty;
+        });
+      return { period: m.slice(5), Sotilgan: sold, Qaytarilgan: ret, Net: net };
+    });
+  }, [waterSalesRows]);
+
+  const problems = useMemo(() => {
+    const list = [];
+    if (pendingCallCount > 0) {
+      list.push({
+        sev: 'high',
+        title: `${pendingCallCount} ta mijozga obzvon qilinmagan`,
+        desc: `Qo'ng'iroq kerak bo'lgan ${callNeededCustomers.length} ta aktiv mijozdan ${coveredCallCount} tasiga obzvon qilingan.`,
+        fix: "Obzvon analizi -> Maqsad/Operator kesimida reja qiling.",
+      });
+    }
+    if (missedNoFollowup.length > 0) {
+      list.push({
+        sev: 'high',
+        title: `${missedNoFollowup.length} ta "tel ko'tarmadi" qayta ishlanmagan`,
+        desc: `Bu oy ${monthMissed.length} ta "tel ko'tarmadi" bo'lgan, ${missedNoFollowup.length} tasiga qayta aloqa yo'q.`,
+        fix: "Qayta obzvon navbatini kunlik nazoratga qo'ying.",
+      });
+    }
+    if (weakActive.length > 0) {
+      list.push({
+        sev: 'medium',
+        title: `${weakActive.length} ta aktiv mijoz sust holatda`,
+        desc: `Aktiv mijozlarning ${weakPct}% qismi 30 kundan ko'p vaqt suv olmagan.`,
+        fix: "Sust mijozlar uchun alohida qayta-aktivatsiya skripti ishga tushiring.",
+      });
+    }
+    if (debt30plus.length > 0) {
+      list.push({
+        sev: 'medium',
+        title: `${debt30plus.length} ta qarzdor 30 kundan oshgan`,
+        desc: `15-30 kun: ${debt15to30.length} ta, 30+ kun: ${debt30plus.length} ta.`,
+        fix: "Qarzdorlik bo'yicha operator kesimida qat'iy undirish rejasi tuzing.",
+      });
+    }
+    if (retPct >= 10) {
+      list.push({
+        sev: 'low',
+        title: `Qaytarish darajasi yuqori — ${retPct}%`,
+        desc: `Bu oy ${fmt(monthSales.retQty)} dona qaytarilgan.`,
+        fix: 'Qaytish sabablarini mahsulot kesimida tekshiring.',
+      });
+    }
     return list;
-  },[missedNoFollowup,monthMissed,retPct,monthRetQty,debtorCount,netQty,monthSoldQty]);
+  }, [pendingCallCount, callNeededCustomers.length, coveredCallCount, missedNoFollowup.length, monthMissed.length, weakActive.length, weakPct, debt30plus.length, debt15to30.length, retPct, monthSales.retQty]);
 
-  const sevColor = s=>s==='high'?'var(--rd)':s==='medium'?'var(--yl)':'var(--bl)';
+  const sevColor = (s) => (s === 'high' ? 'var(--rd)' : s === 'medium' ? 'var(--yl)' : 'var(--bl)');
 
   return (
     <div style={{display:'grid',gap:12,background:'var(--s1)',border:'1px solid var(--b2)',borderRadius:12,padding:12}}>
       <div style={{fontWeight:700,fontSize:14,color:'var(--t2)'}}>Bu oy ({thisMonth}) ko'rsatkichlari</div>
 
       <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))'}}>
-        <BigStat icon="✅" label="Sotilgan"    value={fmt(monthSoldQty)} sub={`${fmt(Math.round(monthSoldSum/1000))}K so'm`} color="var(--gr)" />
-        <BigStat icon="↩" label="Qaytarilgan"  value={fmt(monthRetQty)}  sub={`${retPct}%`}   color="var(--rd)" />
-        <BigStat icon="⚖" label="Net"           value={fmt(netQty)}       sub={`${fmt(Math.round(netSum/1000))}K so'm`}  color="var(--bl)" />
-        <BigStat icon="📞" label="Obzvon"        value={String(monthObzvon.length)} sub={`${monthMissed.length} ta kotarmadi`} color="var(--pu)" />
-        <BigStat icon="⚠️" label="Qarzdorlar"    value={String(debtorCount)} sub="Salbiy balans" color="var(--yl)" />
+        <BigStat icon="✅" label="Sotilgan" value={fmt(monthSales.soldQty)} sub={`${fmt(Math.round(monthSales.soldSum/1000))}K so'm`} color="var(--gr)" />
+        <BigStat icon="↩" label="Qaytarilgan" value={fmt(monthSales.retQty)} sub={`${retPct}%`} color="var(--rd)" />
+        <BigStat icon="⚖" label="Net" value={fmt(monthSales.netQty)} sub={`${fmt(Math.round(monthSales.netSum/1000))}K so'm`} color="var(--bl)" />
+        <BigStat icon="📞" label="Obzvon qamrovi" value={`${callCoveragePct}%`} sub={`${coveredCallCount}/${callNeededCustomers.length} mijoz`} color="var(--pu)" />
+        <BigStat icon="👥" label="Aktiv sog'lom" value={`${activeHealthyPct}%`} sub={`${strongActive.length}/${activeCustomers.length} mijoz`} color="var(--gr)" />
+        <BigStat icon="⚠️" label="Qarz riski" value={`${debt30plus.length} ta`} sub={`15-30 kun: ${debt15to30.length}`} color="var(--yl)" />
       </div>
 
-      {/* Muammolar */}
-      {problems.length>0&&(
+      <div className="card" style={{padding:'14px 16px'}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Aktiv mijozlar holati</div>
+        <div style={{display:'grid',gap:10}}>
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
+              <span>Yaxshi ishlayotgan aktivlar (≤14 kun)</span>
+              <strong style={{color:'var(--gr)'}}>{strongActive.length} ta ({activeHealthyPct}%)</strong>
+            </div>
+            <PBar value={strongActive.length} max={Math.max(activeCustomers.length, 1)} color="var(--gr)" height={10} />
+          </div>
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
+              <span>Sust aktivlar (&gt;30 kun)</span>
+              <strong style={{color:'var(--yl)'}}>{weakActive.length} ta ({weakPct}%)</strong>
+            </div>
+            <PBar value={weakActive.length} max={Math.max(activeCustomers.length, 1)} color="var(--yl)" height={10} />
+          </div>
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
+              <span>Qo'ng'iroq kerak mijozlar</span>
+              <strong style={{color:'var(--pu)'}}>{callNeededCustomers.length} ta, bajarilgan {coveredCallCount} ta</strong>
+            </div>
+            <PBar value={coveredCallCount} max={Math.max(callNeededCustomers.length, 1)} color="var(--pu)" height={10} />
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{padding:'14px 16px'}}>
+        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Qarzdorlik holati (aktiv mijozlar)</div>
+        <div style={{display:'grid',gap:8,fontSize:12,color:'var(--t2)'}}>
+          <div><strong>Jami qarzdor aktiv:</strong> {activeDebtors.length} ta mijoz</div>
+          <div><strong>Jami qarz summasi:</strong> {fmt(debtSumActive)} so'm</div>
+          <div><strong>15-30 kun:</strong> {debt15to30.length} ta</div>
+          <div><strong>30+ kun (muammo):</strong> {debt30plus.length} ta</div>
+        </div>
+      </div>
+
+      {problems.length > 0 && (
         <div className="card" style={{padding:'14px 16px'}}>
           <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Diqqat talab qiladigan masalalar</div>
           <div style={{display:'grid',gap:10}}>
@@ -12681,16 +13101,8 @@ function KorxonaHolati({ D, company, obzvonRows=[] }) {
           </div>
         </div>
       )}
-      {problems.length===0&&(
-        <div className="card" style={{padding:'14px 16px',textAlign:'center',color:'var(--gr)'}}>
-          <div style={{fontSize:28,marginBottom:6}}>✅</div>
-          <div style={{fontWeight:700}}>Muammo topilmadi</div>
-          <div style={{fontSize:12,color:'var(--t3)',marginTop:4}}>Bu oy ko'rsatkichlari normal</div>
-        </div>
-      )}
 
-      {/* 6 oylik trend */}
-      {monthlyTrend.some(m=>m.Sotilgan>0)&&(
+      {monthlyTrend.some((m)=>m.Sotilgan>0) && (
         <div className="card" style={{padding:'14px 16px'}}>
           <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>6 oylik trend</div>
           <ResponsiveContainer width="100%" height={220}>
@@ -12699,28 +13111,22 @@ function KorxonaHolati({ D, company, obzvonRows=[] }) {
               <XAxis dataKey="period" style={{fontSize:10}} stroke="var(--t3)" />
               <YAxis style={{fontSize:10}} stroke="var(--t3)" />
               <Tooltip />
-              <Area type="monotone" dataKey="Sotilgan"    stroke="var(--gr)" fill="var(--gr2)" strokeWidth={2} />
+              <Area type="monotone" dataKey="Sotilgan" stroke="var(--gr)" fill="var(--gr2)" strokeWidth={2} />
               <Area type="monotone" dataKey="Qaytarilgan" stroke="var(--rd)" fill="var(--rd2)" strokeWidth={2} />
-              <Area type="monotone" dataKey="Net"          stroke="var(--bl)" fill="none"        strokeWidth={2} strokeDasharray="4 2" />
+              <Area type="monotone" dataKey="Net" stroke="var(--bl)" fill="none" strokeWidth={2} strokeDasharray="4 2" />
             </AreaChart>
           </ResponsiveContainer>
-          <div style={{display:'flex',gap:12,marginTop:6,fontSize:11,color:'var(--t3)',flexWrap:'wrap'}}>
-            <span><span style={{color:'var(--gr)',fontWeight:700}}>■</span> Sotilgan</span>
-            <span><span style={{color:'var(--rd)',fontWeight:700}}>■</span> Qaytarilgan</span>
-            <span><span style={{color:'var(--bl)',fontWeight:700}}>──</span> Net</span>
-          </div>
         </div>
       )}
 
-      {/* Top mahsulotlar */}
-      {topProducts.length>0&&(
+      {topProducts.length > 0 && (
         <div className="card" style={{padding:'14px 16px'}}>
           <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Top mahsulotlar (bu oy)</div>
           <ResponsiveContainer width="100%" height={Math.max(120,topProducts.length*40)}>
             <BarChart layout="vertical" data={topProducts} margin={{top:0,right:50,left:10,bottom:0}}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" horizontal={false} />
               <XAxis type="number" style={{fontSize:11}} stroke="var(--t3)" />
-              <YAxis type="category" dataKey="name" width={120} style={{fontSize:11}} stroke="var(--t3)" />
+              <YAxis type="category" dataKey="name" width={140} style={{fontSize:11}} stroke="var(--t3)" />
               <Tooltip />
               <Bar dataKey="Sotilgan (dona)" fill="var(--bl)" radius={[0,5,5,0]} />
             </BarChart>
@@ -12728,20 +13134,19 @@ function KorxonaHolati({ D, company, obzvonRows=[] }) {
         </div>
       )}
 
-      {/* Top agentlar */}
-      {topAgents.length>0&&(
+      {topAgents.length > 0 && (
         <div className="card" style={{padding:'14px 16px'}}>
           <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Agent reytingi (bu oy)</div>
           <div style={{display:'grid',gap:10}}>
             {topAgents.map((a,i)=>{
-              const maxA=topAgents[0]?.['Dona']||1;
+              const maxA = topAgents[0]?.Dona || 1;
               return (
                 <div key={a.name}>
                   <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
                     <span style={{fontWeight:700}}>#{i+1} {a.name}</span>
-                    <span style={{fontWeight:800,color:'var(--bl)'}}>{fmt(a['Dona'])} dona</span>
+                    <span style={{fontWeight:800,color:'var(--bl)'}}>{fmt(a.Dona)} dona</span>
                   </div>
-                  <PBar value={a['Dona']} max={maxA} color="var(--bl)" height={10} />
+                  <PBar value={a.Dona} max={maxA} color="var(--bl)" height={10} />
                 </div>
               );
             })}
@@ -12776,14 +13181,25 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
     const today  = toIsoDate(new Date());
     const yest   = toIsoDate(new Date(Date.now()-86400000));
     const period = type==='monthly' ? today.slice(0,7) : yest;
-    const rows   = allRows.filter(r=>{
+    const rows = allRows.filter((r) => {
       const d = toIsoDate(r?.callDate||'');
       return type==='monthly' ? d.startsWith(period) : d===period;
     });
     const rowsWithNote = rows.filter((r) => String(r?.note || '').trim());
-    const notes = rowsWithNote.map(r=>String(r?.note||'').trim()).filter(Boolean);
-    if(!notes.length){ setAiSt({loading:false,err:`${period} uchun izoh yo'q`,msg:''}); return; }
-    setAiSt({loading:true,err:'',msg:`${notes.length} ta izoh tahlil qilinmoqda...`});
+    const existing = (arc || []).find((a) => a?.type === type && a?.period === period) || null;
+    const existingRows = Array.isArray(existing?.rows) ? existing.rows : [];
+    const existingKeys = new Set(existingRows.map((r) => makeObzvonRowKey(r)));
+    const pendingRows = rowsWithNote.filter((r) => !existingKeys.has(makeObzvonRowKey(r)));
+    const notes = pendingRows.map((r) => String(r?.note || '').trim()).filter(Boolean);
+    if (!rowsWithNote.length) {
+      setAiSt({ loading: false, err: `${period} uchun izoh yo'q`, msg: '' });
+      return;
+    }
+    if (!pendingRows.length) {
+      setAiSt({ loading: false, err: '', msg: `ℹ️ ${period} bo'yicha barcha qatorlar allaqachon tahlil qilingan` });
+      return;
+    }
+    setAiSt({loading:true,err:'',msg:`${notes.length} ta yangi izoh tahlil qilinmoqda...`});
 
     const byCustomer = new Map();
     allRows.forEach((r) => {
@@ -12797,17 +13213,20 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
     });
     byCustomer.forEach((arr) => arr.sort((a, b) => a.ts - b.ts));
 
-    const catTotals = Object.fromEntries(FIXED_CATS.map((c) => [c.key, 0]));
-    rowsWithNote.forEach((r) => {
+    const catTotals = Object.fromEntries(
+      FIXED_CATS.map((c) => [c.key, Number(existing?.categories?.[c.key] || 0)])
+    );
+    pendingRows.forEach((r) => {
       const cat = detectCat(r?.note);
       if (Object.prototype.hasOwnProperty.call(catTotals, cat)) catTotals[cat] += 1;
     });
-    const archivedRows = rowsWithNote.slice(0, 1200).map((r, idx) => {
+    const archivedRows = pendingRows.slice(0, 1200).map((r, idx) => {
       const cid = String(r?.customerId || '').trim();
       const ts = toDate(r?.callDate)?.getTime() || 0;
       const later = (byCustomer.get(cid) || []).filter((x) => x.ts > ts);
       return {
         id: `${period}_${idx + 1}`,
+        rid: makeObzvonRowKey(r),
         customerId: cid,
         customer: String(r?.customer || r?.customerName || '').trim() || (cid ? `ID: ${cid}` : '—'),
         operator: String(r?.operator || '').trim() || '—',
@@ -12819,18 +13238,19 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
         orderedAfter: later.some((x) => x.sold),
       };
     });
+    const mergedRows = [...existingRows, ...archivedRows];
 
     let xulosa = '';
     const topCat = FIXED_CATS
       .map((c) => ({ key: c.key, label: c.label, val: Number(catTotals[c.key] || 0) }))
       .sort((a, b) => b.val - a.val)[0];
-    xulosa = `${period} davrida ${notes.length} ta izoh tahlil qilindi. Eng ko'p kategoriya: ${topCat?.label || '—'} (${topCat?.val || 0} ta).`;
+    xulosa = `${period} davrida jami ${mergedRows.length} ta izoh tahlil qilindi. Eng ko'p kategoriya: ${topCat?.label || '—'} (${topCat?.val || 0} ta).`;
 
     try {
       if (aiKey.trim()) {
         const prompt = `Quyidagi obzvon kategoriya statistikasi asosida 2-3 jumlalik qisqa boshqaruv xulosasi yozing (uzbek, latin, aniq va amaliy):
 Period: ${period}
-Total: ${notes.length}
+Total: ${mergedRows.length}
 tel_kotarmadi: ${catTotals.tel_kotarmadi || 0}
 buyurtma: ${catTotals.buyurtma || 0}
 suv_borekan: ${catTotals.suv_borekan || 0}
@@ -12852,22 +13272,22 @@ boshqa: ${catTotals.boshqa || 0}`;
         if (text) xulosa = text;
       }
       const item = {
-        id:Date.now(), type, period,
-        totalNotes:rows.length, noteCount:notes.length,
+        id:existing?.id || Date.now(), type, period,
+        totalNotes:rowsWithNote.length, noteCount:mergedRows.length,
         categories:catTotals,
-        rows: archivedRows,
+        rows: mergedRows,
         xulosa,
         analyzedAt:new Date().toISOString(),
       };
       saveObzArc(company, item);
       setArc(readObzArc(company));
-      setAiSt({loading:false,err:'',msg:`✅ Saqlandi: ${period} (${notes.length} ta izoh)`});
+      setAiSt({loading:false,err:'',msg:`✅ Saqlandi: ${period} (+${archivedRows.length} ta yangi, jami ${mergedRows.length} ta)`});
     } catch(e){
       const item = {
-        id:Date.now(), type, period,
-        totalNotes:rows.length, noteCount:notes.length,
+        id:existing?.id || Date.now(), type, period,
+        totalNotes:rowsWithNote.length, noteCount:mergedRows.length,
         categories:catTotals,
-        rows: archivedRows,
+        rows: mergedRows,
         xulosa,
         analyzedAt:new Date().toISOString(),
       };
