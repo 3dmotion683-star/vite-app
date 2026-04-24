@@ -11862,7 +11862,7 @@ function ProblemCard({ sev, title, desc, fix }) {
         {hi ? '🔴' : '🟡'} {title}
       </div>
       <div style={{ color: 'var(--t2)', fontSize: 12 }}>{desc}</div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t1)', background: 'rgba(255,255,255,.06)', borderRadius: 6, padding: '5px 8px' }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t1)', background: 'var(--s2)', border: '1px solid var(--b2)', borderRadius: 6, padding: '5px 8px' }}>
         💡 {fix}
       </div>
     </div>
@@ -11892,34 +11892,74 @@ function SotuvAnaliz({ D }) {
   const [selMonth, setSelMonth] = useState(() => toIsoDate(new Date()).slice(0, 7));
   const [selDay, setSelDay] = useState(() => toIsoDate(new Date()));
   const [spreadMode, setSpreadMode] = useState('only');
-  const [selProduct, setSelProduct] = useState('');
+  const [productFilterOpen, setProductFilterOpen] = useState(false);
+  const [productChecked, setProductChecked] = useState({});
   const [showTable, setShowTable] = useState(false);
 
   const allOrders = useMemo(() => Array.isArray(D?.orders) ? D.orders : [], [D?.orders]);
+  const getProductName = useCallback((raw) => {
+    const p = String(raw || '').trim();
+    return p || "Noma'lum";
+  }, []);
 
   const allProducts = useMemo(() => {
     const s = new Set();
-    allOrders.forEach(o => { const p = String(o?.product || '').trim(); if (p) s.add(p); });
-    return Array.from(s).sort();
-  }, [allOrders]);
+    allOrders.forEach((o) => s.add(getProductName(o?.product)));
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [allOrders, getProductName]);
+
+  useEffect(() => {
+    setProductChecked((prev) => {
+      const next = {};
+      allProducts.forEach((p) => {
+        next[p] = Object.prototype.hasOwnProperty.call(prev, p) ? !!prev[p] : true;
+      });
+      return next;
+    });
+  }, [allProducts]);
 
   const timFiltered = useMemo(() => allOrders.filter(o => {
-    const d = String(o?.orderDate || o?.deliveryDate || '').slice(0, 10);
-    if (timeMode === 'year') return d.startsWith(selYear);
-    if (timeMode === 'month') return d.startsWith(selMonth);
+    const d = toIsoDate(o?.orderDate || o?.deliveryDate || '');
+    if (timeMode === 'year') return d ? d.startsWith(selYear) : false;
+    if (timeMode === 'month') return d ? d.startsWith(selMonth) : false;
     if (timeMode === 'day') return d === selDay;
     return true;
   }), [allOrders, timeMode, selYear, selMonth, selDay]);
 
+  const activeProducts = useMemo(
+    () => new Set(allProducts.filter((p) => productChecked[p] !== false)),
+    [allProducts, productChecked]
+  );
+  const activeProductsCount = activeProducts.size;
+
+  const toggleProduct = useCallback((product) => {
+    setProductChecked((prev) => {
+      const current = prev[product] !== false;
+      return { ...prev, [product]: !current };
+    });
+  }, []);
+
+  const selectAllProducts = useCallback(() => {
+    const next = {};
+    allProducts.forEach((p) => { next[p] = true; });
+    setProductChecked(next);
+  }, [allProducts]);
+
+  const clearAllProducts = useCallback(() => {
+    const next = {};
+    allProducts.forEach((p) => { next[p] = false; });
+    setProductChecked(next);
+  }, [allProducts]);
+
   const filtered = useMemo(() => {
-    if (!selProduct) return timFiltered;
-    return timFiltered.filter(o => String(o?.product || '').trim() === selProduct);
-  }, [timFiltered, selProduct]);
+    if (!activeProducts.size) return [];
+    return timFiltered.filter((o) => activeProducts.has(getProductName(o?.product)));
+  }, [timFiltered, activeProducts, getProductName]);
 
   const productStats = useMemo(() => {
     const map = {};
     filtered.forEach(o => {
-      const prod = String(o?.product || '').trim() || "Noma'lum";
+      const prod = getProductName(o?.product);
       if (!map[prod]) map[prod] = { name: prod, sotilgan: 0, qaytarilgan: 0, soldSum: 0, returnSum: 0 };
       const qty = Math.abs(toNum(o?.qty));
       const sum = Math.abs(toNum(o?.sum));
@@ -11929,7 +11969,7 @@ function SotuvAnaliz({ D }) {
     return Object.values(map)
       .map(p => ({ ...p, net: p.sotilgan - p.qaytarilgan, netSum: p.soldSum - p.returnSum }))
       .sort((a, b) => b.net - a.net);
-  }, [filtered]);
+  }, [filtered, getProductName]);
 
   const spreadData = useMemo(() => {
     if (spreadMode === 'only' || timeMode === 'day') return null;
@@ -11940,7 +11980,7 @@ function SotuvAnaliz({ D }) {
     };
     const map = {};
     filtered.forEach(o => {
-      const d = String(o?.orderDate || o?.deliveryDate || '').slice(0, 10);
+      const d = toIsoDate(o?.orderDate || o?.deliveryDate || '');
       const key = getKey(d);
       if (!key || key === '0000') return;
       if (!map[key]) map[key] = { period: key, Sotilgan: 0, Qaytarilgan: 0 };
@@ -11979,10 +12019,35 @@ function SotuvAnaliz({ D }) {
               </div>
             )}
           />
-          <select className="select" value={selProduct} onChange={e => setSelProduct(e.target.value)} style={{ maxWidth: 200 }}>
-            <option value="">Barcha mahsulotlar</option>
-            {allProducts.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
+          <div style={{ position: 'relative' }}>
+            <button
+              className="btn btn-gh btn-sm"
+              type="button"
+              onClick={() => setProductFilterOpen((v) => !v)}
+              style={{ minWidth: 220, justifyContent: 'space-between' }}
+            >
+              <span>Mahsulot turlari</span>
+              <span className="tag" style={{ background: 'var(--s3)', color: 'var(--t2)' }}>
+                {activeProductsCount}/{allProducts.length || 0}
+              </span>
+            </button>
+            {productFilterOpen && (
+              <div className="card" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 280, zIndex: 40, padding: 10, display: 'grid', gap: 8, maxHeight: 320, overflow: 'auto' }}>
+                <div style={{ display: 'grid', gap: 6, gridTemplateColumns: '1fr 1fr' }}>
+                  <button className="btn btn-gh btn-sm" type="button" onClick={selectAllProducts}>Hammasi</button>
+                  <button className="btn btn-gh btn-sm" type="button" onClick={clearAllProducts}>Tozalash</button>
+                </div>
+                <div style={{ display: 'grid', gap: 6 }}>
+                  {allProducts.map((p) => (
+                    <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--t2)', minWidth: 0, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={productChecked[p] !== false} onChange={() => toggleProduct(p)} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -12123,19 +12188,22 @@ function SotuvAnaliz({ D }) {
 }
 
 /* ====== OBZVON ANALIZI ====== */
-function ObzvonAnaliz({ D, company }) {
+function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
   const [tab, setTab] = useState('count');
   const [timeMode, setTimeMode] = useState('all');
   const [selYear, setSelYear] = useState(() => String(new Date().getFullYear()));
   const [selMonth, setSelMonth] = useState(() => toIsoDate(new Date()).slice(0, 7));
   const [selDay, setSelDay] = useState(() => toIsoDate(new Date()));
 
-  const allRows = useMemo(() => readObzvonRows(company), [company]);
+  const allRows = useMemo(
+    () => (Array.isArray(obzvonRows) ? obzvonRows : []),
+    [obzvonRows]
+  );
 
   const filtered = useMemo(() => allRows.filter(r => {
-    const d = String(r?.callDate || '').slice(0, 10);
-    if (timeMode === 'year') return d.startsWith(selYear);
-    if (timeMode === 'month') return d.startsWith(selMonth);
+    const d = toIsoDate(r?.callDate || '');
+    if (timeMode === 'year') return d ? d.startsWith(selYear) : false;
+    if (timeMode === 'month') return d ? d.startsWith(selMonth) : false;
     if (timeMode === 'day') return d === selDay;
     return true;
   }), [allRows, timeMode, selYear, selMonth, selDay]);
@@ -12160,11 +12228,13 @@ function ObzvonAnaliz({ D, company }) {
 
   const missedAnalysis = useMemo(() => missedRows.map(r => {
     const custId = String(r?.customerId || '').trim();
-    const callDate = r?.callDate || '';
+    const callTs = toDate(r?.callDate)?.getTime() || 0;
     let followedUp = false, orderedAfter = false;
     if (custId) {
       const later = allRows.filter(o =>
-        String(o?.customerId || '').trim() === custId && o.rid !== r.rid && (o?.callDate || '') > callDate
+        String(o?.customerId || '').trim() === custId &&
+        o.rid !== r.rid &&
+        (toDate(o?.callDate)?.getTime() || 0) > callTs
       );
       followedUp = later.length > 0;
       orderedAfter = later.some(o => String(o?.orderCount || '').trim() || String(o?.orderDate || '').trim());
@@ -12189,7 +12259,7 @@ function ObzvonAnaliz({ D, company }) {
   const orderedAfterCount = missedAnalysis.filter(r => r.orderedAfter).length;
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div style={{ display: 'grid', gap: 12, background: 'var(--s1)', border: '1px solid var(--b2)', borderRadius: 12, padding: 12 }}>
       {/* Tab va filter */}
       <div className="card" style={{ padding: '10px 14px' }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -12345,7 +12415,7 @@ function ObzvonAnaliz({ D, company }) {
                   <tbody>
                     {missedAnalysis.slice(0, 100).map(r => (
                       <tr key={r.rid}>
-                        <td style={{ fontWeight: 600 }}>{r.customerName || '—'}</td>
+                        <td style={{ fontWeight: 600 }}>{r.customerName || r.customer || (r.customerId ? `ID: ${r.customerId}` : '—')}</td>
                         <td>{r.operator}</td>
                         <td style={{ whiteSpace: 'nowrap', color: 'var(--t3)' }}>{r.callDate || '—'}</td>
                         <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--t2)' }}>{r.note}</td>
@@ -12365,28 +12435,43 @@ function ObzvonAnaliz({ D, company }) {
 }
 
 /* ====== KORXONA HOLATI ====== */
-function KorxonaHolati({ D, company }) {
+function KorxonaHolati({ D, company, obzvonRows = [] }) {
   const allOrders    = useMemo(() => Array.isArray(D?.orders) ? D.orders : [], [D?.orders]);
   const allCustomers = useMemo(() => Array.isArray(D?.customers) ? D.customers : [], [D?.customers]);
-  const allObzvon    = useMemo(() => readObzvonRows(company), [company]);
+  const allObzvon    = useMemo(
+    () => (Array.isArray(obzvonRows) ? obzvonRows : []),
+    [obzvonRows]
+  );
 
   const today = toIsoDate(new Date());
   const thisMonth = today.slice(0, 7);
 
-  const monthOrders  = useMemo(() => allOrders.filter(o => isOrderDoc(o?.docType) && String(o?.orderDate || o?.deliveryDate || '').startsWith(thisMonth)), [allOrders, thisMonth]);
-  const monthReturns = useMemo(() => allOrders.filter(o => isReturnDoc(o?.docType) && String(o?.orderDate || o?.deliveryDate || '').startsWith(thisMonth)), [allOrders, thisMonth]);
+  const monthOrders  = useMemo(() => allOrders.filter((o) => {
+    if (!isOrderDoc(o?.docType)) return false;
+    return toIsoDate(o?.orderDate || o?.deliveryDate || '').startsWith(thisMonth);
+  }), [allOrders, thisMonth]);
+  const monthReturns = useMemo(() => allOrders.filter((o) => {
+    if (!isReturnDoc(o?.docType)) return false;
+    return toIsoDate(o?.orderDate || o?.deliveryDate || '').startsWith(thisMonth);
+  }), [allOrders, thisMonth]);
   const monthSoldQty = useMemo(() => monthOrders.reduce((s,o) => s + Math.abs(toNum(o?.qty)), 0), [monthOrders]);
   const monthRetQty  = useMemo(() => monthReturns.reduce((s,o) => s + Math.abs(toNum(o?.qty)), 0), [monthReturns]);
   const monthSoldSum = useMemo(() => monthOrders.reduce((s,o) => s + Math.abs(toNum(o?.sum)), 0), [monthOrders]);
   const monthRetSum  = useMemo(() => monthReturns.reduce((s,o) => s + Math.abs(toNum(o?.sum)), 0), [monthReturns]);
 
-  const monthObzvon  = useMemo(() => allObzvon.filter(r => String(r?.callDate || '').startsWith(thisMonth)), [allObzvon, thisMonth]);
+  const monthObzvon  = useMemo(
+    () => allObzvon.filter((r) => toIsoDate(r?.callDate || '').startsWith(thisMonth)),
+    [allObzvon, thisMonth]
+  );
   const monthMissed  = useMemo(() => monthObzvon.filter(r => isMissedCall(r?.note)), [monthObzvon]);
   const missedNoFollowup = useMemo(() => monthMissed.filter(r => {
     const custId = String(r?.customerId || '').trim();
     if (!custId) return true;
+    const rowTs = toDate(r?.callDate)?.getTime() || 0;
     return !allObzvon.some(o =>
-      String(o?.customerId || '').trim() === custId && o.rid !== r.rid && (o?.callDate || '') > (r?.callDate || '')
+      String(o?.customerId || '').trim() === custId &&
+      o.rid !== r.rid &&
+      (toDate(o?.callDate)?.getTime() || 0) > rowTs
     );
   }), [monthMissed, allObzvon]);
 
@@ -12418,12 +12503,21 @@ function KorxonaHolati({ D, company }) {
   const monthlyTrend = useMemo(() => {
     const months = [];
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(); d.setMonth(d.getMonth() - i);
-      months.push(d.toISOString().slice(0, 7));
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(1);
+      d.setMonth(d.getMonth() - i);
+      months.push(toIsoDate(d).slice(0, 7));
     }
     return months.map(m => {
-      const ords = allOrders.filter(o => isOrderDoc(o?.docType) && String(o?.orderDate || o?.deliveryDate || '').startsWith(m));
-      const rets = allOrders.filter(o => isReturnDoc(o?.docType) && String(o?.orderDate || o?.deliveryDate || '').startsWith(m));
+      const ords = allOrders.filter((o) => {
+        if (!isOrderDoc(o?.docType)) return false;
+        return toIsoDate(o?.orderDate || o?.deliveryDate || '').startsWith(m);
+      });
+      const rets = allOrders.filter((o) => {
+        if (!isReturnDoc(o?.docType)) return false;
+        return toIsoDate(o?.orderDate || o?.deliveryDate || '').startsWith(m);
+      });
       const sold = ords.reduce((s,o) => s + Math.abs(toNum(o?.qty)), 0);
       const ret  = rets.reduce((s,o) => s + Math.abs(toNum(o?.qty)), 0);
       return { period: m.slice(5), 'Sotilgan': sold, 'Qaytarilgan': ret, 'Net': sold - ret };
@@ -12460,7 +12554,7 @@ function KorxonaHolati({ D, company }) {
   }, [missedNoFollowup, monthMissed, retPct, debtorCount, monthOrders]);
 
   return (
-    <div style={{ display: 'grid', gap: 12 }}>
+    <div style={{ display: 'grid', gap: 12, background: 'var(--s1)', border: '1px solid var(--b2)', borderRadius: 12, padding: 12 }}>
       {/* KPI kartalar */}
       <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))' }}>
         <BigStat icon="✅" label="Net sotuv (bu oy)" value={`${fmt(netQty)} dona`} sub={`${fmt(netSum)} so'm`} color="var(--bl)" />
@@ -12546,8 +12640,38 @@ function KorxonaHolati({ D, company }) {
 }
 
 /* ====== ASOSIY ANALIZ SAHIFASI ====== */
-function AnalyticsPage({ D, company, currentUser }) {
+function AnalyticsPage({ D, company, currentUser, obzvonAllRows = [], obzvonNewRows = [] }) {
   const [sub, setSub] = useState('sotuv');
+  const analyticsObzvonRows = useMemo(() => {
+    const src = [
+      ...(Array.isArray(obzvonAllRows) ? obzvonAllRows : []),
+      ...(Array.isArray(obzvonNewRows) ? obzvonNewRows : []),
+    ];
+    const map = new Map();
+    src.forEach((r, i) => {
+      const rid = String(r?.rid || r?._rid || '').trim();
+      const fallback = [
+        String(r?.customerId || r?.id || '').trim(),
+        toIsoDate(r?.callDate || ''),
+        String(r?.operator || '').trim(),
+        String(r?.note || '').trim(),
+        String(i),
+      ].join('__');
+      const key = rid || fallback;
+      map.set(key, {
+        ...r,
+        rid: key,
+        customer: String(r?.customer || '').trim(),
+        customerId: String(r?.customerId || r?.id || '').trim(),
+        callDate: r?.callDate || '',
+        note: String(r?.note || '').trim(),
+        operator: String(r?.operator || '').trim(),
+        orderCount: String(r?.orderCount || '').trim(),
+        orderDate: r?.orderDate || '',
+      });
+    });
+    return Array.from(map.values());
+  }, [obzvonAllRows, obzvonNewRows]);
   return (
     <div className="ani" style={{ display: 'grid', gap: 12, padding: 12, alignContent: 'start', color: 'var(--t1)' }}>
       <div className="tabs">
@@ -12556,8 +12680,8 @@ function AnalyticsPage({ D, company, currentUser }) {
         <button className={`tab${sub==='korxona'?' on':''}`} onClick={() => setSub('korxona')}>🏢 Korxona holati</button>
       </div>
       {sub === 'sotuv'   && <SotuvAnaliz D={D} />}
-      {sub === 'obzvon'  && <ObzvonAnaliz D={D} company={company} currentUser={currentUser} />}
-      {sub === 'korxona' && <KorxonaHolati D={D} company={company} />}
+      {sub === 'obzvon'  && <ObzvonAnaliz D={D} company={company} currentUser={currentUser} obzvonRows={analyticsObzvonRows} />}
+      {sub === 'korxona' && <KorxonaHolati D={D} company={company} obzvonRows={analyticsObzvonRows} />}
     </div>
   );
 }
