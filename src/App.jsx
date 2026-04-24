@@ -11821,911 +11821,747 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
   );
 }
 
-function AnalyticsPage({
-  D,
-  company='murodbaxsh',
-  currentUser='Admin',
-  planRows=[],
-  obzvonAllRows=[],
-  obzvonNewRows=[],
-}) {
-  const [tab, setTab] = useState('sales');
-  const periodOptions = useMemo(() => ([
-    { value: 'all', label: 'Hamma vaqt' },
-    { value: 'year', label: 'Yil' },
-    { value: 'month', label: 'Oy' },
-    { value: 'day', label: 'Kun' },
-  ]), []);
-  const salesModeOptions = useMemo(() => ([
-    { value: 'spread', label: 'Yoyma' },
-    { value: 'exact', label: "Faqat shu" },
-  ]), []);
-  const nowIso = useMemo(() => toIsoDate(new Date()), []);
-  const nowMonth = useMemo(() => monthKey(new Date()) || nowIso.slice(0, 7), [nowIso]);
-  const nowYear = useMemo(() => nowIso.slice(0, 4), [nowIso]);
+/* ── Analiz sahifasi ──────────────────────────────────────── */
+const isMissedCall = (note) => {
+  const n = normalizeMatchText(String(note || ''));
+  return n.includes('kotarmadi') || n.includes('trubka') || n.includes('javob bermadi') || n.includes('qabul qilmadi');
+};
 
-  const [salesPeriod, setSalesPeriod] = useState('all');
-  const [salesYear, setSalesYear] = useState(nowYear);
-  const [salesMonth, setSalesMonth] = useState(nowMonth);
-  const [salesDay, setSalesDay] = useState(nowIso);
-  const [salesCategory, setSalesCategory] = useState('all');
-  const [salesViewMode, setSalesViewMode] = useState('spread');
-  const [selectedProducts, setSelectedProducts] = useState({});
+function PBar({ value = 0, max = 100, color = 'var(--bl)', height = 10 }) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+  return (
+    <div style={{ background: 'var(--s3)', borderRadius: 99, height, overflow: 'hidden', flex: 1 }}>
+      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 99, transition: 'width .4s ease' }} />
+    </div>
+  );
+}
 
-  const [callPeriod, setCallPeriod] = useState('month');
-  const [callYear, setCallYear] = useState(nowYear);
-  const [callMonth, setCallMonth] = useState(nowMonth);
-  const [callDay, setCallDay] = useState(nowIso);
-  const [corpMonth, setCorpMonth] = useState(nowMonth);
+function BigStat({ icon, label, value, sub, color = 'var(--bl)' }) {
+  return (
+    <div style={{
+      background: 'var(--s1)', border: '1px solid var(--b2)', borderRadius: 14,
+      padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 4,
+      borderLeft: `4px solid ${color}`,
+    }}>
+      <div style={{ fontSize: 22, lineHeight: 1 }}>{icon}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--t3)', textTransform: 'uppercase', letterSpacing: '.06em', marginTop: 4 }}>{label}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1.2 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: 'var(--t3)' }}>{sub}</div>}
+    </div>
+  );
+}
 
-  const detectCategory = useCallback((rawCategory, product) => {
-    const direct = String(rawCategory || '').trim();
-    if (direct) return direct;
-    const p = normalizeMatchText(product || '');
-    if (isWaterProduct(product || '')) return 'Suv';
-    if (p.includes('kuler') || p.includes('cooler') || p.includes('кулер')) return 'Kuler';
-    if (p.includes('tara') || p.includes('idish') || p.includes('бутыл')) return 'Idish';
-    return 'Boshqa';
-  }, []);
+function ProblemCard({ sev, title, desc, fix }) {
+  const hi = sev === 'high';
+  return (
+    <div style={{
+      borderRadius: 10, border: `1px solid ${hi ? 'var(--rd)' : 'var(--yl)'}`,
+      background: hi ? 'var(--rd2)' : 'var(--yl2)', padding: '12px 16px', display: 'grid', gap: 6,
+    }}>
+      <div style={{ fontWeight: 700, color: hi ? 'var(--rd)' : 'var(--yl)', fontSize: 13 }}>
+        {hi ? '🔴' : '🟡'} {title}
+      </div>
+      <div style={{ color: 'var(--t2)', fontSize: 12 }}>{desc}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--t1)', background: 'rgba(255,255,255,.06)', borderRadius: 6, padding: '5px 8px' }}>
+        💡 {fix}
+      </div>
+    </div>
+  );
+}
 
-  const matchPeriod = useCallback((isoDate, period, year, month, day) => {
-    const iso = String(isoDate || '').slice(0, 10);
-    if (!iso) return false;
-    if (period === 'all') return true;
-    if (period === 'year') return iso.startsWith(`${String(year || '').slice(0, 4)}-`);
-    if (period === 'month') return iso.startsWith(`${String(month || '').slice(0, 7)}-`);
-    if (period === 'day') return iso === String(day || '').slice(0, 10);
+function TimeFilterBar({ timeMode, setTimeMode, selYear, setSelYear, selMonth, setSelMonth, selDay, setSelDay, extra }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="tabs">
+        {[['all','Hamma vaqt'],['year','Yil'],['month','Oy'],['day','Kun']].map(([m,l]) => (
+          <button key={m} className={`tab${timeMode===m?' on':''}`} onClick={() => setTimeMode(m)}>{l}</button>
+        ))}
+      </div>
+      {timeMode === 'year' && <input className="input" type="number" min="2020" max="2035" value={selYear} onChange={e => setSelYear(e.target.value)} style={{ maxWidth: 96 }} />}
+      {timeMode === 'month' && <input className="input" type="month" value={selMonth} onChange={e => setSelMonth(e.target.value)} style={{ maxWidth: 158 }} />}
+      {timeMode === 'day' && <input className="input" type="date" value={selDay} onChange={e => setSelDay(e.target.value)} style={{ maxWidth: 158 }} />}
+      {extra}
+    </div>
+  );
+}
+
+/* ====== SOTUV ANALIZI ====== */
+function SotuvAnaliz({ D }) {
+  const [timeMode, setTimeMode] = useState('all');
+  const [selYear, setSelYear] = useState(() => String(new Date().getFullYear()));
+  const [selMonth, setSelMonth] = useState(() => toIsoDate(new Date()).slice(0, 7));
+  const [selDay, setSelDay] = useState(() => toIsoDate(new Date()));
+  const [spreadMode, setSpreadMode] = useState('only');
+  const [selProduct, setSelProduct] = useState('');
+  const [showTable, setShowTable] = useState(false);
+
+  const allOrders = useMemo(() => Array.isArray(D?.orders) ? D.orders : [], [D?.orders]);
+
+  const allProducts = useMemo(() => {
+    const s = new Set();
+    allOrders.forEach(o => { const p = String(o?.product || '').trim(); if (p) s.add(p); });
+    return Array.from(s).sort();
+  }, [allOrders]);
+
+  const timFiltered = useMemo(() => allOrders.filter(o => {
+    const d = String(o?.orderDate || o?.deliveryDate || '').slice(0, 10);
+    if (timeMode === 'year') return d.startsWith(selYear);
+    if (timeMode === 'month') return d.startsWith(selMonth);
+    if (timeMode === 'day') return d === selDay;
     return true;
-  }, []);
+  }), [allOrders, timeMode, selYear, selMonth, selDay]);
 
-  const orderRows = useMemo(() => {
-    const src = Array.isArray(D?.rawOrders) ? D.rawOrders : [];
-    return src
-      .filter((o) => (isOrderDoc(o?.docType) || isReturnDoc(o?.docType)) && !isCancelledStatus(o?.status))
-      .map((o) => {
-        const date = toIsoDate(o?.orderDate);
-        if (!date) return null;
-        const isReturn = isReturnDoc(o?.docType);
-        const direction = isReturn ? -1 : 1;
-        const product = String(o?.product || '').trim() || '(Nomsiz mahsulot)';
-        const qty = direction * Math.abs(toNum(o?.qty));
-        const sumUZS = direction * Math.abs(toNum(o?.sum));
-        return {
-          id: `${String(o?.soNum || '').trim()}__${String(o?.uniqueId || '').trim()}__${product}__${date}`,
-          date,
-          year: date.slice(0, 4),
-          monthKey: date.slice(0, 7),
-          product,
-          category: detectCategory(o?.cat, product),
-          customerId: String(o?.mId || '').trim(),
-          qty,
-          sumUZS,
-          direction,
-        };
-      })
-      .filter(Boolean);
-  }, [D?.rawOrders, detectCategory]);
+  const filtered = useMemo(() => {
+    if (!selProduct) return timFiltered;
+    return timFiltered.filter(o => String(o?.product || '').trim() === selProduct);
+  }, [timFiltered, selProduct]);
 
-  const activeCustomers = useMemo(() => (
-    (D?.customers || [])
-      .filter((c) => !isNameInactiveByPrefix(c?.name || ''))
-      .map((c) => ({
-        id: String(c?.id || '').trim(),
-        name: String(c?.name || '').trim(),
-        source: String(c?.source || '').trim(),
-      }))
-      .filter((c) => c.id && c.name)
-  ), [D?.customers]);
-  const activeCustomerIdSet = useMemo(
-    () => new Set(activeCustomers.map((c) => c.id)),
-    [activeCustomers]
-  );
+  const productStats = useMemo(() => {
+    const map = {};
+    filtered.forEach(o => {
+      const prod = String(o?.product || '').trim() || "Noma'lum";
+      if (!map[prod]) map[prod] = { name: prod, sotilgan: 0, qaytarilgan: 0, soldSum: 0, returnSum: 0 };
+      const qty = Math.abs(toNum(o?.qty));
+      const sum = Math.abs(toNum(o?.sum));
+      if (isReturnDoc(o?.docType)) { map[prod].qaytarilgan += qty; map[prod].returnSum += sum; }
+      else if (isOrderDoc(o?.docType)) { map[prod].sotilgan += qty; map[prod].soldSum += sum; }
+    });
+    return Object.values(map)
+      .map(p => ({ ...p, net: p.sotilgan - p.qaytarilgan, netSum: p.soldSum - p.returnSum }))
+      .sort((a, b) => b.net - a.net);
+  }, [filtered]);
 
-  const salesYearOptions = useMemo(
-    () => Array.from(new Set(orderRows.map((r) => r.year))).sort((a, b) => b.localeCompare(a)),
-    [orderRows]
-  );
-  const salesMonthOptions = useMemo(() => {
-    const src = orderRows.filter((r) => !salesYear || r.year === salesYear);
-    return Array.from(new Set(src.map((r) => r.monthKey))).sort((a, b) => b.localeCompare(a));
-  }, [orderRows, salesYear]);
-  const salesDayOptions = useMemo(() => {
-    const src = orderRows.filter((r) => !salesMonth || r.monthKey === salesMonth);
-    return Array.from(new Set(src.map((r) => r.date))).sort((a, b) => b.localeCompare(a));
-  }, [orderRows, salesMonth]);
-  useEffect(() => {
-    if (!salesYearOptions.length) return;
-    if (!salesYearOptions.includes(salesYear)) setSalesYear(salesYearOptions[0]);
-  }, [salesYearOptions, salesYear]);
-  useEffect(() => {
-    if (!salesMonthOptions.length) return;
-    if (!salesMonthOptions.includes(salesMonth)) setSalesMonth(salesMonthOptions[0]);
-  }, [salesMonthOptions, salesMonth]);
-  useEffect(() => {
-    if (!salesDayOptions.length) return;
-    if (!salesDayOptions.includes(salesDay)) setSalesDay(salesDayOptions[0]);
-  }, [salesDayOptions, salesDay]);
-
-  const salesCategoryOptions = useMemo(() => {
-    const list = Array.from(new Set(orderRows.map((r) => String(r.category || '').trim()).filter(Boolean)));
-    list.sort((a, b) => a.localeCompare(b));
-    return ['all', ...list];
-  }, [orderRows]);
-  const salesProductOptions = useMemo(() => {
-    const list = Array.from(new Set(orderRows.map((r) => r.product).filter(Boolean)));
-    list.sort((a, b) => a.localeCompare(b));
-    return list;
-  }, [orderRows]);
-  useEffect(() => {
-    if (!salesProductOptions.length) return;
-    setSelectedProducts((prev) => {
-      const old = (prev && typeof prev === 'object') ? prev : {};
-      const hasOld = Object.keys(old).length > 0;
-      const next = {};
-      salesProductOptions.forEach((p) => {
-        next[p] = hasOld ? !!old[p] : true;
-      });
-      return next;
-    });
-  }, [salesProductOptions]);
-  const hasProductSelectionMap = useMemo(
-    () => Object.keys(selectedProducts || {}).length > 0,
-    [selectedProducts]
-  );
-  const selectedProductSet = useMemo(() => {
-    const set = new Set();
-    Object.entries(selectedProducts || {}).forEach(([name, enabled]) => {
-      if (enabled) set.add(name);
-    });
-    return set;
-  }, [selectedProducts]);
-  const isProductAllowed = useCallback((name) => {
-    if (!salesProductOptions.length) return true;
-    if (!hasProductSelectionMap) return true;
-    return selectedProductSet.has(name);
-  }, [salesProductOptions.length, hasProductSelectionMap, selectedProductSet]);
-
-  const salesFilteredRows = useMemo(() => {
-    return orderRows
-      .filter((r) => matchPeriod(r.date, salesPeriod, salesYear, salesMonth, salesDay))
-      .filter((r) => salesCategory === 'all' || String(r.category || '') === salesCategory)
-      .filter((r) => isProductAllowed(r.product));
-  }, [orderRows, matchPeriod, salesPeriod, salesYear, salesMonth, salesDay, salesCategory, isProductAllowed]);
-  const salesTotals = useMemo(() => {
-    return salesFilteredRows.reduce((acc, r) => {
-      acc.qty += Number(r.qty || 0);
-      acc.sumUZS += Number(r.sumUZS || 0);
-      acc.rows += 1;
-      return acc;
-    }, { qty: 0, sumUZS: 0, rows: 0 });
-  }, [salesFilteredRows]);
-  const salesExactRows = useMemo(() => {
-    const byProduct = new Map();
-    salesFilteredRows.forEach((r) => {
-      if (!byProduct.has(r.product)) {
-        byProduct.set(r.product, { product: r.product, category: r.category, qty: 0, sumUZS: 0, rows: 0 });
-      }
-      const b = byProduct.get(r.product);
-      b.qty += Number(r.qty || 0);
-      b.sumUZS += Number(r.sumUZS || 0);
-      b.rows += 1;
-    });
-    return Array.from(byProduct.values()).sort((a, b) => a.product.localeCompare(b.product));
-  }, [salesFilteredRows]);
-  const spreadKeyLabel = useCallback((scope, row) => {
-    if (scope === 'all') return row.year;
-    if (scope === 'year') return row.monthKey;
-    if (scope === 'month') return row.date;
-    return row.date;
-  }, []);
-  const spreadLabel = useCallback((v) => {
-    const key = String(v || '');
-    if (/^\d{4}-\d{2}$/.test(key)) return formatMonthShort(key);
-    if (/^\d{4}-\d{2}-\d{2}$/.test(key)) return fmtD(key);
-    return key || '-';
-  }, []);
-  const salesSpreadRows = useMemo(() => {
-    const m = new Map();
-    salesFilteredRows.forEach((r) => {
-      const pKey = spreadKeyLabel(salesPeriod, r);
-      const key = `${pKey}__${r.product}`;
-      if (!m.has(key)) {
-        m.set(key, { period: pKey, product: r.product, category: r.category, qty: 0, sumUZS: 0, rows: 0 });
-      }
-      const b = m.get(key);
-      b.qty += Number(r.qty || 0);
-      b.sumUZS += Number(r.sumUZS || 0);
-      b.rows += 1;
-    });
-    return Array.from(m.values()).sort((a, b) => (
-      a.period === b.period
-        ? a.product.localeCompare(b.product)
-        : a.period.localeCompare(b.period)
-    ));
-  }, [salesFilteredRows, spreadKeyLabel, salesPeriod]);
-
-  const mergedObzvonRows = useMemo(() => {
-    const toNorm = (r, i, srcTag) => ({
-      rid: String(r?.rid || r?._rid || '').trim() || `${srcTag}_${i}`,
-      callDate: toIsoDate(r?.callDate || r?.date || ''),
-      customerId: String(r?.customerId || r?.id || '').trim(),
-      customer: String(r?.customer || r?.name || '').trim(),
-      topic: String(r?.topic || '').trim(),
-      note: String(r?.note || '').trim(),
-      nextDate: toIsoDate(r?.nextDate || ''),
-      operator: String(r?.operator || '').trim() || '-',
-      updatedAt: String(r?.updatedAt || '').trim(),
-    });
-    const list = [
-      ...(Array.isArray(obzvonAllRows) ? obzvonAllRows.map((r, i) => toNorm(r, i, 'all')) : []),
-      ...(Array.isArray(obzvonNewRows) ? obzvonNewRows.map((r, i) => toNorm(r, i, 'new')) : []),
-    ].filter((r) => r.callDate || r.customerId || r.note || r.topic);
-    const map = new Map();
-    list.forEach((r, idx) => {
-      const fallback = `${r.callDate}__${r.customerId}__${r.topic}__${r.note}__${r.operator}__${idx}`;
-      const key = r.rid || fallback;
-      const prev = map.get(key);
-      if (!prev) {
-        map.set(key, r);
-        return;
-      }
-      const prevTs = toDate(prev.updatedAt || prev.callDate)?.getTime() || 0;
-      const nextTs = toDate(r.updatedAt || r.callDate)?.getTime() || 0;
-      if (nextTs >= prevTs) map.set(key, r);
-    });
-    return Array.from(map.values()).sort((a, b) => (
-      (toDate(b.callDate)?.getTime() || 0) - (toDate(a.callDate)?.getTime() || 0)
-    ));
-  }, [obzvonAllRows, obzvonNewRows]);
-
-  const callYearOptions = useMemo(
-    () => Array.from(new Set(mergedObzvonRows.map((r) => String(r.callDate || '').slice(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a)),
-    [mergedObzvonRows]
-  );
-  const callMonthOptions = useMemo(() => {
-    const list = mergedObzvonRows
-      .map((r) => String(r.callDate || '').slice(0, 7))
-      .filter((mk) => mk && (!callYear || mk.startsWith(`${callYear}-`)));
-    return Array.from(new Set(list)).sort((a, b) => b.localeCompare(a));
-  }, [mergedObzvonRows, callYear]);
-  const callDayOptions = useMemo(() => {
-    const list = mergedObzvonRows
-      .map((r) => String(r.callDate || '').slice(0, 10))
-      .filter((d) => d && (!callMonth || d.startsWith(`${callMonth}-`)));
-    return Array.from(new Set(list)).sort((a, b) => b.localeCompare(a));
-  }, [mergedObzvonRows, callMonth]);
-  useEffect(() => {
-    if (!callYearOptions.length) return;
-    if (!callYearOptions.includes(callYear)) setCallYear(callYearOptions[0]);
-  }, [callYearOptions, callYear]);
-  useEffect(() => {
-    if (!callMonthOptions.length) return;
-    if (!callMonthOptions.includes(callMonth)) setCallMonth(callMonthOptions[0]);
-  }, [callMonthOptions, callMonth]);
-  useEffect(() => {
-    if (!callDayOptions.length) return;
-    if (!callDayOptions.includes(callDay)) setCallDay(callDayOptions[0]);
-  }, [callDayOptions, callDay]);
-
-  const filteredObzvonRows = useMemo(() => (
-    mergedObzvonRows.filter((r) => matchPeriod(r.callDate, callPeriod, callYear, callMonth, callDay))
-  ), [mergedObzvonRows, matchPeriod, callPeriod, callYear, callMonth, callDay]);
-
-  const callsByOperatorRows = useMemo(() => {
-    const m = new Map();
-    filteredObzvonRows.forEach((r) => {
-      const op = r.operator || '-';
-      if (!m.has(op)) {
-        m.set(op, { operator: op, calls: 0, customers: new Set(), topicMap: new Map() });
-      }
-      const b = m.get(op);
-      b.calls += 1;
-      if (r.customerId) b.customers.add(r.customerId);
-      const topic = r.topic || '-';
-      b.topicMap.set(topic, (b.topicMap.get(topic) || 0) + 1);
-    });
-    return Array.from(m.values())
-      .map((b) => ({
-        operator: b.operator,
-        calls: b.calls,
-        customers: b.customers.size,
-        topics: Array.from(b.topicMap.entries())
-          .sort((a, c) => c[1] - a[1])
-          .slice(0, 3)
-          .map(([name, count]) => `${name} (${count})`)
-          .join(' | '),
-      }))
-      .sort((a, b) => b.calls - a.calls || a.operator.localeCompare(b.operator));
-  }, [filteredObzvonRows]);
-
-  const ordersInCallPeriodByCustomer = useMemo(() => {
-    const m = new Map();
-    orderRows
-      .filter((r) => matchPeriod(r.date, callPeriod, callYear, callMonth, callDay))
-      .forEach((r) => {
-        if (!r.customerId) return;
-        if (!m.has(r.customerId)) m.set(r.customerId, { qty: 0, sumUZS: 0, rows: 0 });
-        const b = m.get(r.customerId);
-        b.qty += Number(r.qty || 0);
-        b.sumUZS += Number(r.sumUZS || 0);
-        b.rows += 1;
-      });
-    return m;
-  }, [orderRows, matchPeriod, callPeriod, callYear, callMonth, callDay]);
-
-  const salesFromCallsRows = useMemo(() => {
-    const latestCallByCustomer = new Map();
-    filteredObzvonRows.forEach((r) => {
-      if (!r.customerId || !activeCustomerIdSet.has(r.customerId)) return;
-      const prev = latestCallByCustomer.get(r.customerId);
-      const prevTs = prev ? (toDate(prev.callDate)?.getTime() || 0) : -1;
-      const nowTs = toDate(r.callDate)?.getTime() || 0;
-      if (!prev || nowTs >= prevTs) {
-        latestCallByCustomer.set(r.customerId, { operator: r.operator || '-', callDate: r.callDate });
-      }
-    });
-    const byOperator = new Map();
-    latestCallByCustomer.forEach((info, customerId) => {
-      const op = info.operator || '-';
-      if (!byOperator.has(op)) {
-        byOperator.set(op, { operator: op, calledCustomers: 0, soldCustomers: 0, qty: 0, sumUZS: 0 });
-      }
-      const b = byOperator.get(op);
-      b.calledCustomers += 1;
-      const orderStat = ordersInCallPeriodByCustomer.get(customerId);
-      if (orderStat && Number(orderStat.qty || 0) > 0.0001) {
-        b.soldCustomers += 1;
-        b.qty += Number(orderStat.qty || 0);
-        b.sumUZS += Number(orderStat.sumUZS || 0);
-      }
-    });
-    return Array.from(byOperator.values())
-      .map((r) => ({
-        ...r,
-        conversionPct: r.calledCustomers ? (r.soldCustomers * 100 / r.calledCustomers) : 0,
-      }))
-      .sort((a, b) => b.calledCustomers - a.calledCustomers || b.soldCustomers - a.soldCustomers);
-  }, [filteredObzvonRows, activeCustomerIdSet, ordersInCallPeriodByCustomer]);
-
-  const isNoAnswerNote = useCallback((noteText = '') => {
-    const t = normalizeMatchText(noteText || '');
-    if (!t) return false;
-    return (
-      textHasAny(t, ['tel kotarmadi', 'telefon kotarmadi', "ko'tarmadi", 'kotarmadi']) ||
-      textHasAny(t, ['не поднял', 'не отвечает', 'не ответил'])
-    );
-  }, []);
-  const allCallDatesByCustomer = useMemo(() => {
-    const m = new Map();
-    mergedObzvonRows.forEach((r) => {
-      if (!r.customerId || !r.callDate) return;
-      if (!m.has(r.customerId)) m.set(r.customerId, []);
-      m.get(r.customerId).push(r.callDate);
-    });
-    m.forEach((arr, key) => {
-      m.set(key, arr.slice().sort((a, b) => a.localeCompare(b)));
-    });
-    return m;
-  }, [mergedObzvonRows]);
-  const allOrderDatesByCustomer = useMemo(() => {
-    const m = new Map();
-    orderRows.forEach((r) => {
-      if (!r.customerId || !r.date) return;
-      if (!m.has(r.customerId)) m.set(r.customerId, []);
-      m.get(r.customerId).push(r.date);
-    });
-    m.forEach((arr, key) => {
-      m.set(key, arr.slice().sort((a, b) => a.localeCompare(b)));
-    });
-    return m;
-  }, [orderRows]);
-
-  const noAnswerRows = useMemo(
-    () => filteredObzvonRows.filter((r) => isNoAnswerNote(r.note)),
-    [filteredObzvonRows, isNoAnswerNote]
-  );
-  const noAnswerSummary = useMemo(() => {
-    const byOp = new Map();
-    let followedCalls = 0;
-    let noFollowCalls = 0;
-    let boughtAfter = 0;
-    noAnswerRows.forEach((r) => {
-      if (!r.customerId || !r.callDate) return;
-      const op = r.operator || '-';
-      if (!byOp.has(op)) byOp.set(op, { operator: op, total: 0, followed: 0, noFollow: 0, boughtAfter: 0 });
-      const b = byOp.get(op);
-      b.total += 1;
-      const nextCall = (allCallDatesByCustomer.get(r.customerId) || []).some((d) => d > r.callDate);
-      const nextOrder = (allOrderDatesByCustomer.get(r.customerId) || []).some((d) => d > r.callDate);
-      if (nextCall) {
-        followedCalls += 1;
-        b.followed += 1;
-      } else {
-        noFollowCalls += 1;
-        b.noFollow += 1;
-      }
-      if (nextOrder) {
-        boughtAfter += 1;
-        b.boughtAfter += 1;
-      }
-    });
-    return {
-      total: noAnswerRows.length,
-      followedCalls,
-      noFollowCalls,
-      boughtAfter,
-      byOperator: Array.from(byOp.values()).sort((a, b) => b.total - a.total || b.boughtAfter - a.boughtAfter),
+  const spreadData = useMemo(() => {
+    if (spreadMode === 'only' || timeMode === 'day') return null;
+    const getKey = d => {
+      if (timeMode === 'all') return d.slice(0, 4);
+      if (timeMode === 'year') return d.slice(0, 7);
+      return d.slice(0, 10);
     };
-  }, [noAnswerRows, allCallDatesByCustomer, allOrderDatesByCustomer]);
-
-  const latestOrderByCustomer = useMemo(() => {
-    const out = {};
-    orderRows.forEach((r) => {
-      if (!r.customerId || !r.date) return;
-      if (!out[r.customerId] || r.date > out[r.customerId]) out[r.customerId] = r.date;
+    const map = {};
+    filtered.forEach(o => {
+      const d = String(o?.orderDate || o?.deliveryDate || '').slice(0, 10);
+      const key = getKey(d);
+      if (!key || key === '0000') return;
+      if (!map[key]) map[key] = { period: key, Sotilgan: 0, Qaytarilgan: 0 };
+      const qty = Math.abs(toNum(o?.qty));
+      if (isReturnDoc(o?.docType)) map[key].Qaytarilgan += qty;
+      else if (isOrderDoc(o?.docType)) map[key].Sotilgan += qty;
     });
-    return out;
-  }, [orderRows]);
-  const latestCallByCustomer = useMemo(() => {
-    const out = {};
-    mergedObzvonRows.forEach((r) => {
-      if (!r.customerId || !r.callDate) return;
-      if (!out[r.customerId] || r.callDate > out[r.customerId]) out[r.customerId] = r.callDate;
-    });
-    return out;
-  }, [mergedObzvonRows]);
+    return Object.values(map)
+      .map(d => ({ ...d, Net: d.Sotilgan - d.Qaytarilgan }))
+      .sort((a, b) => a.period.localeCompare(b.period));
+  }, [filtered, spreadMode, timeMode]);
 
-  const needsCallRows = useMemo(() => {
-    return activeCustomers
-      .map((c) => {
-        const ord = latestOrderByCustomer[c.id] || '';
-        const cal = latestCallByCustomer[c.id] || '';
-        const orderDays = ord ? (daysAgo(ord) ?? 0) : null;
-        const callDays = cal ? (daysAgo(cal) ?? 0) : null;
-        return {
-          ...c,
-          lastOrderDate: ord,
-          lastCallDate: cal,
-          orderDays,
-          callDays,
-        };
-      })
-      .filter((r) => r.orderDays != null && r.orderDays >= 7)
-      .filter((r) => r.callDays == null || r.callDays > 7)
-      .sort((a, b) => (b.orderDays || 0) - (a.orderDays || 0))
-      .slice(0, 300);
-  }, [activeCustomers, latestOrderByCustomer, latestCallByCustomer]);
-
-  const planByMonth = useMemo(() => {
-    const m = {};
-    (planRows || []).forEach((r) => {
-      const mk = normalizeMonthKey(r?.month);
-      if (!mk) return;
-      m[mk] = {
-        waterPlan: Number(r?.waterPlan || 0),
-        coolerPlan: Number(r?.coolerPlan || 0),
-        workDays: Number(r?.workDays || 26),
-      };
-    });
-    return m;
-  }, [planRows]);
-  const allMonthOptions = useMemo(() => {
-    const set = new Set([
-      ...Object.keys(planByMonth || {}),
-      ...orderRows.map((r) => r.monthKey).filter(Boolean),
-      ...mergedObzvonRows.map((r) => String(r.callDate || '').slice(0, 7)).filter(Boolean),
-    ]);
-    return Array.from(set).sort((a, b) => b.localeCompare(a));
-  }, [planByMonth, orderRows, mergedObzvonRows]);
-  useEffect(() => {
-    if (!allMonthOptions.length) return;
-    if (!allMonthOptions.includes(corpMonth)) setCorpMonth(allMonthOptions[0]);
-  }, [allMonthOptions, corpMonth]);
-
-  const companyMonthStats = useMemo(() => {
-    const monthOrders = orderRows.filter((r) => r.monthKey === corpMonth && isWaterProduct(r.product));
-    const soldQty = monthOrders.filter((r) => r.direction > 0).reduce((s, r) => s + Math.abs(toNum(r.qty)), 0);
-    const returnedQty = monthOrders.filter((r) => r.direction < 0).reduce((s, r) => s + Math.abs(toNum(r.qty)), 0);
-    const netQty = soldQty - returnedQty;
-    const netSumUZS = monthOrders.reduce((s, r) => s + Number(r.sumUZS || 0), 0);
-    const monthCalls = mergedObzvonRows.filter((r) => String(r.callDate || '').startsWith(`${corpMonth}-`));
-    const noAnswerCount = monthCalls.filter((r) => isNoAnswerNote(r.note)).length;
-    const calledActiveCustomers = new Set(
-      monthCalls
-        .map((r) => r.customerId)
-        .filter((id) => activeCustomerIdSet.has(id))
-    ).size;
-    const activeCount = activeCustomers.length;
-    const plan = Number(planByMonth?.[corpMonth]?.waterPlan || 0);
-    const planGap = plan - netQty;
-    const planPct = plan > 0 ? (netQty * 100 / plan) : 0;
-    const returnPct = soldQty > 0 ? (returnedQty * 100 / soldQty) : 0;
-    const callCoveragePct = activeCount > 0 ? (calledActiveCustomers * 100 / activeCount) : 0;
-    const noAnswerPct = monthCalls.length > 0 ? (noAnswerCount * 100 / monthCalls.length) : 0;
-    return {
-      plan,
-      soldQty,
-      returnedQty,
-      netQty,
-      netSumUZS,
-      planGap,
-      planPct,
-      returnPct,
-      callCoveragePct,
-      noAnswerCount,
-      noAnswerPct,
-      monthCalls: monthCalls.length,
-      calledActiveCustomers,
-      activeCount,
-    };
-  }, [orderRows, corpMonth, mergedObzvonRows, isNoAnswerNote, activeCustomerIdSet, activeCustomers.length, planByMonth]);
-
-  const companyIssues = useMemo(() => {
-    const issues = [];
-    const fixes = [];
-    if (companyMonthStats.plan > 0 && companyMonthStats.netQty + 0.0001 < companyMonthStats.plan) {
-      issues.push(`Plan bajarilmadi: ${fmt(companyMonthStats.plan)} ta reja, ${fmt(companyMonthStats.netQty)} ta fakt.`);
-      fixes.push("Faol operatorlar bo'yicha kunlik call rejasi qo'ying va javobsiz mijozlar uchun qayta-call oynasini qat'iylashtiring.");
-    }
-    if (companyMonthStats.returnPct >= 8) {
-      issues.push(`Vozvrat ulushi yuqori: ${companyMonthStats.returnPct.toFixed(1)}%.`);
-      fixes.push("Vozvrat sabablari bo'yicha top-3 mahsulotni tekshirib, dostavka va sifat bo'yicha alohida nazorat qo'ying.");
-    }
-    if (companyMonthStats.callCoveragePct < 60) {
-      issues.push(`Aktiv mijoz qamrovi past: ${companyMonthStats.callCoveragePct.toFixed(1)}%.`);
-      fixes.push("Operator kesimida qamrovi past segmentni ajratib, har kuni majburiy minimum obzvon normasi belgilang.");
-    }
-    if (companyMonthStats.noAnswerPct > 25) {
-      issues.push(`"Tel ko'tarmadi" ulushi yuqori: ${companyMonthStats.noAnswerPct.toFixed(1)}%.`);
-      fixes.push("Javobsiz mijozlarga 2-bosqich callback jadvali kiriting (kunning boshqa vaqtida qayta urinish).");
-    }
-    if (!issues.length) {
-      issues.push("Asosiy ko'rsatkichlar bo'yicha kritik og'ish aniqlanmadi.");
-      fixes.push("Hozirgi tempni saqlang va haftalik monitoringni davom ettiring.");
-    }
-    return { issues, fixes };
-  }, [companyMonthStats]);
-
-  const toggleProduct = (name) => {
-    setSelectedProducts((prev) => {
-      const old = (prev && typeof prev === 'object') ? prev : {};
-      const hasOld = Object.keys(old).length > 0;
-      const next = {};
-      salesProductOptions.forEach((p) => {
-        next[p] = hasOld ? !!old[p] : true;
-      });
-      next[name] = !next[name];
-      return next;
-    });
-  };
-  const selectAllProducts = () => {
-    const next = {};
-    salesProductOptions.forEach((p) => { next[p] = true; });
-    setSelectedProducts(next);
-  };
-  const clearProductSelection = () => {
-    const next = {};
-    salesProductOptions.forEach((p) => { next[p] = false; });
-    setSelectedProducts(next);
-  };
+  const prodChartData = productStats.slice(0, 12).map(p => ({
+    name: p.name, Sotilgan: p.sotilgan, Qaytarilgan: p.qaytarilgan,
+  }));
+  const maxProd = Math.max(...productStats.map(p => p.sotilgan), 1);
+  const totSold = productStats.reduce((s, p) => s + p.sotilgan, 0);
+  const totRet  = productStats.reduce((s, p) => s + p.qaytarilgan, 0);
+  const totNet  = productStats.reduce((s, p) => s + p.net, 0);
+  const totSum  = productStats.reduce((s, p) => s + p.netSum, 0);
 
   return (
-    <div className="ani" style={{display:'flex',flexDirection:'column',gap:10}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-        <div className="tabs" style={{display:'inline-flex'}}>
-          <button className={`tab${tab==='sales'?' on':''}`} onClick={()=>setTab('sales')}>Sotuv analizi</button>
-          <button className={`tab${tab==='calls'?' on':''}`} onClick={()=>setTab('calls')}>Obzvon analizi</button>
-          <button className={`tab${tab==='company'?' on':''}`} onClick={()=>setTab('company')}>Korxona holati</button>
-        </div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Kompaniya: {companyLabelByKey(company)}</span>
-          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Foydalanuvchi: {currentUser}</span>
+    <div style={{ display: 'grid', gap: 12 }}>
+      {/* Filter paneli */}
+      <div className="card" style={{ padding: '10px 14px' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <TimeFilterBar
+            timeMode={timeMode} setTimeMode={setTimeMode}
+            selYear={selYear} setSelYear={setSelYear}
+            selMonth={selMonth} setSelMonth={setSelMonth}
+            selDay={selDay} setSelDay={setSelDay}
+            extra={timeMode !== 'day' && (
+              <div className="tabs">
+                <button className={`tab${spreadMode==='only'?' on':''}`} onClick={() => setSpreadMode('only')}>Faqat shu</button>
+                <button className={`tab${spreadMode==='spread'?' on':''}`} onClick={() => setSpreadMode('spread')}>Yoyma</button>
+              </div>
+            )}
+          />
+          <select className="select" value={selProduct} onChange={e => setSelProduct(e.target.value)} style={{ maxWidth: 200 }}>
+            <option value="">Barcha mahsulotlar</option>
+            {allProducts.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
         </div>
       </div>
 
-      {tab === 'sales' && (
-        <>
-          <div className="card" style={{padding:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Davr</span>
-            <select className="select" value={salesPeriod} onChange={(e)=>setSalesPeriod(e.target.value)}>
-              {periodOptions.map((x) => <option key={`sales_p_${x.value}`} value={x.value}>{x.label}</option>)}
-            </select>
-            {(salesPeriod === 'year' || salesPeriod === 'month' || salesPeriod === 'day') && (
-              <select className="select" value={salesYear} onChange={(e)=>setSalesYear(e.target.value)}>
-                {salesYearOptions.map((y) => <option key={`sales_y_${y}`} value={y}>{y}</option>)}
-              </select>
-            )}
-            {(salesPeriod === 'month' || salesPeriod === 'day') && (
-              <select className="select" value={salesMonth} onChange={(e)=>setSalesMonth(e.target.value)}>
-                {salesMonthOptions.map((m) => <option key={`sales_m_${m}`} value={m}>{formatMonthShort(m)}</option>)}
-              </select>
-            )}
-            {salesPeriod === 'day' && (
-              <select className="select" value={salesDay} onChange={(e)=>setSalesDay(e.target.value)}>
-                {salesDayOptions.map((d) => <option key={`sales_d_${d}`} value={d}>{fmtD(d)}</option>)}
-              </select>
-            )}
-            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Kategoriya</span>
-            <select className="select" value={salesCategory} onChange={(e)=>setSalesCategory(e.target.value)}>
-              {salesCategoryOptions.map((c) => <option key={`sales_c_${c}`} value={c}>{c === 'all' ? 'Hammasi' : c}</option>)}
-            </select>
-            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Ko'rinish</span>
-            <select className="select" value={salesViewMode} onChange={(e)=>setSalesViewMode(e.target.value)}>
-              {salesModeOptions.map((m) => <option key={`sales_mode_${m.value}`} value={m.value}>{m.label}</option>)}
-            </select>
+      {/* Katta stat kartalar */}
+      <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(155px,1fr))' }}>
+        <BigStat icon="📦" label="Jami sotilgan" value={`${fmt(totSold)} dona`} sub={`${fmt(productStats.reduce((s,p)=>s+p.soldSum,0))} so'm`} color="var(--gr)" />
+        <BigStat icon="↩️" label="Qaytarilgan" value={`${fmt(totRet)} dona`} sub={totSold > 0 ? `${Math.round(totRet/totSold*100)}% qaytarildi` : '—'} color="var(--rd)" />
+        <BigStat icon="✅" label="Net sotuv (dona)" value={`${fmt(totNet)} dona`} sub="Sotilgan − Qaytarilgan" color="var(--bl)" />
+        <BigStat icon="💰" label="Net sotuv (so'm)" value={fmt(totSum)} sub="so'm" color="var(--pu)" />
+      </div>
+
+      {/* Vaqt dinamikasi Area chart */}
+      {spreadData && spreadData.length > 0 && (
+        <div className="card" style={{ padding: '14px 16px' }}>
+          <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 13 }}>
+            📈 Sotuv dinamikasi —{' '}
+            {timeMode === 'all' ? 'yilma-yil' : timeMode === 'year' ? 'oyma-oy' : 'kunma-kun'}
           </div>
-          <div className="card" style={{padding:10,display:'grid',gap:8}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-              <div style={{fontWeight:700}}>Mahsulot tanlash</div>
-              <div style={{display:'flex',gap:6}}>
-                <button className="btn btn-gh btn-sm" onClick={selectAllProducts}>Hammasini tanlash</button>
-                <button className="btn btn-gh btn-sm" onClick={clearProductSelection}>Tozalash</button>
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={spreadData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
+              <defs>
+                <linearGradient id="gSold" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--bl)" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="var(--bl)" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="gNet" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--gr)" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="var(--gr)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" />
+              <XAxis dataKey="period" style={{ fontSize: 11 }} stroke="var(--t3)" />
+              <YAxis style={{ fontSize: 11 }} stroke="var(--t3)" tickFormatter={v => fmt(v)} />
+              <Tooltip formatter={(v, n) => [fmt(v) + ' dona', n]} />
+              <Area type="monotone" dataKey="Sotilgan" stroke="var(--bl)" fill="url(#gSold)" strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="Net" stroke="var(--gr)" fill="url(#gNet)" strokeWidth={2} dot={false} />
+              <Area type="monotone" dataKey="Qaytarilgan" stroke="var(--rd)" fill="none" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+          <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--t3)', marginTop: 6 }}>
+            <span><span style={{ width: 20, height: 3, background: 'var(--bl)', display: 'inline-block', borderRadius: 2, marginRight: 5, verticalAlign: 'middle' }} />Sotilgan</span>
+            <span><span style={{ width: 20, height: 3, background: 'var(--gr)', display: 'inline-block', borderRadius: 2, marginRight: 5, verticalAlign: 'middle' }} />Net</span>
+            <span><span style={{ width: 20, height: 3, background: 'var(--rd)', display: 'inline-block', borderRadius: 2, marginRight: 5, verticalAlign: 'middle' }} />Qaytarilgan</span>
+          </div>
+        </div>
+      )}
+
+      {/* Mahsulot solishtirma grafigi (gorizontal bar) */}
+      {prodChartData.length > 0 && (
+        <div className="card" style={{ padding: '14px 16px' }}>
+          <div style={{ fontWeight: 700, marginBottom: 12, fontSize: 13 }}>🏆 Mahsulotlar solishtirmasi (dona)</div>
+          <ResponsiveContainer width="100%" height={Math.max(160, prodChartData.length * 40)}>
+            <BarChart layout="vertical" data={prodChartData} margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" horizontal={false} />
+              <XAxis type="number" style={{ fontSize: 11 }} stroke="var(--t3)" tickFormatter={v => fmt(v)} />
+              <YAxis type="category" dataKey="name" width={130} style={{ fontSize: 11 }} stroke="var(--t3)" />
+              <Tooltip formatter={(v, n) => [fmt(v) + ' dona', n]} />
+              <Bar dataKey="Sotilgan" fill="var(--bl)" radius={[0, 5, 5, 0]} />
+              <Bar dataKey="Qaytarilgan" fill="var(--rd)" radius={[0, 5, 5, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Progress bar ko'rinishida tafsilot */}
+      {productStats.length > 0 && (
+        <div className="card" style={{ padding: '14px 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>📋 Mahsulotlar tafsiloti</div>
+            <button className="btn btn-gh btn-sm" onClick={() => setShowTable(v => !v)}>
+              {showTable ? 'Yashirish' : "Jadval ko'rish"}
+            </button>
+          </div>
+
+          {!showTable ? (
+            <div style={{ display: 'grid', gap: 12 }}>
+              {productStats.map(p => (
+                <div key={p.name}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 5 }}>
+                    <span style={{ fontWeight: 700 }}>{p.name}</span>
+                    <span>
+                      <span style={{ color: 'var(--gr)' }}>{fmt(p.sotilgan)} sotilgan</span>
+                      {p.qaytarilgan > 0 && <span style={{ color: 'var(--rd)' }}> − {fmt(p.qaytarilgan)} qaytarilgan</span>}
+                      <span style={{ fontWeight: 800, color: 'var(--t1)', marginLeft: 6 }}>= {fmt(p.net)} dona</span>
+                      <span style={{ color: 'var(--t3)', marginLeft: 8 }}>{fmt(p.netSum)} so'm</span>
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <PBar value={p.sotilgan} max={maxProd} color="var(--bl)" height={9} />
+                    {p.qaytarilgan > 0 && <PBar value={p.qaytarilgan} max={maxProd} color="var(--rd)" height={9} />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tbl" style={{ width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th>Mahsulot nomi</th>
+                    <th style={{ textAlign: 'right', color: 'var(--gr)' }}>Sotilgan (dona)</th>
+                    <th style={{ textAlign: 'right', color: 'var(--rd)' }}>Qaytarilgan (dona)</th>
+                    <th style={{ textAlign: 'right' }}>Net (dona)</th>
+                    <th style={{ textAlign: 'right' }}>Net (so'm)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productStats.map(p => (
+                    <tr key={p.name}>
+                      <td style={{ fontWeight: 600 }}>{p.name}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--gr)' }}>{fmt(p.sotilgan)}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--rd)' }}>{fmt(p.qaytarilgan)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(p.net)}</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmt(p.netSum)}</td>
+                    </tr>
+                  ))}
+                  <tr style={{ fontWeight: 800, background: 'var(--s2)', borderTop: '2px solid var(--b2)' }}>
+                    <td>JAMI</td>
+                    <td style={{ textAlign: 'right', color: 'var(--gr)' }}>{fmt(totSold)}</td>
+                    <td style={{ textAlign: 'right', color: 'var(--rd)' }}>{fmt(totRet)}</td>
+                    <td style={{ textAlign: 'right' }}>{fmt(totNet)}</td>
+                    <td style={{ textAlign: 'right' }}>{fmt(totSum)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {productStats.length === 0 && (
+        <div className="card" style={{ padding: 40, textAlign: 'center', color: 'var(--t3)' }}>
+          Tanlangan davr uchun ma'lumot yo'q
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ====== OBZVON ANALIZI ====== */
+function ObzvonAnaliz({ D, company }) {
+  const [tab, setTab] = useState('count');
+  const [timeMode, setTimeMode] = useState('all');
+  const [selYear, setSelYear] = useState(() => String(new Date().getFullYear()));
+  const [selMonth, setSelMonth] = useState(() => toIsoDate(new Date()).slice(0, 7));
+  const [selDay, setSelDay] = useState(() => toIsoDate(new Date()));
+
+  const allRows = useMemo(() => readObzvonRows(company), [company]);
+
+  const filtered = useMemo(() => allRows.filter(r => {
+    const d = String(r?.callDate || '').slice(0, 10);
+    if (timeMode === 'year') return d.startsWith(selYear);
+    if (timeMode === 'month') return d.startsWith(selMonth);
+    if (timeMode === 'day') return d === selDay;
+    return true;
+  }), [allRows, timeMode, selYear, selMonth, selDay]);
+
+  const byOp = useMemo(() => {
+    const map = {};
+    filtered.forEach(r => {
+      const op = String(r?.operator || '').trim() || "Noma'lum";
+      if (!map[op]) map[op] = { name: op, 'Jami': 0, 'Sotildi': 0, 'Tel kotarmadi': 0 };
+      map[op]['Jami'] += 1;
+      if (String(r?.orderCount || '').trim() || String(r?.orderDate || '').trim()) map[op]['Sotildi'] += 1;
+      if (isMissedCall(r?.note)) map[op]['Tel kotarmadi'] += 1;
+    });
+    return Object.values(map).sort((a, b) => b['Jami'] - a['Jami']);
+  }, [filtered]);
+
+  const totTotal  = byOp.reduce((s, o) => s + o['Jami'], 0);
+  const totSold   = byOp.reduce((s, o) => s + o['Sotildi'], 0);
+  const totMissed = byOp.reduce((s, o) => s + o['Tel kotarmadi'], 0);
+
+  const missedRows = useMemo(() => filtered.filter(r => isMissedCall(r?.note)), [filtered]);
+
+  const missedAnalysis = useMemo(() => missedRows.map(r => {
+    const custId = String(r?.customerId || '').trim();
+    const callDate = r?.callDate || '';
+    let followedUp = false, orderedAfter = false;
+    if (custId) {
+      const later = allRows.filter(o =>
+        String(o?.customerId || '').trim() === custId && o.rid !== r.rid && (o?.callDate || '') > callDate
+      );
+      followedUp = later.length > 0;
+      orderedAfter = later.some(o => String(o?.orderCount || '').trim() || String(o?.orderDate || '').trim());
+    }
+    return { ...r, followedUp, orderedAfter };
+  }), [missedRows, allRows]);
+
+  const noteFreq = useMemo(() => {
+    const map = {};
+    filtered.forEach(r => {
+      const note = String(r?.note || '').trim();
+      if (!note) return;
+      const key = note.toLowerCase().slice(0, 70);
+      if (!map[key]) map[key] = { name: note.slice(0, 70), 'Marta': 0 };
+      map[key]['Marta'] += 1;
+    });
+    return Object.values(map).sort((a, b) => b['Marta'] - a['Marta']).slice(0, 20);
+  }, [filtered]);
+
+  const followedCount    = missedAnalysis.filter(r => r.followedUp).length;
+  const notFollowedCount = missedAnalysis.filter(r => !r.followedUp).length;
+  const orderedAfterCount = missedAnalysis.filter(r => r.orderedAfter).length;
+
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      {/* Tab va filter */}
+      <div className="card" style={{ padding: '10px 14px' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="tabs">
+            <button className={`tab${tab==='count'?' on':''}`} onClick={() => setTab('count')}>📊 Statistika</button>
+            <button className={`tab${tab==='convert'?' on':''}`} onClick={() => setTab('convert')}>🎯 Konversiya</button>
+            <button className={`tab${tab==='notes'?' on':''}`} onClick={() => setTab('notes')}>📝 Izoh tahlili</button>
+          </div>
+          <TimeFilterBar
+            timeMode={timeMode} setTimeMode={setTimeMode}
+            selYear={selYear} setSelYear={setSelYear}
+            selMonth={selMonth} setSelMonth={setSelMonth}
+            selDay={selDay} setSelDay={setSelDay}
+            extra={<span className="tag" style={{ background: 'var(--s3)', color: 'var(--t2)' }}>Jami: {filtered.length} ta</span>}
+          />
+        </div>
+      </div>
+
+      {/* Tab 1: Statistika */}
+      {tab === 'count' && (
+        <>
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))' }}>
+            <BigStat icon="📞" label="Jami obzvon" value={String(totTotal)} sub="Barcha operatorlar" color="var(--bl)" />
+            <BigStat icon="✅" label="Sotildi" value={String(totSold)} sub={totTotal > 0 ? `${Math.round(totSold/totTotal*100)}% konversiya` : '—'} color="var(--gr)" />
+            <BigStat icon="📵" label="Tel kotarmadi" value={String(totMissed)} sub={totTotal > 0 ? `${Math.round(totMissed/totTotal*100)}% obzvondan` : '—'} color="var(--rd)" />
+            <BigStat icon="👥" label="Operatorlar" value={String(byOp.length)} sub="Faol operator" color="var(--pu)" />
+          </div>
+          {byOp.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>👤 Operator bo'yicha obzvon grafigi</div>
+              <ResponsiveContainer width="100%" height={Math.max(150, byOp.length * 44)}>
+                <BarChart layout="vertical" data={byOp} margin={{ top: 0, right: 50, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" horizontal={false} />
+                  <XAxis type="number" style={{ fontSize: 11 }} stroke="var(--t3)" />
+                  <YAxis type="category" dataKey="name" width={100} style={{ fontSize: 12 }} stroke="var(--t3)" />
+                  <Tooltip />
+                  <Bar dataKey="Jami" fill="var(--bl)" radius={[0, 5, 5, 0]} />
+                  <Bar dataKey="Sotildi" fill="var(--gr)" radius={[0, 5, 5, 0]} />
+                  <Bar dataKey="Tel kotarmadi" fill="var(--rd)" radius={[0, 5, 5, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+              <div style={{ display: 'flex', gap: 16, fontSize: 11, color: 'var(--t3)', marginTop: 8 }}>
+                <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'var(--bl)', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />Jami obzvon</span>
+                <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'var(--gr)', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />Sotildi</span>
+                <span><span style={{ display: 'inline-block', width: 12, height: 12, background: 'var(--rd)', borderRadius: 3, marginRight: 4, verticalAlign: 'middle' }} />Tel kotarmadi</span>
               </div>
             </div>
-            <div style={{display:'flex',gap:10,flexWrap:'wrap',maxHeight:120,overflow:'auto'}}>
-              {salesProductOptions.map((p) => (
-                <label key={`sales_pr_${p}`} style={FILTER_CHECK_LABEL_STYLE}>
-                  <input
-                    type="checkbox"
-                    checked={hasProductSelectionMap ? !!(selectedProducts || {})[p] : true}
-                    onChange={()=>toggleProduct(p)}
-                  />
-                  <span style={FILTER_CHECK_TEXT_STYLE}>{p}</span>
-                </label>
-              ))}
-            </div>
-            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-              <span className="tag">Qator: {fmt(salesTotals.rows)}</span>
-              <span className="tag">Netto son: {fmt(salesTotals.qty)} ta</span>
-              <span className="tag">Netto summa: {fmt(salesTotals.sumUZS)} so'm</span>
-            </div>
-          </div>
-          <div className="card" style={{padding:0,overflow:'hidden'}}>
-            <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>
-              {salesViewMode === 'spread' ? 'Sotuv yoyma analizi' : 'Sotuv (faqat tanlangan davr)'}
-            </div>
-            <div style={{overflow:'auto',maxHeight:'52vh'}}>
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                    {salesViewMode === 'spread' && <th>Davr</th>}
-                    <th>Mahsulot</th>
-                    <th>Kategoriya</th>
-                    <th style={{textAlign:'right'}}>Netto son</th>
-                    <th style={{textAlign:'right'}}>Netto summa (so'm)</th>
-                    <th style={{textAlign:'right'}}>Qator</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(salesViewMode === 'spread' ? salesSpreadRows : salesExactRows).length === 0 ? (
-                    <tr><td colSpan={salesViewMode === 'spread' ? 7 : 6} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr>
-                  ) : (salesViewMode === 'spread' ? salesSpreadRows : salesExactRows).map((r, i) => (
-                    <tr key={`sales_row_${i}_${r.product}`}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
-                      {salesViewMode === 'spread' && <td style={{fontFamily:'var(--mono)'}}>{spreadLabel(r.period)}</td>}
-                      <td>{r.product}</td>
-                      <td>{r.category || '-'}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:Number(r.qty || 0) >= 0 ? 'var(--gr)' : 'var(--rd)'}}>{fmt(r.qty)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:Number(r.sumUZS || 0) >= 0 ? 'var(--gr)' : 'var(--rd)'}}>{fmt(r.sumUZS)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.rows)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          )}
         </>
       )}
 
-      {tab === 'calls' && (
+      {/* Tab 2: Konversiya */}
+      {tab === 'convert' && (
         <>
-          <div className="card" style={{padding:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Davr</span>
-            <select className="select" value={callPeriod} onChange={(e)=>setCallPeriod(e.target.value)}>
-              {periodOptions.map((x) => <option key={`call_p_${x.value}`} value={x.value}>{x.label}</option>)}
-            </select>
-            {(callPeriod === 'year' || callPeriod === 'month' || callPeriod === 'day') && (
-              <select className="select" value={callYear} onChange={(e)=>setCallYear(e.target.value)}>
-                {callYearOptions.map((y) => <option key={`call_y_${y}`} value={y}>{y}</option>)}
-              </select>
-            )}
-            {(callPeriod === 'month' || callPeriod === 'day') && (
-              <select className="select" value={callMonth} onChange={(e)=>setCallMonth(e.target.value)}>
-                {callMonthOptions.map((m) => <option key={`call_m_${m}`} value={m}>{formatMonthShort(m)}</option>)}
-              </select>
-            )}
-            {callPeriod === 'day' && (
-              <select className="select" value={callDay} onChange={(e)=>setCallDay(e.target.value)}>
-                {callDayOptions.map((d) => <option key={`call_d_${d}`} value={d}>{fmtD(d)}</option>)}
-              </select>
-            )}
-            <span className="tag">Obzvon yozuvi: {fmt(filteredObzvonRows.length)}</span>
-            <span className="tag">Operator: {fmt(callsByOperatorRows.length)}</span>
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))' }}>
+            <BigStat icon="🎯" label="Umumiy konversiya" value={totTotal > 0 ? `${Math.round(totSold/totTotal*100)}%` : '—'} sub={`${totSold} ta muvaffaqiyatli`} color="var(--gr)" />
+            <BigStat icon="📞" label="Jami obzvon" value={String(totTotal)} sub="Barcha operator" color="var(--bl)" />
+            <BigStat icon="❌" label="Sotilmadi" value={String(totTotal - totSold)} sub={totTotal > 0 ? `${Math.round((totTotal-totSold)/totTotal*100)}%` : '0%'} color="var(--rd)" />
           </div>
-
-          <div className="card" style={{padding:0,overflow:'hidden'}}>
-            <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Operator bo'yicha obzvon</div>
-            <div style={{overflow:'auto',maxHeight:'28vh'}}>
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                    <th>Operator</th>
-                    <th style={{textAlign:'right'}}>Obzvon</th>
-                    <th style={{textAlign:'right'}}>Mijoz</th>
-                    <th>Top kategoriyalar</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {callsByOperatorRows.length === 0 ? (
-                    <tr><td colSpan={5} style={{textAlign:'center',padding:22,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
-                  ) : callsByOperatorRows.map((r, i) => (
-                    <tr key={`call_op_${r.operator}_${i}`}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
-                      <td>{r.operator}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.calls)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.customers)}</td>
-                      <td style={{fontSize:12,color:'var(--t2)'}}>{r.topics || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {byOp.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>🏆 Operator konversiya reytingi (progress bar)</div>
+              <div style={{ display: 'grid', gap: 14 }}>
+                {byOp.map(op => {
+                  const pct = op['Jami'] > 0 ? Math.round(op['Sotildi'] / op['Jami'] * 100) : 0;
+                  const col = pct >= 50 ? 'var(--gr)' : pct >= 25 ? 'var(--yl)' : 'var(--rd)';
+                  return (
+                    <div key={op.name}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 13 }}>
+                        <span style={{ fontWeight: 700 }}>{op.name}</span>
+                        <span style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--t3)' }}>
+                          <span>{op['Jami']} ta obzvon</span>
+                          <span style={{ color: 'var(--gr)' }}>✓ {op['Sotildi']} sotdi</span>
+                          <span style={{ color: col, fontWeight: 800, fontSize: 14 }}>{pct}%</span>
+                        </span>
+                      </div>
+                      <PBar value={op['Sotildi']} max={op['Jami']} color={col} height={12} />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-
-          <div className="card" style={{padding:0,overflow:'hidden'}}>
-            <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Obzvondan sotuvga o'tish</div>
-            <div style={{overflow:'auto',maxHeight:'26vh'}}>
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                    <th>Operator</th>
-                    <th style={{textAlign:'right'}}>Qo'ng'iroq qilingan mijoz</th>
-                    <th style={{textAlign:'right'}}>Sotuv qilgan mijoz</th>
-                    <th style={{textAlign:'right'}}>Konversiya %</th>
-                    <th style={{textAlign:'right'}}>Netto son</th>
-                    <th style={{textAlign:'right'}}>Netto summa</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {salesFromCallsRows.length === 0 ? (
-                    <tr><td colSpan={7} style={{textAlign:'center',padding:22,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
-                  ) : salesFromCallsRows.map((r, i) => (
-                    <tr key={`call_sale_${r.operator}_${i}`}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
-                      <td>{r.operator}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.calledCustomers)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.soldCustomers)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{r.conversionPct.toFixed(1)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.qty)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.sumUZS)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="card" style={{padding:10,display:'flex',gap:8,flexWrap:'wrap'}}>
-            <span className="tag">"Tel ko'tarmadi": <strong style={{color:'var(--t1)'}}>{fmt(noAnswerSummary.total)}</strong></span>
-            <span className="tag">Qayta aloqa bor: <strong style={{color:'var(--gr)'}}>{fmt(noAnswerSummary.followedCalls)}</strong></span>
-            <span className="tag">Qayta aloqa yo'q: <strong style={{color:'var(--rd)'}}>{fmt(noAnswerSummary.noFollowCalls)}</strong></span>
-            <span className="tag">Keyin sotuv bo'lgan: <strong style={{color:'var(--bl)'}}>{fmt(noAnswerSummary.boughtAfter)}</strong></span>
-          </div>
-
-          <div className="card" style={{padding:0,overflow:'hidden'}}>
-            <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Tel ko'tarmadi - operator kesimi</div>
-            <div style={{overflow:'auto',maxHeight:'24vh'}}>
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                    <th>Operator</th>
-                    <th style={{textAlign:'right'}}>Jami</th>
-                    <th style={{textAlign:'right'}}>Qayta aloqa</th>
-                    <th style={{textAlign:'right'}}>Qayta aloqa yo'q</th>
-                    <th style={{textAlign:'right'}}>Keyin sotuv</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {noAnswerSummary.byOperator.length === 0 ? (
-                    <tr><td colSpan={6} style={{textAlign:'center',padding:22,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
-                  ) : noAnswerSummary.byOperator.map((r, i) => (
-                    <tr key={`noans_${r.operator}_${i}`}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
-                      <td>{r.operator}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.total)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.followed)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--rd)'}}>{fmt(r.noFollow)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.boughtAfter)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="card" style={{padding:0,overflow:'hidden'}}>
-            <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Hozir qo'ng'iroq kerak bo'lgan aktiv mijozlar</div>
-            <div style={{overflow:'auto',maxHeight:'30vh'}}>
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
-                    <th>ID</th>
-                    <th>Mijoz</th>
-                    <th>Oxirgi zakaz</th>
-                    <th>Oxirgi obzvon</th>
-                    <th style={{textAlign:'right'}}>Zakazdan beri kun</th>
-                    <th style={{textAlign:'right'}}>Obzvondan beri kun</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {needsCallRows.length === 0 ? (
-                    <tr><td colSpan={7} style={{textAlign:'center',padding:22,color:'var(--t3)'}}>Hozircha qo'ng'iroq navbati topilmadi</td></tr>
-                  ) : needsCallRows.map((r, i) => (
-                    <tr key={`need_call_${r.id}`}>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
-                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
-                      <td>{r.name}</td>
-                      <td style={{fontFamily:'var(--mono)'}}>{fmtD(r.lastOrderDate)}</td>
-                      <td style={{fontFamily:'var(--mono)'}}>{fmtD(r.lastCallDate)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--rd)'}}>{r.orderDays == null ? '-' : fmt(r.orderDays)}</td>
-                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{r.callDays == null ? '-' : fmt(r.callDays)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          )}
         </>
       )}
 
-      {tab === 'company' && (
+      {/* Tab 3: Izoh tahlili */}
+      {tab === 'notes' && (
         <>
-          <div className="card" style={{padding:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Oy</span>
-            <select className="select" value={corpMonth} onChange={(e)=>setCorpMonth(e.target.value)}>
-              {allMonthOptions.map((m) => <option key={`corp_m_${m}`} value={m}>{formatMonthShort(m)}</option>)}
-            </select>
-            <span className="tag">Plan: {fmt(companyMonthStats.plan)} ta</span>
-            <span className="tag">Fakt (netto): {fmt(companyMonthStats.netQty)} ta</span>
-            <span className="tag">Plan bajarilishi: {companyMonthStats.planPct.toFixed(1)}%</span>
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))' }}>
+            <BigStat icon="📵" label="Tel kotarmadi" value={String(missedAnalysis.length)} sub={`${filtered.length} ta obzvondan`} color="var(--rd)" />
+            <BigStat icon="🔁" label="Qaytib aloqa qildi" value={String(followedCount)} sub="Keyinroq obzvon bor" color="var(--gr)" />
+            <BigStat icon="⚠️" label="Aloqa qilinmagan" value={String(notFollowedCount)} sub="Hali ham yo'q" color="var(--yl)" />
+            <BigStat icon="🛒" label="Sotib oldi" value={String(orderedAfterCount)} sub="Tel kotarmasdan keyin" color="var(--bl)" />
           </div>
 
-          <div style={{display:'grid',gap:8,gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
-            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Sotilgan (oy)</div><div style={{fontSize:24,fontWeight:800,color:'var(--gr)'}}>{fmt(companyMonthStats.soldQty)} ta</div></div>
-            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Vozvrat (oy)</div><div style={{fontSize:24,fontWeight:800,color:'var(--rd)'}}>{fmt(companyMonthStats.returnedQty)} ta</div></div>
-            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Netto summa</div><div style={{fontSize:24,fontWeight:800,color:'var(--bl)'}}>{fmt(companyMonthStats.netSumUZS)} so'm</div></div>
-            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Obzvon qamrovi</div><div style={{fontSize:24,fontWeight:800,color:'var(--yl)'}}>{companyMonthStats.callCoveragePct.toFixed(1)}%</div></div>
-            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>"Tel ko'tarmadi" ulushi</div><div style={{fontSize:24,fontWeight:800,color:'var(--or)'}}>{companyMonthStats.noAnswerPct.toFixed(1)}%</div></div>
-            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Vozvrat ulushi</div><div style={{fontSize:24,fontWeight:800,color:'var(--or)'}}>{companyMonthStats.returnPct.toFixed(1)}%</div></div>
-          </div>
+          {missedAnalysis.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>📵 Tel kotarmadi — holat tahlili</div>
+              <div style={{ display: 'grid', gap: 10 }}>
+                {[
+                  { label: "Qaytib aloqa qildi (yaxshi)", value: followedCount, color: 'var(--gr)' },
+                  { label: "Aloqa qilinmagan (xavfli!)", value: notFollowedCount, color: 'var(--rd)' },
+                  { label: "Tel kotarmasdan keyin sotib oldi", value: orderedAfterCount, color: 'var(--bl)' },
+                ].map(row => (
+                  <div key={row.label}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ fontWeight: 600 }}>{row.label}</span>
+                      <span style={{ fontWeight: 800, color: row.color }}>
+                        {row.value} ta ({missedAnalysis.length > 0 ? Math.round(row.value / missedAnalysis.length * 100) : 0}%)
+                      </span>
+                    </div>
+                    <PBar value={row.value} max={missedAnalysis.length} color={row.color} height={12} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-          <div className="card" style={{padding:12}}>
-            <div style={{fontWeight:700,marginBottom:8}}>Kamchiliklar</div>
-            <ol style={{margin:0,paddingLeft:18,display:'grid',gap:6}}>
-              {companyIssues.issues.map((text, i) => (
-                <li key={`issue_${i}`} style={{color:i === 0 ? 'var(--rd)' : 'var(--t2)'}}>{text}</li>
-              ))}
-            </ol>
-          </div>
+          {noteFreq.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>📝 Eng ko'p yozilgan izohlar (grafik)</div>
+              <ResponsiveContainer width="100%" height={Math.max(160, noteFreq.length * 36)}>
+                <BarChart layout="vertical" data={noteFreq} margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" horizontal={false} />
+                  <XAxis type="number" style={{ fontSize: 11 }} stroke="var(--t3)" />
+                  <YAxis type="category" dataKey="name" width={200} style={{ fontSize: 10 }} stroke="var(--t3)" />
+                  <Tooltip />
+                  <Bar dataKey="Marta" fill="var(--pu)" radius={[0, 5, 5, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
-          <div className="card" style={{padding:12}}>
-            <div style={{fontWeight:700,marginBottom:8}}>Tavsiya etilgan yechimlar</div>
-            <ol style={{margin:0,paddingLeft:18,display:'grid',gap:6}}>
-              {companyIssues.fixes.map((text, i) => (
-                <li key={`fix_${i}`} style={{color:'var(--gr)'}}>{text}</li>
-              ))}
-            </ol>
-          </div>
+          {missedAnalysis.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
+                Tel kotarmadi ro'yxati
+                <span className="tag" style={{ marginLeft: 8, background: 'var(--rd2)', color: 'var(--rd)' }}>{missedAnalysis.length} ta</span>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="tbl" style={{ width: '100%' }}>
+                  <thead>
+                    <tr>
+                      <th>Mijoz ismi</th>
+                      <th>Operator</th>
+                      <th>Obzvon sanasi</th>
+                      <th>Izoh (nima yozilgan)</th>
+                      <th style={{ textAlign: 'center' }}>Qaytib aloqa?</th>
+                      <th style={{ textAlign: 'center' }}>Sotib oldimi?</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {missedAnalysis.slice(0, 100).map(r => (
+                      <tr key={r.rid}>
+                        <td style={{ fontWeight: 600 }}>{r.customerName || '—'}</td>
+                        <td>{r.operator}</td>
+                        <td style={{ whiteSpace: 'nowrap', color: 'var(--t3)' }}>{r.callDate || '—'}</td>
+                        <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--t2)' }}>{r.note}</td>
+                        <td style={{ textAlign: 'center', fontSize: 16 }}>{r.followedUp ? '✅' : '❌'}</td>
+                        <td style={{ textAlign: 'center', fontSize: 16 }}>{r.orderedAfter ? '✅' : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
+
+/* ====== KORXONA HOLATI ====== */
+function KorxonaHolati({ D, company }) {
+  const allOrders    = useMemo(() => Array.isArray(D?.orders) ? D.orders : [], [D?.orders]);
+  const allCustomers = useMemo(() => Array.isArray(D?.customers) ? D.customers : [], [D?.customers]);
+  const allObzvon    = useMemo(() => readObzvonRows(company), [company]);
+
+  const today = toIsoDate(new Date());
+  const thisMonth = today.slice(0, 7);
+
+  const monthOrders  = useMemo(() => allOrders.filter(o => isOrderDoc(o?.docType) && String(o?.orderDate || o?.deliveryDate || '').startsWith(thisMonth)), [allOrders, thisMonth]);
+  const monthReturns = useMemo(() => allOrders.filter(o => isReturnDoc(o?.docType) && String(o?.orderDate || o?.deliveryDate || '').startsWith(thisMonth)), [allOrders, thisMonth]);
+  const monthSoldQty = useMemo(() => monthOrders.reduce((s,o) => s + Math.abs(toNum(o?.qty)), 0), [monthOrders]);
+  const monthRetQty  = useMemo(() => monthReturns.reduce((s,o) => s + Math.abs(toNum(o?.qty)), 0), [monthReturns]);
+  const monthSoldSum = useMemo(() => monthOrders.reduce((s,o) => s + Math.abs(toNum(o?.sum)), 0), [monthOrders]);
+  const monthRetSum  = useMemo(() => monthReturns.reduce((s,o) => s + Math.abs(toNum(o?.sum)), 0), [monthReturns]);
+
+  const monthObzvon  = useMemo(() => allObzvon.filter(r => String(r?.callDate || '').startsWith(thisMonth)), [allObzvon, thisMonth]);
+  const monthMissed  = useMemo(() => monthObzvon.filter(r => isMissedCall(r?.note)), [monthObzvon]);
+  const missedNoFollowup = useMemo(() => monthMissed.filter(r => {
+    const custId = String(r?.customerId || '').trim();
+    if (!custId) return true;
+    return !allObzvon.some(o =>
+      String(o?.customerId || '').trim() === custId && o.rid !== r.rid && (o?.callDate || '') > (r?.callDate || '')
+    );
+  }), [monthMissed, allObzvon]);
+
+  const debtorCount = useMemo(() => allCustomers.filter(c => toNum(c?.balanceUZS) < 0).length, [allCustomers]);
+  const retPct = monthSoldQty > 0 ? Math.round(monthRetQty / monthSoldQty * 100) : 0;
+  const netQty = monthSoldQty - monthRetQty;
+  const netSum = monthSoldSum - monthRetSum;
+
+  const topProducts = useMemo(() => {
+    const map = {};
+    monthOrders.forEach(o => {
+      const p = String(o?.product || '').trim() || "Noma'lum";
+      if (!map[p]) map[p] = { name: p, 'Sotilgan (dona)': 0 };
+      map[p]['Sotilgan (dona)'] += Math.abs(toNum(o?.qty));
+    });
+    return Object.values(map).sort((a,b) => b['Sotilgan (dona)'] - a['Sotilgan (dona)']).slice(0, 10);
+  }, [monthOrders]);
+
+  const topAgents = useMemo(() => {
+    const map = {};
+    monthOrders.forEach(o => {
+      const a = String(o?.agent || '').trim() || "Noma'lum";
+      if (!map[a]) map[a] = { name: a, 'Dona': 0 };
+      map[a]['Dona'] += Math.abs(toNum(o?.qty));
+    });
+    return Object.values(map).sort((a,b) => b['Dona'] - a['Dona']);
+  }, [monthOrders]);
+
+  const monthlyTrend = useMemo(() => {
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(); d.setMonth(d.getMonth() - i);
+      months.push(d.toISOString().slice(0, 7));
+    }
+    return months.map(m => {
+      const ords = allOrders.filter(o => isOrderDoc(o?.docType) && String(o?.orderDate || o?.deliveryDate || '').startsWith(m));
+      const rets = allOrders.filter(o => isReturnDoc(o?.docType) && String(o?.orderDate || o?.deliveryDate || '').startsWith(m));
+      const sold = ords.reduce((s,o) => s + Math.abs(toNum(o?.qty)), 0);
+      const ret  = rets.reduce((s,o) => s + Math.abs(toNum(o?.qty)), 0);
+      return { period: m.slice(5), 'Sotilgan': sold, 'Qaytarilgan': ret, 'Net': sold - ret };
+    });
+  }, [allOrders]);
+
+  const problems = useMemo(() => {
+    const list = [];
+    if (missedNoFollowup.length > 0) list.push({
+      sev: 'high',
+      title: `${missedNoFollowup.length} ta mijozga tel kotarmasdan qaytib aloqa qilinmagan`,
+      desc: `Bu oyda ${monthMissed.length} ta "tel kotarmadi" yozuvi bor, shundan ${missedNoFollowup.length} tasiga hali obzvon yo'q.`,
+      fix: "Obzvon analizi → Izoh tahlili bo'limida ko'ring va har biriga qaytib aloqa qiling.",
+    });
+    if (retPct >= 10) list.push({
+      sev: 'medium',
+      title: `Qaytarish darajasi yuqori — ${retPct}%`,
+      desc: `Bu oy ${fmt(monthRetQty)} dona mahsulot qaytarilgan (sotilganning ${retPct}%i).`,
+      fix: "Qaytarishlar sababini tekshiring: yetkazish sifati yoki noto'g'ri mahsulot bo'lishi mumkin.",
+    });
+    if (debtorCount > 0) list.push({
+      sev: 'medium',
+      title: `${debtorCount} ta mijozda to'lanmagan qarz bor`,
+      desc: "Salbiy balansli mijozlar topildi.",
+      fix: "Doljniklar bo'limida ularni ko'ring va to'lov eslatmasi yuboring.",
+    });
+    if (monthOrders.length === 0) list.push({
+      sev: 'high',
+      title: "Bu oyda hali birorta zakaz yo'q",
+      desc: "Ma'lumotlar yuklanmagan yoki bu oy hech zakaz qilinmagan.",
+      fix: "Ma'lumotlarni to'g'ri yuklanganini tekshiring.",
+    });
+    return list;
+  }, [missedNoFollowup, monthMissed, retPct, debtorCount, monthOrders]);
+
+  return (
+    <div style={{ display: 'grid', gap: 12 }}>
+      {/* KPI kartalar */}
+      <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit, minmax(150px,1fr))' }}>
+        <BigStat icon="✅" label="Net sotuv (bu oy)" value={`${fmt(netQty)} dona`} sub={`${fmt(netSum)} so'm`} color="var(--bl)" />
+        <BigStat icon="📦" label="Zakazlar" value={`${monthOrders.length} ta`} sub={`${fmt(monthSoldQty)} dona sotilgan`} color="var(--gr)" />
+        <BigStat icon="↩️" label="Qaytarishlar" value={`${monthReturns.length} ta`} sub={`${fmt(monthRetQty)} dona — ${retPct}%`} color="var(--rd)" />
+        <BigStat icon="📞" label="Obzvon" value={`${monthObzvon.length} ta`} sub={`${monthMissed.length} tel kotarmadi`} color="var(--yl)" />
+        <BigStat icon="💳" label="Qarzdorlar" value={`${debtorCount} ta`} sub="Salbiy balans" color="var(--or)" />
+        <BigStat icon={problems.length === 0 ? '🟢' : '🔴'} label="Muammolar" value={`${problems.length} ta`} sub={problems.length === 0 ? 'Hammasi yaxshi' : 'Hal qilish kerak'} color={problems.length === 0 ? 'var(--gr)' : 'var(--rd)'} />
+      </div>
+
+      {/* 6 oylik trend */}
+      <div className="card" style={{ padding: '14px 16px' }}>
+        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>📈 Oxirgi 6 oy dinamikasi (dona)</div>
+        <ResponsiveContainer width="100%" height={200}>
+          <AreaChart data={monthlyTrend} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
+            <defs>
+              <linearGradient id="kgSold" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--bl)" stopOpacity={0.25} />
+                <stop offset="95%" stopColor="var(--bl)" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" />
+            <XAxis dataKey="period" style={{ fontSize: 11 }} stroke="var(--t3)" />
+            <YAxis style={{ fontSize: 11 }} stroke="var(--t3)" tickFormatter={v => fmt(v)} />
+            <Tooltip formatter={(v, n) => [fmt(v) + ' dona', n]} />
+            <Area type="monotone" dataKey="Sotilgan" stroke="var(--bl)" fill="url(#kgSold)" strokeWidth={2} dot={false} />
+            <Area type="monotone" dataKey="Net" stroke="var(--gr)" fill="none" strokeWidth={2} dot={false} />
+            <Area type="monotone" dataKey="Qaytarilgan" stroke="var(--rd)" fill="none" strokeWidth={1.5} strokeDasharray="4 3" dot={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Mahsulot va agent grafiklari */}
+      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(290px,1fr))' }}>
+        {topProducts.length > 0 && (
+          <div className="card" style={{ padding: '14px 16px' }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>🏆 Eng ko'p sotilgan mahsulotlar</div>
+            <ResponsiveContainer width="100%" height={Math.max(150, topProducts.length * 36)}>
+              <BarChart layout="vertical" data={topProducts} margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" horizontal={false} />
+                <XAxis type="number" style={{ fontSize: 11 }} stroke="var(--t3)" tickFormatter={v => fmt(v)} />
+                <YAxis type="category" dataKey="name" width={110} style={{ fontSize: 11 }} stroke="var(--t3)" />
+                <Tooltip formatter={(v, n) => [fmt(v) + ' dona', n]} />
+                <Bar dataKey="Sotilgan (dona)" fill="var(--bl)" radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+        {topAgents.length > 0 && (
+          <div className="card" style={{ padding: '14px 16px' }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>👤 Agent reytingi (dona)</div>
+            <ResponsiveContainer width="100%" height={Math.max(150, topAgents.length * 44)}>
+              <BarChart layout="vertical" data={topAgents} margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" horizontal={false} />
+                <XAxis type="number" style={{ fontSize: 11 }} stroke="var(--t3)" tickFormatter={v => fmt(v)} />
+                <YAxis type="category" dataKey="name" width={100} style={{ fontSize: 12 }} stroke="var(--t3)" />
+                <Tooltip formatter={(v, n) => [fmt(v) + ' dona', n]} />
+                <Bar dataKey="Dona" fill="var(--gr)" radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Muammolar */}
+      <div className="card" style={{ padding: '14px 16px' }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>
+          ⚠️ Aniqlanган muammolar va yechimlar
+          {problems.length === 0 && <span className="tag" style={{ marginLeft: 8, background: 'var(--gr2)', color: 'var(--gr)' }}>Muammo yo'q ✓</span>}
+        </div>
+        {problems.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--gr)', fontSize: 13 }}>
+            🟢 Hozircha kritik muammolar aniqlanmadi. Korxona yaxshi ishlayapti!
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {problems.map((p, i) => <ProblemCard key={i} {...p} />)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ====== ASOSIY ANALIZ SAHIFASI ====== */
+function AnalyticsPage({ D, company, currentUser }) {
+  const [sub, setSub] = useState('sotuv');
+  return (
+    <div className="ani" style={{ display: 'grid', gap: 12, padding: 12, alignContent: 'start', color: 'var(--t1)' }}>
+      <div className="tabs">
+        <button className={`tab${sub==='sotuv'?' on':''}`} onClick={() => setSub('sotuv')}>📊 Sotuv analizi</button>
+        <button className={`tab${sub==='obzvon'?' on':''}`} onClick={() => setSub('obzvon')}>📞 Obzvon analizi</button>
+        <button className={`tab${sub==='korxona'?' on':''}`} onClick={() => setSub('korxona')}>🏢 Korxona holati</button>
+      </div>
+      {sub === 'sotuv'   && <SotuvAnaliz D={D} />}
+      {sub === 'obzvon'  && <ObzvonAnaliz D={D} company={company} currentUser={currentUser} />}
+      {sub === 'korxona' && <KorxonaHolati D={D} company={company} />}
+    </div>
+  );
+}
+/* ── /Analiz sahifasi ───────────────────────────────────────────── */
 
 function SettingsPanel({
   users, setUsers, access, setAccess, currentUser, setCurrentUser,
