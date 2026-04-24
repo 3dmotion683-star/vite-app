@@ -11985,10 +11985,20 @@ function SotuvAnaliz({ D }) {
             selMonth={selMonth} setSelMonth={setSelMonth} selDay={selDay} setSelDay={setSelDay}
             extra={<span className="tag" style={{background:'var(--s3)',color:'var(--t2)'}}>{filtered.length} ta buyurtma</span>}
           />
-          <select className="input" style={{fontSize:12,maxWidth:180}} value={selProduct} onChange={e=>setSelProduct(e.target.value)}>
-            <option value="">Barcha mahsulot</option>
-            {allProducts.map(p=><option key={p} value={p}>{p}</option>)}
-          </select>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+            {timeMode!=='day' && (
+              <div className="tabs" style={{gap:4}}>
+                <button className={`tab${spreadMode==='only'?' on':''}`} style={{fontSize:11,padding:'4px 10px'}}
+                  onClick={()=>setSpreadMode('only')}>Faqat shu</button>
+                <button className={`tab${spreadMode==='spread'?' on':''}`} style={{fontSize:11,padding:'4px 10px'}}
+                  onClick={()=>setSpreadMode('spread')}>Yoyma</button>
+              </div>
+            )}
+            <select className="input" style={{fontSize:12,maxWidth:180}} value={selProduct} onChange={e=>setSelProduct(e.target.value)}>
+              <option value="">Barcha mahsulot</option>
+              {allProducts.map(p=><option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -12001,15 +12011,9 @@ function SotuvAnaliz({ D }) {
       </div>
 
       {/* Spread chart */}
-      {spreadData && spreadData.length > 0 && (
+      {spreadMode==='spread' && spreadData && spreadData.length > 0 && (
         <div className="card" style={{padding:'14px 16px'}}>
-          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-            <div style={{fontWeight:700,fontSize:13}}>Vaqt bo'yicha dinamika</div>
-            <div className="tabs" style={{gap:4}}>
-              <button className={`tab${spreadMode==='only'?' on':''}`} style={{fontSize:11,padding:'3px 8px'}} onClick={()=>setSpreadMode('only')}>Faqat mahsulot</button>
-              <button className={`tab${spreadMode==='spread'?' on':''}`} style={{fontSize:11,padding:'3px 8px'}} onClick={()=>setSpreadMode('spread')}>Vaqt</button>
-            </div>
-          </div>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Vaqt bo'yicha dinamika</div>
           <ResponsiveContainer width="100%" height={220}>
             <AreaChart data={spreadData} margin={{top:4,right:12,left:0,bottom:4}}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" />
@@ -12555,13 +12559,12 @@ function KorxonaHolati({ D, company, obzvonRows=[] }) {
    TAHLIL ARXIVI  (AI tugmalari shu yerda)
    ════════════════════════════════════════════════════════════════════ */
 function TahlilArxivi({ company, obzvonRows=[] }) {
-  const [arc,setArc]       = useState(()=>readObzArc(company));
-  const [aiKey,setAiKey]   = useState(()=>localStorage.getItem('__claude_api_key')||''  );
-  const [aiSt,setAiSt]     = useState({loading:false,err:'',msg:''});
-  const allRows            = useMemo(()=>Array.isArray(obzvonRows)?obzvonRows:[], [obzvonRows]);
+  const [arc,setArc]   = useState(()=>readObzArc(company));
+  const [aiSt,setAiSt] = useState({loading:false,err:'',msg:''});
+  const allRows        = useMemo(()=>Array.isArray(obzvonRows)?obzvonRows:[], [obzvonRows]);
 
-  const refresh = ()=>setArc(readObzArc(company));
-  const saveKey = v=>{ setAiKey(v); localStorage.setItem('__claude_api_key',v); };
+  const refresh  = ()=>setArc(readObzArc(company));
+  const getKey   = ()=>localStorage.getItem('__claude_api_key')||'';
 
   const del = (id)=>{
     const arr=arc.filter(a=>a.id!==id);
@@ -12571,7 +12574,8 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
 
   /* Arxiv AI tahlil */
   const runArchiveAi = async (type) => {
-    if(!aiKey.trim()){ setAiSt({loading:false,err:'API key kiriting',msg:''}); return; }
+    const aiKey = getKey();
+    if(!aiKey.trim()){ setAiSt({loading:false,err:"API key sozlamalarga kiriting (Sozlamalar → Ilova sozlamalari)",msg:''}); return; }
     const today  = toIsoDate(new Date());
     const yest   = toIsoDate(new Date(Date.now()-86400000));
     const period = type==='monthly' ? today.slice(0,7) : yest;
@@ -12601,7 +12605,7 @@ FAQAT JSON:
       const res = await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
         headers:{
-          'x-api-key':aiKey.trim(),
+          'x-api-key':aiKey,
           'anthropic-version':'2023-06-01',
           'content-type':'application/json',
           'anthropic-dangerous-direct-browser-access':'true',
@@ -12636,16 +12640,12 @@ FAQAT JSON:
     <div style={{display:'grid',gap:12}}>
       {/* AI Tugmalari */}
       <div className="card" style={{padding:'14px 16px'}}>
-        <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>AI Arxiv Tahlili</div>
-        {!aiKey&&(
-          <div style={{marginBottom:10}}>
-            <input className="input" type="password" placeholder="Anthropic API key (sk-ant-...)"
-              value={aiKey} onChange={e=>saveKey(e.target.value)} style={{width:'100%',fontSize:12}} />
-            <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>
-              <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" style={{color:'var(--bl)'}}>console.anthropic.com</a> dan oling. Claude Haiku — arzon tarif.
-            </div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:8}}>
+          <div style={{fontWeight:700,fontSize:13}}>AI Arxiv Tahlili</div>
+          <div style={{fontSize:11,color:getKey()?'var(--gr)':'var(--rd)'}}>
+            {getKey()?'✓ API kalit sozlangan':'✗ API kalit yo\'q — Sozlamalar → Ilova sozlamalari'}
           </div>
-        )}
+        </div>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
           <button
             style={{background:aiSt.loading?'var(--s3)':'var(--bl)',color:'#fff',padding:'8px 16px',
@@ -12657,10 +12657,6 @@ FAQAT JSON:
               borderRadius:8,border:'none',cursor:aiSt.loading?'default':'pointer',fontWeight:700,fontSize:13}}
             onClick={()=>runArchiveAi('daily')} disabled={aiSt.loading}
           >Kunlik tahlil (kecha)</button>
-          {aiKey&&(
-            <button style={{fontSize:11,color:'var(--t3)',background:'none',border:'none',cursor:'pointer'}}
-              onClick={()=>saveKey('')}>Key o'zgartirish</button>
-          )}
         </div>
         {aiSt.loading&&<div style={{marginTop:8,color:'var(--bl)',fontSize:12}}>⏳ {aiSt.msg}</div>}
         {aiSt.err   &&<div style={{marginTop:8,color:'var(--rd)',fontSize:12}}>⚠️ {aiSt.err}</div>}
@@ -12779,6 +12775,22 @@ function AnalyticsPage({ D, company, currentUser, obzvonNewRows=[] }) {
   );
 }
 /* ── /Analiz sahifasi ───────────────────────────────────────────── */
+
+/* Claude API key field — Settings panel uchun */
+function ClaudeKeyField() {
+  const [val, setVal] = React.useState(()=>localStorage.getItem('__claude_api_key')||'');
+  const save = v => { setVal(v); localStorage.setItem('__claude_api_key', v); };
+  return (
+    <div>
+      <input className="input" type="password" placeholder="sk-ant-api03-..."
+        value={val} onChange={e=>save(e.target.value)} style={{width:'100%'}} />
+      {val
+        ? <div style={{fontSize:11,color:'var(--gr)',marginTop:4}}>✓ Kalit saqlangan ({val.length} ta belgi)</div>
+        : <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>Kalit kiritilmagan — Tahlil arxivi AI funksiyasi ishlamaydi</div>
+      }
+    </div>
+  );
+}
 
 function SettingsPanel({
   users, setUsers, access, setAccess, currentUser, setCurrentUser,
@@ -13483,7 +13495,15 @@ function SettingsPanel({
           <div style={{fontWeight:700,marginBottom:8}}>Access API URL</div>
           <input className="input" placeholder="https://your-access-api.workers.dev" value={webhookUrl} onChange={(e)=>setWebhookUrl(e.target.value)} />
           <div style={{fontSize:11,color:'var(--t3)',marginTop:8}}>Bu URL faqat login, parol va ruxsatlarni barcha kompyuterlarda bir xil saqlash uchun ishlatiladi.</div>
-          <div style={{marginTop:14,padding:10,border:'1px dashed var(--b1)',borderRadius:8,color:'var(--t3)',fontSize:12}}>Kelajak sozlamalari uchun joy.</div>
+          {/* Claude AI key */}
+          <div style={{marginTop:18,borderTop:'1px solid var(--b2)',paddingTop:14}}>
+            <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>Tahlil arxivi: Claude AI kaliti</div>
+            <div style={{fontSize:12,color:'var(--t3)',marginBottom:8}}>
+              Obzvon izohlarini AI bilan tahlil qilish uchun ishlatiladi (Tahlil arxivi bo'limi).
+              Kalit <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" style={{color:'var(--bl)'}}>console.anthropic.com</a> dan olinadi. Claude Haiku modeli arzon tarif.
+            </div>
+            <ClaudeKeyField />
+          </div>
         </div>
       )}
 
