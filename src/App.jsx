@@ -826,7 +826,7 @@ const normalizeObzvonSourceEntry = (entry) => {
   };
 };
 const buildDefaultObzvonCompanySources = () => ({
-  murodbaxsh: normalizeObzvonSourceEntry({ url: OBZVON_ALL_SHEET_URL, gid: extractGidFromUrl(OBZVON_ALL_SHEET_URL) || '0' }),
+  murodbaxsh: normalizeObzvonSourceEntry({ url: OBZVON_ALL_SHEET_URL, gid: extractGid(OBZVON_ALL_SHEET_URL) || '0' }),
   ahmadtea: normalizeObzvonSourceEntry({}),
   alp_jamol: normalizeObzvonSourceEntry({}),
 });
