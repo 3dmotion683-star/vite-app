@@ -151,6 +151,7 @@ const OBZVON_NEW_LAST_AUTO_DATE_KEY = 'aq-obzvon-new-last-auto-date';
 const OBZVON_NEW_HEADERS_WRITTEN_KEY = 'aq-obzvon-new-sheet-headers-written';
 const OBZVON_NEW_STABLE_ID_MAP_KEY = 'aq-obzvon-new-stable-id-map';
 const OBZVON_NEW_STABLE_ID_LAST_KEY = 'aq-obzvon-new-stable-id-last';
+const OBZVON_COMPANY_SOURCES_KEY = 'aq-obzvon-company-sources';
 const ACCESS_SYNC_URL_KEY = 'aq-access-api-url';
 const ACCESS_UPDATED_AT_KEY = 'aq-access-updated-at';
 // Access konfiguratsiya sinxroni uchun Cloudflare Worker API URL:
@@ -815,6 +816,33 @@ const companyLabelByKey = (v) => {
   if (k === 'ahmadtea') return 'Ahmadtea';
   if (k === 'alp_jamol') return 'Alp Jamol';
   return 'Murodbaxsh';
+};
+const normalizeObzvonSourceEntry = (entry) => {
+  const src = (entry && typeof entry === 'object') ? entry : {};
+  return {
+    url: String(src.url || '').trim(),
+    sheetName: String(src.sheetName || src.sheet || '').trim(),
+    gid: String(src.gid || '').trim(),
+  };
+};
+const buildDefaultObzvonCompanySources = () => ({
+  murodbaxsh: normalizeObzvonSourceEntry({ url: OBZVON_ALL_SHEET_URL, gid: extractGidFromUrl(OBZVON_ALL_SHEET_URL) || '0' }),
+  ahmadtea: normalizeObzvonSourceEntry({}),
+  alp_jamol: normalizeObzvonSourceEntry({}),
+});
+const normalizeObzvonCompanySources = (raw) => {
+  const next = buildDefaultObzvonCompanySources();
+  const src = (raw && typeof raw === 'object') ? raw : {};
+  COMPANY_OPTIONS.forEach((opt) => {
+    const k = normalizeCompanyKey(opt?.key);
+    next[k] = normalizeObzvonSourceEntry(src[k] || {});
+  });
+  return next;
+};
+const getObzvonCompanySource = (allConfig, companyKey) => {
+  const cKey = normalizeCompanyKey(companyKey);
+  const src = normalizeObzvonCompanySources(allConfig || {});
+  return normalizeObzvonSourceEntry(src[cKey] || {});
 };
 const normalizeIdKey = (v) => {
   const s = String(v ?? '').trim();
@@ -11856,6 +11884,26 @@ const detectCat = (note) => {
     return 'buyurtma';
   return 'boshqa';
 };
+const normalizeTopicKey = (topic) => {
+  const t = normalizeMatchText(String(topic || '')).replace(/\s+/g, ' ').trim();
+  if (!t) return 'boshqa';
+  if (t.includes('qarz') || t.includes('dolg')) return 'qarzdorlik';
+  if (t.includes('buyurtma') || t.includes('zakaz')) return 'buyurtma_olish';
+  if (t.includes('sotuv') || t.includes('savdo')) return 'sotuv';
+  if (t.includes('kuler')) return 'kuler';
+  if (t.includes('eslatma') || t.includes('napomin')) return 'eslatma';
+  return t;
+};
+const topicLabelByKey = (topicKey) => {
+  const k = String(topicKey || '').trim();
+  if (k === 'qarzdorlik') return 'Qarzdorlik';
+  if (k === 'buyurtma_olish') return "Buyurtma olish";
+  if (k === 'sotuv') return 'Sotuv';
+  if (k === 'kuler') return 'Kuler';
+  if (k === 'eslatma') return 'Eslatma';
+  if (!k || k === 'boshqa') return 'Boshqa maqsad';
+  return k;
+};
 
 const isMissedCall = (note) => detectCat(note) === 'tel_kotarmadi';
 
@@ -11902,102 +11950,173 @@ function TimeFilterBar({ timeMode, setTimeMode, selYear, setSelYear, selMonth, s
    SOTUV ANALIZI
    ════════════════════════════════════════════════════════════════════ */
 function SotuvAnaliz({ D }) {
-  const allOrders = useMemo(()=>Array.isArray(D?.orders)?D.orders:[], [D?.orders]);
+  const allOrders = useMemo(() => Array.isArray(D?.orders) ? D.orders : [], [D?.orders]);
+  const [timeMode, setTimeMode] = useState('all');
+  const [selYear, setSelYear] = useState('');
+  const [selMonth, setSelMonth] = useState(() => toIsoDate(new Date()).slice(0, 7));
+  const [selDay, setSelDay] = useState(() => toIsoDate(new Date()));
+  const [spreadMode, setSpreadMode] = useState('only');
+  const [showTable, setShowTable] = useState(false);
+  const [productFilterOpen, setProductFilterOpen] = useState(false);
+  const [productChecked, setProductChecked] = useState({});
 
-  /* default selYear — eng so'nggi yil (ma'lumotdan) */
-  const latestYear = useMemo(()=>{
-    let best = String(new Date().getFullYear());
-    allOrders.forEach(o=>{
-      const y = String(o?.orderDate||o?.deliveryDate||'0').slice(0,4);
-      if(y > best) best = y;
+  const getProductName = useCallback((raw) => {
+    const p = String(raw || '').trim();
+    return p || "Noma'lum";
+  }, []);
+  const isMainWh = useCallback((o) => isMainWarehouseLabel(o?.warehouse), []);
+
+  const latestYear = useMemo(() => {
+    const years = allOrders
+      .map((o) => toIsoDate(o?.orderDate || o?.deliveryDate || '').slice(0, 4))
+      .filter((y) => /^\d{4}$/.test(y));
+    return years.length ? years.sort().at(-1) : String(new Date().getFullYear());
+  }, [allOrders]);
+  useEffect(() => {
+    if (!String(selYear || '').trim()) setSelYear(latestYear);
+  }, [latestYear, selYear]);
+
+  const allProducts = useMemo(() => {
+    const s = new Set();
+    allOrders.forEach((o) => s.add(getProductName(o?.product)));
+    return Array.from(s).sort((a, b) => a.localeCompare(b));
+  }, [allOrders, getProductName]);
+
+  useEffect(() => {
+    setProductChecked((prev) => {
+      const next = {};
+      allProducts.forEach((p) => {
+        next[p] = Object.prototype.hasOwnProperty.call(prev, p) ? !!prev[p] : true;
+      });
+      return next;
     });
-    return best;
-  },[allOrders]);
+  }, [allProducts]);
 
-  const [timeMode,setTimeMode] = useState('all');
-  const [selYear,setSelYear]   = useState('');
-  const [selMonth,setSelMonth] = useState(()=>toIsoDate(new Date()).slice(0,7));
-  const [selDay,setSelDay]     = useState(()=>toIsoDate(new Date()));
-  const [selProduct,setSelProduct] = useState('');
-  const [spreadMode,setSpreadMode] = useState('only');
-  const [showTable,setShowTable]   = useState(false);
+  const activeProducts = useMemo(
+    () => new Set(allProducts.filter((p) => productChecked[p] !== false)),
+    [allProducts, productChecked]
+  );
+  const activeProductsCount = activeProducts.size;
+  const toggleProduct = useCallback((product) => {
+    setProductChecked((prev) => ({ ...prev, [product]: !(prev[product] !== false) }));
+  }, []);
+  const selectAllProducts = useCallback(() => {
+    const next = {};
+    allProducts.forEach((p) => { next[p] = true; });
+    setProductChecked(next);
+  }, [allProducts]);
+  const clearAllProducts = useCallback(() => {
+    const next = {};
+    allProducts.forEach((p) => { next[p] = false; });
+    setProductChecked(next);
+  }, [allProducts]);
 
-  /* selYear ni latestYear bilan sinxronlaymiz (birinchi render) */
-  const [yearInited,setYearInited] = useState(false);
-  useEffect(()=>{ if(!yearInited && latestYear){ setSelYear(latestYear); setYearInited(true); } },[latestYear,yearInited]);
-
-  const isMainWh = useCallback((o)=>isMainWarehouseLabel(o?.warehouse),[]);
-
-  const allProducts = useMemo(()=>{
-    const s=new Set(); allOrders.forEach(o=>{const p=String(o?.product||''). trim();if(p)s.add(p);}); return Array.from(s).sort();
-  },[allOrders]);
-
-  const timFiltered = useMemo(()=>allOrders.filter(o=>{
-    const d=String(o?.orderDate||o?.deliveryDate||''). slice(0,10);
-    if(timeMode==='year')  return d.startsWith(String(selYear));
-    if(timeMode==='month') return d.startsWith(selMonth);
-    if(timeMode==='day')   return d===selDay;
+  const timFiltered = useMemo(() => allOrders.filter((o) => {
+    const d = toIsoDate(o?.orderDate || o?.deliveryDate || '');
+    if (timeMode === 'year') {
+      const y = String(selYear || '').trim();
+      return y ? d.startsWith(y) : true;
+    }
+    if (timeMode === 'month') return selMonth ? d.startsWith(selMonth) : true;
+    if (timeMode === 'day') return selDay ? d === selDay : true;
     return true;
-  }),[allOrders,timeMode,selYear,selMonth,selDay]);
+  }), [allOrders, timeMode, selYear, selMonth, selDay]);
 
-  const filtered = useMemo(()=>!selProduct?timFiltered:timFiltered.filter(o=>String(o?.product||''). trim()===selProduct),[timFiltered,selProduct]);
+  const filtered = useMemo(() => {
+    if (!activeProducts.size) return [];
+    return timFiltered.filter((o) => activeProducts.has(getProductName(o?.product)));
+  }, [timFiltered, activeProducts, getProductName]);
 
-  const productStats = useMemo(()=>{
-    const map={};
-    filtered.forEach(o=>{
-      const prod=String(o?.product||''). trim()||"Noma'lum";
-      if(!map[prod]) map[prod]={name:prod,sotilgan:0,qaytarilgan:0,soldSum:0,returnSum:0};
-      const qty=Math.abs(toNum(o?.qty)); const sum=Math.abs(toNum(o?.sum));
-      if(isReturnDoc(o?.docType)&&!isMainWh(o)){map[prod].qaytarilgan+=qty;map[prod].returnSum+=sum;}
-      else if(isOrderDoc(o?.docType)){map[prod].sotilgan+=qty;map[prod].soldSum+=sum;}
+  const productStats = useMemo(() => {
+    const map = {};
+    filtered.forEach((o) => {
+      const prod = getProductName(o?.product);
+      if (!map[prod]) map[prod] = { name: prod, sotilgan: 0, qaytarilgan: 0, soldSum: 0, returnSum: 0 };
+      const qty = Math.abs(toNum(o?.qty));
+      const sum = Math.abs(toNum(o?.sum));
+      if (isReturnDoc(o?.docType) && !isMainWh(o)) {
+        map[prod].qaytarilgan += qty;
+        map[prod].returnSum += sum;
+      } else if (isOrderDoc(o?.docType)) {
+        map[prod].sotilgan += qty;
+        map[prod].soldSum += sum;
+      }
     });
-    return Object.values(map).map(p=>({...p,net:p.sotilgan-p.qaytarilgan,netSum:p.soldSum-p.returnSum})).sort((a,b)=>b.net-a.net);
-  },[filtered,isMainWh]);
+    return Object.values(map)
+      .map((p) => ({ ...p, net: p.sotilgan - p.qaytarilgan, netSum: p.soldSum - p.returnSum }))
+      .sort((a, b) => b.net - a.net);
+  }, [filtered, isMainWh, getProductName]);
 
-  const spreadData = useMemo(()=>{
-    if(spreadMode==='only'||timeMode==='day') return null;
-    const getKey=d=>timeMode==='all'?d.slice(0,4):timeMode==='year'?d.slice(0,7):d.slice(0,10);
-    const map={};
-    filtered.forEach(o=>{
-      const d=String(o?.orderDate||o?.deliveryDate||''). slice(0,10);
-      const key=getKey(d); if(!key||key==='0000') return;
-      if(!map[key]) map[key]={period:key,Sotilgan:0,Qaytarilgan:0};
-      const qty=Math.abs(toNum(o?.qty));
-      if(isReturnDoc(o?.docType)&&!isMainWh(o)) map[key].Qaytarilgan+=qty;
-      else if(isOrderDoc(o?.docType)) map[key].Sotilgan+=qty;
+  const spreadData = useMemo(() => {
+    if (spreadMode === 'only' || timeMode === 'day') return null;
+    const getKey = (d) => (timeMode === 'all' ? d.slice(0, 4) : timeMode === 'year' ? d.slice(0, 7) : d.slice(0, 10));
+    const map = {};
+    filtered.forEach((o) => {
+      const d = toIsoDate(o?.orderDate || o?.deliveryDate || '');
+      const key = getKey(d);
+      if (!key || key === '0000') return;
+      if (!map[key]) map[key] = { period: key, Sotilgan: 0, Qaytarilgan: 0 };
+      const qty = Math.abs(toNum(o?.qty));
+      if (isReturnDoc(o?.docType) && !isMainWh(o)) map[key].Qaytarilgan += qty;
+      else if (isOrderDoc(o?.docType)) map[key].Sotilgan += qty;
     });
-    return Object.values(map).map(d=>({...d,Net:d.Sotilgan-d.Qaytarilgan})).sort((a,b)=>a.period.localeCompare(b.period));
-  },[filtered,spreadMode,timeMode,isMainWh]);
+    return Object.values(map)
+      .map((d) => ({ ...d, Net: d.Sotilgan - d.Qaytarilgan }))
+      .sort((a, b) => a.period.localeCompare(b.period));
+  }, [filtered, spreadMode, timeMode, isMainWh]);
 
-  const prodChartData = productStats.slice(0,12).map(p=>({name:p.name,Sotilgan:p.sotilgan,Qaytarilgan:p.qaytarilgan}));
-  const maxProd  = Math.max(...productStats.map(p=>p.sotilgan),1);
-  const totSold  = productStats.reduce((s,p)=>s+p.sotilgan,0);
-  const totReturn= productStats.reduce((s,p)=>s+p.qaytarilgan,0);
-  const totNet   = totSold-totReturn;
-  const totSoldSum = productStats.reduce((s,p)=>s+p.soldSum,0);
+  const prodChartData = productStats.slice(0, 12).map((p) => ({ name: p.name, Sotilgan: p.sotilgan, Qaytarilgan: p.qaytarilgan }));
+  const maxProd = Math.max(...productStats.map((p) => p.sotilgan), 1);
+  const totSold = productStats.reduce((s, p) => s + p.sotilgan, 0);
+  const totReturn = productStats.reduce((s, p) => s + p.qaytarilgan, 0);
+  const totNet = totSold - totReturn;
+  const totSoldSum = productStats.reduce((s, p) => s + p.soldSum, 0);
 
   return (
-    <div style={{display:'grid',gap:12}}>
+    <div style={{ display: 'grid', gap: 12 }}>
       {/* Filter bar */}
-      <div className="card" style={{padding:'10px 14px'}}>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',justifyContent:'space-between'}}>
-          <TimeFilterBar timeMode={timeMode} setTimeMode={setTimeMode} selYear={selYear} setSelYear={setSelYear}
-            selMonth={selMonth} setSelMonth={setSelMonth} selDay={selDay} setSelDay={setSelDay}
-            extra={<span className="tag" style={{background:'var(--s3)',color:'var(--t2)'}}>{filtered.length} ta buyurtma</span>}
+      <div className="card" style={{ padding: '10px 14px' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+          <TimeFilterBar
+            timeMode={timeMode}
+            setTimeMode={setTimeMode}
+            selYear={selYear}
+            setSelYear={setSelYear}
+            selMonth={selMonth}
+            setSelMonth={setSelMonth}
+            selDay={selDay}
+            setSelDay={setSelDay}
+            extra={<span className="tag" style={{ background: 'var(--s3)', color: 'var(--t2)' }}>{filtered.length} ta buyurtma</span>}
           />
-          <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
-            {timeMode!=='day' && (
-              <div className="tabs" style={{gap:4}}>
-                <button className={`tab${spreadMode==='only'?' on':''}`} style={{fontSize:11,padding:'4px 10px'}}
-                  onClick={()=>setSpreadMode('only')}>Faqat shu</button>
-                <button className={`tab${spreadMode==='spread'?' on':''}`} style={{fontSize:11,padding:'4px 10px'}}
-                  onClick={()=>setSpreadMode('spread')}>Yoyma</button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {timeMode !== 'day' && (
+              <div className="tabs" style={{ gap: 4 }}>
+                <button className={`tab${spreadMode === 'only' ? ' on' : ''}`} style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSpreadMode('only')}>Faqat shu</button>
+                <button className={`tab${spreadMode === 'spread' ? ' on' : ''}`} style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSpreadMode('spread')}>Yoyma</button>
               </div>
             )}
-            <select className="input" style={{fontSize:12,maxWidth:180}} value={selProduct} onChange={e=>setSelProduct(e.target.value)}>
-              <option value="">Barcha mahsulot</option>
-              {allProducts.map(p=><option key={p} value={p}>{p}</option>)}
-            </select>
+            <div style={{ position: 'relative' }}>
+              <button className="btn btn-gh btn-sm" type="button" style={{ minWidth: 220, justifyContent: 'space-between' }} onClick={() => setProductFilterOpen((v) => !v)}>
+                <span>Mahsulot turlari</span>
+                <span className="tag" style={{ background: 'var(--s3)', color: 'var(--t2)' }}>{activeProductsCount}/{allProducts.length || 0}</span>
+              </button>
+              {productFilterOpen && (
+                <div className="card" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 280, zIndex: 40, padding: 10, display: 'grid', gap: 8, maxHeight: 320, overflow: 'auto' }}>
+                  <div style={{ display: 'grid', gap: 6, gridTemplateColumns: '1fr 1fr' }}>
+                    <button className="btn btn-gh btn-sm" type="button" onClick={selectAllProducts}>Hammasi</button>
+                    <button className="btn btn-gh btn-sm" type="button" onClick={clearAllProducts}>Tozalash</button>
+                  </div>
+                  <div style={{ display: 'grid', gap: 6 }}>
+                    {allProducts.map((p) => (
+                      <label key={p} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--t2)', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={productChecked[p] !== false} onChange={() => toggleProduct(p)} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -12096,239 +12215,240 @@ function SotuvAnaliz({ D }) {
 /* ════════════════════════════════════════════════════════════════════
    OBZVON ANALIZI
    ════════════════════════════════════════════════════════════════════ */
-function ObzvonAnaliz({ D, company, obzvonRows=[] }) {
-  const [tab,setTab]         = useState('count');
-  const [timeMode,setTimeMode] = useState('month');
-  const [selYear,setSelYear]   = useState(()=>String(new Date().getFullYear()));
-  const [selMonth,setSelMonth] = useState(()=>toIsoDate(new Date()).slice(0,7));
-  const [selDay,setSelDay]     = useState(()=>toIsoDate(new Date()));
-  const [search,setSearch]     = useState('');
+function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
+  const [tab, setTab] = useState('count');
+  const [timeMode, setTimeMode] = useState('month');
+  const [selYear, setSelYear] = useState(() => String(new Date().getFullYear()));
+  const [selMonth, setSelMonth] = useState(() => toIsoDate(new Date()).slice(0, 7));
+  const [selDay, setSelDay] = useState(() => toIsoDate(new Date()));
+  const [search, setSearch] = useState('');
 
-  const allRows = useMemo(()=>Array.isArray(obzvonRows)?obzvonRows:[], [obzvonRows]);
+  const allRows = useMemo(() => Array.isArray(obzvonRows) ? obzvonRows : [], [obzvonRows]);
 
-  const filtered = useMemo(()=>allRows.filter(r=>{
-    const d=String(r?.callDate||''). slice(0,10);
-    if(timeMode==='year')  return d.startsWith(String(selYear));
-    if(timeMode==='month') return d.startsWith(selMonth);
-    if(timeMode==='day')   return d===selDay;
+  const filtered = useMemo(() => allRows.filter((r) => {
+    const d = toIsoDate(r?.callDate || '');
+    if (timeMode === 'year') return selYear ? d.startsWith(String(selYear)) : true;
+    if (timeMode === 'month') return selMonth ? d.startsWith(selMonth) : true;
+    if (timeMode === 'day') return selDay ? d === selDay : true;
     return true;
-  }),[allRows,timeMode,selYear,selMonth,selDay]);
+  }), [allRows, timeMode, selYear, selMonth, selDay]);
 
-  /* Statistika */
-  const byOp = useMemo(()=>{
-    const map={};
-    filtered.forEach(r=>{
-      const op=String(r?.operator||''). trim()||"Noma'lum";
-      if(!map[op]) map[op]={name:op,'Jami':0,'Sotildi':0,'Tel kotarmadi':0};
-      map[op]['Jami']+=1;
-      if(String(r?.orderCount||''). trim()||String(r?.orderDate||''). trim()) map[op]['Sotildi']+=1;
-      if(isMissedCall(r?.note)) map[op]['Tel kotarmadi']+=1;
+  const byOp = useMemo(() => {
+    const map = {};
+    filtered.forEach((r) => {
+      const op = String(r?.operator || '').trim() || "Noma'lum";
+      if (!map[op]) map[op] = { name: op, Jami: 0, Sotildi: 0, TelKotarmadi: 0 };
+      map[op].Jami += 1;
+      if (String(r?.orderCount || '').trim() || String(r?.orderDate || '').trim()) map[op].Sotildi += 1;
+      if (isMissedCall(r?.note)) map[op].TelKotarmadi += 1;
     });
-    return Object.values(map).sort((a,b)=>b['Jami']-a['Jami']);
-  },[filtered]);
+    return Object.values(map).sort((a, b) => b.Jami - a.Jami);
+  }, [filtered]);
 
-  const totTotal  = byOp.reduce((s,o)=>s+o['Jami'],0);
-  const totSold   = byOp.reduce((s,o)=>s+o['Sotildi'],0);
-  const totMissed = byOp.reduce((s,o)=>s+o['Tel kotarmadi'],0);
+  const byTopic = useMemo(() => {
+    const map = {};
+    filtered.forEach((r) => {
+      const key = normalizeTopicKey(r?.topic);
+      const label = topicLabelByKey(key);
+      if (!map[key]) map[key] = { key, name: label, Jami: 0, Sotildi: 0, TelKotarmadi: 0 };
+      map[key].Jami += 1;
+      if (String(r?.orderCount || '').trim() || String(r?.orderDate || '').trim()) map[key].Sotildi += 1;
+      if (isMissedCall(r?.note)) map[key].TelKotarmadi += 1;
+    });
+    return Object.values(map).sort((a, b) => b.Jami - a.Jami);
+  }, [filtered]);
 
-  /* Missed call tahlili */
-  const missedRows = useMemo(()=>filtered.filter(r=>isMissedCall(r?.note)),[filtered]);
-  const missedAnalysis = useMemo(()=>missedRows.map((r,i)=>{
-    const custId=String(r?.customerId||''). trim(); const callDate=r?.callDate||'';
-    let followedUp=false,orderedAfter=false;
-    if(custId){
-      const later=allRows.filter(o=>String(o?.customerId||''). trim()===custId&&(o?.callDate||''). slice(0,10)>callDate.slice(0,10)&&o!==r);
-      followedUp=later.length>0;
-      orderedAfter=later.some(o=>String(o?.orderCount||''). trim()||String(o?.orderDate||''). trim());
+  const totTotal = byOp.reduce((s, o) => s + o.Jami, 0);
+  const totSold = byOp.reduce((s, o) => s + o.Sotildi, 0);
+  const totMissed = byOp.reduce((s, o) => s + o.TelKotarmadi, 0);
+
+  const archiveItems = useMemo(() => {
+    const src = readObzArc(company);
+    return (src || []).filter((item) => {
+      const period = String(item?.period || '');
+      if (!period) return false;
+      if (timeMode === 'all') return true;
+      if (timeMode === 'year') return period.startsWith(String(selYear || ''));
+      if (timeMode === 'month') return period.startsWith(String(selMonth || ''));
+      return period === String(selDay || '');
+    });
+  }, [company, timeMode, selYear, selMonth, selDay]);
+  const archiveRows = useMemo(
+    () => archiveItems.flatMap((item) => (Array.isArray(item?.rows) ? item.rows : [])),
+    [archiveItems]
+  );
+  const usingArchiveForNotes = archiveItems.length > 0;
+
+  const rawMissedAnalysis = useMemo(() => {
+    const missedRows = filtered.filter((r) => isMissedCall(r?.note));
+    return missedRows.map((r, i) => {
+      const custId = String(r?.customerId || '').trim();
+      const callTs = toDate(r?.callDate)?.getTime() || 0;
+      let followedUp = false;
+      let orderedAfter = false;
+      if (custId) {
+        const later = allRows.filter((o) => {
+          const same = String(o?.customerId || '').trim() === custId;
+          const laterTs = toDate(o?.callDate)?.getTime() || 0;
+          return same && o !== r && laterTs > callTs;
+        });
+        followedUp = later.length > 0;
+        orderedAfter = later.some((o) => String(o?.orderCount || '').trim() || String(o?.orderDate || '').trim());
+      }
+      return { ...r, followedUp, orderedAfter, _i: i };
+    });
+  }, [filtered, allRows]);
+
+  const missedAnalysis = useMemo(() => {
+    if (!archiveRows.length) return rawMissedAnalysis;
+    return archiveRows
+      .filter((r) => String(r?.cat || detectCat(r?.note)).trim() === 'tel_kotarmadi')
+      .map((r, i) => ({
+        ...r,
+        customer: r.customer || r.customerName || (r.customerId ? `ID: ${r.customerId}` : '—'),
+        operator: r.operator || '—',
+        callDate: toIsoDate(r.callDate || ''),
+        note: String(r.note || '').trim(),
+        followedUp: !!r.followedUp,
+        orderedAfter: !!r.orderedAfter,
+        _i: i,
+      }));
+  }, [archiveRows, rawMissedAnalysis]);
+
+  const catCounts = useMemo(() => {
+    const sums = Object.fromEntries(FIXED_CATS.map((c) => [c.key, 0]));
+    if (archiveItems.length) {
+      archiveItems.forEach((item) => {
+        const hasCats = item?.categories && typeof item.categories === 'object';
+        if (hasCats) {
+          FIXED_CATS.forEach((c) => { sums[c.key] += Number(item.categories?.[c.key] || 0); });
+        } else {
+          (item?.rows || []).forEach((r) => {
+            const cat = String(r?.cat || detectCat(r?.note)).trim();
+            if (Object.prototype.hasOwnProperty.call(sums, cat)) sums[cat] += 1;
+          });
+        }
+      });
+      return sums;
     }
-    return {...r,followedUp,orderedAfter,_i:i};
-  }),[missedRows,allRows]);
-
-  /* Izoh chastotasi */
-  const noteFreq = useMemo(()=>{
-    const map={};
-    filtered.forEach(r=>{
-      const note=String(r?.note||''). trim(); if(!note) return;
-      const key=note.toLowerCase().slice(0,70);
-      if(!map[key]) map[key]={name:note.slice(0,70),'Marta':0};
-      map[key]['Marta']+=1;
+    filtered.forEach((r) => {
+      const cat = detectCat(r?.note);
+      if (Object.prototype.hasOwnProperty.call(sums, cat)) sums[cat] += 1;
     });
-    return Object.values(map).sort((a,b)=>b['Marta']-a['Marta']).slice(0,20);
-  },[filtered]);
+    return sums;
+  }, [archiveItems, filtered]);
 
-  const followedCount     = missedAnalysis.filter(r=>r.followedUp).length;
-  const notFollowedCount  = missedAnalysis.filter(r=>!r.followedUp).length;
-  const orderedAfterCount = missedAnalysis.filter(r=>r.orderedAfter).length;
+  const noteFreq = useMemo(() => FIXED_CATS.map((c) => ({
+    name: c.label,
+    Marta: Number(catCounts[c.key] || 0),
+    color: c.color,
+  })).filter((r) => r.Marta > 0), [catCounts]);
 
-  /* ─── Barchasi tab ─── */
-  const allFiltered = useMemo(()=>{
-    const q=search.toLowerCase().trim();
-    return filtered.filter(r=>{
-      if(!q) return true;
+  const followedCount = missedAnalysis.filter((r) => r.followedUp).length;
+  const notFollowedCount = missedAnalysis.filter((r) => !r.followedUp).length;
+  const orderedAfterCount = missedAnalysis.filter((r) => r.orderedAfter).length;
+
+  const allFiltered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return filtered.filter((r) => {
+      if (!q) return true;
       return (
-        String(r?.customer||''). toLowerCase().includes(q)||
-        String(r?.note||''). toLowerCase().includes(q)||
-        String(r?.operator||''). toLowerCase().includes(q)
+        String(r?.customer || '').toLowerCase().includes(q) ||
+        String(r?.note || '').toLowerCase().includes(q) ||
+        String(r?.operator || '').toLowerCase().includes(q) ||
+        String(r?.topic || '').toLowerCase().includes(q)
       );
     });
-  },[filtered,search]);
+  }, [filtered, search]);
 
   const filterBar = (
-    <div className="card" style={{padding:'10px 14px'}}>
-      <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',justifyContent:'space-between'}}>
+    <div className="card" style={{ padding: '10px 14px' }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
         <div className="tabs">
-          <button className={`tab${tab==='count'?' on':''}`}   onClick={()=>setTab('count')}>Statistika</button>
-          <button className={`tab${tab==='convert'?' on':''}`} onClick={()=>setTab('convert')}>Konversiya</button>
-          <button className={`tab${tab==='notes'?' on':''}`}   onClick={()=>setTab('notes')}>Izoh tahlili</button>
-          <button className={`tab${tab==='all'?' on':''}`}     onClick={()=>setTab('all')}>Barchasi</button>
+          <button className={`tab${tab === 'count' ? ' on' : ''}`} onClick={() => setTab('count')}>Statistika</button>
+          <button className={`tab${tab === 'maqsad' ? ' on' : ''}`} onClick={() => setTab('maqsad')}>Maqsad analizi</button>
+          <button className={`tab${tab === 'convert' ? ' on' : ''}`} onClick={() => setTab('convert')}>Konversiya</button>
+          <button className={`tab${tab === 'notes' ? ' on' : ''}`} onClick={() => setTab('notes')}>Izoh tahlili</button>
+          <button className={`tab${tab === 'all' ? ' on' : ''}`} onClick={() => setTab('all')}>Barchasi</button>
         </div>
-        <TimeFilterBar timeMode={timeMode} setTimeMode={setTimeMode} selYear={selYear} setSelYear={setSelYear}
-          selMonth={selMonth} setSelMonth={setSelMonth} selDay={selDay} setSelDay={setSelDay}
-          extra={<span className="tag" style={{background:'var(--s3)',color:'var(--t2)'}}>{filtered.length} ta</span>}
+        <TimeFilterBar
+          timeMode={timeMode}
+          setTimeMode={setTimeMode}
+          selYear={selYear}
+          setSelYear={setSelYear}
+          selMonth={selMonth}
+          setSelMonth={setSelMonth}
+          selDay={selDay}
+          setSelDay={setSelDay}
+          extra={<span className="tag" style={{ background: 'var(--s3)', color: 'var(--t2)' }}>{filtered.length} ta</span>}
         />
       </div>
     </div>
   );
 
   return (
-    <div style={{display:'grid',gap:12}}>
+    <div style={{ display: 'grid', gap: 12, background:'var(--s1)', border:'1px solid var(--b2)', borderRadius:12, padding:12 }}>
       {filterBar}
 
-      {/* ── STATISTIKA ── */}
-      {tab==='count'&&(
+      {tab === 'count' && (
         <>
-          <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))'}}>
-            <BigStat icon="📞" label="Jami obzvon"    value={String(totTotal)}    sub="Barcha operatorlar"  color="var(--bl)" />
-            <BigStat icon="✅" label="Sotildi"         value={String(totSold)}     sub={totTotal>0?`${Math.round(totSold/totTotal*100)}% konversiya`:''} color="var(--gr)" />
-            <BigStat icon="📵" label="Tel kotarmadi"   value={String(totMissed)}   sub={totTotal>0?`${Math.round(totMissed/totTotal*100)}% obzvondan`:''} color="var(--rd)" />
-            <BigStat icon="👥" label="Operatorlar"     value={String(byOp.length)} sub="Faol operator"      color="var(--pu)" />
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' }}>
+            <BigStat icon="📞" label="Jami obzvon" value={String(totTotal)} sub="Barcha operatorlar" color="var(--bl)" />
+            <BigStat icon="✅" label="Sotildi" value={String(totSold)} sub={totTotal > 0 ? `${Math.round(totSold / totTotal * 100)}% konversiya` : ''} color="var(--gr)" />
+            <BigStat icon="📵" label="Tel kotarmadi" value={String(totMissed)} sub={totTotal > 0 ? `${Math.round(totMissed / totTotal * 100)}% obzvondan` : ''} color="var(--rd)" />
+            <BigStat icon="👥" label="Operatorlar" value={String(byOp.length)} sub="Faol operator" color="var(--pu)" />
           </div>
-          {byOp.length>0&&(
-            <div className="card" style={{padding:'14px 16px'}}>
-              <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Operator bo'yicha grafik</div>
-              <ResponsiveContainer width="100%" height={Math.max(150,byOp.length*44)}>
-                <BarChart layout="vertical" data={byOp} margin={{top:0,right:50,left:10,bottom:0}}>
+          {byOp.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Operator bo'yicha grafik</div>
+              <ResponsiveContainer width="100%" height={Math.max(150, byOp.length * 44)}>
+                <BarChart layout="vertical" data={byOp} margin={{ top: 0, right: 50, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" horizontal={false} />
-                  <XAxis type="number" style={{fontSize:11}} stroke="var(--t3)" />
-                  <YAxis type="category" dataKey="name" width={100} style={{fontSize:12}} stroke="var(--t3)" />
+                  <XAxis type="number" style={{ fontSize: 11 }} stroke="var(--t3)" />
+                  <YAxis type="category" dataKey="name" width={100} style={{ fontSize: 12 }} stroke="var(--t3)" />
                   <Tooltip />
-                  <Bar dataKey="Jami"          fill="var(--bl)" radius={[0,5,5,0]} />
-                  <Bar dataKey="Sotildi"       fill="var(--gr)" radius={[0,5,5,0]} />
-                  <Bar dataKey="Tel kotarmadi" fill="var(--rd)" radius={[0,5,5,0]} />
+                  <Bar dataKey="Jami" fill="var(--bl)" radius={[0, 5, 5, 0]} />
+                  <Bar dataKey="Sotildi" fill="var(--gr)" radius={[0, 5, 5, 0]} />
+                  <Bar dataKey="TelKotarmadi" fill="var(--rd)" radius={[0, 5, 5, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
-          {allRows.length===0&&(
-            <div className="card" style={{padding:40,textAlign:'center',color:'var(--t3)'}}>
-              <div style={{fontWeight:700,marginBottom:8}}>Obzvon ma'lumoti topilmadi</div>
-              <div style={{fontSize:12}}>Obzvon sahifasida ma'lumot yuklang</div>
-            </div>
-          )}
         </>
       )}
 
-      {/* ── KONVERSIYA ── */}
-      {tab==='convert'&&(
+      {tab === 'maqsad' && (
         <>
-          <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))'}}>
-            <BigStat icon="🎯" label="Umumiy konversiya" value={totTotal>0?`${Math.round(totSold/totTotal*100)}%`:'—'} sub={`${totSold} ta muvaffaqiyatli`} color="var(--gr)" />
-            <BigStat icon="📞" label="Jami obzvon"       value={String(totTotal)} sub="Barcha operator" color="var(--bl)" />
-            <BigStat icon="❌" label="Sotilmadi"          value={String(totTotal-totSold)} sub={totTotal>0?`${Math.round((totTotal-totSold)/totTotal*100)}%`:'0%'} color="var(--rd)" />
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))' }}>
+            <BigStat icon="🎯" label="Maqsad turlari" value={String(byTopic.length)} sub="Alohida hisob" color="var(--pu)" />
+            <BigStat icon="📞" label="Jami obzvon" value={String(totTotal)} sub="Tanlangan davr" color="var(--bl)" />
+            <BigStat icon="✅" label="Sotuvga aylangan" value={String(totSold)} sub={totTotal > 0 ? `${Math.round(totSold / totTotal * 100)}%` : '0%'} color="var(--gr)" />
           </div>
-          {byOp.length>0&&(
-            <div className="card" style={{padding:'14px 16px'}}>
-              <div style={{fontWeight:700,fontSize:13,marginBottom:14}}>Operator konversiya reytingi</div>
-              <div style={{display:'grid',gap:14}}>
-                {byOp.map(op=>{
-                  const pct=op['Jami']>0?Math.round(op['Sotildi']/op['Jami']*100):0;
-                  const col=pct>=50?'var(--gr)':pct>=25?'var(--yl)':'var(--rd)';
-                  return (
-                    <div key={op.name}>
-                      <div style={{display:'flex',justifyContent:'space-between',marginBottom:5,fontSize:13}}>
-                        <span style={{fontWeight:700}}>{op.name}</span>
-                        <span style={{display:'flex',gap:12,fontSize:12,color:'var(--t3)'}}>
-                          <span>{op['Jami']} ta</span>
-                          <span style={{color:'var(--gr)'}}>✓ {op['Sotildi']}</span>
-                          <span style={{color:col,fontWeight:800,fontSize:14}}>{pct}%</span>
-                        </span>
-                      </div>
-                      <PBar value={op['Sotildi']} max={op['Jami']} color={col} height={12} />
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ── IZOH TAHLILI ── */}
-      {tab==='notes'&&(
-        <>
-          <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))'}}>
-            <BigStat icon="📵" label="Tel kotarmadi"      value={String(missedAnalysis.length)} sub={`${filtered.length} ta obzvondan`} color="var(--rd)" />
-            <BigStat icon="🔁" label="Qaytib aloqa qildi" value={String(followedCount)}         sub="Keyinroq obzvon bor" color="var(--gr)" />
-            <BigStat icon="⚠️" label="Aloqa qilinmagan"   value={String(notFollowedCount)}       sub="Hali ham yo'q"      color="var(--yl)" />
-            <BigStat icon="🛒" label="Sotib oldi"          value={String(orderedAfterCount)}      sub="Tel kotarmasdan keyin" color="var(--bl)" />
-          </div>
-
-          {missedAnalysis.length>0&&(
-            <div className="card" style={{padding:'14px 16px'}}>
-              <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Tel kotarmadi — holat tahlili</div>
-              <div style={{display:'grid',gap:10}}>
-                {[
-                  {label:"Qaytib aloqa qildi (yaxshi)",         value:followedCount,    color:'var(--gr)'},
-                  {label:"Aloqa qilinmagan (xavfli!)",          value:notFollowedCount, color:'var(--rd)'},
-                  {label:"Tel kotarmasdan keyin sotib oldi",     value:orderedAfterCount,color:'var(--bl)'},
-                ].map(row=>(
-                  <div key={row.label}>
-                    <div style={{display:'flex',justifyContent:'space-between',fontSize:12,marginBottom:4}}>
-                      <span style={{fontWeight:600}}>{row.label}</span>
-                      <span style={{fontWeight:800,color:row.color}}>{row.value} ta ({missedAnalysis.length>0?Math.round(row.value/missedAnalysis.length*100):0}%)</span>
-                    </div>
-                    <PBar value={row.value} max={missedAnalysis.length} color={row.color} height={12} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {noteFreq.length>0&&(
-            <div className="card" style={{padding:'14px 16px'}}>
-              <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Eng ko'p yozilgan izohlar</div>
-              <ResponsiveContainer width="100%" height={Math.max(160,noteFreq.length*36)}>
-                <BarChart layout="vertical" data={noteFreq} margin={{top:0,right:40,left:10,bottom:0}}>
+          {byTopic.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>Maqsad bo'yicha obzvon analizi</div>
+              <ResponsiveContainer width="100%" height={Math.max(180, byTopic.length * 44)}>
+                <BarChart layout="vertical" data={byTopic} margin={{ top: 0, right: 50, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" horizontal={false} />
-                  <XAxis type="number" style={{fontSize:11}} stroke="var(--t3)" />
-                  <YAxis type="category" dataKey="name" width={200} style={{fontSize:10}} stroke="var(--t3)" />
-                  <Tooltip /><Bar dataKey="Marta" fill="var(--pu)" radius={[0,5,5,0]} />
+                  <XAxis type="number" style={{ fontSize: 11 }} stroke="var(--t3)" />
+                  <YAxis type="category" dataKey="name" width={140} style={{ fontSize: 11 }} stroke="var(--t3)" />
+                  <Tooltip />
+                  <Bar dataKey="Jami" fill="var(--bl)" radius={[0, 5, 5, 0]} />
+                  <Bar dataKey="Sotildi" fill="var(--gr)" radius={[0, 5, 5, 0]} />
+                  <Bar dataKey="TelKotarmadi" fill="var(--rd)" radius={[0, 5, 5, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          )}
-
-          {missedAnalysis.length>0&&(
-            <div className="card" style={{padding:'14px 16px'}}>
-              <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>
-                Tel kotarmadi ro'yxati
-                <span className="tag" style={{marginLeft:8,background:'var(--rd2)',color:'var(--rd)'}}>{missedAnalysis.length} ta</span>
-              </div>
-              <div style={{overflowX:'auto'}}>
-                <table className="tbl" style={{width:'100%'}}>
-                  <thead><tr>
-                    <th>Mijoz</th><th>Operator</th><th>Sana</th><th>Izoh</th>
-                    <th style={{textAlign:'center'}}>Aloqa?</th><th style={{textAlign:'center'}}>Sotib oldi?</th>
-                  </tr></thead>
+              <div style={{ overflowX: 'auto', marginTop: 10 }}>
+                <table className="tbl" style={{ width: '100%' }}>
+                  <thead><tr><th>Maqsad</th><th>Jami</th><th>Sotildi</th><th>Tel ko'tarmadi</th><th>Konversiya</th></tr></thead>
                   <tbody>
-                    {missedAnalysis.slice(0,100).map((r,i)=>(
-                      <tr key={i}>
-                        <td style={{fontWeight:600}}>{r.customer||r.customerName||'—'}</td>
-                        <td>{r.operator}</td>
-                        <td style={{whiteSpace:'nowrap',color:'var(--t3)'}}>{String(r.callDate||''). slice(0,10)||'—'}</td>
-                        <td style={{maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--t2)'}}>{r.note}</td>
-                        <td style={{textAlign:'center',fontSize:16}}>{r.followedUp?'✅':'❌'}</td>
-                        <td style={{textAlign:'center',fontSize:16}}>{r.orderedAfter?'✅':'—'}</td>
+                    {byTopic.map((t) => (
+                      <tr key={t.key}>
+                        <td style={{ fontWeight: 600 }}>{t.name}</td>
+                        <td>{fmt(t.Jami)}</td>
+                        <td style={{ color: 'var(--gr)' }}>{fmt(t.Sotildi)}</td>
+                        <td style={{ color: 'var(--rd)' }}>{fmt(t.TelKotarmadi)}</td>
+                        <td style={{ fontWeight: 700 }}>{t.Jami > 0 ? `${Math.round(t.Sotildi / t.Jami * 100)}%` : '0%'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -12339,61 +12459,132 @@ function ObzvonAnaliz({ D, company, obzvonRows=[] }) {
         </>
       )}
 
-      {/* ── BARCHASI (avtomatik kategoriya) ── */}
-      {tab==='all'&&(
+      {tab === 'convert' && (
         <>
-          <div className="card" style={{padding:'10px 14px'}}>
-            <input className="input" placeholder="Qidirish (mijoz, izoh, operator)..."
-              value={search} onChange={e=>setSearch(e.target.value)} style={{width:'100%',fontSize:12}} />
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' }}>
+            <BigStat icon="🎯" label="Umumiy konversiya" value={totTotal > 0 ? `${Math.round(totSold / totTotal * 100)}%` : '—'} sub={`${totSold} ta muvaffaqiyatli`} color="var(--gr)" />
+            <BigStat icon="📞" label="Jami obzvon" value={String(totTotal)} sub="Barcha operator" color="var(--bl)" />
+            <BigStat icon="❌" label="Sotilmadi" value={String(totTotal - totSold)} sub={totTotal > 0 ? `${Math.round((totTotal - totSold) / totTotal * 100)}%` : '0%'} color="var(--rd)" />
           </div>
-          <div className="card" style={{padding:'14px 16px'}}>
-            <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>
-              Barcha obzvon qatorlari
-              <span className="tag" style={{marginLeft:8,background:'var(--s3)',color:'var(--t2)'}}>{allFiltered.length} ta</span>
+          {byOp.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 14 }}>Operator konversiya reytingi</div>
+              <div style={{ display: 'grid', gap: 14 }}>
+                {byOp.map((op) => {
+                  const pct = op.Jami > 0 ? Math.round(op.Sotildi / op.Jami * 100) : 0;
+                  const col = pct >= 50 ? 'var(--gr)' : pct >= 25 ? 'var(--yl)' : 'var(--rd)';
+                  return (
+                    <div key={op.name}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 13 }}>
+                        <span style={{ fontWeight: 700 }}>{op.name}</span>
+                        <span style={{ display: 'flex', gap: 12, fontSize: 12, color: 'var(--t3)' }}>
+                          <span>{op.Jami} ta</span>
+                          <span style={{ color: 'var(--gr)' }}>✓ {op.Sotildi}</span>
+                          <span style={{ color: col, fontWeight: 800, fontSize: 14 }}>{pct}%</span>
+                        </span>
+                      </div>
+                      <PBar value={op.Sotildi} max={op.Jami} color={col} height={12} />
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div style={{overflowX:'auto'}}>
-              <table className="tbl" style={{width:'100%',fontSize:12}}>
-                <thead><tr>
-                  <th>#</th>
-                  <th>Mijoz</th>
-                  <th>Operator</th>
-                  <th>Sana</th>
-                  <th>Izoh</th>
-                  <th>Kategoriya</th>
-                </tr></thead>
+          )}
+        </>
+      )}
+
+      {tab === 'notes' && (
+        <>
+          {!usingArchiveForNotes && (
+            <div className="card" style={{ padding: 12, border: '1px solid var(--yl)', background: 'var(--yl2)', color: 'var(--yl)' }}>
+              Tahlil arxivida bu davr uchun yozuv topilmadi. Hozircha jonli obzvon ma'lumotidan hisoblandi.
+            </div>
+          )}
+          <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))' }}>
+            <BigStat icon="📵" label="Tel kotarmadi" value={String(missedAnalysis.length)} sub={`${filtered.length} ta obzvondan`} color="var(--rd)" />
+            <BigStat icon="🔁" label="Qaytib aloqa qildi" value={String(followedCount)} sub="Keyinroq obzvon bor" color="var(--gr)" />
+            <BigStat icon="⚠️" label="Aloqa qilinmagan" value={String(notFollowedCount)} sub="Hali ham yo'q" color="var(--yl)" />
+            <BigStat icon="🛒" label="Sotib oldi" value={String(orderedAfterCount)} sub="Tel kotarmasdan keyin" color="var(--bl)" />
+          </div>
+
+          {noteFreq.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 12 }}>
+                Izohlar qattiq kategoriyalar bo'yicha
+                {usingArchiveForNotes ? <span className="tag" style={{ marginLeft: 8, background: 'var(--gr2)', color: 'var(--gr)' }}>Arxivdan</span> : null}
+              </div>
+              <ResponsiveContainer width="100%" height={Math.max(180, noteFreq.length * 40)}>
+                <BarChart layout="vertical" data={noteFreq} margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" horizontal={false} />
+                  <XAxis type="number" style={{ fontSize: 11 }} stroke="var(--t3)" />
+                  <YAxis type="category" dataKey="name" width={180} style={{ fontSize: 11 }} stroke="var(--t3)" />
+                  <Tooltip />
+                  <Bar dataKey="Marta" fill="var(--pu)" radius={[0, 5, 5, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {missedAnalysis.length > 0 && (
+            <div className="card" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
+                Tel kotarmadi ro'yxati
+                <span className="tag" style={{ marginLeft: 8, background: 'var(--rd2)', color: 'var(--rd)' }}>{missedAnalysis.length} ta</span>
+              </div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="tbl" style={{ width: '100%' }}>
+                  <thead><tr><th>Mijoz</th><th>Operator</th><th>Sana</th><th>Izoh</th><th style={{ textAlign: 'center' }}>Aloqa?</th><th style={{ textAlign: 'center' }}>Sotib oldi?</th></tr></thead>
+                  <tbody>
+                    {missedAnalysis.slice(0, 120).map((r, i) => (
+                      <tr key={i}>
+                        <td style={{ fontWeight: 600 }}>{r.customer || r.customerName || '—'}</td>
+                        <td>{r.operator}</td>
+                        <td style={{ whiteSpace: 'nowrap', color: 'var(--t3)' }}>{toIsoDate(r.callDate || '') || '—'}</td>
+                        <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--t2)' }}>{r.note || '—'}</td>
+                        <td style={{ textAlign: 'center', fontSize: 16 }}>{r.followedUp ? '✅' : '❌'}</td>
+                        <td style={{ textAlign: 'center', fontSize: 16 }}>{r.orderedAfter ? '✅' : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === 'all' && (
+        <>
+          <div className="card" style={{ padding: '10px 14px' }}>
+            <input className="input" placeholder="Qidirish (mijoz, izoh, operator)..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: '100%', fontSize: 12 }} />
+          </div>
+          <div className="card" style={{ padding: '14px 16px' }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>
+              Barcha obzvon qatorlari
+              <span className="tag" style={{ marginLeft: 8, background: 'var(--s3)', color: 'var(--t2)' }}>{allFiltered.length} ta</span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="tbl" style={{ width: '100%', fontSize: 12 }}>
+                <thead><tr><th>#</th><th>Mijoz</th><th>Maqsad</th><th>Operator</th><th>Sana</th><th>Izoh</th><th>Kategoriya</th></tr></thead>
                 <tbody>
-                  {allFiltered.slice(0,200).map((r,i)=>{
+                  {allFiltered.slice(0, 200).map((r, i) => {
                     const cat = detectCat(r?.note);
-                    const catInfo = FIXED_CATS.find(c=>c.key===cat)||FIXED_CATS[FIXED_CATS.length-1];
+                    const catInfo = FIXED_CATS.find((c) => c.key === cat) || FIXED_CATS[FIXED_CATS.length - 1];
                     return (
                       <tr key={i}>
-                        <td style={{color:'var(--t3)',width:36}}>{i+1}</td>
-                        <td style={{fontWeight:600}}>{r.customer||r.customerName||'—'}</td>
-                        <td style={{color:'var(--t2)'}}>{r.operator||'—'}</td>
-                        <td style={{whiteSpace:'nowrap',color:'var(--t3)'}}>{String(r.callDate||''). slice(0,10)||'—'}</td>
-                        <td style={{maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--t2)'}}
-                          title={r.note}>{r.note||'—'}</td>
-                        <td>
-                          <span style={{
-                            background:catInfo.color.replace('var(','').replace(')','')=== catInfo.color
-                              ? catInfo.color : undefined,
-                            color: catInfo.color,
-                            fontWeight:700, fontSize:11,
-                            border:`1px solid ${catInfo.color}`,
-                            borderRadius:6, padding:'2px 7px',
-                            whiteSpace:'nowrap',
-                          }}>{catInfo.label}</span>
-                        </td>
+                        <td style={{ color: 'var(--t3)', width: 36 }}>{i + 1}</td>
+                        <td style={{ fontWeight: 600 }}>{r.customer || r.customerName || '—'}</td>
+                        <td>{topicLabelByKey(normalizeTopicKey(r?.topic))}</td>
+                        <td style={{ color: 'var(--t2)' }}>{r.operator || '—'}</td>
+                        <td style={{ whiteSpace: 'nowrap', color: 'var(--t3)' }}>{toIsoDate(r.callDate || '') || '—'}</td>
+                        <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--t2)' }} title={r.note}>{r.note || '—'}</td>
+                        <td><span style={{ color: catInfo.color, fontWeight: 700, fontSize: 11, border: `1px solid ${catInfo.color}`, borderRadius: 6, padding: '2px 7px', whiteSpace: 'nowrap' }}>{catInfo.label}</span></td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-              {allFiltered.length>200&&(
-                <div style={{textAlign:'center',padding:12,color:'var(--t3)',fontSize:12}}>
-                  Ko'rsatildi: 200 / {allFiltered.length}
-                </div>
-              )}
+              {allFiltered.length > 200 && <div style={{ textAlign: 'center', padding: 12, color: 'var(--t3)', fontSize: 12 }}>Ko'rsatildi: 200 / {allFiltered.length}</div>}
             </div>
           </div>
         </>
@@ -12411,17 +12602,23 @@ function KorxonaHolati({ D, company, obzvonRows=[] }) {
   const allObzvon   = useMemo(()=>Array.isArray(obzvonRows)?obzvonRows:[], [obzvonRows]);
   const today=toIsoDate(new Date()); const thisMonth=today.slice(0,7);
 
-  const monthOrders  = useMemo(()=>allOrders.filter(o=>isOrderDoc(o?.docType)&&String(o?.orderDate||o?.deliveryDate||''). startsWith(thisMonth)),[allOrders,thisMonth]);
-  const monthReturns = useMemo(()=>allOrders.filter(o=>isReturnDoc(o?.docType)&&!isMainWarehouseLabel(o?.warehouse)&&String(o?.orderDate||o?.deliveryDate||''). startsWith(thisMonth)),[allOrders,thisMonth]);
+  const monthOrders  = useMemo(()=>allOrders.filter(o=>isOrderDoc(o?.docType)&&toIsoDate(o?.orderDate||o?.deliveryDate||'').startsWith(thisMonth)),[allOrders,thisMonth]);
+  const monthReturns = useMemo(()=>allOrders.filter(o=>isReturnDoc(o?.docType)&&!isMainWarehouseLabel(o?.warehouse)&&toIsoDate(o?.orderDate||o?.deliveryDate||'').startsWith(thisMonth)),[allOrders,thisMonth]);
   const monthSoldQty = useMemo(()=>monthOrders.reduce((s,o)=>s+Math.abs(toNum(o?.qty)),0),[monthOrders]);
   const monthRetQty  = useMemo(()=>monthReturns.reduce((s,o)=>s+Math.abs(toNum(o?.qty)),0),[monthReturns]);
   const monthSoldSum = useMemo(()=>monthOrders.reduce((s,o)=>s+Math.abs(toNum(o?.sum)),0),[monthOrders]);
   const monthRetSum  = useMemo(()=>monthReturns.reduce((s,o)=>s+Math.abs(toNum(o?.sum)),0),[monthReturns]);
-  const monthObzvon  = useMemo(()=>allObzvon.filter(r=>String(r?.callDate||''). startsWith(thisMonth)),[allObzvon,thisMonth]);
+  const monthObzvon  = useMemo(()=>allObzvon.filter(r=>toIsoDate(r?.callDate||'').startsWith(thisMonth)),[allObzvon,thisMonth]);
   const monthMissed  = useMemo(()=>monthObzvon.filter(r=>isMissedCall(r?.note)),[monthObzvon]);
   const missedNoFollowup = useMemo(()=>monthMissed.filter(r=>{
-    const custId=String(r?.customerId||''). trim(); if(!custId) return true;
-    return !allObzvon.some(o=>String(o?.customerId||''). trim()===custId&&o!==r&&(o?.callDate||''). slice(0,10)>(r?.callDate||''). slice(0,10));
+    const custId=String(r?.customerId||'').trim(); if(!custId) return true;
+    const rowTs = toDate(r?.callDate)?.getTime() || 0;
+    return !allObzvon.some((o)=>{
+      const same = String(o?.customerId||'').trim()===custId && o!==r;
+      if(!same) return false;
+      const otherTs = toDate(o?.callDate)?.getTime() || 0;
+      return otherTs > rowTs;
+    });
   }),[monthMissed,allObzvon]);
   const debtorCount  = useMemo(()=>allCustomers.filter(c=>toNum(c?.balanceUZS)<0).length,[allCustomers]);
   const retPct=monthSoldQty>0?Math.round(monthRetQty/monthSoldQty*100):0;
@@ -12436,10 +12633,10 @@ function KorxonaHolati({ D, company, obzvonRows=[] }) {
     return Object.values(map).sort((a,b)=>b['Dona']-a['Dona']);
   },[monthOrders]);
   const monthlyTrend = useMemo(()=>{
-    const months=[]; for(let i=5;i>=0;i--){const d=new Date();d.setMonth(d.getMonth()-i);months.push(d.toISOString().slice(0,7));}
+    const months=[]; for(let i=5;i>=0;i--){const d=new Date();d.setHours(0,0,0,0);d.setDate(1);d.setMonth(d.getMonth()-i);months.push(toIsoDate(d).slice(0,7));}
     return months.map(m=>{
-      const ords=allOrders.filter(o=>isOrderDoc(o?.docType)&&String(o?.orderDate||o?.deliveryDate||''). startsWith(m));
-      const rets=allOrders.filter(o=>isReturnDoc(o?.docType)&&!isMainWarehouseLabel(o?.warehouse)&&String(o?.orderDate||o?.deliveryDate||''). startsWith(m));
+      const ords=allOrders.filter(o=>isOrderDoc(o?.docType)&&toIsoDate(o?.orderDate||o?.deliveryDate||'').startsWith(m));
+      const rets=allOrders.filter(o=>isReturnDoc(o?.docType)&&!isMainWarehouseLabel(o?.warehouse)&&toIsoDate(o?.orderDate||o?.deliveryDate||'').startsWith(m));
       const sold=ords.reduce((s,o)=>s+Math.abs(toNum(o?.qty)),0);
       const ret =rets.reduce((s,o)=>s+Math.abs(toNum(o?.qty)),0);
       return {period:m.slice(5),'Sotilgan':sold,'Qaytarilgan':ret,'Net':sold-ret};
@@ -12458,7 +12655,7 @@ function KorxonaHolati({ D, company, obzvonRows=[] }) {
   const sevColor = s=>s==='high'?'var(--rd)':s==='medium'?'var(--yl)':'var(--bl)';
 
   return (
-    <div style={{display:'grid',gap:12}}>
+    <div style={{display:'grid',gap:12,background:'var(--s1)',border:'1px solid var(--b2)',borderRadius:12,padding:12}}>
       <div style={{fontWeight:700,fontSize:14,color:'var(--t2)'}}>Bu oy ({thisMonth}) ko'rsatkichlari</div>
 
       <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))'}}>
@@ -12562,6 +12759,7 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
   const [arc,setArc]   = useState(()=>readObzArc(company));
   const [aiSt,setAiSt] = useState({loading:false,err:'',msg:''});
   const allRows        = useMemo(()=>Array.isArray(obzvonRows)?obzvonRows:[], [obzvonRows]);
+  useEffect(() => { setArc(readObzArc(company)); }, [company]);
 
   const refresh  = ()=>setArc(readObzArc(company));
   const getKey   = ()=>localStorage.getItem('__claude_api_key')||'';
@@ -12572,62 +12770,111 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
     setArc(arr);
   };
 
-  /* Arxiv AI tahlil */
+  /* Arxiv tahlil (qattiq kategoriya + ixtiyoriy AI xulosa) */
   const runArchiveAi = async (type) => {
     const aiKey = getKey();
-    if(!aiKey.trim()){ setAiSt({loading:false,err:"API key sozlamalarga kiriting (Sozlamalar → Ilova sozlamalari)",msg:''}); return; }
     const today  = toIsoDate(new Date());
     const yest   = toIsoDate(new Date(Date.now()-86400000));
     const period = type==='monthly' ? today.slice(0,7) : yest;
     const rows   = allRows.filter(r=>{
-      const d=String(r?.callDate||''). slice(0,10);
+      const d = toIsoDate(r?.callDate||'');
       return type==='monthly' ? d.startsWith(period) : d===period;
     });
-    const notes = rows.map(r=>String(r?.note||''). trim()).filter(Boolean);
+    const rowsWithNote = rows.filter((r) => String(r?.note || '').trim());
+    const notes = rowsWithNote.map(r=>String(r?.note||'').trim()).filter(Boolean);
     if(!notes.length){ setAiSt({loading:false,err:`${period} uchun izoh yo'q`,msg:''}); return; }
     setAiSt({loading:true,err:'',msg:`${notes.length} ta izoh tahlil qilinmoqda...`});
-    try {
-      const prompt = `Obzvon izohlarini 5 ta qattiq kategoriyaga ajrat. Faqat JSON qaytargin.
 
-KATEGORIYALAR:
-tel_kotarmadi: Tel kotarmadi, javob bermadi, trubka olmadi, nedostupno, ne beret trubku, qabul qilmadi
-buyurtma: Suv buyurtma berdi, zakaz, tasdiqladi, olib ketadi, dostavka, podtverdil
-suv_borekan: Suvi borekan, suvi borakan, hali borakan, suv bor, hali bor, eshik yopiq
-kelishuv_tugatildi: Boshqa joydan oldi, boshqa brand, kerak emas, ne nado, bizdan suv olmaydi, bekor qildi, toxtatdi
-boshqa: Yuqoridagilarga togri kelmaydigan barchasi
-
-IZOHLAR:
-${notes.join('\n')}
-
-FAQAT JSON:
-{"cats":{"tel_kotarmadi":0,"buyurtma":0,"suv_borekan":0,"kelishuv_tugatildi":0,"boshqa":0},"total":0,"xulosa":"..."}`;
-
-      const res = await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{
-          'x-api-key':aiKey,
-          'anthropic-version':'2023-06-01',
-          'content-type':'application/json',
-          'anthropic-dangerous-direct-browser-access':'true',
-        },
-        body:JSON.stringify({ model:'claude-haiku-4-5', max_tokens:512, messages:[{role:'user',content:prompt}] }),
+    const byCustomer = new Map();
+    allRows.forEach((r) => {
+      const cid = String(r?.customerId || '').trim();
+      if (!cid) return;
+      if (!byCustomer.has(cid)) byCustomer.set(cid, []);
+      byCustomer.get(cid).push({
+        ts: toDate(r?.callDate)?.getTime() || 0,
+        sold: Boolean(String(r?.orderCount || '').trim() || String(r?.orderDate || '').trim()),
       });
-      const data = await res.json();
-      if(data?.error) throw new Error(data.error?.message||'API xato');
-      const text = data?.content?.[0]?.text||''  ;
-      const m = text.match(/\{[\s\S]*\}/);
-      if(!m) throw new Error('JSON topilmadi');
-      const parsed = JSON.parse(m[0]);
+    });
+    byCustomer.forEach((arr) => arr.sort((a, b) => a.ts - b.ts));
+
+    const catTotals = Object.fromEntries(FIXED_CATS.map((c) => [c.key, 0]));
+    rowsWithNote.forEach((r) => {
+      const cat = detectCat(r?.note);
+      if (Object.prototype.hasOwnProperty.call(catTotals, cat)) catTotals[cat] += 1;
+    });
+    const archivedRows = rowsWithNote.slice(0, 1200).map((r, idx) => {
+      const cid = String(r?.customerId || '').trim();
+      const ts = toDate(r?.callDate)?.getTime() || 0;
+      const later = (byCustomer.get(cid) || []).filter((x) => x.ts > ts);
+      return {
+        id: `${period}_${idx + 1}`,
+        customerId: cid,
+        customer: String(r?.customer || r?.customerName || '').trim() || (cid ? `ID: ${cid}` : '—'),
+        operator: String(r?.operator || '').trim() || '—',
+        callDate: toIsoDate(r?.callDate || ''),
+        topic: String(r?.topic || '').trim(),
+        note: String(r?.note || '').trim().slice(0, 260),
+        cat: detectCat(r?.note),
+        followedUp: later.length > 0,
+        orderedAfter: later.some((x) => x.sold),
+      };
+    });
+
+    let xulosa = '';
+    const topCat = FIXED_CATS
+      .map((c) => ({ key: c.key, label: c.label, val: Number(catTotals[c.key] || 0) }))
+      .sort((a, b) => b.val - a.val)[0];
+    xulosa = `${period} davrida ${notes.length} ta izoh tahlil qilindi. Eng ko'p kategoriya: ${topCat?.label || '—'} (${topCat?.val || 0} ta).`;
+
+    try {
+      if (aiKey.trim()) {
+        const prompt = `Quyidagi obzvon kategoriya statistikasi asosida 2-3 jumlalik qisqa boshqaruv xulosasi yozing (uzbek, latin, aniq va amaliy):
+Period: ${period}
+Total: ${notes.length}
+tel_kotarmadi: ${catTotals.tel_kotarmadi || 0}
+buyurtma: ${catTotals.buyurtma || 0}
+suv_borekan: ${catTotals.suv_borekan || 0}
+kelishuv_tugatildi: ${catTotals.kelishuv_tugatildi || 0}
+boshqa: ${catTotals.boshqa || 0}`;
+        const res = await fetch('https://api.anthropic.com/v1/messages',{
+          method:'POST',
+          headers:{
+            'x-api-key':aiKey,
+            'anthropic-version':'2023-06-01',
+            'content-type':'application/json',
+            'anthropic-dangerous-direct-browser-access':'true',
+          },
+          body:JSON.stringify({ model:'claude-haiku-4-5', max_tokens:220, messages:[{role:'user',content:prompt}] }),
+        });
+        const data = await res.json();
+        if(data?.error) throw new Error(data.error?.message||'API xato');
+        const text = String(data?.content?.[0]?.text || '').trim();
+        if (text) xulosa = text;
+      }
       const item = {
         id:Date.now(), type, period,
         totalNotes:rows.length, noteCount:notes.length,
-        categories:parsed.cats||{}, xulosa:parsed.xulosa||''  ,
+        categories:catTotals,
+        rows: archivedRows,
+        xulosa,
         analyzedAt:new Date().toISOString(),
       };
       saveObzArc(company, item);
       setArc(readObzArc(company));
       setAiSt({loading:false,err:'',msg:`✅ Saqlandi: ${period} (${notes.length} ta izoh)`});
-    } catch(e){ setAiSt({loading:false,err:'Xato: '+e.message,msg:''}); }
+    } catch(e){
+      const item = {
+        id:Date.now(), type, period,
+        totalNotes:rows.length, noteCount:notes.length,
+        categories:catTotals,
+        rows: archivedRows,
+        xulosa,
+        analyzedAt:new Date().toISOString(),
+      };
+      saveObzArc(company, item);
+      setArc(readObzArc(company));
+      setAiSt({loading:false,err:'AI xulosada xato bo‘ldi, lekin arxiv saqlandi: '+e.message,msg:''});
+    }
   };
 
   const dailyArc  = [...arc].filter(a=>a.type==='daily').slice(0,30).reverse();
@@ -12641,9 +12888,9 @@ FAQAT JSON:
       {/* AI Tugmalari */}
       <div className="card" style={{padding:'14px 16px'}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:8}}>
-          <div style={{fontWeight:700,fontSize:13}}>AI Arxiv Tahlili</div>
-          <div style={{fontSize:11,color:getKey()?'var(--gr)':'var(--rd)'}}>
-            {getKey()?'✓ API kalit sozlangan':'✗ API kalit yo\'q — Sozlamalar → Ilova sozlamalari'}
+          <div style={{fontWeight:700,fontSize:13}}>Tahlil arxivi (qattiq kategoriya)</div>
+          <div style={{fontSize:11,color:getKey()?'var(--gr)':'var(--t3)'}}>
+            {getKey()?'✓ AI kalit sozlangan (xulosa AI bilan)':'Kalitsiz ham tahlil ishlaydi (qattiq kategoriya)'}
           </div>
         </div>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
@@ -12742,6 +12989,46 @@ FAQAT JSON:
                     );
                   })}
                 </div>
+                {Array.isArray(item.rows) && item.rows.length > 0 && (
+                  <div style={{marginTop:10}}>
+                    <div style={{fontSize:11,fontWeight:700,color:'var(--t2)',marginBottom:6}}>
+                      Arxiv satrlari (izohlar bo'yicha): {item.rows.length} ta
+                    </div>
+                    <div style={{overflowX:'auto',border:'1px solid var(--b2)',borderRadius:8}}>
+                      <table className="tbl" style={{width:'100%',fontSize:11}}>
+                        <thead><tr>
+                          <th>#</th>
+                          <th>Mijoz</th>
+                          <th>Maqsad</th>
+                          <th>Operator</th>
+                          <th>Sana</th>
+                          <th>Kategoriya</th>
+                          <th>Izoh</th>
+                          <th>Aloqa?</th>
+                          <th>Sotib oldi?</th>
+                        </tr></thead>
+                        <tbody>
+                          {item.rows.slice(0, 120).map((r, idx) => {
+                            const cat = FIXED_CATS.find((c) => c.key === String(r?.cat || '')) || FIXED_CATS[FIXED_CATS.length - 1];
+                            return (
+                              <tr key={`${item.id}_${idx}`}>
+                                <td style={{color:'var(--t3)'}}>{idx + 1}</td>
+                                <td style={{fontWeight:600}}>{r.customer || (r.customerId ? `ID: ${r.customerId}` : '—')}</td>
+                                <td>{topicLabelByKey(normalizeTopicKey(r?.topic))}</td>
+                                <td>{r.operator || '—'}</td>
+                                <td style={{whiteSpace:'nowrap'}}>{toIsoDate(r.callDate || '') || '—'}</td>
+                                <td><span style={{color:cat.color,fontWeight:700}}>{cat.label}</span></td>
+                                <td style={{maxWidth:220,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.note || '—'}</td>
+                                <td style={{textAlign:'center'}}>{r.followedUp ? '✅' : '❌'}</td>
+                                <td style={{textAlign:'center'}}>{r.orderedAfter ? '✅' : '—'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
                 <div style={{fontSize:10,color:'var(--t3)',marginTop:8}}>
                   Tahlil qilindi: {new Date(item.analyzedAt).toLocaleString('uz')}
                 </div>
@@ -12757,8 +13044,28 @@ FAQAT JSON:
 /* ════════════════════════════════════════════════════════════════════
    ANALYTICS PAGE  (bosh komponent — 4 ta tab)
    ════════════════════════════════════════════════════════════════════ */
-function AnalyticsPage({ D, company, currentUser, obzvonNewRows=[] }) {
+function AnalyticsPage({ D, company, currentUser, obzvonAllRows = [], obzvonNewRows = [] }) {
   const [sub,setSub] = useState('sotuv');
+  const mergedObzvonRows = useMemo(() => {
+    const src = [
+      ...(Array.isArray(obzvonAllRows) ? obzvonAllRows : []),
+      ...(Array.isArray(obzvonNewRows) ? obzvonNewRows : []),
+    ];
+    const m = new Map();
+    src.forEach((r, i) => {
+      const rid = String(r?.rid || r?._rid || '').trim();
+      const key = rid || [
+        String(r?.customerId || r?.id || '').trim(),
+        toIsoDate(r?.callDate || ''),
+        String(r?.operator || '').trim(),
+        String(r?.note || '').trim(),
+        String(i),
+      ].join('__');
+      if (!key) return;
+      m.set(key, { ...(r || {}), rid: key });
+    });
+    return Array.from(m.values());
+  }, [obzvonAllRows, obzvonNewRows]);
   return (
     <div className="ani" style={{display:'grid',gap:12,padding:12,alignContent:'start',color:'var(--t1)'}}>
       <div className="tabs">
@@ -12768,9 +13075,9 @@ function AnalyticsPage({ D, company, currentUser, obzvonNewRows=[] }) {
         <button className={`tab${sub==='arxiv'?' on':''}`}   onClick={()=>setSub('arxiv')}>Tahlil arxivi</button>
       </div>
       {sub==='sotuv'   &&<SotuvAnaliz   D={D} />}
-      {sub==='obzvon'  &&<ObzvonAnaliz  D={D} company={company} currentUser={currentUser} obzvonRows={obzvonNewRows} />}
-      {sub==='korxona' &&<KorxonaHolati D={D} company={company} obzvonRows={obzvonNewRows} />}
-      {sub==='arxiv'   &&<TahlilArxivi  company={company} obzvonRows={obzvonNewRows} />}
+      {sub==='obzvon'  &&<ObzvonAnaliz  D={D} company={company} currentUser={currentUser} obzvonRows={mergedObzvonRows} />}
+      {sub==='korxona' &&<KorxonaHolati D={D} company={company} obzvonRows={mergedObzvonRows} />}
+      {sub==='arxiv'   &&<TahlilArxivi  company={company} obzvonRows={mergedObzvonRows} />}
     </div>
   );
 }
@@ -12778,7 +13085,7 @@ function AnalyticsPage({ D, company, currentUser, obzvonNewRows=[] }) {
 
 /* Claude API key field — Settings panel uchun */
 function ClaudeKeyField() {
-  const [val, setVal] = React.useState(()=>localStorage.getItem('__claude_api_key')||'');
+  const [val, setVal] = useState(()=>localStorage.getItem('__claude_api_key')||'');
   const save = v => { setVal(v); localStorage.setItem('__claude_api_key', v); };
   return (
     <div>
@@ -12786,7 +13093,7 @@ function ClaudeKeyField() {
         value={val} onChange={e=>save(e.target.value)} style={{width:'100%'}} />
       {val
         ? <div style={{fontSize:11,color:'var(--gr)',marginTop:4}}>✓ Kalit saqlangan ({val.length} ta belgi)</div>
-        : <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>Kalit kiritilmagan — Tahlil arxivi AI funksiyasi ishlamaydi</div>
+        : <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>Kalit ixtiyoriy: qattiq kategoriyali tahlil kalitsiz ham ishlaydi</div>
       }
     </div>
   );
@@ -12796,6 +13103,7 @@ function SettingsPanel({
   users, setUsers, access, setAccess, currentUser, setCurrentUser,
   webhookUrl, setWebhookUrl, userCreds, setUserCreds, onSwitchUser, isAdminSession=false, viewerAccess=null,
   D=null, company='murodbaxsh', rawArchiveSheetRows = [], rawEmployeeSheetRows = [],
+  obzvonCompanySources = {}, setObzvonCompanySources = () => {},
 }) {
   const [tab, setTab] = useState('staff');
   const [sel, setSel] = useState(currentUser || users[0] || 'Admin');
@@ -12829,6 +13137,18 @@ function SettingsPanel({
   ];
   const viewerConf = normalizeAccessConfig(currentUser, viewerAccess || access[currentUser]);
   const uiConf = normalizeAccessConfig(currentUser, access[currentUser]);
+  const obzvonSources = useMemo(
+    () => normalizeObzvonCompanySources(obzvonCompanySources),
+    [obzvonCompanySources]
+  );
+  const updateObzvonSource = useCallback((companyKey, patch) => {
+    const key = normalizeCompanyKey(companyKey);
+    setObzvonCompanySources((prev) => {
+      const next = normalizeObzvonCompanySources(prev || {});
+      next[key] = normalizeObzvonSourceEntry({ ...(next[key] || {}), ...(patch || {}) });
+      return next;
+    });
+  }, [setObzvonCompanySources]);
   const bindingStorageKey = useMemo(
     () => `aq-driver-warehouse-map-${normalizeCompanyKey(company)}`,
     [company]
@@ -13499,10 +13819,47 @@ function SettingsPanel({
           <div style={{marginTop:18,borderTop:'1px solid var(--b2)',paddingTop:14}}>
             <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>Tahlil arxivi: Claude AI kaliti</div>
             <div style={{fontSize:12,color:'var(--t3)',marginBottom:8}}>
-              Obzvon izohlarini AI bilan tahlil qilish uchun ishlatiladi (Tahlil arxivi bo'limi).
-              Kalit <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" style={{color:'var(--bl)'}}>console.anthropic.com</a> dan olinadi. Claude Haiku modeli arzon tarif.
+              Bu kalit ixtiyoriy: qattiq kategoriyali tahlil kalitsiz ham ishlaydi.
+              Kalit bo'lsa, arxivga AI xulosa ham qo'shiladi. Kalitni <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" style={{color:'var(--bl)'}}>console.anthropic.com</a> dan olasiz.
             </div>
             <ClaudeKeyField />
+          </div>
+          <div style={{marginTop:18,borderTop:'1px solid var(--b2)',paddingTop:14,display:'grid',gap:10}}>
+            <div>
+              <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>Obzvon manbasi (kompaniya bo'yicha)</div>
+              <div style={{fontSize:12,color:'var(--t3)'}}>
+                Har bir kompaniya uchun obzvon Google Sheet manbasini kiriting: URL, varaq nomi (sheet) yoki GID.
+              </div>
+            </div>
+            {(COMPANY_OPTIONS || []).map((opt) => {
+              const key = normalizeCompanyKey(opt?.key);
+              const src = obzvonSources[key] || normalizeObzvonSourceEntry({});
+              return (
+                <div key={`obz_src_${key}`} style={{border:'1px solid var(--b2)',borderRadius:10,padding:10,display:'grid',gap:8,background:'var(--s2)'}}>
+                  <div style={{fontWeight:700,fontSize:12}}>{companyLabelByKey(key)}</div>
+                  <input
+                    className="input"
+                    placeholder="Google Sheet URL"
+                    value={src.url}
+                    onChange={(e) => updateObzvonSource(key, { url: e.target.value })}
+                  />
+                  <div style={{display:'grid',gap:8,gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
+                    <input
+                      className="input"
+                      placeholder="Qator nomi (sheet nomi)"
+                      value={src.sheetName}
+                      onChange={(e) => updateObzvonSource(key, { sheetName: e.target.value })}
+                    />
+                    <input
+                      className="input"
+                      placeholder="GID (masalan: 123456789)"
+                      value={src.gid}
+                      onChange={(e) => updateObzvonSource(key, { gid: e.target.value })}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -14585,6 +14942,9 @@ export default function App() {
   const [isLoggedIn,setIsLoggedIn] = useState(() => !!S.get('aq-session-user', ''));
   const [mainSheetUrl, setMainSheetUrl] = useState(() => SHEET_CONFIG.url || '');
   const [obzvonSheetUrl, setObzvonSheetUrl] = useState(() => OBZVON_ALL_SHEET_URL || '');
+  const [obzvonCompanySources, setObzvonCompanySources] = useState(() =>
+    normalizeObzvonCompanySources(S.get(OBZVON_COMPANY_SOURCES_KEY, buildDefaultObzvonCompanySources()))
+  );
   // Muhim: barcha qurilmalarda bir xil endpoint ishlashi uchun URL saqlanadi va normallashtiriladi.
   const [obzvonWebhook,setObzvonWebhook] = useState(() =>
     normalizeAccessApiUrl(S.get(ACCESS_SYNC_URL_KEY, OBZVON_WEBHOOK_DEFAULT))
@@ -14954,6 +15314,64 @@ export default function App() {
   }, []);
 
   const loadObzvonAllRemote = useCallback(async () => {
+    const targetCompany = normalizeCompanyKey(companyFilter);
+    const applyRows = (rows, companyKey, mergeByCompany = false) => {
+      const body = (rows || [])
+        .slice(1)
+        .map((row, i) => normalizeObzvonAllRow({
+          no: row?.[0] ?? (i + 1),                // A
+          customer: pickObzvonCustomerName(row),  // J prioritet, bo'lmasa B
+          callDate: row?.[2] || '',               // C
+          topic: row?.[3] || '',                  // D
+          note: row?.[4] || '',                   // E
+          nextDate: row?.[5] || '',               // F
+          orderCount: row?.[6] || '',             // G
+          operator: row?.[7] || '',               // H
+          customerId: row?.[8] || '',             // I
+          orderDate: row?.[10] || '',             // K (bo'lsa)
+          company: companyKey,
+        }, i))
+        .filter((x) => x.customer || x.customerId);
+      if (!body.length) return false;
+      if (!mergeByCompany) {
+        setObzvonAllRows(body || []);
+        setObzvonAllLoaded(true);
+        S.set('aq-obzvon-all-rows', body || []);
+        return true;
+      }
+      setObzvonAllRows((prev) => {
+        const source = Array.isArray(prev) ? prev : [];
+        const next = [
+          ...body,
+          ...source.filter((r) => normalizeStoredCompanyKey(r?.company) !== normalizeCompanyKey(companyKey)),
+        ];
+        S.set('aq-obzvon-all-rows', next);
+        return next;
+      });
+      setObzvonAllLoaded(true);
+      return true;
+    };
+
+    if (targetCompany !== 'murodbaxsh') {
+      try {
+        const src = getObzvonCompanySource(obzvonCompanySources, targetCompany);
+        const sid = extractSheetId(src.url || '');
+        if (sid && (src.sheetName || src.gid)) {
+          let rows = [];
+          if (src.sheetName) {
+            try { rows = await fetchSheetCsvByName(sid, src.sheetName, `${companyLabelByKey(targetCompany)} obzvon`); } catch {}
+          }
+          if ((!rows || !rows.length) && src.gid) {
+            try { rows = await fetchSheetCsv(sid, src.gid, `${companyLabelByKey(targetCompany)} obzvon`); } catch {}
+          }
+          if (rows && rows.length) {
+            return applyRows(rows, targetCompany, true);
+          }
+        }
+      } catch {}
+      return false;
+    }
+
     try {
       const r = await fetch(OBZVON_ALL_LOCAL_XLSX, { cache:'no-store' });
       if (!r.ok) return false;
@@ -14962,28 +15380,10 @@ export default function App() {
       const firstSheet = wb.SheetNames?.[0];
       if (!firstSheet) return false;
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[firstSheet], { header:1, defval:'', raw:true });
-      const body = rows
-        .slice(1)
-        .map((row, i) => normalizeObzvonAllRow({
-          no: row?.[0] ?? (i + 1),                 // A
-          customer: pickObzvonCustomerName(row),    // J (prioritet), xato/bo'sh bo'lsa B
-          callDate: row?.[2] || '',                // C
-          topic: row?.[3] || '',                   // D
-          note: row?.[4] || '',                    // E
-          nextDate: row?.[5] || '',                // F
-          orderCount: row?.[6] || '',              // G
-          operator: row?.[7] || '',                // H
-          customerId: row?.[8] || '',              // I
-          orderDate: '',                            // Bu faylda yo'q
-        }, i))
-        .filter((x) => x.customer || x.customerId);
-      setObzvonAllRows(body || []);
-      setObzvonAllLoaded(true);
-      S.set('aq-obzvon-all-rows', body || []);
-      return true;
+      return applyRows(rows, targetCompany, false);
     } catch {}
     return false;
-  }, [normalizeObzvonAllRow]);
+  }, [normalizeObzvonAllRow, obzvonCompanySources, companyFilter]);
 
   const appendObzvonAllRemote = useCallback(async (rows = []) => {
     const normalizedRows = (rows || [])
@@ -15465,6 +15865,9 @@ export default function App() {
   useEffect(() => { S.set('aq-main-url', mainSheetUrl || ''); }, [mainSheetUrl]);
   useEffect(() => { S.set('aq-obzvon-url', obzvonSheetUrl || ''); }, [obzvonSheetUrl]);
   useEffect(() => {
+    S.set(OBZVON_COMPANY_SOURCES_KEY, normalizeObzvonCompanySources(obzvonCompanySources || {}));
+  }, [obzvonCompanySources]);
+  useEffect(() => {
     const fixed = SHEET_CONFIG.url || '';
     if (mainSheetUrl !== fixed) setMainSheetUrl(fixed);
   }, [mainSheetUrl]);
@@ -15529,6 +15932,10 @@ export default function App() {
     }, 350);
     return () => clearTimeout(t);
   }, [users, access, userCreds, bindingSyncTick, isLoggedIn, sessionUser, remoteAccessLoaded, pushRemoteAccessConfig, readAllBindingMaps]);
+
+  useEffect(() => {
+    setObzvonAllLoaded(false);
+  }, [companyFilter]);
 
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -16778,7 +17185,7 @@ export default function App() {
                     mode="bloggers"
                   />
                 )}
-                {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} D={D} company={activeCompany} rawArchiveSheetRows={leftoverArchiveSheetRows} rawEmployeeSheetRows={leftoverEmployeeSheetRows} />}
+                {page==='settings' && canViewPage('settings') && <SettingsPanel users={users} setUsers={setUsers} access={access} setAccess={setAccess} currentUser={currentUser} setCurrentUser={setCurrentUser} webhookUrl={obzvonWebhook} setWebhookUrl={setObzvonWebhook} userCreds={userCreds} setUserCreds={setUserCreds} onSwitchUser={switchUser} isAdminSession={sessionUser==='Admin'} viewerAccess={currentAccess} D={D} company={activeCompany} rawArchiveSheetRows={leftoverArchiveSheetRows} rawEmployeeSheetRows={leftoverEmployeeSheetRows} obzvonCompanySources={obzvonCompanySources} setObzvonCompanySources={setObzvonCompanySources} />}
               </>
             )}
           </div>
