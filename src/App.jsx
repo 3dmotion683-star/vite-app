@@ -3949,7 +3949,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, tg_bot:false, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, analytics:true, plan:true, tg_bot:false, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3958,7 +3958,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'own',
     role: 'operator',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, tg_bot:false, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, analytics:true, plan:true, tg_bot:false, test:true, bloggers:true, refresh:true, settings:false, settings_staff:false, settings_app:false, settings_ui:false, obzvon_new_edit:false, obzvon_new_delete:false, obzvon_new_publish:false, nazorat_perm_handler:false },
     ui: { theme:'dark' },
     company: { canSwitch:false, default:'murodbaxsh' },
   },
@@ -3967,7 +3967,7 @@ const DEFAULT_ACCESS = {
     activeScope: 'all',
     role: 'admin',
     customerTabs: { ...DEFAULT_CUSTOMER_TABS },
-    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, plan:true, tg_bot:true, test:true, bloggers:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
+    visible: { dash:true, cust:true, orders:true, left_orders:true, kassa:true, obzvon:true, doljniki:true, doljniki_kuler:true, nazorat:true, reports:true, analytics:true, plan:true, tg_bot:true, test:true, bloggers:true, refresh:true, settings:true, settings_staff:true, settings_app:true, settings_ui:true, obzvon_new_edit:true, obzvon_new_delete:true, obzvon_new_publish:true, nazorat_perm_handler:true },
     ui: { theme:'dark' },
     company: { canSwitch:true, default:'murodbaxsh' },
   },
@@ -11821,6 +11821,912 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
   );
 }
 
+function AnalyticsPage({
+  D,
+  company='murodbaxsh',
+  currentUser='Admin',
+  planRows=[],
+  obzvonAllRows=[],
+  obzvonNewRows=[],
+}) {
+  const [tab, setTab] = useState('sales');
+  const periodOptions = useMemo(() => ([
+    { value: 'all', label: 'Hamma vaqt' },
+    { value: 'year', label: 'Yil' },
+    { value: 'month', label: 'Oy' },
+    { value: 'day', label: 'Kun' },
+  ]), []);
+  const salesModeOptions = useMemo(() => ([
+    { value: 'spread', label: 'Yoyma' },
+    { value: 'exact', label: "Faqat shu" },
+  ]), []);
+  const nowIso = useMemo(() => toIsoDate(new Date()), []);
+  const nowMonth = useMemo(() => monthKey(new Date()) || nowIso.slice(0, 7), [nowIso]);
+  const nowYear = useMemo(() => nowIso.slice(0, 4), [nowIso]);
+
+  const [salesPeriod, setSalesPeriod] = useState('all');
+  const [salesYear, setSalesYear] = useState(nowYear);
+  const [salesMonth, setSalesMonth] = useState(nowMonth);
+  const [salesDay, setSalesDay] = useState(nowIso);
+  const [salesCategory, setSalesCategory] = useState('all');
+  const [salesViewMode, setSalesViewMode] = useState('spread');
+  const [selectedProducts, setSelectedProducts] = useState({});
+
+  const [callPeriod, setCallPeriod] = useState('month');
+  const [callYear, setCallYear] = useState(nowYear);
+  const [callMonth, setCallMonth] = useState(nowMonth);
+  const [callDay, setCallDay] = useState(nowIso);
+  const [corpMonth, setCorpMonth] = useState(nowMonth);
+
+  const detectCategory = useCallback((rawCategory, product) => {
+    const direct = String(rawCategory || '').trim();
+    if (direct) return direct;
+    const p = normalizeMatchText(product || '');
+    if (isWaterProduct(product || '')) return 'Suv';
+    if (p.includes('kuler') || p.includes('cooler') || p.includes('кулер')) return 'Kuler';
+    if (p.includes('tara') || p.includes('idish') || p.includes('бутыл')) return 'Idish';
+    return 'Boshqa';
+  }, []);
+
+  const matchPeriod = useCallback((isoDate, period, year, month, day) => {
+    const iso = String(isoDate || '').slice(0, 10);
+    if (!iso) return false;
+    if (period === 'all') return true;
+    if (period === 'year') return iso.startsWith(`${String(year || '').slice(0, 4)}-`);
+    if (period === 'month') return iso.startsWith(`${String(month || '').slice(0, 7)}-`);
+    if (period === 'day') return iso === String(day || '').slice(0, 10);
+    return true;
+  }, []);
+
+  const orderRows = useMemo(() => {
+    const src = Array.isArray(D?.rawOrders) ? D.rawOrders : [];
+    return src
+      .filter((o) => (isOrderDoc(o?.docType) || isReturnDoc(o?.docType)) && !isCancelledStatus(o?.status))
+      .map((o) => {
+        const date = toIsoDate(o?.orderDate);
+        if (!date) return null;
+        const isReturn = isReturnDoc(o?.docType);
+        const direction = isReturn ? -1 : 1;
+        const product = String(o?.product || '').trim() || '(Nomsiz mahsulot)';
+        const qty = direction * Math.abs(toNum(o?.qty));
+        const sumUZS = direction * Math.abs(toNum(o?.sum));
+        return {
+          id: `${String(o?.soNum || '').trim()}__${String(o?.uniqueId || '').trim()}__${product}__${date}`,
+          date,
+          year: date.slice(0, 4),
+          monthKey: date.slice(0, 7),
+          product,
+          category: detectCategory(o?.cat, product),
+          customerId: String(o?.mId || '').trim(),
+          qty,
+          sumUZS,
+          direction,
+        };
+      })
+      .filter(Boolean);
+  }, [D?.rawOrders, detectCategory]);
+
+  const activeCustomers = useMemo(() => (
+    (D?.customers || [])
+      .filter((c) => !isNameInactiveByPrefix(c?.name || ''))
+      .map((c) => ({
+        id: String(c?.id || '').trim(),
+        name: String(c?.name || '').trim(),
+        source: String(c?.source || '').trim(),
+      }))
+      .filter((c) => c.id && c.name)
+  ), [D?.customers]);
+  const activeCustomerIdSet = useMemo(
+    () => new Set(activeCustomers.map((c) => c.id)),
+    [activeCustomers]
+  );
+
+  const salesYearOptions = useMemo(
+    () => Array.from(new Set(orderRows.map((r) => r.year))).sort((a, b) => b.localeCompare(a)),
+    [orderRows]
+  );
+  const salesMonthOptions = useMemo(() => {
+    const src = orderRows.filter((r) => !salesYear || r.year === salesYear);
+    return Array.from(new Set(src.map((r) => r.monthKey))).sort((a, b) => b.localeCompare(a));
+  }, [orderRows, salesYear]);
+  const salesDayOptions = useMemo(() => {
+    const src = orderRows.filter((r) => !salesMonth || r.monthKey === salesMonth);
+    return Array.from(new Set(src.map((r) => r.date))).sort((a, b) => b.localeCompare(a));
+  }, [orderRows, salesMonth]);
+  useEffect(() => {
+    if (!salesYearOptions.length) return;
+    if (!salesYearOptions.includes(salesYear)) setSalesYear(salesYearOptions[0]);
+  }, [salesYearOptions, salesYear]);
+  useEffect(() => {
+    if (!salesMonthOptions.length) return;
+    if (!salesMonthOptions.includes(salesMonth)) setSalesMonth(salesMonthOptions[0]);
+  }, [salesMonthOptions, salesMonth]);
+  useEffect(() => {
+    if (!salesDayOptions.length) return;
+    if (!salesDayOptions.includes(salesDay)) setSalesDay(salesDayOptions[0]);
+  }, [salesDayOptions, salesDay]);
+
+  const salesCategoryOptions = useMemo(() => {
+    const list = Array.from(new Set(orderRows.map((r) => String(r.category || '').trim()).filter(Boolean)));
+    list.sort((a, b) => a.localeCompare(b));
+    return ['all', ...list];
+  }, [orderRows]);
+  const salesProductOptions = useMemo(() => {
+    const list = Array.from(new Set(orderRows.map((r) => r.product).filter(Boolean)));
+    list.sort((a, b) => a.localeCompare(b));
+    return list;
+  }, [orderRows]);
+  useEffect(() => {
+    if (!salesProductOptions.length) return;
+    setSelectedProducts((prev) => {
+      const old = (prev && typeof prev === 'object') ? prev : {};
+      const hasOld = Object.keys(old).length > 0;
+      const next = {};
+      salesProductOptions.forEach((p) => {
+        next[p] = hasOld ? !!old[p] : true;
+      });
+      return next;
+    });
+  }, [salesProductOptions]);
+  const hasProductSelectionMap = useMemo(
+    () => Object.keys(selectedProducts || {}).length > 0,
+    [selectedProducts]
+  );
+  const selectedProductSet = useMemo(() => {
+    const set = new Set();
+    Object.entries(selectedProducts || {}).forEach(([name, enabled]) => {
+      if (enabled) set.add(name);
+    });
+    return set;
+  }, [selectedProducts]);
+  const isProductAllowed = useCallback((name) => {
+    if (!salesProductOptions.length) return true;
+    if (!hasProductSelectionMap) return true;
+    return selectedProductSet.has(name);
+  }, [salesProductOptions.length, hasProductSelectionMap, selectedProductSet]);
+
+  const salesFilteredRows = useMemo(() => {
+    return orderRows
+      .filter((r) => matchPeriod(r.date, salesPeriod, salesYear, salesMonth, salesDay))
+      .filter((r) => salesCategory === 'all' || String(r.category || '') === salesCategory)
+      .filter((r) => isProductAllowed(r.product));
+  }, [orderRows, matchPeriod, salesPeriod, salesYear, salesMonth, salesDay, salesCategory, isProductAllowed]);
+  const salesTotals = useMemo(() => {
+    return salesFilteredRows.reduce((acc, r) => {
+      acc.qty += Number(r.qty || 0);
+      acc.sumUZS += Number(r.sumUZS || 0);
+      acc.rows += 1;
+      return acc;
+    }, { qty: 0, sumUZS: 0, rows: 0 });
+  }, [salesFilteredRows]);
+  const salesExactRows = useMemo(() => {
+    const byProduct = new Map();
+    salesFilteredRows.forEach((r) => {
+      if (!byProduct.has(r.product)) {
+        byProduct.set(r.product, { product: r.product, category: r.category, qty: 0, sumUZS: 0, rows: 0 });
+      }
+      const b = byProduct.get(r.product);
+      b.qty += Number(r.qty || 0);
+      b.sumUZS += Number(r.sumUZS || 0);
+      b.rows += 1;
+    });
+    return Array.from(byProduct.values()).sort((a, b) => a.product.localeCompare(b.product));
+  }, [salesFilteredRows]);
+  const spreadKeyLabel = useCallback((scope, row) => {
+    if (scope === 'all') return row.year;
+    if (scope === 'year') return row.monthKey;
+    if (scope === 'month') return row.date;
+    return row.date;
+  }, []);
+  const spreadLabel = useCallback((v) => {
+    const key = String(v || '');
+    if (/^\d{4}-\d{2}$/.test(key)) return formatMonthShort(key);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(key)) return fmtD(key);
+    return key || '-';
+  }, []);
+  const salesSpreadRows = useMemo(() => {
+    const m = new Map();
+    salesFilteredRows.forEach((r) => {
+      const pKey = spreadKeyLabel(salesPeriod, r);
+      const key = `${pKey}__${r.product}`;
+      if (!m.has(key)) {
+        m.set(key, { period: pKey, product: r.product, category: r.category, qty: 0, sumUZS: 0, rows: 0 });
+      }
+      const b = m.get(key);
+      b.qty += Number(r.qty || 0);
+      b.sumUZS += Number(r.sumUZS || 0);
+      b.rows += 1;
+    });
+    return Array.from(m.values()).sort((a, b) => (
+      a.period === b.period
+        ? a.product.localeCompare(b.product)
+        : a.period.localeCompare(b.period)
+    ));
+  }, [salesFilteredRows, spreadKeyLabel, salesPeriod]);
+
+  const mergedObzvonRows = useMemo(() => {
+    const toNorm = (r, i, srcTag) => ({
+      rid: String(r?.rid || r?._rid || '').trim() || `${srcTag}_${i}`,
+      callDate: toIsoDate(r?.callDate || r?.date || ''),
+      customerId: String(r?.customerId || r?.id || '').trim(),
+      customer: String(r?.customer || r?.name || '').trim(),
+      topic: String(r?.topic || '').trim(),
+      note: String(r?.note || '').trim(),
+      nextDate: toIsoDate(r?.nextDate || ''),
+      operator: String(r?.operator || '').trim() || '-',
+      updatedAt: String(r?.updatedAt || '').trim(),
+    });
+    const list = [
+      ...(Array.isArray(obzvonAllRows) ? obzvonAllRows.map((r, i) => toNorm(r, i, 'all')) : []),
+      ...(Array.isArray(obzvonNewRows) ? obzvonNewRows.map((r, i) => toNorm(r, i, 'new')) : []),
+    ].filter((r) => r.callDate || r.customerId || r.note || r.topic);
+    const map = new Map();
+    list.forEach((r, idx) => {
+      const fallback = `${r.callDate}__${r.customerId}__${r.topic}__${r.note}__${r.operator}__${idx}`;
+      const key = r.rid || fallback;
+      const prev = map.get(key);
+      if (!prev) {
+        map.set(key, r);
+        return;
+      }
+      const prevTs = toDate(prev.updatedAt || prev.callDate)?.getTime() || 0;
+      const nextTs = toDate(r.updatedAt || r.callDate)?.getTime() || 0;
+      if (nextTs >= prevTs) map.set(key, r);
+    });
+    return Array.from(map.values()).sort((a, b) => (
+      (toDate(b.callDate)?.getTime() || 0) - (toDate(a.callDate)?.getTime() || 0)
+    ));
+  }, [obzvonAllRows, obzvonNewRows]);
+
+  const callYearOptions = useMemo(
+    () => Array.from(new Set(mergedObzvonRows.map((r) => String(r.callDate || '').slice(0, 4)).filter(Boolean))).sort((a, b) => b.localeCompare(a)),
+    [mergedObzvonRows]
+  );
+  const callMonthOptions = useMemo(() => {
+    const list = mergedObzvonRows
+      .map((r) => String(r.callDate || '').slice(0, 7))
+      .filter((mk) => mk && (!callYear || mk.startsWith(`${callYear}-`)));
+    return Array.from(new Set(list)).sort((a, b) => b.localeCompare(a));
+  }, [mergedObzvonRows, callYear]);
+  const callDayOptions = useMemo(() => {
+    const list = mergedObzvonRows
+      .map((r) => String(r.callDate || '').slice(0, 10))
+      .filter((d) => d && (!callMonth || d.startsWith(`${callMonth}-`)));
+    return Array.from(new Set(list)).sort((a, b) => b.localeCompare(a));
+  }, [mergedObzvonRows, callMonth]);
+  useEffect(() => {
+    if (!callYearOptions.length) return;
+    if (!callYearOptions.includes(callYear)) setCallYear(callYearOptions[0]);
+  }, [callYearOptions, callYear]);
+  useEffect(() => {
+    if (!callMonthOptions.length) return;
+    if (!callMonthOptions.includes(callMonth)) setCallMonth(callMonthOptions[0]);
+  }, [callMonthOptions, callMonth]);
+  useEffect(() => {
+    if (!callDayOptions.length) return;
+    if (!callDayOptions.includes(callDay)) setCallDay(callDayOptions[0]);
+  }, [callDayOptions, callDay]);
+
+  const filteredObzvonRows = useMemo(() => (
+    mergedObzvonRows.filter((r) => matchPeriod(r.callDate, callPeriod, callYear, callMonth, callDay))
+  ), [mergedObzvonRows, matchPeriod, callPeriod, callYear, callMonth, callDay]);
+
+  const callsByOperatorRows = useMemo(() => {
+    const m = new Map();
+    filteredObzvonRows.forEach((r) => {
+      const op = r.operator || '-';
+      if (!m.has(op)) {
+        m.set(op, { operator: op, calls: 0, customers: new Set(), topicMap: new Map() });
+      }
+      const b = m.get(op);
+      b.calls += 1;
+      if (r.customerId) b.customers.add(r.customerId);
+      const topic = r.topic || '-';
+      b.topicMap.set(topic, (b.topicMap.get(topic) || 0) + 1);
+    });
+    return Array.from(m.values())
+      .map((b) => ({
+        operator: b.operator,
+        calls: b.calls,
+        customers: b.customers.size,
+        topics: Array.from(b.topicMap.entries())
+          .sort((a, c) => c[1] - a[1])
+          .slice(0, 3)
+          .map(([name, count]) => `${name} (${count})`)
+          .join(' | '),
+      }))
+      .sort((a, b) => b.calls - a.calls || a.operator.localeCompare(b.operator));
+  }, [filteredObzvonRows]);
+
+  const ordersInCallPeriodByCustomer = useMemo(() => {
+    const m = new Map();
+    orderRows
+      .filter((r) => matchPeriod(r.date, callPeriod, callYear, callMonth, callDay))
+      .forEach((r) => {
+        if (!r.customerId) return;
+        if (!m.has(r.customerId)) m.set(r.customerId, { qty: 0, sumUZS: 0, rows: 0 });
+        const b = m.get(r.customerId);
+        b.qty += Number(r.qty || 0);
+        b.sumUZS += Number(r.sumUZS || 0);
+        b.rows += 1;
+      });
+    return m;
+  }, [orderRows, matchPeriod, callPeriod, callYear, callMonth, callDay]);
+
+  const salesFromCallsRows = useMemo(() => {
+    const latestCallByCustomer = new Map();
+    filteredObzvonRows.forEach((r) => {
+      if (!r.customerId || !activeCustomerIdSet.has(r.customerId)) return;
+      const prev = latestCallByCustomer.get(r.customerId);
+      const prevTs = prev ? (toDate(prev.callDate)?.getTime() || 0) : -1;
+      const nowTs = toDate(r.callDate)?.getTime() || 0;
+      if (!prev || nowTs >= prevTs) {
+        latestCallByCustomer.set(r.customerId, { operator: r.operator || '-', callDate: r.callDate });
+      }
+    });
+    const byOperator = new Map();
+    latestCallByCustomer.forEach((info, customerId) => {
+      const op = info.operator || '-';
+      if (!byOperator.has(op)) {
+        byOperator.set(op, { operator: op, calledCustomers: 0, soldCustomers: 0, qty: 0, sumUZS: 0 });
+      }
+      const b = byOperator.get(op);
+      b.calledCustomers += 1;
+      const orderStat = ordersInCallPeriodByCustomer.get(customerId);
+      if (orderStat && Number(orderStat.qty || 0) > 0.0001) {
+        b.soldCustomers += 1;
+        b.qty += Number(orderStat.qty || 0);
+        b.sumUZS += Number(orderStat.sumUZS || 0);
+      }
+    });
+    return Array.from(byOperator.values())
+      .map((r) => ({
+        ...r,
+        conversionPct: r.calledCustomers ? (r.soldCustomers * 100 / r.calledCustomers) : 0,
+      }))
+      .sort((a, b) => b.calledCustomers - a.calledCustomers || b.soldCustomers - a.soldCustomers);
+  }, [filteredObzvonRows, activeCustomerIdSet, ordersInCallPeriodByCustomer]);
+
+  const isNoAnswerNote = useCallback((noteText = '') => {
+    const t = normalizeMatchText(noteText || '');
+    if (!t) return false;
+    return (
+      textHasAny(t, ['tel kotarmadi', 'telefon kotarmadi', "ko'tarmadi", 'kotarmadi']) ||
+      textHasAny(t, ['не поднял', 'не отвечает', 'не ответил'])
+    );
+  }, []);
+  const allCallDatesByCustomer = useMemo(() => {
+    const m = new Map();
+    mergedObzvonRows.forEach((r) => {
+      if (!r.customerId || !r.callDate) return;
+      if (!m.has(r.customerId)) m.set(r.customerId, []);
+      m.get(r.customerId).push(r.callDate);
+    });
+    m.forEach((arr, key) => {
+      m.set(key, arr.slice().sort((a, b) => a.localeCompare(b)));
+    });
+    return m;
+  }, [mergedObzvonRows]);
+  const allOrderDatesByCustomer = useMemo(() => {
+    const m = new Map();
+    orderRows.forEach((r) => {
+      if (!r.customerId || !r.date) return;
+      if (!m.has(r.customerId)) m.set(r.customerId, []);
+      m.get(r.customerId).push(r.date);
+    });
+    m.forEach((arr, key) => {
+      m.set(key, arr.slice().sort((a, b) => a.localeCompare(b)));
+    });
+    return m;
+  }, [orderRows]);
+
+  const noAnswerRows = useMemo(
+    () => filteredObzvonRows.filter((r) => isNoAnswerNote(r.note)),
+    [filteredObzvonRows, isNoAnswerNote]
+  );
+  const noAnswerSummary = useMemo(() => {
+    const byOp = new Map();
+    let followedCalls = 0;
+    let noFollowCalls = 0;
+    let boughtAfter = 0;
+    noAnswerRows.forEach((r) => {
+      if (!r.customerId || !r.callDate) return;
+      const op = r.operator || '-';
+      if (!byOp.has(op)) byOp.set(op, { operator: op, total: 0, followed: 0, noFollow: 0, boughtAfter: 0 });
+      const b = byOp.get(op);
+      b.total += 1;
+      const nextCall = (allCallDatesByCustomer.get(r.customerId) || []).some((d) => d > r.callDate);
+      const nextOrder = (allOrderDatesByCustomer.get(r.customerId) || []).some((d) => d > r.callDate);
+      if (nextCall) {
+        followedCalls += 1;
+        b.followed += 1;
+      } else {
+        noFollowCalls += 1;
+        b.noFollow += 1;
+      }
+      if (nextOrder) {
+        boughtAfter += 1;
+        b.boughtAfter += 1;
+      }
+    });
+    return {
+      total: noAnswerRows.length,
+      followedCalls,
+      noFollowCalls,
+      boughtAfter,
+      byOperator: Array.from(byOp.values()).sort((a, b) => b.total - a.total || b.boughtAfter - a.boughtAfter),
+    };
+  }, [noAnswerRows, allCallDatesByCustomer, allOrderDatesByCustomer]);
+
+  const latestOrderByCustomer = useMemo(() => {
+    const out = {};
+    orderRows.forEach((r) => {
+      if (!r.customerId || !r.date) return;
+      if (!out[r.customerId] || r.date > out[r.customerId]) out[r.customerId] = r.date;
+    });
+    return out;
+  }, [orderRows]);
+  const latestCallByCustomer = useMemo(() => {
+    const out = {};
+    mergedObzvonRows.forEach((r) => {
+      if (!r.customerId || !r.callDate) return;
+      if (!out[r.customerId] || r.callDate > out[r.customerId]) out[r.customerId] = r.callDate;
+    });
+    return out;
+  }, [mergedObzvonRows]);
+
+  const needsCallRows = useMemo(() => {
+    return activeCustomers
+      .map((c) => {
+        const ord = latestOrderByCustomer[c.id] || '';
+        const cal = latestCallByCustomer[c.id] || '';
+        const orderDays = ord ? (daysAgo(ord) ?? 0) : null;
+        const callDays = cal ? (daysAgo(cal) ?? 0) : null;
+        return {
+          ...c,
+          lastOrderDate: ord,
+          lastCallDate: cal,
+          orderDays,
+          callDays,
+        };
+      })
+      .filter((r) => r.orderDays != null && r.orderDays >= 7)
+      .filter((r) => r.callDays == null || r.callDays > 7)
+      .sort((a, b) => (b.orderDays || 0) - (a.orderDays || 0))
+      .slice(0, 300);
+  }, [activeCustomers, latestOrderByCustomer, latestCallByCustomer]);
+
+  const planByMonth = useMemo(() => {
+    const m = {};
+    (planRows || []).forEach((r) => {
+      const mk = normalizeMonthKey(r?.month);
+      if (!mk) return;
+      m[mk] = {
+        waterPlan: Number(r?.waterPlan || 0),
+        coolerPlan: Number(r?.coolerPlan || 0),
+        workDays: Number(r?.workDays || 26),
+      };
+    });
+    return m;
+  }, [planRows]);
+  const allMonthOptions = useMemo(() => {
+    const set = new Set([
+      ...Object.keys(planByMonth || {}),
+      ...orderRows.map((r) => r.monthKey).filter(Boolean),
+      ...mergedObzvonRows.map((r) => String(r.callDate || '').slice(0, 7)).filter(Boolean),
+    ]);
+    return Array.from(set).sort((a, b) => b.localeCompare(a));
+  }, [planByMonth, orderRows, mergedObzvonRows]);
+  useEffect(() => {
+    if (!allMonthOptions.length) return;
+    if (!allMonthOptions.includes(corpMonth)) setCorpMonth(allMonthOptions[0]);
+  }, [allMonthOptions, corpMonth]);
+
+  const companyMonthStats = useMemo(() => {
+    const monthOrders = orderRows.filter((r) => r.monthKey === corpMonth && isWaterProduct(r.product));
+    const soldQty = monthOrders.filter((r) => r.direction > 0).reduce((s, r) => s + Math.abs(toNum(r.qty)), 0);
+    const returnedQty = monthOrders.filter((r) => r.direction < 0).reduce((s, r) => s + Math.abs(toNum(r.qty)), 0);
+    const netQty = soldQty - returnedQty;
+    const netSumUZS = monthOrders.reduce((s, r) => s + Number(r.sumUZS || 0), 0);
+    const monthCalls = mergedObzvonRows.filter((r) => String(r.callDate || '').startsWith(`${corpMonth}-`));
+    const noAnswerCount = monthCalls.filter((r) => isNoAnswerNote(r.note)).length;
+    const calledActiveCustomers = new Set(
+      monthCalls
+        .map((r) => r.customerId)
+        .filter((id) => activeCustomerIdSet.has(id))
+    ).size;
+    const activeCount = activeCustomers.length;
+    const plan = Number(planByMonth?.[corpMonth]?.waterPlan || 0);
+    const planGap = plan - netQty;
+    const planPct = plan > 0 ? (netQty * 100 / plan) : 0;
+    const returnPct = soldQty > 0 ? (returnedQty * 100 / soldQty) : 0;
+    const callCoveragePct = activeCount > 0 ? (calledActiveCustomers * 100 / activeCount) : 0;
+    const noAnswerPct = monthCalls.length > 0 ? (noAnswerCount * 100 / monthCalls.length) : 0;
+    return {
+      plan,
+      soldQty,
+      returnedQty,
+      netQty,
+      netSumUZS,
+      planGap,
+      planPct,
+      returnPct,
+      callCoveragePct,
+      noAnswerCount,
+      noAnswerPct,
+      monthCalls: monthCalls.length,
+      calledActiveCustomers,
+      activeCount,
+    };
+  }, [orderRows, corpMonth, mergedObzvonRows, isNoAnswerNote, activeCustomerIdSet, activeCustomers.length, planByMonth]);
+
+  const companyIssues = useMemo(() => {
+    const issues = [];
+    const fixes = [];
+    if (companyMonthStats.plan > 0 && companyMonthStats.netQty + 0.0001 < companyMonthStats.plan) {
+      issues.push(`Plan bajarilmadi: ${fmt(companyMonthStats.plan)} ta reja, ${fmt(companyMonthStats.netQty)} ta fakt.`);
+      fixes.push("Faol operatorlar bo'yicha kunlik call rejasi qo'ying va javobsiz mijozlar uchun qayta-call oynasini qat'iylashtiring.");
+    }
+    if (companyMonthStats.returnPct >= 8) {
+      issues.push(`Vozvrat ulushi yuqori: ${companyMonthStats.returnPct.toFixed(1)}%.`);
+      fixes.push("Vozvrat sabablari bo'yicha top-3 mahsulotni tekshirib, dostavka va sifat bo'yicha alohida nazorat qo'ying.");
+    }
+    if (companyMonthStats.callCoveragePct < 60) {
+      issues.push(`Aktiv mijoz qamrovi past: ${companyMonthStats.callCoveragePct.toFixed(1)}%.`);
+      fixes.push("Operator kesimida qamrovi past segmentni ajratib, har kuni majburiy minimum obzvon normasi belgilang.");
+    }
+    if (companyMonthStats.noAnswerPct > 25) {
+      issues.push(`"Tel ko'tarmadi" ulushi yuqori: ${companyMonthStats.noAnswerPct.toFixed(1)}%.`);
+      fixes.push("Javobsiz mijozlarga 2-bosqich callback jadvali kiriting (kunning boshqa vaqtida qayta urinish).");
+    }
+    if (!issues.length) {
+      issues.push("Asosiy ko'rsatkichlar bo'yicha kritik og'ish aniqlanmadi.");
+      fixes.push("Hozirgi tempni saqlang va haftalik monitoringni davom ettiring.");
+    }
+    return { issues, fixes };
+  }, [companyMonthStats]);
+
+  const toggleProduct = (name) => {
+    setSelectedProducts((prev) => {
+      const old = (prev && typeof prev === 'object') ? prev : {};
+      const hasOld = Object.keys(old).length > 0;
+      const next = {};
+      salesProductOptions.forEach((p) => {
+        next[p] = hasOld ? !!old[p] : true;
+      });
+      next[name] = !next[name];
+      return next;
+    });
+  };
+  const selectAllProducts = () => {
+    const next = {};
+    salesProductOptions.forEach((p) => { next[p] = true; });
+    setSelectedProducts(next);
+  };
+  const clearProductSelection = () => {
+    const next = {};
+    salesProductOptions.forEach((p) => { next[p] = false; });
+    setSelectedProducts(next);
+  };
+
+  return (
+    <div className="ani" style={{display:'flex',flexDirection:'column',gap:10}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <div className="tabs" style={{display:'inline-flex'}}>
+          <button className={`tab${tab==='sales'?' on':''}`} onClick={()=>setTab('sales')}>Sotuv analizi</button>
+          <button className={`tab${tab==='calls'?' on':''}`} onClick={()=>setTab('calls')}>Obzvon analizi</button>
+          <button className={`tab${tab==='company'?' on':''}`} onClick={()=>setTab('company')}>Korxona holati</button>
+        </div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Kompaniya: {companyLabelByKey(company)}</span>
+          <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Foydalanuvchi: {currentUser}</span>
+        </div>
+      </div>
+
+      {tab === 'sales' && (
+        <>
+          <div className="card" style={{padding:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Davr</span>
+            <select className="select" value={salesPeriod} onChange={(e)=>setSalesPeriod(e.target.value)}>
+              {periodOptions.map((x) => <option key={`sales_p_${x.value}`} value={x.value}>{x.label}</option>)}
+            </select>
+            {(salesPeriod === 'year' || salesPeriod === 'month' || salesPeriod === 'day') && (
+              <select className="select" value={salesYear} onChange={(e)=>setSalesYear(e.target.value)}>
+                {salesYearOptions.map((y) => <option key={`sales_y_${y}`} value={y}>{y}</option>)}
+              </select>
+            )}
+            {(salesPeriod === 'month' || salesPeriod === 'day') && (
+              <select className="select" value={salesMonth} onChange={(e)=>setSalesMonth(e.target.value)}>
+                {salesMonthOptions.map((m) => <option key={`sales_m_${m}`} value={m}>{formatMonthShort(m)}</option>)}
+              </select>
+            )}
+            {salesPeriod === 'day' && (
+              <select className="select" value={salesDay} onChange={(e)=>setSalesDay(e.target.value)}>
+                {salesDayOptions.map((d) => <option key={`sales_d_${d}`} value={d}>{fmtD(d)}</option>)}
+              </select>
+            )}
+            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Kategoriya</span>
+            <select className="select" value={salesCategory} onChange={(e)=>setSalesCategory(e.target.value)}>
+              {salesCategoryOptions.map((c) => <option key={`sales_c_${c}`} value={c}>{c === 'all' ? 'Hammasi' : c}</option>)}
+            </select>
+            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Ko'rinish</span>
+            <select className="select" value={salesViewMode} onChange={(e)=>setSalesViewMode(e.target.value)}>
+              {salesModeOptions.map((m) => <option key={`sales_mode_${m.value}`} value={m.value}>{m.label}</option>)}
+            </select>
+          </div>
+          <div className="card" style={{padding:10,display:'grid',gap:8}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+              <div style={{fontWeight:700}}>Mahsulot tanlash</div>
+              <div style={{display:'flex',gap:6}}>
+                <button className="btn btn-gh btn-sm" onClick={selectAllProducts}>Hammasini tanlash</button>
+                <button className="btn btn-gh btn-sm" onClick={clearProductSelection}>Tozalash</button>
+              </div>
+            </div>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap',maxHeight:120,overflow:'auto'}}>
+              {salesProductOptions.map((p) => (
+                <label key={`sales_pr_${p}`} style={FILTER_CHECK_LABEL_STYLE}>
+                  <input
+                    type="checkbox"
+                    checked={hasProductSelectionMap ? !!(selectedProducts || {})[p] : true}
+                    onChange={()=>toggleProduct(p)}
+                  />
+                  <span style={FILTER_CHECK_TEXT_STYLE}>{p}</span>
+                </label>
+              ))}
+            </div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              <span className="tag">Qator: {fmt(salesTotals.rows)}</span>
+              <span className="tag">Netto son: {fmt(salesTotals.qty)} ta</span>
+              <span className="tag">Netto summa: {fmt(salesTotals.sumUZS)} so'm</span>
+            </div>
+          </div>
+          <div className="card" style={{padding:0,overflow:'hidden'}}>
+            <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>
+              {salesViewMode === 'spread' ? 'Sotuv yoyma analizi' : 'Sotuv (faqat tanlangan davr)'}
+            </div>
+            <div style={{overflow:'auto',maxHeight:'52vh'}}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                    {salesViewMode === 'spread' && <th>Davr</th>}
+                    <th>Mahsulot</th>
+                    <th>Kategoriya</th>
+                    <th style={{textAlign:'right'}}>Netto son</th>
+                    <th style={{textAlign:'right'}}>Netto summa (so'm)</th>
+                    <th style={{textAlign:'right'}}>Qator</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(salesViewMode === 'spread' ? salesSpreadRows : salesExactRows).length === 0 ? (
+                    <tr><td colSpan={salesViewMode === 'spread' ? 7 : 6} style={{textAlign:'center',padding:24,color:'var(--t3)'}}>Ma'lumot topilmadi</td></tr>
+                  ) : (salesViewMode === 'spread' ? salesSpreadRows : salesExactRows).map((r, i) => (
+                    <tr key={`sales_row_${i}_${r.product}`}>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
+                      {salesViewMode === 'spread' && <td style={{fontFamily:'var(--mono)'}}>{spreadLabel(r.period)}</td>}
+                      <td>{r.product}</td>
+                      <td>{r.category || '-'}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:Number(r.qty || 0) >= 0 ? 'var(--gr)' : 'var(--rd)'}}>{fmt(r.qty)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:Number(r.sumUZS || 0) >= 0 ? 'var(--gr)' : 'var(--rd)'}}>{fmt(r.sumUZS)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.rows)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {tab === 'calls' && (
+        <>
+          <div className="card" style={{padding:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Davr</span>
+            <select className="select" value={callPeriod} onChange={(e)=>setCallPeriod(e.target.value)}>
+              {periodOptions.map((x) => <option key={`call_p_${x.value}`} value={x.value}>{x.label}</option>)}
+            </select>
+            {(callPeriod === 'year' || callPeriod === 'month' || callPeriod === 'day') && (
+              <select className="select" value={callYear} onChange={(e)=>setCallYear(e.target.value)}>
+                {callYearOptions.map((y) => <option key={`call_y_${y}`} value={y}>{y}</option>)}
+              </select>
+            )}
+            {(callPeriod === 'month' || callPeriod === 'day') && (
+              <select className="select" value={callMonth} onChange={(e)=>setCallMonth(e.target.value)}>
+                {callMonthOptions.map((m) => <option key={`call_m_${m}`} value={m}>{formatMonthShort(m)}</option>)}
+              </select>
+            )}
+            {callPeriod === 'day' && (
+              <select className="select" value={callDay} onChange={(e)=>setCallDay(e.target.value)}>
+                {callDayOptions.map((d) => <option key={`call_d_${d}`} value={d}>{fmtD(d)}</option>)}
+              </select>
+            )}
+            <span className="tag">Obzvon yozuvi: {fmt(filteredObzvonRows.length)}</span>
+            <span className="tag">Operator: {fmt(callsByOperatorRows.length)}</span>
+          </div>
+
+          <div className="card" style={{padding:0,overflow:'hidden'}}>
+            <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Operator bo'yicha obzvon</div>
+            <div style={{overflow:'auto',maxHeight:'28vh'}}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                    <th>Operator</th>
+                    <th style={{textAlign:'right'}}>Obzvon</th>
+                    <th style={{textAlign:'right'}}>Mijoz</th>
+                    <th>Top kategoriyalar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {callsByOperatorRows.length === 0 ? (
+                    <tr><td colSpan={5} style={{textAlign:'center',padding:22,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
+                  ) : callsByOperatorRows.map((r, i) => (
+                    <tr key={`call_op_${r.operator}_${i}`}>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
+                      <td>{r.operator}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.calls)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.customers)}</td>
+                      <td style={{fontSize:12,color:'var(--t2)'}}>{r.topics || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card" style={{padding:0,overflow:'hidden'}}>
+            <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Obzvondan sotuvga o'tish</div>
+            <div style={{overflow:'auto',maxHeight:'26vh'}}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                    <th>Operator</th>
+                    <th style={{textAlign:'right'}}>Qo'ng'iroq qilingan mijoz</th>
+                    <th style={{textAlign:'right'}}>Sotuv qilgan mijoz</th>
+                    <th style={{textAlign:'right'}}>Konversiya %</th>
+                    <th style={{textAlign:'right'}}>Netto son</th>
+                    <th style={{textAlign:'right'}}>Netto summa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salesFromCallsRows.length === 0 ? (
+                    <tr><td colSpan={7} style={{textAlign:'center',padding:22,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
+                  ) : salesFromCallsRows.map((r, i) => (
+                    <tr key={`call_sale_${r.operator}_${i}`}>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
+                      <td>{r.operator}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.calledCustomers)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.soldCustomers)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{r.conversionPct.toFixed(1)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.qty)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.sumUZS)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card" style={{padding:10,display:'flex',gap:8,flexWrap:'wrap'}}>
+            <span className="tag">"Tel ko'tarmadi": <strong style={{color:'var(--t1)'}}>{fmt(noAnswerSummary.total)}</strong></span>
+            <span className="tag">Qayta aloqa bor: <strong style={{color:'var(--gr)'}}>{fmt(noAnswerSummary.followedCalls)}</strong></span>
+            <span className="tag">Qayta aloqa yo'q: <strong style={{color:'var(--rd)'}}>{fmt(noAnswerSummary.noFollowCalls)}</strong></span>
+            <span className="tag">Keyin sotuv bo'lgan: <strong style={{color:'var(--bl)'}}>{fmt(noAnswerSummary.boughtAfter)}</strong></span>
+          </div>
+
+          <div className="card" style={{padding:0,overflow:'hidden'}}>
+            <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Tel ko'tarmadi - operator kesimi</div>
+            <div style={{overflow:'auto',maxHeight:'24vh'}}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                    <th>Operator</th>
+                    <th style={{textAlign:'right'}}>Jami</th>
+                    <th style={{textAlign:'right'}}>Qayta aloqa</th>
+                    <th style={{textAlign:'right'}}>Qayta aloqa yo'q</th>
+                    <th style={{textAlign:'right'}}>Keyin sotuv</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {noAnswerSummary.byOperator.length === 0 ? (
+                    <tr><td colSpan={6} style={{textAlign:'center',padding:22,color:'var(--t3)'}}>Ma'lumot yo'q</td></tr>
+                  ) : noAnswerSummary.byOperator.map((r, i) => (
+                    <tr key={`noans_${r.operator}_${i}`}>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
+                      <td>{r.operator}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{fmt(r.total)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--gr)'}}>{fmt(r.followed)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--rd)'}}>{fmt(r.noFollow)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--bl)'}}>{fmt(r.boughtAfter)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="card" style={{padding:0,overflow:'hidden'}}>
+            <div style={{padding:'10px 12px',borderBottom:'1px solid var(--b2)',fontWeight:700}}>Hozir qo'ng'iroq kerak bo'lgan aktiv mijozlar</div>
+            <div style={{overflow:'auto',maxHeight:'30vh'}}>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th style={{width:54,minWidth:54,maxWidth:54}}>No</th>
+                    <th>ID</th>
+                    <th>Mijoz</th>
+                    <th>Oxirgi zakaz</th>
+                    <th>Oxirgi obzvon</th>
+                    <th style={{textAlign:'right'}}>Zakazdan beri kun</th>
+                    <th style={{textAlign:'right'}}>Obzvondan beri kun</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {needsCallRows.length === 0 ? (
+                    <tr><td colSpan={7} style={{textAlign:'center',padding:22,color:'var(--t3)'}}>Hozircha qo'ng'iroq navbati topilmadi</td></tr>
+                  ) : needsCallRows.map((r, i) => (
+                    <tr key={`need_call_${r.id}`}>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{i + 1}</td>
+                      <td style={{fontFamily:'var(--mono)',fontSize:11,color:'var(--t3)'}}>{r.id}</td>
+                      <td>{r.name}</td>
+                      <td style={{fontFamily:'var(--mono)'}}>{fmtD(r.lastOrderDate)}</td>
+                      <td style={{fontFamily:'var(--mono)'}}>{fmtD(r.lastCallDate)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)',color:'var(--rd)'}}>{r.orderDays == null ? '-' : fmt(r.orderDays)}</td>
+                      <td style={{textAlign:'right',fontFamily:'var(--mono)'}}>{r.callDays == null ? '-' : fmt(r.callDays)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {tab === 'company' && (
+        <>
+          <div className="card" style={{padding:10,display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            <span className="tag" style={{background:'var(--s3)',color:'var(--t3)'}}>Oy</span>
+            <select className="select" value={corpMonth} onChange={(e)=>setCorpMonth(e.target.value)}>
+              {allMonthOptions.map((m) => <option key={`corp_m_${m}`} value={m}>{formatMonthShort(m)}</option>)}
+            </select>
+            <span className="tag">Plan: {fmt(companyMonthStats.plan)} ta</span>
+            <span className="tag">Fakt (netto): {fmt(companyMonthStats.netQty)} ta</span>
+            <span className="tag">Plan bajarilishi: {companyMonthStats.planPct.toFixed(1)}%</span>
+          </div>
+
+          <div style={{display:'grid',gap:8,gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))'}}>
+            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Sotilgan (oy)</div><div style={{fontSize:24,fontWeight:800,color:'var(--gr)'}}>{fmt(companyMonthStats.soldQty)} ta</div></div>
+            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Vozvrat (oy)</div><div style={{fontSize:24,fontWeight:800,color:'var(--rd)'}}>{fmt(companyMonthStats.returnedQty)} ta</div></div>
+            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Netto summa</div><div style={{fontSize:24,fontWeight:800,color:'var(--bl)'}}>{fmt(companyMonthStats.netSumUZS)} so'm</div></div>
+            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Obzvon qamrovi</div><div style={{fontSize:24,fontWeight:800,color:'var(--yl)'}}>{companyMonthStats.callCoveragePct.toFixed(1)}%</div></div>
+            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>"Tel ko'tarmadi" ulushi</div><div style={{fontSize:24,fontWeight:800,color:'var(--or)'}}>{companyMonthStats.noAnswerPct.toFixed(1)}%</div></div>
+            <div className="stat"><div style={{fontSize:11,color:'var(--t3)'}}>Vozvrat ulushi</div><div style={{fontSize:24,fontWeight:800,color:'var(--or)'}}>{companyMonthStats.returnPct.toFixed(1)}%</div></div>
+          </div>
+
+          <div className="card" style={{padding:12}}>
+            <div style={{fontWeight:700,marginBottom:8}}>Kamchiliklar</div>
+            <ol style={{margin:0,paddingLeft:18,display:'grid',gap:6}}>
+              {companyIssues.issues.map((text, i) => (
+                <li key={`issue_${i}`} style={{color:i === 0 ? 'var(--rd)' : 'var(--t2)'}}>{text}</li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="card" style={{padding:12}}>
+            <div style={{fontWeight:700,marginBottom:8}}>Tavsiya etilgan yechimlar</div>
+            <ol style={{margin:0,paddingLeft:18,display:'grid',gap:6}}>
+              {companyIssues.fixes.map((text, i) => (
+                <li key={`fix_${i}`} style={{color:'var(--gr)'}}>{text}</li>
+              ))}
+            </ol>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function SettingsPanel({
   users, setUsers, access, setAccess, currentUser, setCurrentUser,
   webhookUrl, setWebhookUrl, userCreds, setUserCreds, onSwitchUser, isAdminSession=false, viewerAccess=null,
@@ -11834,7 +12740,7 @@ function SettingsPanel({
   const [editLogin, setEditLogin] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const pages = ['dash','cust','orders','left_orders','kassa','obzvon','doljniki','nazorat','reports','plan','test','bloggers','refresh','settings'];
+  const pages = ['dash','cust','orders','left_orders','kassa','obzvon','doljniki','nazorat','reports','analytics','plan','test','bloggers','refresh','settings'];
   const settingsSections = [
     { key:'settings_staff', label:"Hodimlar ruhsatlari" },
     { key:'settings_app', label:'Ilova sozlamalari' },
@@ -12169,6 +13075,7 @@ function SettingsPanel({
       ],
     },
     { key: 'reports', label: 'Hisobotlar', fallback: true, children: [] },
+    { key: 'analytics', label: 'Analizlar', fallback: true, children: [] },
     { key: 'plan', label: 'Plan', fallback: true, children: [] },
     { key: 'tg_bot', label: 'Telegram bot', fallback: false, children: [] },
     { key: 'test', label: 'Test', fallback: true, children: [] },
@@ -13545,6 +14452,7 @@ const NAV = [
   { id:'doljniki',label:'Doljniki',   icon:E.doc, badge:'dz' },
   { id:'nazorat', label:'Nazorat',    icon:E.report },
   { id:'reports', label:'Hisobotlar', icon:E.report },
+  { id:'analytics', label:'Analizlar', icon:E.report },
   { id:'plan',    label:'Plan',       icon:E.plan },
   { id:'tg_bot',  label:'Telegram bot', icon:'\u{1F916}' },
   { id:'test',    label:'Test',       icon:E.test },
@@ -15738,6 +16646,16 @@ export default function App() {
                     mode="reports"
                   />
                 )}
+                {page==='analytics' && canViewPage('analytics') && (
+                  <AnalyticsPage
+                    D={D}
+                    company={activeCompany}
+                    currentUser={effectiveUser}
+                    planRows={planRows}
+                    obzvonAllRows={companyObzvonAllRows}
+                    obzvonNewRows={companyObzvonAllNewRows}
+                  />
+                )}
                 {page==='nazorat' && canViewPage('nazorat') && (
                   <Reports
                     D={nazoratData}
@@ -15958,12 +16876,6 @@ export default function App() {
     </>
   );
 }
-
-
-
-
-
-
 
 
 
