@@ -11896,7 +11896,7 @@ const OBZVON_ARXIV_SHEET_HEADERS = [
 const OBZVON_ARXIV_EXPORT_HEADERS = [
   'No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh',
   'Davr', 'Kategoriya', 'Natija',
-  'Operator', 'Kompaniya', 'UpdatedAt',
+  'Operator', 'Kompaniya',
 ];
 const toObzArcCompanyKey = (co) => normalizeCompanyKey(co) || String(co || '').trim().toLowerCase();
 const getObzArcStorageKey = (co) => `__obzArc_${toObzArcCompanyKey(co)}`;
@@ -11932,6 +11932,18 @@ const parseObzArcResultFlags = (raw) => {
     followedUp: n.includes('aloqa') && (n.includes('ha') || n.includes('bor')),
     orderedAfter: n.includes('sotib') && (n.includes('ha') || n.includes('oldi') || n.includes('bor')),
   };
+};
+const makeObzArcMatchKey = (r) => {
+  const customerId = String(r?.customerId || r?.id || '').trim();
+  const customerName = normalizeMatchText(String(r?.customer || r?.customerName || '')).replace(/\s+/g, ' ').trim();
+  const customer = customerId || customerName;
+  const callDate = toIsoDate(r?.callDate || '');
+  const operator = normalizeMatchText(String(r?.operator || '')).replace(/\s+/g, ' ').trim();
+  const topic = normalizeMatchText(String(r?.topic || '')).replace(/\s+/g, ' ').trim();
+  const note = normalizeMatchText(String(r?.note || '')).replace(/\s+/g, ' ').trim();
+  const parts = [customer, callDate, operator, topic, note];
+  if (!parts.some(Boolean)) return '';
+  return parts.join('__');
 };
 const sortObzArcItems = (items = []) => {
   const toTs = (item) => {
@@ -12154,6 +12166,7 @@ const parseObzArcSheetRows = (rows = [], defaultCompany = '') => {
       if (Object.prototype.hasOwnProperty.call(item.categories, cat)) item.categories[cat] += 1;
       const safeRid = String(
         rid ||
+        makeObzArcMatchKey({ customerId, customer, operator, callDate, topic, note }) ||
         `arc__${company}__${type}__${period}__${String(customerId || customer || '').replace(/\s+/g, '_').slice(0, 40)}__${String(callDate || '').replace(/\s+/g, '_').slice(0, 20)}__${item.rows.length + 1}`
       ).trim();
       item.rows.push({
@@ -12188,9 +12201,14 @@ const parseObzArcSheetRows = (rows = [], defaultCompany = '') => {
                 detectCat(note || '');
     /* Kategoriya hisobini yangilaymiz */
     if (Object.prototype.hasOwnProperty.call(item.categories, cat)) item.categories[cat] += 1;
+    const stableRid = String(
+      rid ||
+      makeObzArcMatchKey({ customerId, customer, operator, callDate, topic, note }) ||
+      `${recordId}_${item.rows.length + 1}`
+    ).trim();
     item.rows.push({
-      id:  rid || `${recordId}_${item.rows.length + 1}`,
-      rid: rid || `${recordId}_${item.rows.length + 1}`,
+      id:  stableRid || `${recordId}_${item.rows.length + 1}`,
+      rid: stableRid || `${recordId}_${item.rows.length + 1}`,
       customerId, customer, operator,
       callDate: toIsoDate(callDate || ''),
       topic, note: (note || '').slice(0, 260), cat,
@@ -12217,8 +12235,8 @@ const serializeObzArcByCompanyToSheetRows = (byCompany = {}) => {
       const period = String(item?.period || '').trim();
       const periodRows = Array.isArray(item?.rows) && item.rows.length ? item.rows : [null];
       periodRows.forEach((r) => {
-        const followed = r?.followedUp ? 'ha' : 'yoq';
-        const ordered = r?.orderedAfter ? 'ha' : 'yoq';
+        const followed = r?.followedUp ? '1' : '0';
+        const ordered = r?.orderedAfter ? '1' : '0';
         out.push({
           no: '',
           customerId: String(r?.customerId || '').trim(),
@@ -12228,10 +12246,9 @@ const serializeObzArcByCompanyToSheetRows = (byCompany = {}) => {
           note: String(r?.note || '').trim().slice(0, 260),
           period,
           category: String(r?.cat || '').trim(),
-          result: `Aloqa:${followed};Sotib:${ordered}`,
+          result: `${followed}|${ordered}`,
           operator: String(r?.operator || '').trim(),
           company,
-          updatedAt: String(item?.analyzedAt || new Date().toISOString()),
         });
       });
     });
@@ -12337,7 +12354,6 @@ const pushObzArcRowsToGoogleSheet = async (rows = [], by = 'unknown', mode = 're
       result: String(r?.result || '').trim(),
       operator: String(r?.operator || '').trim(),
       company: String(r?.company || '').trim(),
-      updatedAt: String(r?.updatedAt || '').trim(),
     }));
   const fetchLastNo = async () => {
     for (const url of urlsToTry) {
@@ -12391,7 +12407,6 @@ const pushObzArcRowsToGoogleSheet = async (rows = [], by = 'unknown', mode = 're
     String(r?.result || '').trim(),
     String(r?.operator || '').trim(),
     String(r?.company || '').trim(),
-    String(r?.updatedAt || '').trim(),
   ]));
   const payload = {
     sheetId:   OBZVON_ARCHIVE_SHEET_ID,
@@ -12444,7 +12459,7 @@ const pushObzArcRowsToGoogleSheet = async (rows = [], by = 'unknown', mode = 're
 };
 const syncObzArcCompanyToGoogleSheet = async (company, items = [], by = 'unknown', mode = 'replace') => {
   /* mode='replace' -> kompaniya arxivi to'liq qayta yoziladi
-     mode='append'  -> faqat berilgan yangi satrlar qo'shiladi (RID bo'yicha dedup server tomonda) */
+     mode='append'  -> faqat berilgan yangi satrlar qo'shiladi (dedup client tomonda) */
   const key      = toObzArcCompanyKey(company);
   const normalized = normalizeObzArcItems(items || []);
   const payloadRows = serializeObzArcByCompanyToSheetRows({ [key]: normalized });
@@ -13394,27 +13409,61 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
     [archiveItems]
   );
   const usingArchiveForNotes = archiveItems.length > 0;
+  const analyticsTimelineByCustomer = useMemo(() => {
+    const grouped = new Map();
+    analyticsRows.forEach((r) => {
+      const customerId = String(r?.customerId || '').trim();
+      const ts = toDate(r?.callDate)?.getTime() || 0;
+      if (!customerId || !ts) return;
+      if (!grouped.has(customerId)) grouped.set(customerId, []);
+      grouped.get(customerId).push({
+        ts,
+        sold: hasObzvonSale(r),
+      });
+    });
+    const timeline = new Map();
+    grouped.forEach((arr, customerId) => {
+      arr.sort((a, b) => a.ts - b.ts);
+      const soldSuffix = new Array(arr.length).fill(false);
+      let seenSold = false;
+      for (let i = arr.length - 1; i >= 0; i--) {
+        seenSold = seenSold || Boolean(arr[i]?.sold);
+        soldSuffix[i] = seenSold;
+      }
+      timeline.set(customerId, { arr, soldSuffix });
+    });
+    return timeline;
+  }, [analyticsRows]);
 
   const rawMissedAnalysis = useMemo(() => {
     const missedRows = analyticsRows.filter((r) => isMissedCall(r?.note));
+    const findFirstAfterIdx = (arr, ts) => {
+      let lo = 0;
+      let hi = arr.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (Number(arr[mid]?.ts || 0) <= ts) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo;
+    };
     return missedRows.map((r, i) => {
       const custId = String(r?.customerId || '').trim();
       const callTs = toDate(r?.callDate)?.getTime() || 0;
       let followedUp = false;
       let orderedAfter = false;
-      if (custId) {
-        const later = allRows.filter((o) => {
-          if (isIgnoredObzvonOperator(o?.operator)) return false;
-          const same = String(o?.customerId || '').trim() === custId;
-          const laterTs = toDate(o?.callDate)?.getTime() || 0;
-          return same && o !== r && laterTs > callTs;
-        });
-        followedUp = later.length > 0;
-        orderedAfter = later.some((o) => String(o?.orderCount || '').trim() || String(o?.orderDate || '').trim());
+      if (custId && callTs) {
+        const bucket = analyticsTimelineByCustomer.get(custId);
+        const arr = Array.isArray(bucket?.arr) ? bucket.arr : [];
+        if (arr.length) {
+          const idxAfter = findFirstAfterIdx(arr, callTs);
+          followedUp = idxAfter < arr.length;
+          orderedAfter = followedUp ? Boolean(bucket?.soldSuffix?.[idxAfter]) : false;
+        }
       }
       return { ...r, followedUp, orderedAfter, _i: i };
     });
-  }, [analyticsRows, allRows]);
+  }, [analyticsRows, analyticsTimelineByCustomer]);
 
   const missedAnalysis = useMemo(() => {
     if (!archiveRows.length) return rawMissedAnalysis;
@@ -14230,8 +14279,8 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
       const monthPeriod = period.slice(0, 7);
       const monthlyItem = (arc || []).find((a) => a?.type === 'monthly' && String(a?.period || '') === monthPeriod);
       if (monthlyItem) {
-        const monthlyKeys = new Set((Array.isArray(monthlyItem?.rows) ? monthlyItem.rows : []).map((r) => makeObzvonRowKey(r)));
-        const dailyKeys = rowsWithNote.map((r) => makeObzvonRowKey(r));
+        const monthlyKeys = new Set((Array.isArray(monthlyItem?.rows) ? monthlyItem.rows : []).map((r) => makeObzArcMatchKey(r)));
+        const dailyKeys = rowsWithNote.map((r) => makeObzArcMatchKey(r));
         const alreadyCovered = dailyKeys.length > 0 && dailyKeys.every((k) => monthlyKeys.has(k));
         if (alreadyCovered) {
           setAiSt({ loading: false, err: '', msg: `ℹ️ ${period} kunlik satrlar oylik tahlilda allaqachon bor` });
@@ -14241,8 +14290,8 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
     }
     const existing = (arc || []).find((a) => a?.type === type && a?.period === period) || null;
     const existingRows = Array.isArray(existing?.rows) ? existing.rows : [];
-    const existingKeys = new Set(existingRows.map((r) => makeObzvonRowKey(r)));
-    const pendingRows = rowsWithNote.filter((r) => !existingKeys.has(makeObzvonRowKey(r)));
+    const existingKeys = new Set(existingRows.map((r) => makeObzArcMatchKey(r)));
+    const pendingRows = rowsWithNote.filter((r) => !existingKeys.has(makeObzArcMatchKey(r)));
     const notes = pendingRows.map((r) => String(r?.note || '').trim()).filter(Boolean);
     if (!rowsWithNote.length) {
       setAiSt({ loading: false, err: `${period} uchun izoh yo'q`, msg: '' });
@@ -14254,7 +14303,7 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
           const nextCat = detectCat(r?.note);
           return {
             ...(r || {}),
-            rid: String(r?.rid || '').trim() || makeObzvonRowKey(r),
+            rid: String(r?.rid || '').trim() || makeObzArcMatchKey(r),
             cat: nextCat,
           };
         });
@@ -14368,7 +14417,7 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
       const cid = String(r?.customerId || '').trim();
       const ts = toDate(r?.callDate)?.getTime() || 0;
       const later = (byCustomer.get(cid) || []).filter((x) => x.ts > ts);
-      const key = makeObzvonRowKey(r);
+      const key = makeObzArcMatchKey(r);
       return {
         id: `${period}_${idx + 1}`,
         rid: key,
@@ -17867,8 +17916,8 @@ export default function App() {
         const sourceArc = await loadObzArcFromGoogleSheet(companyKey);
         const existing = (sourceArc || []).find((a) => a?.type === 'daily' && String(a?.period || '') === targetDate) || null;
         const existingRows = Array.isArray(existing?.rows) ? existing.rows : [];
-        const existingKeys = new Set(existingRows.map((r) => makeObzvonRowKey(r)));
-        const pendingRows = rowsWithNote.filter((r) => !existingKeys.has(makeObzvonRowKey(r)));
+        const existingKeys = new Set(existingRows.map((r) => makeObzArcMatchKey(r)));
+        const pendingRows = rowsWithNote.filter((r) => !existingKeys.has(makeObzArcMatchKey(r)));
         if (!pendingRows.length) {
           clearObzArc(companyKey);
           emitObzArcUpdated(companyKey);
@@ -17901,7 +17950,7 @@ export default function App() {
           const later = (byCustomer.get(cid) || []).filter((x) => x.ts > ts);
           const cat = detectCat(r?.note);
           if (Object.prototype.hasOwnProperty.call(catTotals, cat)) catTotals[cat] += 1;
-          const rid = makeObzvonRowKey(r);
+          const rid = makeObzArcMatchKey(r);
           return {
             id: `${targetDate}_${idx + 1}`,
             rid,
