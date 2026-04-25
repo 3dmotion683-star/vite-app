@@ -12205,7 +12205,9 @@ function SotuvAnaliz({ D, company = 'murodbaxsh' }) {
   }, [filtered, spreadMode, timeMode, getSalesValues]);
 
   const bonusRows = useMemo(
-    () => productStats.filter((p) => isBonusWaterProduct(p?.name)),
+    () => productStats
+      .filter((p) => Number(p?.zeroPriceQty || 0) > 0 || isBonusWaterProduct(p?.name))
+      .sort((a, b) => Number(b?.zeroPriceQty || 0) - Number(a?.zeroPriceQty || 0)),
     [productStats]
   );
   const prodChartData = productStats.slice(0, 12).map((p) => ({ name: p.name, Sotilgan: p.sotilgan, Qaytarilgan: p.qaytarilgan }));
@@ -12352,7 +12354,7 @@ function SotuvAnaliz({ D, company = 'murodbaxsh' }) {
                 {bonusRows.map((p) => (
                   <tr key={`bonus_${p.name}`}>
                     <td style={{fontWeight:600}}>{p.name}</td>
-                    <td style={{color:'var(--bl)',fontWeight:700}}>{fmt(p.sotilgan)}</td>
+                    <td style={{color:'var(--bl)',fontWeight:700}}>{fmt(p.zeroPriceQty)}</td>
                     <td style={{color:'var(--yl)'}}>{fmt(p.zeroPriceQty)}</td>
                     <td style={{color:'var(--rd)'}}>{fmt(p.qaytarilgan)}</td>
                   </tr>
@@ -13358,9 +13360,25 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
     const period = type==='monthly' ? today.slice(0,7) : yest;
     const rows = allRows.filter((r) => {
       const d = toIsoDate(r?.callDate||'');
-      return type==='monthly' ? d.startsWith(period) : d===period;
+      if (!d) return false;
+      return type === 'monthly'
+        ? (d.startsWith(period) && d <= yest)
+        : d === period;
     });
     const rowsWithNote = rows.filter((r) => String(r?.note || '').trim());
+    if (type === 'daily') {
+      const monthPeriod = period.slice(0, 7);
+      const monthlyItem = (arc || []).find((a) => a?.type === 'monthly' && String(a?.period || '') === monthPeriod);
+      if (monthlyItem) {
+        const monthlyKeys = new Set((Array.isArray(monthlyItem?.rows) ? monthlyItem.rows : []).map((r) => makeObzvonRowKey(r)));
+        const dailyKeys = rowsWithNote.map((r) => makeObzvonRowKey(r));
+        const alreadyCovered = dailyKeys.length > 0 && dailyKeys.every((k) => monthlyKeys.has(k));
+        if (alreadyCovered) {
+          setAiSt({ loading: false, err: '', msg: `ℹ️ ${period} kunlik satrlar oylik tahlilda allaqachon bor` });
+          return;
+        }
+      }
+    }
     const existing = (arc || []).find((a) => a?.type === type && a?.period === period) || null;
     const existingRows = Array.isArray(existing?.rows) ? existing.rows : [];
     const existingKeys = new Set(existingRows.map((r) => makeObzvonRowKey(r)));
@@ -13532,7 +13550,27 @@ boshqa: ${catTotals.boshqa || 0}`;
     }
   };
 
-  const dailyArc  = [...arc].filter(a=>a.type==='daily').slice(0,30).reverse();
+  const visibleArc = useMemo(() => {
+    const monthlyByMonth = new Map();
+    (arc || [])
+      .filter((a) => a?.type === 'monthly')
+      .forEach((a) => {
+        const mk = String(a?.period || '').slice(0, 7);
+        if (mk) monthlyByMonth.set(mk, a);
+      });
+    return (arc || []).filter((item) => {
+      if (item?.type !== 'daily') return true;
+      const mk = String(item?.period || '').slice(0, 7);
+      const monthly = monthlyByMonth.get(mk);
+      if (!monthly) return true;
+      const monthlyKeys = new Set((Array.isArray(monthly?.rows) ? monthly.rows : []).map((r) => makeObzvonRowKey(r)));
+      const dailyRows = Array.isArray(item?.rows) ? item.rows : [];
+      if (!dailyRows.length) return false;
+      const covered = dailyRows.every((r) => monthlyKeys.has(makeObzvonRowKey(r)));
+      return !covered;
+    });
+  }, [arc]);
+  const dailyArc  = [...visibleArc].filter(a=>a.type==='daily').slice(0,30).reverse();
   const trendData = dailyArc.map(a=>({
     period:a.period.slice(5),
     ...Object.fromEntries(FIXED_CATS.map(c=>[c.label,a.categories?.[c.key]||0])),
@@ -13566,7 +13604,7 @@ boshqa: ${catTotals.boshqa || 0}`;
       </div>
 
       {/* Arxiv bo'sh holati */}
-      {arc.length===0&&(
+      {visibleArc.length===0&&(
         <div className="card" style={{padding:40,textAlign:'center',color:'var(--t3)'}}>
           <div style={{fontWeight:700,marginBottom:8}}>Arxiv bo'sh</div>
           <div style={{fontSize:13}}>"Oylik tahlil" yoki "Kunlik tahlil" tugmasini bosing</div>
@@ -13574,11 +13612,11 @@ boshqa: ${catTotals.boshqa || 0}`;
       )}
 
       {/* Arxiv mavjud */}
-      {arc.length>0&&(
+      {visibleArc.length>0&&(
         <>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <div style={{fontWeight:700,fontSize:14}}>Tahlil arxivi
-              <span className="tag" style={{marginLeft:8,background:'var(--s3)',color:'var(--t2)'}}>{arc.length} ta yozuv</span>
+              <span className="tag" style={{marginLeft:8,background:'var(--s3)',color:'var(--t2)'}}>{visibleArc.length} ta yozuv</span>
             </div>
             <button className="btn btn-gh btn-sm" onClick={refresh}>↻ Yangilash</button>
           </div>
@@ -13610,7 +13648,7 @@ boshqa: ${catTotals.boshqa || 0}`;
           )}
 
           {/* Arxiv ro'yxati */}
-          {arc.map(item=>{
+          {visibleArc.map(item=>{
             const total=item.noteCount||1;
             return (
               <div key={item.id} className="card" style={{padding:'14px 16px'}}>
