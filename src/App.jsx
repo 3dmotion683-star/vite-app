@@ -11862,12 +11862,14 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
 /* ── Analiz sahifasi ───────────────────────────────────────────── */
 /* 6 ta qattiy kategoriya */
 const FIXED_CATS = [
-  { key: 'tel_kotarmadi',      label: "Tel ko'tarmadi",      color: 'var(--rd)' },
-  { key: 'telegram_yozildi',   label: "Telegramdan yozildi", color: 'var(--pu)' },
-  { key: 'buyurtma',           label: 'Buyurtma berdi',      color: 'var(--gr)' },
-  { key: 'suv_borekan',        label: 'Suv borekan',         color: 'var(--bl)' },
-  { key: 'kelishuv_tugatildi', label: 'Kelishuv tugatildi',  color: 'var(--or)' },
-  { key: 'boshqa',             label: 'Boshqalar',           color: 'var(--t3)' },
+  { key: 'zakaz',        label: 'Zakaz olindi',          color: 'var(--gr)' },
+  { key: 'qarz_sorab',   label: "Qarz/pul so'rash",      color: 'var(--or)' },
+  { key: 'tel_kotarmadi',label: "Tel ko'tarmadi",         color: 'var(--rd)' },
+  { key: 'suv_borekan',  label: 'Suvi bor / Keyin oladi',color: 'var(--bl)' },
+  { key: 'xabar_olish',  label: 'Qayta aloqa kerak',     color: 'var(--pu)' },
+  { key: 'tashadi',      label: 'Tashadi / Pul tushdi',  color: '#0ea5a0' },
+  { key: 'tugatildi',    label: 'Kelishuv tugadi',        color: '#c0392b' },
+  { key: 'boshqa',       label: 'Boshqalar',              color: 'var(--t3)' },
 ];
 
 const OBZVON_ARXIV_SHEET_HEADERS = [
@@ -12169,126 +12171,180 @@ const syncObzArcCompanyToGoogleSheet = async (company, items = [], by = 'unknown
 
 /* Izoh matnini avtomatik kategoriyaga ajratadi */
 const detectCat = (note) => {
-  const n = normalizeMatchText(String(note || ''));
-  const tgMention = (
-    /\b(tg|tgdan|tgda|telegram|telegramdan|telegramda)\b/.test(n) ||
-    n.includes('telega')
-  );
-  const tgWrite = n.includes('yoz') || n.includes('napis') || n.includes('писал') || n.includes('qarzini sor');
-  if (tgMention && tgWrite) return 'telegram_yozildi';
+  /* Izoh matnini normallashtirish + apostrof/ʻ ni qo'shimcha saqlab qolamiz */
+  const raw = String(note || '').trim().toLowerCase();
+  const n   = normalizeMatchText(raw); /* apostrof o'rniga bo'sh joy qo'yadi */
 
-  if (n.includes('kotarmadi') || n.includes('trubka') || n.includes('javob bermadi') ||
-      n.includes('ne beret') || n.includes('nedostupno') || n.includes('qabul qilmadi'))
-    return 'tel_kotarmadi';
-  const hasOrderWord = n.includes('buyurtma') || n.includes('zakaz');
-  const hasFutureHint = (
-    n.includes('keyin') ||
-    n.includes('ertaga') ||
-    n.includes('indin') ||
-    n.includes('berarkan') ||
-    n.includes('beradi') ||
-    n.includes('oladi') ||
-    n.includes('olarkan') ||
-    /\b\d+\s*kun/.test(n)
-  );
-  const hasOrderDone = (
+  /* ── 1. ZAKAZ / BUYURTMA ──────────────────────────────────────────
+     "zakaz oldm", "zakaz oldim", "5 ta", "3 ta buyurtma berdi"      */
+  const isZakaz = (
+    n.includes('zakaz old') ||                      /* zakaz oldm / zakaz oldim */
+    n.includes('zakaz od')  ||                      /* zakaz odm */
+    n.includes('zakaz qild') ||
     n.includes('buyurtma berdi') ||
-    n.includes('zakaz oldim') ||
-    n.includes('zakaz oldi') ||
-    n.includes('zakaz qildi') ||
-    n.includes('buyurtma qildi') ||
-    n.includes('tasdiq') ||
-    n.includes('podtverd')
+    n.includes('buyurtma qild') ||
+    n.includes('tasdiq') || n.includes('podtverd') ||
+    /^\s*\d+(\+\d+)?\s*ta(\s+buyurtma)?\s*$/.test(n) /* "5 ta", "3+1 ta" */
   );
-  if (
-    n.includes('suvi bor') ||
-    n.includes('borekan') ||
-    n.includes('borakan') ||
-    n.includes('hali bor') ||
-    n.includes('suv bor') ||
-    /\b\d+\s*ta\s*bor\b/.test(n) ||
-    (hasOrderWord && hasFutureHint && !hasOrderDone) ||
-    (hasOrderWord && !hasOrderDone)
-  )
-    return 'suv_borekan';
-  if (n.includes('boshqa joy') || n.includes('boshqa brand') || n.includes('kerak emas') ||
-      n.includes('ne nado') || n.includes('bolmaydi') || n.includes('toxtatdi') ||
-      n.includes('boshqa kompaniya') || n.includes('boshqa yerdan'))
-    return 'kelishuv_tugatildi';
-  if (hasOrderDone || n.includes('tasdiqladi') || n.includes('podtverdil'))
-    return 'buyurtma';
+  if (isZakaz) return 'zakaz';
+
+  /* ── 2. QARZ / PUL SO'RASH ───────────────────────────────────────
+     "Telegramdan yozdim qarzini sorab", "pul so'rab"                */
+  const isQarz = (
+    n.includes('qarzini sor') || n.includes('qarzi sor') ||
+    n.includes('qarz sor')    || n.includes('qarzni sor') ||
+    n.includes('pulini sor')  || n.includes('puli sor')   ||
+    n.includes('pulni sor')   || n.includes('qarz so')
+  );
+  if (isQarz) return 'qarz_sorab';
+
+  /* ── 3. TEL KO'TARMADI ──────────────────────────────────────────
+     apostrof olib tashlanadi: "ko'tarmadi" → "ko tarmadi"
+     shuning uchun "tarmadi" ni qidiramiz                           */
+  const isMissed = (
+    n.includes('tarmadi')    ||   /* ko'tarmadi, tarmadi */
+    n.includes('trubka')     ||
+    n.includes('javob bermadi') ||
+    n.includes('ne beret')   ||
+    n.includes('nedostupno') ||
+    n.includes('qabul qilmadi') ||
+    n.includes('tel ochu')   ||   /* tel o'chiq */
+    n.includes('tel ochiq')  ||
+    n.includes('nomer ochiq')||
+    n.includes('nomer o chiq')
+  );
+  if (isMissed) return 'tel_kotarmadi';
+
+  /* ── 4. SUVI BOR / KEYIN OLADI ──────────────────────────────────
+     "Hali bor", "3 ta bor", "suvlari yetarlikan",
+     "keyingi xafta zakaz", "ertaga zakaz berarkan"                 */
+  const isSuvBor = (
+    n.includes('hali bor')   || n.includes('hazir bor') ||
+    n.includes('suvi bor')   || n.includes('suv bor')   ||
+    n.includes('borekan')    || n.includes('borakan')    ||
+    n.includes('borkan')     || n.includes('suvlar bor') ||
+    n.includes('yetarlikan') || n.includes('yetarli')    ||
+    /\b\d+\s*ta\s*(suv\s*)?bor\b/.test(n) ||            /* "3 ta bor", "2 ta suv bor" */
+    n.includes('keyingi xafta') || n.includes('keyingi hafta') ||
+    n.includes('oyli tushganda') || n.includes('maosh tushganda') ||
+    /\b\d+\s*kunda\s*(zakaz|suv)\b/.test(n) ||
+    n.includes('keyin zakaz') || n.includes('keyin suv') ||
+    n.includes('ertaga zakaz') || n.includes('berarkan') ||
+    (n.includes('zakaz') && (n.includes('keyin') || n.includes('ertaga') || n.includes('indin') || n.includes('kundan')))
+  );
+  if (isSuvBor) return 'suv_borekan';
+
+  /* ── 5. QAYTA ALOQA KERAK ───────────────────────────────────────
+     "Habar olish kere", "Bilib etaman dedi",
+     "uyga borib ko'rib etvorarkan"                                 */
+  const isXabar = (
+    n.includes('habar olish') || n.includes('xabar olish') ||
+    n.includes('bilib etaman')|| n.includes('bilib etad') ||
+    n.includes('uyga borib')  || n.includes('korib etvorar') ||
+    n.includes('bilib etvo')  || n.includes('o zim etaman') ||
+    n.includes('yozvorar')    || n.includes('o zim habar') ||
+    n.includes('uydamasakan') || n.includes('bant ekan') ||
+    n.includes('ikkinchi liniya') || n.includes('qayta aloqa')
+  );
+  if (isXabar) return 'xabar_olish';
+
+  /* ── 6. TASHADI / PUL TUSHDI ────────────────────────────────────
+     "bugun tashaberarkan", "pul tashab berdi", "naxt bergan"       */
+  const isTashadi = (
+    n.includes('tashaberarkan') || n.includes('tashaman dedi') ||
+    n.includes('tashiman dedi') || n.includes('tashib berdi') ||
+    n.includes('tashab berdi')  || n.includes('tashab berdila') ||
+    n.includes('tashib berdila')|| n.includes('tashab bergan') ||
+    n.includes('tashib bergan') || n.includes('ertaga tashiman') ||
+    n.includes('bugun tashiman')|| n.includes('pul tashab') ||
+    n.includes('pul tashaberdi')|| n.includes('naxt bergan') ||
+    n.includes('naqt bergan')   || n.includes('puli kiritildi') ||
+    n.includes('pul kiritildi') || n.includes('chekni kiritdm') ||
+    n.includes('dastavshik')    || n.includes('dastyavshik') ||
+    n.includes('jo natdm')      || n.includes('jo natim') ||
+    n.includes('tara olish')
+  );
+  if (isTashadi) return 'tashadi';
+
+  /* ── 7. KELISHUV TUGADI ─────────────────────────────────────────
+     "Tugatildi", "boshqa firmadan olyapti", "kerak emas"           */
+  const isTugadi = (
+    n.includes('tugatildi')    || n.includes('tugatiladi') ||
+    n.includes('boshqa firma') || n.includes('boshqa joy') ||
+    n.includes('boshqa brand') || n.includes('kerak emas') ||
+    n.includes('ne nado')      || n.includes('bolmaydi')   ||
+    n.includes('toxtatdi')     || n.includes('olmasakan')  ||
+    n.includes('keremas')      || n.includes('olmaydi')
+  );
+  if (isTugadi) return 'tugatildi';
+
   return 'boshqa';
 };
 const buildObzvonAiCategoryPrompt = ({ companyKey = 'murodbaxsh', sample = [] } = {}) => {
-  const cKey = normalizeCompanyKey(companyKey);
-  const commonRules = [
-    'Vazifa: har bir izohni faqat bitta kategoriyaga ajrating.',
-    'Ruxsat etilgan kategoriya kalitlari: tel_kotarmadi, telegram_yozildi, buyurtma, suv_borekan, kelishuv_tugatildi, boshqa.',
-    'Agar izohda "telegram/tg dan yozdim" ma\'nosi bo\'lsa ustuvor kategoriya: telegram_yozildi.',
-    'Agar "keyin oladi", "2-3 kunda", "ertaga zakaz", "2 ta bor" bo\'lsa: suv_borekan.',
-    'Buyurtma faqat hozirgi qo\'ng\'iroqda tasdiqlangan bo\'lsa: buyurtma.',
-    'Hech qaysi kategoriya aniq tushmasa: boshqa.',
-    'Faqat JSON qaytaring. Qo\'shimcha matn yozmang.',
-  ];
-  const companyRules = cKey === 'murodbaxsh'
-    ? [
-        'Kompaniya konteksti: Murodbaxsh obzvonlarida "buyurtma olish" maqsadida suv nazarda tutiladi.',
-        'Murodbaxshda "zakaz keyin" mazmuni buyurtma emas, suv_borekan hisoblanadi.',
-        'Qarzdorlik maqsadida "tgdan yozdim qarzini so\'radim" bo\'lsa telegram_yozildi hisoblanadi.',
-      ]
-    : [
-        'Kompaniya konteksti: umumiy biznes obzvoni. Suvga xos qoidani faqat izoh ma\'nosi tasdiqlasa qo\'llang.',
-      ];
-  const examples = cKey === 'murodbaxsh'
-    ? [
-        '"2-3 kundan keyin zakaz berarkan" -> suv_borekan',
-        '"2 ta bor" -> suv_borekan',
-        '"tel kotarmadi tgdan yozdim" -> telegram_yozildi',
-        '"zakaz oldim" -> buyurtma',
-        '"boshqa firmadan olyapti" -> kelishuv_tugatildi',
-      ]
-    : [
-        '"tel kotarmadi" -> tel_kotarmadi',
-        '"telegramdan yozdim" -> telegram_yozildi',
-        '"hozir buyurtma berdi" -> buyurtma',
-      ];
-  return `Siz call-center izohlarini kategoriyalovchi modelsiz.
+  return `Siz Murodbaxsh suv yetkazib berish kompaniyasining call-center izohlarini kategoriyalovchi modelsiz.
+
+KATEGORIYALAR (faqat shu 8 kalit ruxsat):
+- zakaz        : Zakaz olindi — "zakaz oldm", "5 ta", "3 ta buyurtma berdi", miqdor yozilgan
+- qarz_sorab   : Qarz/pul so'rash — "qarzini sorab", "pulini sorab", TG orqali qarz so'rash
+- tel_kotarmadi: Tel ko'tarmadi — "tel kotarmadi", "tel o'chiq", "tel ochu", "trubka olmadi"
+- suv_borekan  : Suvi bor / Keyin oladi — "Hali bor", "3 ta bor", "yetarlikan", "keyingi xafta zakaz", "ertaga zakaz berarkan"
+- xabar_olish  : Qayta aloqa kerak — "Habar olish kere", "Bilib etaman", "uyga borib ko'rib etvorarkan", "bant ekan"
+- tashadi      : Tashadi / Pul tushdi — "bugun tashiman dedi", "tashab berdi", "pul tashab berdi", "naxt bergan"
+- tugatildi    : Kelishuv tugadi — "Tugatildi", "boshqa firmadan olyapti", "kerak emas"
+- boshqa       : Yuqoridagilarga to'g'ri kelmaydigan barchasi
 
 QOIDALAR:
-${commonRules.map((x, i) => `${i + 1}. ${x}`).join('\n')}
-
-KOMPANIYA:
-${companyRules.map((x, i) => `${i + 1}. ${x}`).join('\n')}
+1. Har bir izohni FAQAT bitta kategoriyaga ajrating.
+2. "qarzini sorab" bo'lsa — qarz_sorab (telegram orqali bo'lsa ham).
+3. "tel kotarmadi" + "tgdan yozdim" = tel_kotarmadi (qarz yo'q bo'lsa).
+4. "tel kotarmadi" + "tgdan yozdim qarzini sorab" = qarz_sorab.
+5. "5 ta", "3 ta", "zakaz oldm" = zakaz.
+6. "Hali bor", "2 ta bor", "yetarlikan" = suv_borekan.
+7. "Habar olish kere", "bilib etaman" = xabar_olish.
+8. Faqat JSON massiv qaytaring.
 
 MISOLLAR:
-${examples.map((x, i) => `${i + 1}. ${x}`).join('\n')}
+1. "zakaz oldm" -> zakaz
+2. "5 ta buyurtma berdi" -> zakaz
+3. "3 ta" -> zakaz
+4. "Telegramdan yozdim qarzini sorab" -> qarz_sorab
+5. "Tel ko'tarmadi telegramdan yozdim qarzini sorab" -> qarz_sorab
+6. "tel ko'tarmadi tgdan yozdm" -> tel_kotarmadi
+7. "Tel ko'tarmadi" -> tel_kotarmadi
+8. "tel o'chiq" -> tel_kotarmadi
+9. "Hali bor" -> suv_borekan
+10. "2 ta suv bor" -> suv_borekan
+11. "suvlari yetarlikan" -> suv_borekan
+12. "keyingi xafta zakaz berarkan" -> suv_borekan
+13. "Habar olish kere" -> xabar_olish
+14. "Bilib etaman dedi" -> xabar_olish
+15. "Bugun tashiman dedi" -> tashadi
+16. "pul tashab berdi" -> tashadi
+17. "naxt bergan" -> tashadi
+18. "Tugatildi" -> tugatildi
+19. "boshqa firmadan suv ovotganikan" -> tugatildi
+20. "tgdan yozdm" -> xabar_olish
 
-FORMAT:
-- JSON massiv qaytaring.
-- Har element: {"idx": <number>, "cat": "<category_key>"}.
-- Faqat idx va cat maydonlari bo'lsin.
+FORMAT: JSON massiv, har element: {"idx": <number>, "cat": "<kalit>"}.
 
 IZOHLAR:
 ${sample.map((x) => `${x.idx}. ${x.note}`).join('\n')}`;
 };
 const buildObzvonAiSummaryPrompt = ({ companyKey = 'murodbaxsh', period = '', total = 0, catTotals = {} } = {}) => {
-  const cKey = normalizeCompanyKey(companyKey);
-  const companyHint = cKey === 'murodbaxsh'
-    ? "Murodbaxsh konteksti: asosiy oqim suv buyurtmasi va suv bo'yicha qarzdorlik."
-    : "Umumiy kompaniya konteksti: izohlar ma'nosiga tayangan holda xulosa bering.";
-  return `Quyidagi kategoriya statistikasi bo'yicha 2-3 jumlalik boshqaruv xulosasi yozing (uzbek, lotin).
+  return `Murodbaxsh suv yetkazib berish kompaniyasi uchun quyidagi obzvon statistikasi bo'yicha 2-3 jumlalik boshqaruv xulosasi yozing (o'zbek tili, lotin yozuv).
 
-${companyHint}
 Davr: ${period}
 Jami izoh: ${total}
-tel_kotarmadi: ${catTotals.tel_kotarmadi || 0}
-telegram_yozildi: ${catTotals.telegram_yozildi || 0}
-buyurtma: ${catTotals.buyurtma || 0}
-suv_borekan: ${catTotals.suv_borekan || 0}
-kelishuv_tugatildi: ${catTotals.kelishuv_tugatildi || 0}
-boshqa: ${catTotals.boshqa || 0}
+Zakaz olindi:        ${catTotals.zakaz || 0}
+Qarz/pul so'rash:    ${catTotals.qarz_sorab || 0}
+Tel ko'tarmadi:      ${catTotals.tel_kotarmadi || 0}
+Suvi bor/Keyin oladi:${catTotals.suv_borekan || 0}
+Qayta aloqa kerak:   ${catTotals.xabar_olish || 0}
+Tashadi/Pul tushdi:  ${catTotals.tashadi || 0}
+Kelishuv tugadi:     ${catTotals.tugatildi || 0}
+Boshqalar:           ${catTotals.boshqa || 0}
 
-Natija aniq, amaliy va qisqa bo'lsin.`;
+Xulosa amaliy, qisqa va boshqaruvga foydali bo'lsin. Muammo va imkoniyatlarni ajrating.`;
 };
 const normalizeTopicKey = (topic) => {
   const t = normalizeMatchText(String(topic || '')).replace(/\s+/g, ' ').trim();
