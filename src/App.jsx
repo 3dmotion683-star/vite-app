@@ -14159,7 +14159,21 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
   useEffect(() => {
     pullFromSheet({ silent:false });
   }, [company, pullFromSheet]);
-  const refresh  = ()=>{ pullFromSheet({ silent:false }); };
+  const refresh = async () => {
+    const current = normalizeObzArcItems(arc || []);
+    if (current.length > 0) {
+      const rs = await pushToSheet(current, { updateLocal: false });
+      if (!rs.ok) {
+        setAiSt((prev) => ({
+          ...prev,
+          err: `Google Sheetga saqlanmadi: ${rs.error || "noma'lum xato"}`,
+        }));
+      }
+      await pullFromSheet({ silent:false });
+      return;
+    }
+    await pullFromSheet({ silent:false });
+  };
 
   const del = async (id)=>{
     const arr = normalizeObzArcItems((arc || []).filter((a)=>a.id!==id));
