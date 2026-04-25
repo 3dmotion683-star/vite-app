@@ -13868,18 +13868,42 @@ function KorxonaHolati({ D, company, obzvonRows=[] }) {
     [allObzvon, thisMonth]
   );
   const monthMissed = useMemo(() => monthObzvon.filter((r) => isMissedCall(r?.note)), [monthObzvon]);
-  const missedNoFollowup = useMemo(() => monthMissed.filter((r) => {
-    const custId = String(r?.customerId || '').trim();
-    if (!custId) return true;
-    const rowTs = toDate(r?.callDate)?.getTime() || 0;
-    return !allObzvon.some((o) => {
-      if (isIgnoredObzvonOperator(o?.operator)) return false;
-      const same = String(o?.customerId || '').trim() === custId && o !== r;
-      if (!same) return false;
-      const otherTs = toDate(o?.callDate)?.getTime() || 0;
-      return otherTs > rowTs;
+  const obzvonTimelineByCustomer = useMemo(() => {
+    const map = new Map();
+    allObzvon.forEach((r) => {
+      if (isIgnoredObzvonOperator(r?.operator)) return;
+      const custId = String(r?.customerId || '').trim();
+      const ts = toDate(r?.callDate)?.getTime() || 0;
+      if (!custId || !ts) return;
+      if (!map.has(custId)) map.set(custId, []);
+      map.get(custId).push(ts);
     });
-  }), [monthMissed, allObzvon]);
+    map.forEach((arr, key) => {
+      const uniq = Array.from(new Set(arr)).sort((a, b) => a - b);
+      map.set(key, uniq);
+    });
+    return map;
+  }, [allObzvon]);
+  const missedNoFollowup = useMemo(() => {
+    const hasLaterCall = (timeline, ts) => {
+      let lo = 0;
+      let hi = timeline.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (timeline[mid] <= ts) lo = mid + 1;
+        else hi = mid;
+      }
+      return lo < timeline.length;
+    };
+    return monthMissed.filter((r) => {
+      const custId = String(r?.customerId || '').trim();
+      if (!custId) return true;
+      const rowTs = toDate(r?.callDate)?.getTime() || 0;
+      if (!rowTs) return true;
+      const timeline = obzvonTimelineByCustomer.get(custId) || [];
+      return !hasLaterCall(timeline, rowTs);
+    });
+  }, [monthMissed, obzvonTimelineByCustomer]);
 
   const activeCustomers = useMemo(() => allCustomers.filter((c) =>
     !isExcludedZCategory(c?.source) &&
@@ -13930,17 +13954,6 @@ function KorxonaHolati({ D, company, obzvonRows=[] }) {
     [activeDebtors]
   );
 
-  const topProducts = useMemo(() => {
-    const map = {};
-    monthSalesRows.forEach((o) => {
-      const { qty } = getDashboardLikeSalesValues(o);
-      if (qty <= 0) return;
-      const p = String(o?.product || '').trim() || "Noma'lum";
-      if (!map[p]) map[p] = { name: p, 'Sotilgan (dona)': 0 };
-      map[p]['Sotilgan (dona)'] += qty;
-    });
-    return Object.values(map).sort((a, b) => b['Sotilgan (dona)'] - a['Sotilgan (dona)']).slice(0, 10);
-  }, [monthSalesRows]);
   const topAgents = useMemo(() => {
     const map = {};
     monthSalesRows.forEach((o) => {
@@ -14102,21 +14115,6 @@ function KorxonaHolati({ D, company, obzvonRows=[] }) {
               <Area type="monotone" dataKey="Qaytarilgan" stroke="var(--rd)" fill="var(--rd2)" strokeWidth={2} />
               <Area type="monotone" dataKey="Net" stroke="var(--bl)" fill="none" strokeWidth={2} strokeDasharray="4 2" />
             </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {topProducts.length > 0 && (
-        <div className="card" style={{padding:'14px 16px'}}>
-          <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Top mahsulotlar (bu oy)</div>
-          <ResponsiveContainer width="100%" height={Math.max(120,topProducts.length*40)}>
-            <BarChart layout="vertical" data={topProducts} margin={{top:0,right:50,left:10,bottom:0}}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--b2)" horizontal={false} />
-              <XAxis type="number" style={{fontSize:11}} stroke="var(--t3)" />
-              <YAxis type="category" dataKey="name" width={140} style={{fontSize:11}} stroke="var(--t3)" />
-              <Tooltip />
-              <Bar dataKey="Sotilgan (dona)" fill="var(--bl)" radius={[0,5,5,0]} />
-            </BarChart>
           </ResponsiveContainer>
         </div>
       )}
