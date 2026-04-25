@@ -149,6 +149,7 @@ const OBZVON_ARCHIVE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNF
 const OBZVON_ARCHIVE_SHEET_ID = '1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8';
 const OBZVON_ARCHIVE_SHEET_GID = '1496428845';
 const OBZVON_ARCHIVE_SHEET_NAME = 'Tahlil_arxivi';
+const OBZVON_ARCHIVE_UPDATED_EVENT = 'aq-obz-archive-updated';
 const OBZVON_NEW_EXPORT_HOUR = 3;
 const OBZVON_NEW_EXPORTED_MAP_KEY = 'aq-obzvon-new-exported-map';
 const OBZVON_NEW_LAST_AUTO_DATE_KEY = 'aq-obzvon-new-last-auto-date';
@@ -11873,10 +11874,24 @@ const FIXED_CATS = [
 ];
 
 const OBZVON_ARXIV_SHEET_HEADERS = [
-  'No', 'RecordId', 'Company', 'Type', 'Period', 'AnalyzedAt',
-  'TotalNotes', 'NoteCount', 'CategoriesJson', 'Xulosa',
-  'RowRid', 'CustomerId', 'Customer', 'Topic', 'Operator',
-  'CallDate', 'RowCategory', 'Note', 'FollowedUp', 'OrderedAfter',
+  /* 0  */ 'No',
+  /* 1  */ 'Davr',              /* 2026-04  yoki  2026-04-25   */
+  /* 2  */ 'Tur',               /* Oylik | Kunlik              */
+  /* 3  */ 'Mijoz ID',
+  /* 4  */ 'Mijoz',
+  /* 5  */ 'Maqsad',
+  /* 6  */ 'Operator',
+  /* 7  */ 'Sana',
+  /* 8  */ 'Kategoriya',
+  /* 9  */ 'Izoh',
+  /* 10 */ 'Aloqa?',            /* followedUp: 1/0             */
+  /* 11 */ 'Sotib oldi?',       /* orderedAfter: 1/0           */
+  /* 12 */ 'RowRid',            /* deduplication uchun         */
+];
+const OBZVON_ARXIV_EXPORT_HEADERS = [
+  'No', 'ID', 'Mijoz', 'Sana', 'Mavzu', 'Izoh',
+  'Keyingi sana', 'Z.soni / summa', 'Zakaz sanasi',
+  'Operator', 'Kompaniya', 'RID', 'UpdatedAt',
 ];
 const toObzArcCompanyKey = (co) => normalizeCompanyKey(co) || String(co || '').trim().toLowerCase();
 const getObzArcStorageKey = (co) => `__obzArc_${toObzArcCompanyKey(co)}`;
@@ -11960,114 +11975,201 @@ const readObzArc = (co) => {
 const writeObzArc = (co, items = []) => {
   localStorage.setItem(getObzArcStorageKey(co), JSON.stringify(normalizeObzArcItems(items)));
 };
+const clearObzArc = (co) => {
+  try { localStorage.removeItem(getObzArcStorageKey(co)); } catch {}
+};
 const saveObzArc = (co, item) => {
   const arr = readObzArc(co).filter((a) => !(a?.period === item?.period && a?.type === item?.type));
   arr.unshift(item);
   writeObzArc(co, arr);
 };
+const emitObzArcUpdated = (co) => {
+  try {
+    window.dispatchEvent(new CustomEvent(OBZVON_ARCHIVE_UPDATED_EVENT, { detail: { company: toObzArcCompanyKey(co) } }));
+  } catch {}
+};
 const normalizeObzArcHeader = (v) => String(v || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
-const parseObzArcSheetRows = (rows = []) => {
+const parseObzArcSheetRows = (rows = [], defaultCompany = '') => {
   if (!Array.isArray(rows) || rows.length === 0) return {};
   const first = Array.isArray(rows[0]) ? rows[0] : [];
-  const firstNormalized = first.map(normalizeObzArcHeader);
-  const hasHeader = firstNormalized.includes('recordid') && firstNormalized.includes('company');
-  const header = hasHeader ? first : OBZVON_ARXIV_SHEET_HEADERS;
+  const firstNorm = first.map(normalizeObzArcHeader);
+  /* Format aniqlash: yangi (davr ustuni bor), eski (recordid+company) yoki obzvon_export */
+  const isNewFmt = firstNorm.includes('davr');
+  const isOldFmt = firstNorm.includes('recordid') && firstNorm.includes('company');
+  const isObzvonFmt = firstNorm.includes('id') && (
+    firstNorm.includes('mijoz') || firstNorm.includes('mavzu') || firstNorm.includes('kompaniya')
+  );
+  const hasHeader = isNewFmt || isOldFmt || isObzvonFmt;
+  const header    = hasHeader ? first : OBZVON_ARXIV_SHEET_HEADERS;
   const hMap = {};
   header.forEach((h, idx) => { hMap[normalizeObzArcHeader(h)] = idx; });
-  const pick = (row, headerKey, fallbackIdx) => {
-    const idx = Number.isFinite(hMap[headerKey]) ? hMap[headerKey] : fallbackIdx;
-    return String((Array.isArray(row) ? row[idx] : '') || '').trim();
+  const pick = (row, key, fb) => {
+    const i = Number.isFinite(hMap[key]) ? hMap[key] : fb;
+    return String((Array.isArray(row) ? row[i] : '') || '').trim();
   };
+  /* Kategoriya label → key */
+  const catLabelToKey = {};
+  FIXED_CATS.forEach((c) => { catLabelToKey[normalizeObzArcHeader(c.label)] = c.key; });
   const body = hasHeader ? rows.slice(1) : rows;
   const byCompany = {};
   body.forEach((row) => {
-    const company = toObzArcCompanyKey(pick(row, 'company', 2));
-    if (!company) return;
-    const type = pick(row, 'type', 3) === 'daily' ? 'daily' : 'monthly';
-    const period = pick(row, 'period', 4);
-    if (!period) return;
-    const recordId = pick(row, 'recordid', 1) || `${company}__${type}__${period}`;
+    let company, type, period, recordId, customerId, customer, topic, operator,
+        callDate, catRaw, note, followedUp, orderedAfter, rid;
+    if (isNewFmt) {
+      /* ── Yangi format: No|Davr|Tur|MijozID|Mijoz|Maqsad|Operator|Sana|Kategoriya|Izoh|Aloqa?|Sotib oldi?|RowRid */
+      company    = toObzArcCompanyKey(defaultCompany) || 'murodbaxsh';
+      period     = pick(row, 'davr',     1);
+      type       = pick(row, 'tur',      2) === 'Kunlik' ? 'daily' : 'monthly';
+      customerId = pick(row, 'mijozid',  3);
+      customer   = pick(row, 'mijoz',    4);
+      topic      = pick(row, 'maqsad',   5);
+      operator   = pick(row, 'operator', 6);
+      callDate   = pick(row, 'sana',     7);
+      const catLabel = pick(row, 'kategoriya', 8);
+      catRaw     = catLabelToKey[normalizeObzArcHeader(catLabel)] || '';
+      note       = pick(row, 'izoh',       9);
+      followedUp = pick(row, 'aloqa',     10);
+      orderedAfter = pick(row, 'sotibaldi', 11);
+      rid        = pick(row, 'rowrid',    12);
+    } else if (isOldFmt) {
+      /* ── Eski format (orqaga moslik) */
+      company    = toObzArcCompanyKey(pick(row, 'company',    2));
+      type       = pick(row, 'type',      3) === 'daily' ? 'daily' : 'monthly';
+      period     = pick(row, 'period',    4);
+      recordId   = pick(row, 'recordid',  1);
+      const rawCats = pick(row, 'categoriesjson', 8);
+      let cats = {};
+      if (rawCats) { try { cats = JSON.parse(rawCats); } catch {} }
+      rid        = pick(row, 'rowrid',   10);
+      customerId = pick(row, 'customerid',11);
+      customer   = pick(row, 'customer', 12);
+      topic      = pick(row, 'topic',    13);
+      operator   = pick(row, 'operator', 14);
+      callDate   = pick(row, 'calldate', 15);
+      catRaw     = pick(row, 'rowcategory',16);
+      note       = pick(row, 'note',     17);
+      followedUp = pick(row, 'followedup',18);
+      orderedAfter = pick(row, 'orderedafter',19);
+    } else {
+      /* ── obzvon_new_export formati:
+         No|ID|Mijoz|Sana|Mavzu|Izoh|Keyingi sana|Z.soni/summa|Zakaz sanasi|Operator|Kompaniya|RID|UpdatedAt */
+      const meta = pick(row, 'keyingisana', 6);
+      const ridRaw = pick(row, 'rid', 11);
+      const isArcMeta = String(meta || '').startsWith('__ARC__|');
+      const isArcRid = String(ridRaw || '').startsWith('arc__');
+      if (!isArcMeta && !isArcRid) return;
+      const metaParts = String(meta || '').split('|');
+      period = String(metaParts[1] || '').trim();
+      type = String(metaParts[2] || '').trim() === 'daily' ? 'daily' : 'monthly';
+      const analyzedAtMeta = decodeURIComponent(String(metaParts[3] || '').trim());
+      company = toObzArcCompanyKey(pick(row, 'kompaniya', 10) || defaultCompany) || 'murodbaxsh';
+      customerId = pick(row, 'id', 1);
+      customer = pick(row, 'mijoz', 2);
+      callDate = pick(row, 'sana', 3);
+      topic = pick(row, 'mavzu', 4);
+      note = pick(row, 'izoh', 5);
+      catRaw = pick(row, 'zsonisumma', 7);
+      const flags = String(pick(row, 'zakazsanasi', 8) || '').split('|');
+      followedUp = String(flags[0] || '0');
+      orderedAfter = String(flags[1] || '0');
+      operator = pick(row, 'operator', 9);
+      rid = ridRaw;
+      recordId = `${company}__${type}__${period}`;
+      if (!period) return;
+      if (!byCompany[company]) byCompany[company] = new Map();
+      if (!byCompany[company].has(recordId)) {
+        byCompany[company].set(recordId, {
+          id: recordId, type, period,
+          analyzedAt: analyzedAtMeta || pick(row, 'updatedat', 12) || new Date().toISOString(),
+          totalNotes: 0, noteCount: 0,
+          categories: normalizeObzArcCategories({}),
+          rows: [], xulosa: '',
+        });
+      }
+      const item = byCompany[company].get(recordId);
+      if (!rid && !note && !customer && !customerId) return;
+      const cat = (FIXED_CATS.some((c) => c.key === catRaw) ? catRaw : null) ||
+                  catLabelToKey[normalizeObzArcHeader(catRaw)] ||
+                  detectCat(note || '');
+      if (Object.prototype.hasOwnProperty.call(item.categories, cat)) item.categories[cat] += 1;
+      item.rows.push({
+        id:  rid || `${recordId}_${item.rows.length + 1}`,
+        rid: rid || `${recordId}_${item.rows.length + 1}`,
+        customerId, customer, operator,
+        callDate: toIsoDate(callDate || ''),
+        topic, note: (note || '').slice(0, 260), cat,
+        followedUp:   toObzArcBool(followedUp),
+        orderedAfter: toObzArcBool(orderedAfter),
+      });
+      item.noteCount = item.rows.length;
+      item.totalNotes = item.rows.length;
+      return;
+    }
+    if (!company || !period) return;
+    recordId = recordId || `${company}__${type}__${period}`;
     if (!byCompany[company]) byCompany[company] = new Map();
     if (!byCompany[company].has(recordId)) {
-      let cats = {};
-      const rawCats = pick(row, 'categoriesjson', 8);
-      if (rawCats) {
-        try { cats = JSON.parse(rawCats); } catch {}
-      }
       byCompany[company].set(recordId, {
-        id: recordId,
-        type,
-        period,
-        analyzedAt: pick(row, 'analyzedat', 5) || new Date().toISOString(),
-        totalNotes: Math.max(0, Number(pick(row, 'totalnotes', 6)) || 0),
-        noteCount: Math.max(0, Number(pick(row, 'notecount', 7)) || 0),
-        categories: normalizeObzArcCategories(cats),
-        rows: [],
-        xulosa: pick(row, 'xulosa', 9),
+        id: recordId, type, period,
+        analyzedAt: new Date().toISOString(),
+        totalNotes: 0, noteCount: 0,
+        categories: normalizeObzArcCategories({}),
+        rows: [], xulosa: '',
       });
     }
     const item = byCompany[company].get(recordId);
-    const rid = pick(row, 'rowrid', 10);
-    const note = pick(row, 'note', 17);
-    const customer = pick(row, 'customer', 12);
-    const customerId = pick(row, 'customerid', 11);
     if (!rid && !note && !customer && !customerId) return;
-    const catRaw = pick(row, 'rowcategory', 16);
-    const cat = FIXED_CATS.some((c) => c.key === catRaw) ? catRaw : detectCat(note);
+    const cat = (FIXED_CATS.some((c) => c.key === catRaw) ? catRaw : null) ||
+                catLabelToKey[normalizeObzArcHeader(catRaw)] ||
+                detectCat(note || '');
+    /* Kategoriya hisobini yangilaymiz */
+    if (Object.prototype.hasOwnProperty.call(item.categories, cat)) item.categories[cat] += 1;
     item.rows.push({
-      id: rid || `${recordId}_${item.rows.length + 1}`,
+      id:  rid || `${recordId}_${item.rows.length + 1}`,
       rid: rid || `${recordId}_${item.rows.length + 1}`,
-      customerId,
-      customer,
-      operator: pick(row, 'operator', 14),
-      callDate: toIsoDate(pick(row, 'calldate', 15)),
-      topic: pick(row, 'topic', 13),
-      note: note.slice(0, 260),
-      cat,
-      followedUp: toObzArcBool(pick(row, 'followedup', 18)),
-      orderedAfter: toObzArcBool(pick(row, 'orderedafter', 19)),
+      customerId, customer, operator,
+      callDate: toIsoDate(callDate || ''),
+      topic, note: (note || '').slice(0, 260), cat,
+      followedUp:   toObzArcBool(followedUp),
+      orderedAfter: toObzArcBool(orderedAfter),
     });
+    item.noteCount = item.rows.length;
+    item.totalNotes = item.rows.length;
   });
   const out = {};
-  Object.keys(byCompany).forEach((company) => {
-    out[company] = normalizeObzArcItems(Array.from(byCompany[company].values()));
+  Object.keys(byCompany).forEach((co) => {
+    out[co] = normalizeObzArcItems(Array.from(byCompany[co].values()));
   });
   return out;
 };
 const serializeObzArcByCompanyToSheetRows = (byCompany = {}) => {
+  /* Apps Script obzvon_new_export formatiga mos object qatorlar */
   const out = [];
   const companyKeys = Object.keys(byCompany || {}).sort();
   let seq = 1;
-  companyKeys.forEach((company) => {
-    const items = normalizeObzArcItems(byCompany[company] || []);
+  companyKeys.forEach((companyRaw) => {
+    const company = toObzArcCompanyKey(companyRaw);
+    const items = normalizeObzArcItems(byCompany[companyRaw] || []).slice().reverse();
     items.forEach((item) => {
-      const categories = normalizeObzArcCategories(item?.categories || {});
-      const base = {
-        recordId: String(item?.id || `${company}__${item?.type || 'monthly'}__${item?.period || ''}`),
-        company,
-        type: String(item?.type || 'monthly'),
-        period: String(item?.period || ''),
-        analyzedAt: String(item?.analyzedAt || ''),
-        totalNotes: String(Math.max(0, Number(item?.totalNotes || 0) || 0)),
-        noteCount: String(Math.max(0, Number(item?.noteCount || 0) || 0)),
-        categoriesJson: JSON.stringify(categories),
-        xulosa: String(item?.xulosa || '').trim(),
-      };
-      const rows = Array.isArray(item?.rows) && item.rows.length ? item.rows : [null];
-      rows.forEach((r) => {
+      const meta = `__ARC__|${String(item?.period || '')}|${String(item?.type || 'monthly')}|${encodeURIComponent(String(item?.analyzedAt || ''))}`;
+      const periodRows = Array.isArray(item?.rows) && item.rows.length ? item.rows : [null];
+      periodRows.forEach((r, idx) => {
+        const rowRidBase = String(r?.rid || '').trim() || `row_${idx + 1}`;
+        const safeRid = rowRidBase.replace(/\s+/g, '_').slice(0, 180);
         out.push({
           no: String(seq++),
-          ...base,
-          rowRid: String(r?.rid || '').trim(),
           customerId: String(r?.customerId || '').trim(),
           customer: String(r?.customer || '').trim(),
-          topic: String(r?.topic || '').trim(),
-          operator: String(r?.operator || '').trim(),
           callDate: String(toIsoDate(r?.callDate || '') || '').trim(),
-          rowCategory: String(r?.cat || '').trim(),
+          topic: String(r?.topic || '').trim(),
           note: String(r?.note || '').trim().slice(0, 260),
-          followedUp: r?.followedUp ? '1' : '0',
-          orderedAfter: r?.orderedAfter ? '1' : '0',
+          nextDate: meta,
+          orderCount: String(r?.cat || '').trim(),
+          orderDate: `${r?.followedUp ? '1' : '0'}|${r?.orderedAfter ? '1' : '0'}`,
+          operator: String(r?.operator || '').trim(),
+          company,
+          rid: `arc__${company}__${String(item?.type || 'monthly')}__${String(item?.period || '')}__${safeRid}`,
+          updatedAt: String(item?.analyzedAt || new Date().toISOString()),
         });
       });
     });
@@ -12078,6 +12180,27 @@ const parseObzArcResponse = (text) => {
   const raw = String(text || '').trim();
   if (!raw) return {};
   try { return JSON.parse(raw); } catch { return { raw }; }
+};
+const fetchSheetCsvByNameAllowEmpty = async (sheetId, sheetName, label, timeoutMs = 12000) => {
+  const sources = [
+    buildGsUrlByName(sheetId, sheetName),
+    `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`,
+  ];
+  const urls = sources.flatMap((url) => [
+    url,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ]);
+  for (const u of urls) {
+    try {
+      const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
+      if (!r.ok) continue;
+      const text = await r.text();
+      if (text.trim().startsWith('<')) continue;
+      return parseGsCsv(text);
+    } catch { continue; }
+  }
+  throw new Error(`"${label}" varaqi yuklanmadi. Sheet: ${sheetName}`);
 };
 const fetchSheetCsvAllowEmpty = async (sheetId, gid, label, timeoutMs = 12000) => {
   const sources = [
@@ -12101,53 +12224,72 @@ const fetchSheetCsvAllowEmpty = async (sheetId, gid, label, timeoutMs = 12000) =
   }
   throw new Error(`"${label}" varaqi yuklanmadi. GID: ${gid}`);
 };
-const loadObzArcAllFromGoogleSheet = async () => {
-  const rows = await fetchSheetCsvAllowEmpty(OBZVON_ARCHIVE_SHEET_ID, OBZVON_ARCHIVE_SHEET_GID, 'Tahlil arxivi', 16000);
-  return parseObzArcSheetRows(rows);
+const loadObzArcAllFromGoogleSheet = async (defaultCompany = '') => {
+  let rows = [];
+  try {
+    rows = await fetchSheetCsvByNameAllowEmpty(OBZVON_ARCHIVE_SHEET_ID, OBZVON_ARCHIVE_SHEET_NAME, 'Tahlil arxivi', 16000);
+  } catch {}
+  if (!Array.isArray(rows) || rows.length === 0) {
+    rows = await fetchSheetCsvAllowEmpty(OBZVON_ARCHIVE_SHEET_ID, OBZVON_ARCHIVE_SHEET_GID, 'Tahlil arxivi', 16000);
+  }
+  return parseObzArcSheetRows(rows, defaultCompany);
 };
 const loadObzArcFromGoogleSheet = async (company) => {
-  const all = await loadObzArcAllFromGoogleSheet();
-  return normalizeObzArcItems(all[toObzArcCompanyKey(company)] || []);
+  const key = toObzArcCompanyKey(company);
+  const all = await loadObzArcAllFromGoogleSheet(key);
+  return normalizeObzArcItems(all[key] || []);
 };
 const pushObzArcRowsToGoogleSheet = async (rows = [], by = 'unknown') => {
-  const accessUrl = normalizeAccessApiUrl(localStorage.getItem(ACCESS_SYNC_URL_KEY) || '');
-  const urlsToTry = Array.from(new Set([OBZVON_EXPORT_APPS_SCRIPT_URL, accessUrl].filter(Boolean)));
+  /* rows — obzvon_new_export formatidagi object qatorlar:
+     { no, customerId, customer, callDate, topic, note, nextDate, orderCount, orderDate, operator, company, rid, updatedAt } */
+  const urlsToTry = [OBZVON_EXPORT_APPS_SCRIPT_URL].filter(Boolean);
   if (!urlsToTry.length) return { ok: false, error: 'Google Sheet export URL topilmadi' };
+  const payloadRows = (Array.isArray(rows) ? rows : [])
+    .filter((r) => r && typeof r === 'object' && !Array.isArray(r))
+    .map((r) => ({
+      no: String(r?.no || '').trim(),
+      customerId: String(r?.customerId || '').trim(),
+      customer: String(r?.customer || '').trim(),
+      callDate: String(r?.callDate || '').trim(),
+      topic: String(r?.topic || '').trim(),
+      note: String(r?.note || '').trim(),
+      nextDate: String(r?.nextDate || '').trim(),
+      orderCount: String(r?.orderCount || '').trim(),
+      orderDate: String(r?.orderDate || '').trim(),
+      operator: String(r?.operator || '').trim(),
+      company: String(r?.company || '').trim(),
+      rid: String(r?.rid || '').trim(),
+      updatedAt: String(r?.updatedAt || '').trim(),
+    }));
   const payload = {
-    sheetId: OBZVON_ARCHIVE_SHEET_ID,
+    sheetId:   OBZVON_ARCHIVE_SHEET_ID,
     sheetName: OBZVON_ARCHIVE_SHEET_NAME,
-    sheetGid: OBZVON_ARCHIVE_SHEET_GID,
-    gid: OBZVON_ARCHIVE_SHEET_GID,
-    sheetUrl: OBZVON_ARCHIVE_SHEET_URL,
+    sheetGid:  OBZVON_ARCHIVE_SHEET_GID,
+    gid:       OBZVON_ARCHIVE_SHEET_GID,
+    sheetUrl:  OBZVON_ARCHIVE_SHEET_URL,
     withHeaders: true,
-    headers: OBZVON_ARXIV_SHEET_HEADERS,
-    rows,
+    headers: OBZVON_ARXIV_EXPORT_HEADERS,
+    rows: payloadRows,
     by,
   };
-  const actions = ['obzvon_new_sheet_replace', 'obzvon_new_export'];
+  const actionsToTry = ['obzvon_new_sheet_replace', 'obzvon_new_export'];
   let lastErr = '';
   for (const url of urlsToTry) {
     const isAppsScript = /script\.google\.com/i.test(String(url || ''));
-    for (const action of actions) {
+    for (const action of actionsToTry) {
       try {
-        const reqInit = isAppsScript
-          ? {
-              method: 'POST',
-              mode: 'cors',
-              cache: 'no-store',
-              headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
-              body: JSON.stringify({ ...payload, action }),
-            }
-          : {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ ...payload, action }),
-            };
-        const resp = await fetch(url, reqInit);
+        const resp = await fetch(url, isAppsScript
+          ? { method:'POST', mode:'cors', cache:'no-store',
+              headers:{'Content-Type':'text/plain;charset=UTF-8'},
+              body: JSON.stringify({ ...payload, action }) }
+          : { method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({ ...payload, action }) }
+        );
         const text = await resp.text().catch(() => '');
-        const js = parseObzArcResponse(text);
+        const js   = parseObzArcResponse(text);
         if (resp.ok && (js?.ok || String(js?.status || '').toLowerCase() === 'ok')) {
-          return { ok: true };
+          return { ok: true, inserted: js?.inserted ?? 0 };
         }
         lastErr = js?.error || js?.message || `HTTP ${resp.status} (${action})`;
       } catch (e) {
@@ -12158,14 +12300,10 @@ const pushObzArcRowsToGoogleSheet = async (rows = [], by = 'unknown') => {
   return { ok: false, error: lastErr || "Google Sheetga yozib bo'lmadi" };
 };
 const syncObzArcCompanyToGoogleSheet = async (company, items = [], by = 'unknown') => {
-  let allByCompany = {};
-  try {
-    allByCompany = await loadObzArcAllFromGoogleSheet();
-  } catch (e) {
-    return { ok: false, error: `Arxiv sheetni o'qib bo'lmadi: ${String(e?.message || e || '')}` };
-  }
-  allByCompany[toObzArcCompanyKey(company)] = normalizeObzArcItems(items || []);
-  const payloadRows = serializeObzArcByCompanyToSheetRows(allByCompany);
+  /* REPLACE rejimi: joriy kompaniya arxivi to'liq qayta yoziladi (header har doim saqlanadi). */
+  const key      = toObzArcCompanyKey(company);
+  const normalized = normalizeObzArcItems(items || []);
+  const payloadRows = serializeObzArcByCompanyToSheetRows({ [key]: normalized });
   return pushObzArcRowsToGoogleSheet(payloadRows, by);
 };
 
@@ -12842,6 +12980,31 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
   const [selMonth, setSelMonth] = useState(() => toIsoDate(new Date()).slice(0, 7));
   const [selDay, setSelDay] = useState(() => toIsoDate(new Date()));
   const [search, setSearch] = useState('');
+  const [archiveSourceItems, setArchiveSourceItems] = useState(() => readObzArc(company));
+
+  const loadArchiveFromSheet = useCallback(async () => {
+    const cached = readObzArc(company);
+    if (cached.length) setArchiveSourceItems(cached);
+    try {
+      const remote = await loadObzArcFromGoogleSheet(company);
+      setArchiveSourceItems(normalizeObzArcItems(remote || []));
+    } catch {
+      setArchiveSourceItems(cached);
+    }
+  }, [company]);
+
+  useEffect(() => {
+    loadArchiveFromSheet();
+    const onArchiveUpdated = (ev) => {
+      const evCompany = toObzArcCompanyKey(ev?.detail?.company || '');
+      if (evCompany && evCompany !== toObzArcCompanyKey(company)) return;
+      loadArchiveFromSheet();
+    };
+    window.addEventListener(OBZVON_ARCHIVE_UPDATED_EVENT, onArchiveUpdated);
+    return () => {
+      window.removeEventListener(OBZVON_ARCHIVE_UPDATED_EVENT, onArchiveUpdated);
+    };
+  }, [company, loadArchiveFromSheet]);
 
   const allRows = useMemo(() => Array.isArray(obzvonRows) ? obzvonRows : [], [obzvonRows]);
 
@@ -13074,7 +13237,7 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
   }, [byTopic, debtWorkStats]);
 
   const archiveItems = useMemo(() => {
-    const src = readObzArc(company);
+    const src = archiveSourceItems;
     return (src || []).filter((item) => {
       const period = String(item?.period || '');
       if (!period) return false;
@@ -13083,7 +13246,7 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
       if (timeMode === 'month') return period.startsWith(String(selMonth || ''));
       return period === String(selDay || '');
     });
-  }, [company, timeMode, selYear, selMonth, selDay]);
+  }, [archiveSourceItems, timeMode, selYear, selMonth, selDay]);
   const archiveRows = useMemo(
     () => archiveItems.flatMap((item) => (Array.isArray(item?.rows) ? item.rows : [])),
     [archiveItems]
@@ -13815,6 +13978,8 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
         setSheetSt((prev) => ({ ...prev, loading:false, saving:true, err:'', src:'cache' }));
         const migrate = await syncObzArcCompanyToGoogleSheet(company, cached, getActor());
         if (migrate?.ok) {
+          clearObzArc(company);
+          emitObzArcUpdated(company);
           setSheetSt({ loading:false, saving:false, err:'', src:'google' });
         } else {
           setSheetSt((prev) => ({
@@ -13827,8 +13992,9 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
         }
         return cached;
       }
-      writeObzArc(company, remote);
+      clearObzArc(company);
       setArc(remote);
+      emitObzArcUpdated(company);
       setSheetSt({ loading:false, saving:false, err:'', src:'google' });
       return remote;
     } catch (e) {
@@ -13853,6 +14019,8 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
     setSheetSt((prev) => ({ ...prev, saving:true, err:'' }));
     const rs = await syncObzArcCompanyToGoogleSheet(company, normalized, getActor());
     if (rs?.ok) {
+      clearObzArc(company);
+      emitObzArcUpdated(company);
       setSheetSt((prev) => ({ ...prev, saving:false, err:'', src:'google' }));
       return { ok:true, items: normalized };
     }
@@ -13941,26 +14109,22 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
             .sort((a, b) => b.val - a.val)[0];
           const item = {
             id: existing?.id || Date.now(),
-            type,
-            period,
-            totalNotes: rowsWithNote.length,
-            noteCount: recatRows.length,
-            categories: recatTotals,
-            rows: recatRows,
-            xulosa: `${period} qayta kategoriyalandi. Eng ko'p kategoriya: ${topCat?.label || '—'} (${topCat?.val || 0} ta).`,
+            type, period,
+            totalNotes: rowsWithNote.length, noteCount: recatRows.length,
+            categories: recatTotals, rows: recatRows,
+            xulosa: `${period} qayta kategoriyalandi. Eng ko'p: ${topCat?.label || '—'} (${topCat?.val || 0} ta).`,
             analyzedAt: new Date().toISOString(),
           };
-          saveObzArc(company, item);
-          const nextArc = readObzArc(company);
+          /* Tezkor lokal saqlash (offline bo'lsa yo'qolmasin) */
+          const nextArc = normalizeObzArcItems([item, ...(arc || []).filter(a => !(a.type===type && a.period===period))]);
+          writeObzArc(company, nextArc);
           setArc(nextArc);
           const syncRs = await pushToSheet(nextArc, { updateLocal:false });
-          setAiSt({
-            loading: false,
-            err: syncRs.ok ? '' : `Google Sheetga saqlanmadi: ${syncRs.error || 'xato'}`,
-            msg: syncRs.ok
-              ? `✅ ${period} qayta kategoriyalandi (${changed} ta qator o'zgardi)`
-              : `⚠️ ${period} qayta kategoriyalandi, lekin Google Sheetga yozilmadi`,
-          });
+          if (syncRs.ok) {
+            setAiSt({ loading:false, err:'', msg:`✅ Google Sheetga saqlandi: ${period} (${changed} ta o'zgardi)` });
+          } else {
+            setAiSt({ loading:false, err:'', msg:`⚠️ Vaqtincha brauzerda: ${period}. Sheet: ${syncRs.error || 'xato'}` });
+          }
           return;
         }
       }
@@ -14153,7 +14317,7 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
         </div>
         <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
           Saqlash joyi: <a href={OBZVON_ARCHIVE_SHEET_URL} target="_blank" rel="noreferrer" style={{color:'var(--bl)'}}>Google Sheet (gid: {OBZVON_ARCHIVE_SHEET_GID})</a>.
-          {' '}Lokal cache kaliti: <code>{archiveStorageKey}</code>
+          {' '}Lokal cache faqat vaqtincha: <code>{archiveStorageKey}</code> (Googlega tushishi bilan auto o'chadi)
         </div>
         {sheetSt.loading && <div style={{fontSize:11,color:'var(--bl)',marginBottom:6}}>Google Sheetdan arxiv yuklanmoqda...</div>}
         {sheetSt.saving && <div style={{fontSize:11,color:'var(--or)',marginBottom:6}}>Google Sheetga saqlanmoqda...</div>}
