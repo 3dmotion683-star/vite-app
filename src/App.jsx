@@ -145,11 +145,14 @@ const OBZVON_NEW_EXPORT_SHEET_ID = '1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8
 const OBZVON_NEW_EXPORT_SHEET_NAME = 'Barcha_obzvon_yangi';
 const OBZVON_NEW_EXPORT_SHEET_GID = '979057575';
 const OBZVON_NEW_EXPORT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=979057575#gid=979057575';
-const OBZVON_ARCHIVE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=1496428845#gid=1496428845';
+const OBZVON_ARCHIVE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit';
 const OBZVON_ARCHIVE_SHEET_ID = '1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8';
 const OBZVON_ARCHIVE_SHEET_GID = '1496428845';
 const OBZVON_ARCHIVE_SHEET_NAME = 'Tahlil_arxivi';
 const OBZVON_ARCHIVE_UPDATED_EVENT = 'aq-obz-archive-updated';
+const OBZVON_ARCHIVE_SYNC_ALERT_EVENT = 'aq-obz-archive-sync-alert';
+const OBZVON_ARCHIVE_AUTO_HOUR = 6;
+const OBZVON_ARCHIVE_AUTO_LAST_KEY = 'aq-obz-archive-auto-last-date';
 const OBZVON_NEW_EXPORT_HOUR = 3;
 const OBZVON_NEW_EXPORTED_MAP_KEY = 'aq-obzvon-new-exported-map';
 const OBZVON_NEW_LAST_AUTO_DATE_KEY = 'aq-obzvon-new-last-auto-date';
@@ -3663,6 +3666,7 @@ body,input,select,button{font-family:var(--sans)}
 .nav-i.on{background:var(--bl2);color:var(--bl)}
 .nav-i:active{transform:translateY(1px)}
 .notif{position:fixed;bottom:18px;right:18px;z-index:999;padding:10px 16px;border-radius:var(--r);display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;box-shadow:0 4px 24px rgba(0,0,0,.6);animation:up .2s ease}
+.archive-sync-alert-top{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:5400;background:var(--rd2);border:1px solid var(--rd);color:var(--rd);padding:8px 14px;border-radius:10px;box-shadow:0 10px 28px rgba(248,81,73,.35);font-size:12px;font-weight:700;max-width:min(94vw,880px);display:flex;align-items:center;gap:8px}
 .alert-topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
 .alert-topic-card{border:1px solid var(--b2);border-radius:10px;background:var(--s2);padding:10px;display:grid;gap:8px;transition:border-color .14s ease, transform .12s ease}
 .alert-topic-card:hover{border-color:var(--bl)}
@@ -11988,6 +11992,19 @@ const emitObzArcUpdated = (co) => {
     window.dispatchEvent(new CustomEvent(OBZVON_ARCHIVE_UPDATED_EVENT, { detail: { company: toObzArcCompanyKey(co) } }));
   } catch {}
 };
+const emitObzArcSyncAlert = ({ company = '', status = 'error', message = '', source = 'manual' } = {}) => {
+  try {
+    window.dispatchEvent(new CustomEvent(OBZVON_ARCHIVE_SYNC_ALERT_EVENT, {
+      detail: {
+        company: toObzArcCompanyKey(company),
+        status: String(status || '').trim() || 'error',
+        message: String(message || '').trim(),
+        source: String(source || '').trim() || 'manual',
+        at: new Date().toISOString(),
+      },
+    }));
+  } catch {}
+};
 const normalizeObzArcHeader = (v) => String(v || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
 const parseObzArcSheetRows = (rows = [], defaultCompany = '') => {
   if (!Array.isArray(rows) || rows.length === 0) return {};
@@ -13980,40 +13997,67 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
         if (migrate?.ok) {
           clearObzArc(company);
           emitObzArcUpdated(company);
+          emitObzArcSyncAlert({
+            company,
+            status: 'ok',
+            source: 'archive-pull-migrate',
+            message: 'Google Sheetga muvaffaqiyatli ko‘chirildi',
+          });
+          const reloaded = await loadObzArcFromGoogleSheet(company).catch(() => cached);
+          setArc(normalizeObzArcItems(reloaded || cached || []));
           setSheetSt({ loading:false, saving:false, err:'', src:'google' });
         } else {
+          const errMsg = String(migrate?.error || "Google Sheetga migratsiyada xato");
+          emitObzArcSyncAlert({
+            company,
+            status: 'error',
+            source: 'archive-pull-migrate',
+            message: `Google Sheetga ko‘chmadi: ${errMsg}`,
+          });
           setSheetSt((prev) => ({
             ...prev,
             loading:false,
             saving:false,
             src:'cache',
-            err:String(migrate?.error || "Google Sheetga migratsiyada xato"),
+            err:errMsg,
           }));
         }
-        return cached;
+        return [];
       }
       clearObzArc(company);
       setArc(remote);
       emitObzArcUpdated(company);
+      emitObzArcSyncAlert({
+        company,
+        status: 'ok',
+        source: 'archive-pull',
+        message: 'Arxiv Google Shetdan yuklandi',
+      });
       setSheetSt({ loading:false, saving:false, err:'', src:'google' });
       return remote;
     } catch (e) {
-      const fallback = readObzArc(company);
-      setArc(fallback);
+      const cached = readObzArc(company);
+      const errMsg = String(e?.message || e || "Google Sheetdan o'qishda xato");
+      emitObzArcSyncAlert({
+        company,
+        status: 'error',
+        source: 'archive-pull',
+        message: `Google Sheetdan o‘qilmadi: ${errMsg}`,
+      });
+      setArc(cached);
       setSheetSt((prev) => ({
         ...prev,
         loading:false,
         saving:false,
         src:'cache',
-        err:String(e?.message || e || "Google Sheetdan o'qishda xato"),
+        err: errMsg,
       }));
-      return fallback;
+      return cached;
     }
   }, [company]);
   const pushToSheet = useCallback(async (items = [], { updateLocal = true } = {}) => {
     const normalized = normalizeObzArcItems(items);
     if (updateLocal) {
-      writeObzArc(company, normalized);
       setArc(normalized);
     }
     setSheetSt((prev) => ({ ...prev, saving:true, err:'' }));
@@ -14021,16 +14065,32 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
     if (rs?.ok) {
       clearObzArc(company);
       emitObzArcUpdated(company);
+      emitObzArcSyncAlert({
+        company,
+        status: 'ok',
+        source: 'archive-push',
+        message: 'Google Sheetga saqlandi',
+      });
       setSheetSt((prev) => ({ ...prev, saving:false, err:'', src:'google' }));
       return { ok:true, items: normalized };
     }
+    const errMsg = String(rs?.error || "Google Sheetga saqlashda xato");
+    if (updateLocal) {
+      writeObzArc(company, normalized);
+    }
+    emitObzArcSyncAlert({
+      company,
+      status: 'error',
+      source: 'archive-push',
+      message: `Google Sheetga ko‘chmadi: ${errMsg}`,
+    });
     setSheetSt((prev) => ({
       ...prev,
       saving:false,
       src:'cache',
-      err: String(rs?.error || "Google Sheetga saqlashda xato"),
+      err: errMsg,
     }));
-    return { ok:false, items: normalized, error: String(rs?.error || '') };
+    return { ok:false, items: normalized, error: errMsg };
   }, [company]);
   useEffect(() => {
     pullFromSheet({ silent:false });
@@ -14115,11 +14175,8 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
             xulosa: `${period} qayta kategoriyalandi. Eng ko'p: ${topCat?.label || '—'} (${topCat?.val || 0} ta).`,
             analyzedAt: new Date().toISOString(),
           };
-          /* Tezkor lokal saqlash (offline bo'lsa yo'qolmasin) */
           const nextArc = normalizeObzArcItems([item, ...(arc || []).filter(a => !(a.type===type && a.period===period))]);
-          writeObzArc(company, nextArc);
-          setArc(nextArc);
-          const syncRs = await pushToSheet(nextArc, { updateLocal:false });
+          const syncRs = await pushToSheet(nextArc, { updateLocal:true });
           if (syncRs.ok) {
             setAiSt({ loading:false, err:'', msg:`✅ Google Sheetga saqlandi: ${period} (${changed} ta o'zgardi)` });
           } else {
@@ -14264,10 +14321,8 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
         xulosa,
         analyzedAt:new Date().toISOString(),
       };
-      saveObzArc(company, item);
-      const nextArc = readObzArc(company);
-      setArc(nextArc);
-      const syncRs = await pushToSheet(nextArc, { updateLocal:false });
+      const nextArc = normalizeObzArcItems([item, ...(arc || []).filter((a) => !(a.type === type && a.period === period))]);
+      const syncRs = await pushToSheet(nextArc, { updateLocal:true });
       setAiSt({
         loading:false,
         err: syncRs.ok ? '' : `Google Sheetga saqlanmadi: ${syncRs.error || 'xato'}`,
@@ -14284,10 +14339,8 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
         xulosa,
         analyzedAt:new Date().toISOString(),
       };
-      saveObzArc(company, item);
-      const nextArc = readObzArc(company);
-      setArc(nextArc);
-      const syncRs = await pushToSheet(nextArc, { updateLocal:false });
+      const nextArc = normalizeObzArcItems([item, ...(arc || []).filter((a) => !(a.type === type && a.period === period))]);
+      const syncRs = await pushToSheet(nextArc, { updateLocal:true });
       setAiSt({
         loading:false,
         err: syncRs.ok
@@ -14316,8 +14369,9 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
           </div>
         </div>
         <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
-          Saqlash joyi: <a href={OBZVON_ARCHIVE_SHEET_URL} target="_blank" rel="noreferrer" style={{color:'var(--bl)'}}>Google Sheet (gid: {OBZVON_ARCHIVE_SHEET_GID})</a>.
-          {' '}Lokal cache faqat vaqtincha: <code>{archiveStorageKey}</code> (Googlega tushishi bilan auto o'chadi)
+          Saqlash joyi: <a href={OBZVON_ARCHIVE_SHEET_URL} target="_blank" rel="noreferrer" style={{color:'var(--bl)'}}>Google Sheet</a>
+          {' '}→ varaq nomi: <code>{OBZVON_ARCHIVE_SHEET_NAME}</code>.
+          {' '}Agar internet/API xato bo'lsa vaqtincha lokal cache ko'rsatiladi: <code>{archiveStorageKey}</code>
         </div>
         {sheetSt.loading && <div style={{fontSize:11,color:'var(--bl)',marginBottom:6}}>Google Sheetdan arxiv yuklanmoqda...</div>}
         {sheetSt.saving && <div style={{fontSize:11,color:'var(--or)',marginBottom:6}}>Google Sheetga saqlanmoqda...</div>}
@@ -16402,6 +16456,7 @@ export default function App() {
   }, []);
   const [showUp,setUp]     = useState(false);
   const [notif,setNotif]   = useState(null);
+  const [archiveSyncAlert, setArchiveSyncAlert] = useState(null);
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [alertsTopicKey, setAlertsTopicKey] = useState('');
   const [alertsReminders, setAlertsReminders] = useState({ topics:{}, items:{} });
@@ -16420,6 +16475,7 @@ export default function App() {
   const pendingObzvonNewRowsRef = useRef([]);
   const obzvonExportBusyRef = useRef(false);
   const tgCustomerSyncKeyRef = useRef('');
+  const archiveAutoBusyRef = useRef(false);
   useEffect(() => {
     if (!isTelegramClientMode || typeof window === 'undefined') return;
     const tg = window.Telegram?.WebApp;
@@ -16479,6 +16535,30 @@ export default function App() {
     window.addEventListener(BINDING_UPDATE_EVENT, onBindingUpdated);
     return () => window.removeEventListener(BINDING_UPDATE_EVENT, onBindingUpdated);
   }, []);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onArchiveSyncAlert = (ev) => {
+      const detail = ev?.detail || {};
+      const status = String(detail?.status || '').trim().toLowerCase();
+      if (status === 'ok') {
+        setArchiveSyncAlert(null);
+        return;
+      }
+      if (status !== 'error') return;
+      const message = String(detail?.message || '').trim() || "Google Sheetga ko'chmadi";
+      setArchiveSyncAlert({
+        message,
+        company: toObzArcCompanyKey(detail?.company || activeCompany),
+        at: String(detail?.at || new Date().toISOString()),
+      });
+    };
+    window.addEventListener(OBZVON_ARCHIVE_SYNC_ALERT_EVENT, onArchiveSyncAlert);
+    return () => window.removeEventListener(OBZVON_ARCHIVE_SYNC_ALERT_EVENT, onArchiveSyncAlert);
+  }, [activeCompany]);
+  useEffect(() => {
+    if (sessionUser === 'Admin') return;
+    setArchiveSyncAlert(null);
+  }, [sessionUser]);
   const buildDefaultCreds = useCallback((baseUsers) => {
     const m = {};
     (baseUsers || []).forEach((u) => { m[u] = u; });
@@ -17628,6 +17708,171 @@ export default function App() {
     () => (obzvonAllNewRows || []).filter((r) => rowBelongsToCompany(r, companyCustomerIds, activeCompany)),
     [obzvonAllNewRows, rowBelongsToCompany, companyCustomerIds, activeCompany]
   );
+  const mergedCompanyObzvonRows = useMemo(() => {
+    const src = [
+      ...(Array.isArray(companyObzvonAllRows) ? companyObzvonAllRows : []),
+      ...(Array.isArray(companyObzvonAllNewRows) ? companyObzvonAllNewRows : []),
+    ];
+    const m = new Map();
+    src.forEach((r, i) => {
+      if (isIgnoredObzvonOperator(r?.operator)) return;
+      const rid = String(r?.rid || r?._rid || '').trim();
+      const key = rid || makeObzvonRowKey(r) || `row_${i + 1}`;
+      const nextRow = { ...(r || {}), rid: key };
+      const prev = m.get(key);
+      if (!prev) {
+        m.set(key, nextRow);
+        return;
+      }
+      const prevTs = toDate(prev?.updatedAt || prev?.callDate)?.getTime() || 0;
+      const nextTs = toDate(nextRow?.updatedAt || nextRow?.callDate)?.getTime() || 0;
+      if (nextTs >= prevTs) m.set(key, nextRow);
+    });
+    return Array.from(m.values());
+  }, [companyObzvonAllRows, companyObzvonAllNewRows]);
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    if (sessionUser !== 'Admin') return;
+    const companyKey = normalizeCompanyKey(activeCompany);
+    if (!companyKey) return;
+    const runAutoArchiveDaily = async () => {
+      if (archiveAutoBusyRef.current) return;
+      const now = new Date();
+      const today = toIsoDate(now);
+      const hh = now.getHours();
+      if (!today || hh < OBZVON_ARCHIVE_AUTO_HOUR) return;
+      const targetDate = toIsoDate(new Date(now.getTime() - 86400000));
+      if (!targetDate) return;
+      const doneKey = `${OBZVON_ARCHIVE_AUTO_LAST_KEY}_${companyKey}`;
+      const lastDone = String(S.get(doneKey, '') || '');
+      if (lastDone === targetDate) return;
+      const rowsWithNote = mergedCompanyObzvonRows.filter((r) => {
+        const d = toIsoDate(r?.callDate || '');
+        if (d !== targetDate) return false;
+        return String(r?.note || '').trim().length > 0;
+      });
+      if (!rowsWithNote.length) return;
+      archiveAutoBusyRef.current = true;
+      try {
+        let sourceArc = [];
+        let fromGoogle = false;
+        try {
+          sourceArc = await loadObzArcFromGoogleSheet(companyKey);
+          fromGoogle = true;
+        } catch {
+          sourceArc = readObzArc(companyKey);
+        }
+        const existing = (sourceArc || []).find((a) => a?.type === 'daily' && String(a?.period || '') === targetDate) || null;
+        const existingRows = Array.isArray(existing?.rows) ? existing.rows : [];
+        const existingKeys = new Set(existingRows.map((r) => makeObzvonRowKey(r)));
+        const pendingRows = rowsWithNote.filter((r) => !existingKeys.has(makeObzvonRowKey(r)));
+        if (!pendingRows.length) {
+          if (fromGoogle) {
+            clearObzArc(companyKey);
+            emitObzArcUpdated(companyKey);
+            S.set(doneKey, targetDate);
+            emitObzArcSyncAlert({
+              company: companyKey,
+              status: 'ok',
+              source: 'auto-daily',
+              message: `${targetDate} kunlik tahlil allaqachon Google Sheetda`,
+            });
+          }
+          return;
+        }
+        const byCustomer = new Map();
+        mergedCompanyObzvonRows.forEach((r) => {
+          const cid = String(r?.customerId || '').trim();
+          if (!cid) return;
+          if (!byCustomer.has(cid)) byCustomer.set(cid, []);
+          byCustomer.get(cid).push({
+            ts: toDate(r?.callDate)?.getTime() || 0,
+            sold: hasObzvonSale(r),
+          });
+        });
+        byCustomer.forEach((arr) => arr.sort((a, b) => a.ts - b.ts));
+        const catTotals = Object.fromEntries(
+          FIXED_CATS.map((c) => [c.key, Number(existing?.categories?.[c.key] || 0)])
+        );
+        const archivedRows = pendingRows.slice(0, 1200).map((r, idx) => {
+          const cid = String(r?.customerId || '').trim();
+          const ts = toDate(r?.callDate)?.getTime() || 0;
+          const later = (byCustomer.get(cid) || []).filter((x) => x.ts > ts);
+          const cat = detectCat(r?.note);
+          if (Object.prototype.hasOwnProperty.call(catTotals, cat)) catTotals[cat] += 1;
+          const rid = makeObzvonRowKey(r);
+          return {
+            id: `${targetDate}_${idx + 1}`,
+            rid,
+            customerId: cid,
+            customer: String(r?.customer || r?.customerName || '').trim() || (cid ? `ID: ${cid}` : '—'),
+            operator: String(r?.operator || '').trim() || '—',
+            callDate: toIsoDate(r?.callDate || ''),
+            topic: String(r?.topic || '').trim(),
+            note: String(r?.note || '').trim().slice(0, 260),
+            cat,
+            followedUp: later.length > 0,
+            orderedAfter: later.some((x) => x.sold),
+          };
+        });
+        const mergedRows = [...existingRows, ...archivedRows];
+        const topCat = FIXED_CATS
+          .map((c) => ({ label: c.label, val: Number(catTotals[c.key] || 0) }))
+          .sort((a, b) => b.val - a.val)[0];
+        const item = {
+          id: existing?.id || Date.now(),
+          type: 'daily',
+          period: targetDate,
+          totalNotes: rowsWithNote.length,
+          noteCount: mergedRows.length,
+          categories: catTotals,
+          rows: mergedRows,
+          xulosa: `${targetDate} davrida jami ${mergedRows.length} ta izoh tahlil qilindi. Eng ko'p kategoriya: ${topCat?.label || '—'} (${topCat?.val || 0} ta).`,
+          analyzedAt: new Date().toISOString(),
+        };
+        const nextArc = normalizeObzArcItems([item, ...(sourceArc || []).filter((a) => !(a.type === 'daily' && a.period === targetDate))]);
+        const syncRs = await syncObzArcCompanyToGoogleSheet(companyKey, nextArc, sessionUser || currentUser || 'unknown');
+        if (syncRs?.ok) {
+          clearObzArc(companyKey);
+          emitObzArcUpdated(companyKey);
+          S.set(doneKey, targetDate);
+          emitObzArcSyncAlert({
+            company: companyKey,
+            status: 'ok',
+            source: 'auto-daily',
+            message: `${targetDate} kunlik tahlil Google Sheetga joylandi`,
+          });
+          return;
+        }
+        writeObzArc(companyKey, nextArc);
+        emitObzArcUpdated(companyKey);
+        emitObzArcSyncAlert({
+          company: companyKey,
+          status: 'error',
+          source: 'auto-daily',
+          message: `Google Sheetga ko'chmadi (${targetDate}): ${String(syncRs?.error || "noma'lum xato")}`,
+        });
+      } catch (e) {
+        emitObzArcSyncAlert({
+          company: companyKey,
+          status: 'error',
+          source: 'auto-daily',
+          message: `Kunlik auto tahlilda xato: ${String(e?.message || e || "noma'lum xato")}`,
+        });
+      } finally {
+        archiveAutoBusyRef.current = false;
+      }
+    };
+    runAutoArchiveDaily();
+    const t = setInterval(runAutoArchiveDaily, 5 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [
+    isLoggedIn,
+    sessionUser,
+    activeCompany,
+    mergedCompanyObzvonRows,
+    currentUser,
+  ]);
   const companyObzvonRecords = useMemo(
     () => (obzvonRecords || []).filter((r) => rowBelongsToCompany(r, companyCustomerIds, activeCompany)),
     [obzvonRecords, rowBelongsToCompany, companyCustomerIds, activeCompany]
@@ -18333,6 +18578,14 @@ export default function App() {
   return (
     <>
       <style>{CSS}</style>
+      {sessionUser === 'Admin' && archiveSyncAlert?.message && (
+        <div className="archive-sync-alert-top">
+          <span>Google Sheetga ko‘chmadi</span>
+          <span style={{opacity:.9,fontWeight:500}}>
+            {archiveSyncAlert.message}
+          </span>
+        </div>
+      )}
       <div style={{height:'100vh',display:'flex',overflow:'hidden',background:'var(--bg)', ...themeVars}}>
         {/* SIDEBAR */}
         <div style={{width:side?215:56,background:'var(--s1)',borderRight:'1px solid var(--b2)',display:'flex',flexDirection:'column',transition:'width .2s',flexShrink:0,overflow:'hidden'}}>
