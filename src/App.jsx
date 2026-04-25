@@ -11997,16 +11997,40 @@ function TimeFilterBar({ timeMode, setTimeMode, selYear, setSelYear, selMonth, s
 /* ════════════════════════════════════════════════════════════════════
    SOTUV ANALIZI
    ════════════════════════════════════════════════════════════════════ */
-function SotuvAnaliz({ D }) {
+function SotuvAnaliz({ D, company = 'murodbaxsh' }) {
   const allOrders = useMemo(() => (
     Array.isArray(D?.rawOrders)
       ? D.rawOrders
       : (Array.isArray(D?.orders) ? D.orders : [])
   ), [D?.rawOrders, D?.orders]);
+  const companyKey = normalizeCompanyKey(company);
+  const isRowInCompanyScope = useCallback((o) => {
+    if (!isOrderDoc(o?.docType) && !isReturnDoc(o?.docType)) return false;
+    if (isCancelledStatus(o?.status)) return false;
+    if (isVirtualWarehouseLabel(o?.warehouse)) return false;
+    const cat = normalizeMatchText(o?.cat).replace(/\s+/g, ' ').trim();
+    if (companyKey === 'murodbaxsh') {
+      if (cat.includes('чай') || cat.includes('chay')) return false;
+      if (cat.includes('alp jamol') || cat.includes('alpjamol')) return false;
+    }
+    return true;
+  }, [companyKey]);
   const salesRows = useMemo(
-    () => allOrders.filter((o) => isMonthlyWaterSalesRow(o)),
-    [allOrders]
+    () => allOrders.filter((o) => isRowInCompanyScope(o)),
+    [allOrders, isRowInCompanyScope]
   );
+  const getSalesValues = useCallback((row) => {
+    if (!row) return { qty: 0, sum: 0, ignored: true };
+    if (isIgnoredMainWarehouseBottleReturn(row)) return { qty: 0, sum: 0, ignored: true };
+    const qty = toNum(row?.qty);
+    const sum = String(row?.currency || '').toUpperCase() === 'USD' ? 0 : toNum(row?.sum);
+    return {
+      qty: Number.isFinite(qty) ? qty : 0,
+      sum: Number.isFinite(sum) ? sum : 0,
+      ignored: false,
+    };
+  }, []);
+
   const [timeMode, setTimeMode] = useState('all');
   const [selYear, setSelYear] = useState('');
   const [selMonth, setSelMonth] = useState(() => toIsoDate(new Date()).slice(0, 7));
@@ -12133,23 +12157,34 @@ function SotuvAnaliz({ D }) {
     const map = {};
     filtered.forEach((o) => {
       const prod = getProductName(o?.product);
-      if (!map[prod]) map[prod] = { name: prod, sotilgan: 0, qaytarilgan: 0, soldSum: 0, returnSum: 0 };
-      const { qty, sum } = getDashboardLikeSalesValues(o);
+      if (!map[prod]) {
+        map[prod] = {
+          name: prod,
+          sotilgan: 0,
+          qaytarilgan: 0,
+          soldSum: 0,
+          returnSum: 0,
+          pricedQty: 0,
+          zeroPriceQty: 0,
+        };
+      }
+      const { qty, sum } = getSalesValues(o);
       if (qty < 0) {
         map[prod].qaytarilgan += Math.abs(qty);
         map[prod].returnSum += Math.abs(sum);
       } else {
         map[prod].sotilgan += qty;
         map[prod].soldSum += Math.max(0, sum);
+        if (sum > 0) map[prod].pricedQty += qty;
+        else map[prod].zeroPriceQty += qty;
       }
     });
     return Object.values(map).map((p) => ({
       ...p,
       net: p.sotilgan - p.qaytarilgan,
       netSum: p.soldSum - p.returnSum,
-    }))
-      .sort((a, b) => b.net - a.net);
-  }, [filtered, getProductName]);
+    })).sort((a, b) => b.net - a.net);
+  }, [filtered, getProductName, getSalesValues]);
 
   const spreadData = useMemo(() => {
     if (spreadMode === 'only' || timeMode === 'day') return null;
@@ -12160,15 +12195,19 @@ function SotuvAnaliz({ D }) {
       const key = getKey(d);
       if (!key || key === '0000') return;
       if (!map[key]) map[key] = { period: key, Sotilgan: 0, Qaytarilgan: 0 };
-      const { qty } = getDashboardLikeSalesValues(o);
+      const { qty } = getSalesValues(o);
       if (qty < 0) map[key].Qaytarilgan += Math.abs(qty);
       else map[key].Sotilgan += qty;
     });
     return Object.values(map)
       .map((d) => ({ ...d, Net: d.Sotilgan - d.Qaytarilgan }))
       .sort((a, b) => a.period.localeCompare(b.period));
-  }, [filtered, spreadMode, timeMode]);
+  }, [filtered, spreadMode, timeMode, getSalesValues]);
 
+  const bonusRows = useMemo(
+    () => productStats.filter((p) => isBonusWaterProduct(p?.name)),
+    [productStats]
+  );
   const prodChartData = productStats.slice(0, 12).map((p) => ({ name: p.name, Sotilgan: p.sotilgan, Qaytarilgan: p.qaytarilgan }));
   const maxProd = Math.max(...productStats.map((p) => p.sotilgan), 1);
   const totSold = productStats.reduce((s, p) => s + p.sotilgan, 0);
@@ -12176,10 +12215,11 @@ function SotuvAnaliz({ D }) {
   const totNet = totSold - totReturn;
   const totSoldSum = productStats.reduce((s, p) => s + p.soldSum, 0);
   const totNetSum = productStats.reduce((s, p) => s + p.netSum, 0);
+  const totPricedQty = productStats.reduce((s, p) => s + p.pricedQty, 0);
+  const totZeroPriceQty = productStats.reduce((s, p) => s + p.zeroPriceQty, 0);
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
-      {/* Filter bar */}
       <div className="card" style={{ padding: '10px 14px' }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
           <TimeFilterBar
@@ -12206,7 +12246,7 @@ function SotuvAnaliz({ D }) {
                 <span className="tag" style={{ background: 'var(--s3)', color: 'var(--t2)' }}>{activeProductsCount}/{allProducts.length || 0}</span>
               </button>
               {productFilterOpen && (
-                <div className="card" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 280, zIndex: 40, padding: 10, display: 'grid', gap: 8, maxHeight: 320, overflow: 'auto' }}>
+                <div className="card" style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, width: 300, zIndex: 40, padding: 10, display: 'grid', gap: 8, maxHeight: 340, overflow: 'auto' }}>
                   <div style={{ display: 'grid', gap: 6, gridTemplateColumns: '1fr 1fr' }}>
                     <button className="btn btn-gh btn-sm" type="button" onClick={selectAllProducts}>Hammasi</button>
                     <button className="btn btn-gh btn-sm" type="button" onClick={clearAllProducts}>Tozalash</button>
@@ -12226,15 +12266,15 @@ function SotuvAnaliz({ D }) {
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))'}}>
-        <BigStat icon="✅" label="Sotilgan"     value={fmt(totSold)}   sub={`${fmt(totSoldSum)} so'm`} color="var(--gr)" />
-        <BigStat icon="↩" label="Qaytarilgan"  value={fmt(totReturn)}  sub={totSold>0?`${Math.round(totReturn/totSold*100)}%`:''} color="var(--rd)" />
-        <BigStat icon="⚖" label="Net"           value={fmt(totNet)}    sub={`${fmt(totNetSum)} so'm`} color="var(--bl)" />
-        <BigStat icon="💰" label="Tushum"  value={fmt(Math.round(totSoldSum/1000))+"K"} sub="Sotuv summasi" color="var(--pu)" />
+        <BigStat icon="✅" label="Sotilgan" value={fmt(totSold)} sub={`${fmt(totSoldSum)} so'm`} color="var(--gr)" />
+        <BigStat icon="↩" label="Qaytarilgan" value={fmt(totReturn)} sub={totSold>0?`${Math.round(totReturn/totSold*100)}%`:''} color="var(--rd)" />
+        <BigStat icon="⚖" label="Net" value={fmt(totNet)} sub={`${fmt(totNetSum)} so'm`} color="var(--bl)" />
+        <BigStat icon="💰" label="Tushum" value={fmt(Math.round(totSoldSum/1000))+"K"} sub="Sotuv summasi" color="var(--pu)" />
+        <BigStat icon="🏷" label="Narxli sotuv" value={fmt(totPricedQty)} sub="Summa > 0 qatorlar" color="var(--gr)" />
+        <BigStat icon="🎁" label="0 narxli qator" value={fmt(totZeroPriceQty)} sub="Bonus/aksiyada urilgan" color="var(--yl)" />
       </div>
 
-      {/* Spread chart */}
       {spreadMode==='spread' && spreadData && spreadData.length > 0 && (
         <div className="card" style={{padding:'14px 16px'}}>
           <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Vaqt bo'yicha dinamika</div>
@@ -12244,20 +12284,14 @@ function SotuvAnaliz({ D }) {
               <XAxis dataKey="period" style={{fontSize:10}} stroke="var(--t3)" />
               <YAxis style={{fontSize:10}} stroke="var(--t3)" />
               <Tooltip />
-              <Area type="monotone" dataKey="Sotilgan"    stroke="var(--gr)" fill="var(--gr2)" strokeWidth={2} />
+              <Area type="monotone" dataKey="Sotilgan" stroke="var(--gr)" fill="var(--gr2)" strokeWidth={2} />
               <Area type="monotone" dataKey="Qaytarilgan" stroke="var(--rd)" fill="var(--rd2)" strokeWidth={2} />
-              <Area type="monotone" dataKey="Net"          stroke="var(--bl)" fill="none"        strokeWidth={2} strokeDasharray="4 2" />
+              <Area type="monotone" dataKey="Net" stroke="var(--bl)" fill="none" strokeWidth={2} strokeDasharray="4 2" />
             </AreaChart>
           </ResponsiveContainer>
-          <div style={{display:'flex',gap:12,marginTop:6,fontSize:11,color:'var(--t3)',flexWrap:'wrap'}}>
-            <span><span style={{color:'var(--gr)',fontWeight:700}}>■</span> Sotilgan</span>
-            <span><span style={{color:'var(--rd)',fontWeight:700}}>■</span> Qaytarilgan</span>
-            <span><span style={{color:'var(--bl)',fontWeight:700}}>──</span> Net</span>
-          </div>
         </div>
       )}
 
-      {/* Product chart */}
       {prodChartData.length > 0 && (
         <div className="card" style={{padding:'14px 16px'}}>
           <div style={{fontWeight:700,fontSize:13,marginBottom:12}}>Mahsulot bo'yicha sotuv</div>
@@ -12267,32 +12301,33 @@ function SotuvAnaliz({ D }) {
               <XAxis type="number" style={{fontSize:11}} stroke="var(--t3)" />
               <YAxis type="category" dataKey="name" width={130} style={{fontSize:11}} stroke="var(--t3)" />
               <Tooltip />
-              <Bar dataKey="Sotilgan"    fill="var(--gr)" radius={[0,5,5,0]} />
+              <Bar dataKey="Sotilgan" fill="var(--gr)" radius={[0,5,5,0]} />
               <Bar dataKey="Qaytarilgan" fill="var(--rd)" radius={[0,5,5,0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       )}
 
-      {/* Product table */}
       {productStats.length > 0 && (
         <div className="card" style={{padding:'14px 16px'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
             <div style={{fontWeight:700,fontSize:13}}>Mahsulot jadvali</div>
             <button className="btn btn-gh btn-sm" onClick={()=>setShowTable(v=>!v)}>{showTable?'Yashirish':"Ko'rsatish"}</button>
           </div>
-          {showTable&&(
+          {showTable && (
             <div style={{overflowX:'auto'}}>
               <table className="tbl" style={{width:'100%'}}>
                 <thead><tr>
-                  <th>Mahsulot</th><th>Sotilgan</th><th>Qaytarilgan</th><th>Net</th><th>Tushum</th><th>Net summa</th>
+                  <th>Mahsulot</th><th>Sotilgan</th><th>Narxli dona</th><th>0 narxli dona</th><th>Qaytarilgan</th><th>Net</th><th>Tushum</th><th>Net summa</th>
                   <th style={{width:100}}>Ulush</th>
                 </tr></thead>
                 <tbody>
-                  {productStats.map(p=>(
+                  {productStats.map((p) => (
                     <tr key={p.name}>
                       <td style={{fontWeight:600}}>{p.name}</td>
                       <td style={{color:'var(--gr)',fontWeight:700}}>{fmt(p.sotilgan)}</td>
+                      <td style={{color:'var(--gr)'}}>{fmt(p.pricedQty)}</td>
+                      <td style={{color:'var(--yl)'}}>{fmt(p.zeroPriceQty)}</td>
                       <td style={{color:'var(--rd)'}}>{fmt(p.qaytarilgan)}</td>
                       <td style={{color:'var(--bl)',fontWeight:700}}>{fmt(p.net)}</td>
                       <td>{fmt(Math.round(p.soldSum/1000))}K</td>
@@ -12304,6 +12339,27 @@ function SotuvAnaliz({ D }) {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {bonusRows.length > 0 && (
+        <div className="card" style={{padding:'14px 16px'}}>
+          <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Bonus mahsulot jadvali</div>
+          <div style={{overflowX:'auto'}}>
+            <table className="tbl" style={{width:'100%'}}>
+              <thead><tr><th>Mahsulot</th><th>Bonus soni</th><th>0 narxli</th><th>Qaytarilgan</th></tr></thead>
+              <tbody>
+                {bonusRows.map((p) => (
+                  <tr key={`bonus_${p.name}`}>
+                    <td style={{fontWeight:600}}>{p.name}</td>
+                    <td style={{color:'var(--bl)',fontWeight:700}}>{fmt(p.sotilgan)}</td>
+                    <td style={{color:'var(--yl)'}}>{fmt(p.zeroPriceQty)}</td>
+                    <td style={{color:'var(--rd)'}}>{fmt(p.qaytarilgan)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -12350,6 +12406,127 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
     () => filtered.filter((r) => !isIgnoredObzvonOperator(r?.operator)),
     [filtered]
   );
+  const customerIdByName = useMemo(() => {
+    const m = new Map();
+    (Array.isArray(D?.customers) ? D.customers : []).forEach((c) => {
+      const id = String(c?.id || '').trim();
+      const nameKey = normalizeMatchText(c?.name).replace(/\s+/g, ' ').trim();
+      if (id && nameKey && !m.has(nameKey)) m.set(nameKey, id);
+    });
+    return m;
+  }, [D?.customers]);
+  const cashPayments = useMemo(() => {
+    const src = Array.isArray(D?.cashbox) ? D.cashbox : [];
+    const out = [];
+    src.forEach((r) => {
+      if (!isPaymentFromCounterparty(r?.opType)) return;
+      const amount = Math.abs(Number(r?.amount || 0));
+      if (!Number.isFinite(amount) || amount < 19000) return;
+      const date = toIsoDate(r?.sana || '');
+      if (!date) return;
+      const rawId = String(r?.mId || '').trim();
+      const byName = customerIdByName.get(normalizeMatchText(r?.contName).replace(/\s+/g, ' ').trim()) || '';
+      const customerId = rawId || byName;
+      if (!customerId) return;
+      out.push({
+        id: String(r?.opNum || '').trim() || `${customerId}__${date}__${amount}`,
+        customerId,
+        date,
+        ts: toDate(r?.sana)?.getTime() || 0,
+        amount,
+      });
+    });
+    return out.sort((a, b) => a.ts - b.ts);
+  }, [D?.cashbox, customerIdByName]);
+  const debtCallRows = useMemo(() => (
+    analyticsRows
+      .filter((r) => normalizeTopicKey(r?.topic) === 'qarzdorlik')
+      .map((r) => ({
+        key: makeObzvonRowKey(r),
+        operator: String(r?.operator || '').trim() || "Noma'lum",
+        customerId: String(r?.customerId || '').trim(),
+        callDate: toIsoDate(r?.callDate || ''),
+        callTs: toDate(r?.callDate)?.getTime() || 0,
+      }))
+      .filter((r) => r.customerId && r.callDate)
+  ), [analyticsRows]);
+  const debtWorkStats = useMemo(() => {
+    const outcomesMap = new Map();
+    debtCallRows.forEach((c) => {
+      outcomesMap.set(c.key, {
+        ...c,
+        collectedSum: 0,
+        paymentCount: 0,
+        firstPaidDays: null,
+      });
+    });
+    const callsByCustomer = new Map();
+    debtCallRows.forEach((c) => {
+      if (!callsByCustomer.has(c.customerId)) callsByCustomer.set(c.customerId, []);
+      callsByCustomer.get(c.customerId).push(c);
+    });
+    callsByCustomer.forEach((arr) => arr.sort((a, b) => a.callTs - b.callTs));
+
+    cashPayments.forEach((p) => {
+      const calls = callsByCustomer.get(p.customerId) || [];
+      if (!calls.length) return;
+      let target = null;
+      for (let i = calls.length - 1; i >= 0; i--) {
+        if (calls[i].callTs <= p.ts) {
+          target = calls[i];
+          break;
+        }
+      }
+      if (!target) return;
+      const out = outcomesMap.get(target.key);
+      if (!out) return;
+      out.collectedSum += p.amount;
+      out.paymentCount += 1;
+      const days = Math.max(0, Math.floor((p.ts - target.callTs) / 86400000));
+      if (out.firstPaidDays == null || days < out.firstPaidDays) out.firstPaidDays = days;
+    });
+
+    const outcomes = Array.from(outcomesMap.values());
+    const byOperatorMap = {};
+    const calledCustomerSet = new Set();
+    let workedSum = 0;
+    outcomes.forEach((o) => {
+      calledCustomerSet.add(o.customerId);
+      workedSum += o.collectedSum;
+      const op = o.operator || "Noma'lum";
+      if (!byOperatorMap[op]) {
+        byOperatorMap[op] = {
+          name: op,
+          Jami: 0,
+          Mijozlar: new Set(),
+          WorkedSum: 0,
+          SameDay: 0,
+          In15Days: 0,
+          In30Days: 0,
+          Unpaid: 0,
+        };
+      }
+      const row = byOperatorMap[op];
+      row.Jami += 1;
+      row.Mijozlar.add(o.customerId);
+      row.WorkedSum += o.collectedSum;
+      if (o.firstPaidDays == null) row.Unpaid += 1;
+      else if (o.firstPaidDays <= 1) row.SameDay += 1;
+      else if (o.firstPaidDays <= 15) row.In15Days += 1;
+      else if (o.firstPaidDays <= 30) row.In30Days += 1;
+    });
+    const byOperator = Object.values(byOperatorMap)
+      .map((r) => ({ ...r, Mijoz: r.Mijozlar.size }))
+      .sort((a, b) => b.Jami - a.Jami);
+    return {
+      outcomes,
+      byOperator,
+      summary: {
+        calledCustomers: calledCustomerSet.size,
+        workedSum,
+      },
+    };
+  }, [debtCallRows, cashPayments]);
 
   const byOp = useMemo(() => {
     const map = {};
@@ -12401,51 +12578,42 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
       }))
       .sort((a, b) => b.Jami - a.Jami);
   }, [analyticsRows, customerById]);
-  const debtByOperator = useMemo(() => {
-    const map = {};
-    analyticsRows
-      .filter((r) => normalizeTopicKey(r?.topic) === 'qarzdorlik')
-      .forEach((r) => {
-        const op = String(r?.operator || '').trim() || "Noma'lum";
-        if (!map[op]) map[op] = { name: op, Jami: 0, Mijozlar: new Set(), DebtSum: 0, _ids: new Set() };
-        const row = map[op];
-        row.Jami += 1;
-        const cid = String(r?.customerId || '').trim();
-        if (!cid) return;
-        row.Mijozlar.add(cid);
-        if (row._ids.has(cid)) return;
-        row._ids.add(cid);
-        const bal = Number(customerById.get(cid)?.balanceUZS || 0);
-        if (bal < 0) row.DebtSum += Math.abs(bal);
-      });
-    return Object.values(map)
-      .map((r) => ({ ...r, Mijoz: r.Mijozlar.size }))
-      .sort((a, b) => b.Jami - a.Jami);
-  }, [analyticsRows, customerById]);
+  const debtByOperator = useMemo(
+    () => debtWorkStats.byOperator || [],
+    [debtWorkStats]
+  );
   const operatorTopicMatrix = useMemo(() => {
+    const debtWorkedByOp = new Map(
+      (debtByOperator || []).map((r) => [String(r?.name || ''), Number(r?.WorkedSum || 0)])
+    );
     const map = {};
     analyticsRows.forEach((r) => {
       const op = String(r?.operator || '').trim() || "Noma'lum";
       const key = normalizeTopicKey(r?.topic);
       const topic = topicLabelByKey(key);
       const mKey = `${op}__${key}`;
-      if (!map[mKey]) map[mKey] = { operator: op, key, topic, Jami: 0, Sotildi: 0, TelKotarmadi: 0 };
+      if (!map[mKey]) map[mKey] = { operator: op, key, topic, Jami: 0, Sotildi: 0, TelKotarmadi: 0, WorkedSum: 0 };
       map[mKey].Jami += 1;
       if (key === 'sotuv' || key === 'buyurtma_olish') {
         if (hasObzvonSale(r)) map[mKey].Sotildi += 1;
       }
       if (isMissedCall(r?.note)) map[mKey].TelKotarmadi += 1;
+      if (key === 'qarzdorlik') map[mKey].WorkedSum = Number(debtWorkedByOp.get(op) || 0);
     });
     return Object.values(map).sort((a, b) => b.Jami - a.Jami);
-  }, [analyticsRows]);
+  }, [analyticsRows, debtByOperator]);
 
   const totTotal = byOp.reduce((s, o) => s + o.Jami, 0);
   const totSold = byOp.reduce((s, o) => s + o.Sotildi, 0);
   const totMissed = byOp.reduce((s, o) => s + o.TelKotarmadi, 0);
-  const debtTopicStats = useMemo(
-    () => byTopic.find((t) => t.key === 'qarzdorlik') || { Jami: 0, Mijoz: 0, DebtSum: 0, TelKotarmadi: 0 },
-    [byTopic]
-  );
+  const debtTopicStats = useMemo(() => {
+    const topic = byTopic.find((t) => t.key === 'qarzdorlik') || { Jami: 0, Mijoz: 0, DebtSum: 0, TelKotarmadi: 0 };
+    return {
+      ...topic,
+      WorkedSum: Number(debtWorkStats?.summary?.workedSum || 0),
+      CalledCustomers: Number(debtWorkStats?.summary?.calledCustomers || topic?.Mijoz || 0),
+    };
+  }, [byTopic, debtWorkStats]);
 
   const archiveItems = useMemo(() => {
     const src = readObzArc(company);
@@ -12611,8 +12779,8 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
           <div style={{ display: 'grid', gap: 10, gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))' }}>
             <BigStat icon="🎯" label="Maqsad turlari" value={String(byTopic.length)} sub="Alohida hisob" color="var(--pu)" />
             <BigStat icon="📞" label="Jami obzvon" value={String(totTotal)} sub="Tanlangan davr" color="var(--bl)" />
-            <BigStat icon="💼" label="Qarzdorlik obzvoni" value={String(debtTopicStats.Jami || 0)} sub={`${fmt(debtTopicStats.Mijoz || 0)} ta mijoz`} color="var(--yl)" />
-            <BigStat icon="💰" label="Qarz bilan ishlangan" value={`${fmt(Math.round((debtTopicStats.DebtSum || 0) / 1000))}K`} sub="UZS" color="var(--rd)" />
+            <BigStat icon="💼" label="Qarzdorlik obzvoni" value={String(debtTopicStats.Jami || 0)} sub={`${fmt(debtTopicStats.CalledCustomers || 0)} ta mijoz`} color="var(--yl)" />
+            <BigStat icon="💰" label="Qarz bilan ishlangan" value={`${fmt(Math.round((debtTopicStats.WorkedSum || 0) / 1000))}K`} sub="Cashboxdan tushgan summa" color="var(--rd)" />
           </div>
           {byTopic.length > 0 && (
             <div className="card" style={{ padding: '14px 16px' }}>
@@ -12642,7 +12810,7 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
                           {t.key === 'qarzdorlik' ? '—' : fmt(t.Sotildi)}
                         </td>
                         <td style={{ color: t.key === 'qarzdorlik' ? 'var(--rd)' : 'var(--t3)', fontWeight: 700 }}>
-                          {t.key === 'qarzdorlik' ? `${fmt(Math.round((t.DebtSum || 0) / 1000))}K` : '—'}
+                          {t.key === 'qarzdorlik' ? `${fmt(Math.round((debtTopicStats.WorkedSum || 0) / 1000))}K` : '—'}
                         </td>
                       </tr>
                     ))}
@@ -12656,14 +12824,18 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Qarzdorlik maqsadi: operator kesimi</div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="tbl" style={{ width: '100%' }}>
-                  <thead><tr><th>Operator</th><th>Obzvon</th><th>Mijoz</th><th>Ishlangan qarz (UZS)</th></tr></thead>
+                  <thead><tr><th>Operator</th><th>Obzvon</th><th>Mijoz</th><th>Ishlangan summa</th><th>1 kunda</th><th>15 kungacha</th><th>30 kungacha</th><th>Hali tushmagan</th></tr></thead>
                   <tbody>
                     {debtByOperator.map((r) => (
                       <tr key={r.name}>
                         <td style={{ fontWeight: 700 }}>{r.name}</td>
                         <td>{fmt(r.Jami)}</td>
                         <td>{fmt(r.Mijoz)}</td>
-                        <td style={{ color: 'var(--rd)', fontWeight: 700 }}>{fmt(r.DebtSum)} so'm</td>
+                        <td style={{ color: 'var(--rd)', fontWeight: 700 }}>{fmt(r.WorkedSum)} so'm</td>
+                        <td>{fmt(r.SameDay)}</td>
+                        <td>{fmt(r.In15Days)}</td>
+                        <td>{fmt(r.In30Days)}</td>
+                        <td>{fmt(r.Unpaid)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -12676,7 +12848,7 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
               <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Operator + maqsad kesimi</div>
               <div style={{ overflowX: 'auto' }}>
                 <table className="tbl" style={{ width: '100%' }}>
-                  <thead><tr><th>Operator</th><th>Maqsad</th><th>Obzvon</th><th>Tel ko'tarmadi</th><th>Sotuv</th></tr></thead>
+                  <thead><tr><th>Operator</th><th>Maqsad</th><th>Obzvon</th><th>Tel ko'tarmadi</th><th>Sotuv</th><th>Qarz ishlangan</th></tr></thead>
                   <tbody>
                     {operatorTopicMatrix.slice(0, 120).map((r, idx) => (
                       <tr key={`${r.operator}_${r.key}_${idx}`}>
@@ -12685,6 +12857,9 @@ function ObzvonAnaliz({ D, company, obzvonRows = [] }) {
                         <td>{fmt(r.Jami)}</td>
                         <td style={{ color: 'var(--rd)' }}>{fmt(r.TelKotarmadi)}</td>
                         <td style={{ color: 'var(--gr)' }}>{fmt(r.Sotildi)}</td>
+                        <td style={{ color: r.key === 'qarzdorlik' ? 'var(--rd)' : 'var(--t3)', fontWeight: 700 }}>
+                          {r.key === 'qarzdorlik' ? `${fmt(r.WorkedSum)} so'm` : '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -13213,27 +13388,84 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
     });
     byCustomer.forEach((arr) => arr.sort((a, b) => a.ts - b.ts));
 
+    const validCats = new Set(FIXED_CATS.map((c) => c.key));
+    const aiCatByKey = new Map();
+    let aiCategorizedCount = 0;
+    if (aiKey.trim()) {
+      try {
+        const sample = pendingRows.slice(0, 180).map((r, i) => ({
+          idx: i + 1,
+          key: makeObzvonRowKey(r),
+          note: String(r?.note || '').trim().slice(0, 240),
+        }));
+        if (sample.length) {
+          const classifyPrompt = `Quyidagi izohlarni faqat bitta qattiq kategoriyaga ajrating:
+Kategoriya kalitlari: tel_kotarmadi, buyurtma, suv_borekan, kelishuv_tugatildi, boshqa
+Faqat JSON qaytaring.
+Format: [{"idx":1,"cat":"boshqa"}]
+Izohlar:
+${sample.map((x) => `${x.idx}. ${x.note}`).join('\n')}`;
+          const clsRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': aiKey,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+              'anthropic-dangerous-direct-browser-access': 'true',
+            },
+            body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 1800, messages: [{ role: 'user', content: classifyPrompt }] }),
+          });
+          const clsData = await clsRes.json();
+          if (!clsData?.error) {
+            const raw = String(clsData?.content?.[0]?.text || '').trim();
+            const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+            const body = fenced ? String(fenced[1] || '').trim() : raw;
+            let parsed = null;
+            try {
+              const a0 = body.indexOf('[');
+              const a1 = body.lastIndexOf(']');
+              if (a0 >= 0 && a1 > a0) parsed = JSON.parse(body.slice(a0, a1 + 1));
+              else parsed = JSON.parse(body);
+            } catch {}
+            const items = Array.isArray(parsed)
+              ? parsed
+              : (Array.isArray(parsed?.items) ? parsed.items : []);
+            items.forEach((it) => {
+              const idx = Number(it?.idx || it?.id || 0);
+              const cat = String(it?.cat || '').trim();
+              if (!Number.isFinite(idx) || idx < 1 || idx > sample.length) return;
+              if (!validCats.has(cat)) return;
+              aiCatByKey.set(sample[idx - 1].key, cat);
+            });
+            aiCategorizedCount = aiCatByKey.size;
+          }
+        }
+      } catch {}
+    }
+
     const catTotals = Object.fromEntries(
       FIXED_CATS.map((c) => [c.key, Number(existing?.categories?.[c.key] || 0)])
     );
     pendingRows.forEach((r) => {
-      const cat = detectCat(r?.note);
+      const key = makeObzvonRowKey(r);
+      const cat = aiCatByKey.get(key) || detectCat(r?.note);
       if (Object.prototype.hasOwnProperty.call(catTotals, cat)) catTotals[cat] += 1;
     });
     const archivedRows = pendingRows.slice(0, 1200).map((r, idx) => {
       const cid = String(r?.customerId || '').trim();
       const ts = toDate(r?.callDate)?.getTime() || 0;
       const later = (byCustomer.get(cid) || []).filter((x) => x.ts > ts);
+      const key = makeObzvonRowKey(r);
       return {
         id: `${period}_${idx + 1}`,
-        rid: makeObzvonRowKey(r),
+        rid: key,
         customerId: cid,
         customer: String(r?.customer || r?.customerName || '').trim() || (cid ? `ID: ${cid}` : '—'),
         operator: String(r?.operator || '').trim() || '—',
         callDate: toIsoDate(r?.callDate || ''),
         topic: String(r?.topic || '').trim(),
         note: String(r?.note || '').trim().slice(0, 260),
-        cat: detectCat(r?.note),
+        cat: aiCatByKey.get(key) || detectCat(r?.note),
         followedUp: later.length > 0,
         orderedAfter: later.some((x) => x.sold),
       };
@@ -13245,6 +13477,9 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
       .map((c) => ({ key: c.key, label: c.label, val: Number(catTotals[c.key] || 0) }))
       .sort((a, b) => b.val - a.val)[0];
     xulosa = `${period} davrida jami ${mergedRows.length} ta izoh tahlil qilindi. Eng ko'p kategoriya: ${topCat?.label || '—'} (${topCat?.val || 0} ta).`;
+    if (aiCategorizedCount > 0) {
+      xulosa += ` AI ${aiCategorizedCount} ta yangi izohni qattiq kategoriyaga ajratdi.`;
+    }
 
     try {
       if (aiKey.trim()) {
@@ -13310,7 +13545,7 @@ boshqa: ${catTotals.boshqa || 0}`;
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10,flexWrap:'wrap',gap:8}}>
           <div style={{fontWeight:700,fontSize:13}}>Tahlil arxivi (qattiq kategoriya)</div>
           <div style={{fontSize:11,color:getKey()?'var(--gr)':'var(--t3)'}}>
-            {getKey()?'✓ AI kalit sozlangan (xulosa AI bilan)':'Kalitsiz ham tahlil ishlaydi (qattiq kategoriya)'}
+            {getKey()?'✓ AI kalit sozlangan (kategoriya + xulosa AI yordamida)':'Kalitsiz ham tahlil ishlaydi (qoidaviy kategoriya)'}
           </div>
         </div>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
@@ -13494,7 +13729,7 @@ function AnalyticsPage({ D, company, currentUser, obzvonAllRows = [], obzvonNewR
         <button className={`tab${sub==='korxona'?' on':''}`} onClick={()=>setSub('korxona')}>Korxona holati</button>
         <button className={`tab${sub==='arxiv'?' on':''}`}   onClick={()=>setSub('arxiv')}>Tahlil arxivi</button>
       </div>
-      {sub==='sotuv'   &&<SotuvAnaliz   D={D} />}
+      {sub==='sotuv'   &&<SotuvAnaliz   D={D} company={company} />}
       {sub==='obzvon'  &&<ObzvonAnaliz  D={D} company={company} currentUser={currentUser} obzvonRows={mergedObzvonRows} />}
       {sub==='korxona' &&<KorxonaHolati D={D} company={company} obzvonRows={mergedObzvonRows} />}
       {sub==='arxiv'   &&<TahlilArxivi  company={company} obzvonRows={mergedObzvonRows} />}
@@ -13513,7 +13748,7 @@ function ClaudeKeyField() {
         value={val} onChange={e=>save(e.target.value)} style={{width:'100%'}} />
       {val
         ? <div style={{fontSize:11,color:'var(--gr)',marginTop:4}}>✓ Kalit saqlangan ({val.length} ta belgi)</div>
-        : <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>Kalit ixtiyoriy: qattiq kategoriyali tahlil kalitsiz ham ishlaydi</div>
+        : <div style={{fontSize:11,color:'var(--t3)',marginTop:4}}>Kalit ixtiyoriy: kalitsiz ham ishlaydi, kalit bo'lsa AI kategoriya + AI xulosa ishlaydi</div>
       }
     </div>
   );
@@ -14240,7 +14475,7 @@ function SettingsPanel({
             <div style={{fontWeight:700,fontSize:13,marginBottom:4}}>Tahlil arxivi: Claude AI kaliti</div>
             <div style={{fontSize:12,color:'var(--t3)',marginBottom:8}}>
               Bu kalit ixtiyoriy: qattiq kategoriyali tahlil kalitsiz ham ishlaydi.
-              Kalit bo'lsa, arxivga AI xulosa ham qo'shiladi. Kalitni <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" style={{color:'var(--bl)'}}>console.anthropic.com</a> dan olasiz.
+              Kalit bo'lsa, arxivda AI kategoriya ajratish va AI xulosa ham qo'shiladi. Kalitni <a href="https://console.anthropic.com/" target="_blank" rel="noreferrer" style={{color:'var(--bl)'}}>console.anthropic.com</a> dan olasiz.
             </div>
             <ClaudeKeyField />
           </div>
