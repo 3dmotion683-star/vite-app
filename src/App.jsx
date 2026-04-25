@@ -12256,10 +12256,24 @@ const loadObzArcFromGoogleSheet = async (company) => {
   const all = await loadObzArcAllFromGoogleSheet(key);
   return normalizeObzArcItems(all[key] || []);
 };
+const getObzArcExportUrls = () => {
+  const urls = [OBZVON_EXPORT_APPS_SCRIPT_URL];
+  try {
+    if (typeof window !== 'undefined') {
+      const storedAccess = normalizeAccessApiUrl(localStorage.getItem(ACCESS_SYNC_URL_KEY) || '');
+      const storedWebhook = normalizeAccessApiUrl(localStorage.getItem('aq-obzvon-webhook') || '');
+      if (storedAccess) urls.push(storedAccess);
+      if (storedWebhook) urls.push(storedWebhook);
+    }
+  } catch {}
+  const def = normalizeAccessApiUrl(OBZVON_WEBHOOK_DEFAULT || '');
+  if (def) urls.push(def);
+  return Array.from(new Set(urls.filter(Boolean)));
+};
 const pushObzArcRowsToGoogleSheet = async (rows = [], by = 'unknown') => {
   /* rows — obzvon_new_export formatidagi object qatorlar:
      { no, customerId, customer, callDate, topic, note, nextDate, orderCount, orderDate, operator, company, rid, updatedAt } */
-  const urlsToTry = [OBZVON_EXPORT_APPS_SCRIPT_URL].filter(Boolean);
+  const urlsToTry = getObzArcExportUrls();
   if (!urlsToTry.length) return { ok: false, error: 'Google Sheet export URL topilmadi' };
   const payloadRows = (Array.isArray(rows) ? rows : [])
     .filter((r) => r && typeof r === 'object' && !Array.isArray(r))
@@ -12291,9 +12305,13 @@ const pushObzArcRowsToGoogleSheet = async (rows = [], by = 'unknown') => {
   };
   const actionsToTry = ['obzvon_new_sheet_replace', 'obzvon_new_export'];
   let lastErr = '';
+  let lastUrl = '';
+  let lastAction = '';
   for (const url of urlsToTry) {
     const isAppsScript = /script\.google\.com/i.test(String(url || ''));
     for (const action of actionsToTry) {
+      lastUrl = String(url || '');
+      lastAction = String(action || '');
       try {
         const resp = await fetch(url, isAppsScript
           ? { method:'POST', mode:'cors', cache:'no-store',
@@ -12314,7 +12332,12 @@ const pushObzArcRowsToGoogleSheet = async (rows = [], by = 'unknown') => {
       }
     }
   }
-  return { ok: false, error: lastErr || "Google Sheetga yozib bo'lmadi" };
+  const detail = [
+    lastErr || "Google Sheetga yozib bo'lmadi",
+    lastAction ? `action=${lastAction}` : '',
+    lastUrl ? `url=${lastUrl}` : '',
+  ].filter(Boolean).join(' | ');
+  return { ok: false, error: detail };
 };
 const syncObzArcCompanyToGoogleSheet = async (company, items = [], by = 'unknown') => {
   /* REPLACE rejimi: joriy kompaniya arxivi to'liq qayta yoziladi (header har doim saqlanadi). */
@@ -13988,9 +14011,11 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
   const pullFromSheet = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setSheetSt((prev) => ({ ...prev, loading:true, err:'' }));
     try {
-      const remote = await loadObzArcFromGoogleSheet(company);
-      const cached = readObzArc(company);
-      if ((!remote || remote.length === 0) && cached.length > 0) {
+      const remote = normalizeObzArcItems(await loadObzArcFromGoogleSheet(company));
+      const cached = normalizeObzArcItems(readObzArc(company));
+      const hasCached = cached.length > 0;
+      const shouldSyncCached = hasCached && JSON.stringify(cached) !== JSON.stringify(remote);
+      if (shouldSyncCached) {
         setArc(cached);
         setSheetSt((prev) => ({ ...prev, loading:false, saving:true, err:'', src:'cache' }));
         const migrate = await syncObzArcCompanyToGoogleSheet(company, cached, getActor());
@@ -14006,6 +14031,7 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
           const reloaded = await loadObzArcFromGoogleSheet(company).catch(() => cached);
           setArc(normalizeObzArcItems(reloaded || cached || []));
           setSheetSt({ loading:false, saving:false, err:'', src:'google' });
+          return normalizeObzArcItems(reloaded || cached || []);
         } else {
           const errMsg = String(migrate?.error || "Google Sheetga migratsiyada xato");
           emitObzArcSyncAlert({
@@ -14021,8 +14047,8 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
             src:'cache',
             err:errMsg,
           }));
+          return cached;
         }
-        return [];
       }
       clearObzArc(company);
       setArc(remote);
@@ -14036,8 +14062,40 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
       setSheetSt({ loading:false, saving:false, err:'', src:'google' });
       return remote;
     } catch (e) {
-      const cached = readObzArc(company);
+      const cached = normalizeObzArcItems(readObzArc(company));
       const errMsg = String(e?.message || e || "Google Sheetdan o'qishda xato");
+      if (cached.length > 0) {
+        setArc(cached);
+        setSheetSt((prev) => ({ ...prev, loading:false, saving:true, err:'', src:'cache' }));
+        const retry = await syncObzArcCompanyToGoogleSheet(company, cached, getActor());
+        if (retry?.ok) {
+          clearObzArc(company);
+          emitObzArcUpdated(company);
+          emitObzArcSyncAlert({
+            company,
+            status: 'ok',
+            source: 'archive-pull-retry',
+            message: 'Google Sheetga saqlandi (retry)',
+          });
+          setSheetSt({ loading:false, saving:false, err:'', src:'google' });
+          return cached;
+        }
+        const retryErr = String(retry?.error || "Google Sheetga saqlashda xato");
+        emitObzArcSyncAlert({
+          company,
+          status: 'error',
+          source: 'archive-pull-retry',
+          message: `Sheet o'qilmadi (${errMsg}); retry ham xato: ${retryErr}`,
+        });
+        setSheetSt((prev) => ({
+          ...prev,
+          loading:false,
+          saving:false,
+          src:'cache',
+          err: `Sheet o'qilmadi (${errMsg}); retry ham xato: ${retryErr}`,
+        }));
+        return cached;
+      }
       emitObzArcSyncAlert({
         company,
         status: 'error',
@@ -16476,6 +16534,7 @@ export default function App() {
   const obzvonExportBusyRef = useRef(false);
   const tgCustomerSyncKeyRef = useRef('');
   const archiveAutoBusyRef = useRef(false);
+  const mergedCompanyObzvonRowsRef = useRef([]);
   useEffect(() => {
     if (!isTelegramClientMode || typeof window === 'undefined') return;
     const tg = window.Telegram?.WebApp;
@@ -17731,12 +17790,16 @@ export default function App() {
     return Array.from(m.values());
   }, [companyObzvonAllRows, companyObzvonAllNewRows]);
   useEffect(() => {
+    mergedCompanyObzvonRowsRef.current = Array.isArray(mergedCompanyObzvonRows) ? mergedCompanyObzvonRows : [];
+  }, [mergedCompanyObzvonRows]);
+  useEffect(() => {
     if (!isLoggedIn) return;
     if (sessionUser !== 'Admin') return;
     const companyKey = normalizeCompanyKey(activeCompany);
     if (!companyKey) return;
     const runAutoArchiveDaily = async () => {
       if (archiveAutoBusyRef.current) return;
+      const rowsSnapshot = Array.isArray(mergedCompanyObzvonRowsRef.current) ? mergedCompanyObzvonRowsRef.current : [];
       const now = new Date();
       const today = toIsoDate(now);
       const hh = now.getHours();
@@ -17746,7 +17809,7 @@ export default function App() {
       const doneKey = `${OBZVON_ARCHIVE_AUTO_LAST_KEY}_${companyKey}`;
       const lastDone = String(S.get(doneKey, '') || '');
       if (lastDone === targetDate) return;
-      const rowsWithNote = mergedCompanyObzvonRows.filter((r) => {
+      const rowsWithNote = rowsSnapshot.filter((r) => {
         const d = toIsoDate(r?.callDate || '');
         if (d !== targetDate) return false;
         return String(r?.note || '').trim().length > 0;
@@ -17781,7 +17844,7 @@ export default function App() {
           return;
         }
         const byCustomer = new Map();
-        mergedCompanyObzvonRows.forEach((r) => {
+        rowsSnapshot.forEach((r) => {
           const cid = String(r?.customerId || '').trim();
           if (!cid) return;
           if (!byCustomer.has(cid)) byCustomer.set(cid, []);
@@ -17870,7 +17933,6 @@ export default function App() {
     isLoggedIn,
     sessionUser,
     activeCompany,
-    mergedCompanyObzvonRows,
     currentUser,
   ]);
   const companyObzvonRecords = useMemo(
