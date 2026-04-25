@@ -16548,13 +16548,13 @@ export default function App() {
       const message = String(detail?.message || '').trim() || "Google Sheetga ko'chmadi";
       setArchiveSyncAlert({
         message,
-        company: toObzArcCompanyKey(detail?.company || activeCompany),
+        company: toObzArcCompanyKey(detail?.company || ''),
         at: String(detail?.at || new Date().toISOString()),
       });
     };
     window.addEventListener(OBZVON_ARCHIVE_SYNC_ALERT_EVENT, onArchiveSyncAlert);
     return () => window.removeEventListener(OBZVON_ARCHIVE_SYNC_ALERT_EVENT, onArchiveSyncAlert);
-  }, [activeCompany]);
+  }, []);
   useEffect(() => {
     if (sessionUser === 'Admin') return;
     setArchiveSyncAlert(null);
