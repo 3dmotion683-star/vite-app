@@ -145,6 +145,10 @@ const OBZVON_NEW_EXPORT_SHEET_ID = '1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8
 const OBZVON_NEW_EXPORT_SHEET_NAME = 'Barcha_obzvon_yangi';
 const OBZVON_NEW_EXPORT_SHEET_GID = '979057575';
 const OBZVON_NEW_EXPORT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=979057575#gid=979057575';
+const OBZVON_ARCHIVE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit?pli=1&gid=1496428845#gid=1496428845';
+const OBZVON_ARCHIVE_SHEET_ID = '1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8';
+const OBZVON_ARCHIVE_SHEET_GID = '1496428845';
+const OBZVON_ARCHIVE_SHEET_NAME = 'Tahlil_arxivi';
 const OBZVON_NEW_EXPORT_HOUR = 3;
 const OBZVON_NEW_EXPORTED_MAP_KEY = 'aq-obzvon-new-exported-map';
 const OBZVON_NEW_LAST_AUTO_DATE_KEY = 'aq-obzvon-new-last-auto-date';
@@ -11856,39 +11860,435 @@ function TestLabPage({ D, planRows = [], currentUser = 'Admin', company = 'murod
 }
 
 /* ── Analiz sahifasi ───────────────────────────────────────────── */
-/* 5 ta qattiy kategoriya */
+/* 6 ta qattiy kategoriya */
 const FIXED_CATS = [
   { key: 'tel_kotarmadi',      label: "Tel ko'tarmadi",      color: 'var(--rd)' },
+  { key: 'telegram_yozildi',   label: "Telegramdan yozildi", color: 'var(--pu)' },
   { key: 'buyurtma',           label: 'Buyurtma berdi',      color: 'var(--gr)' },
   { key: 'suv_borekan',        label: 'Suv borekan',         color: 'var(--bl)' },
   { key: 'kelishuv_tugatildi', label: 'Kelishuv tugatildi',  color: 'var(--or)' },
   { key: 'boshqa',             label: 'Boshqalar',           color: 'var(--t3)' },
 ];
 
-const readObzArc = (co) => { try { return JSON.parse(localStorage.getItem('__obzArc_'+co)||'[]'); } catch{return[];} };
+const OBZVON_ARXIV_SHEET_HEADERS = [
+  'No', 'RecordId', 'Company', 'Type', 'Period', 'AnalyzedAt',
+  'TotalNotes', 'NoteCount', 'CategoriesJson', 'Xulosa',
+  'RowRid', 'CustomerId', 'Customer', 'Topic', 'Operator',
+  'CallDate', 'RowCategory', 'Note', 'FollowedUp', 'OrderedAfter',
+];
+const toObzArcCompanyKey = (co) => normalizeCompanyKey(co) || String(co || '').trim().toLowerCase();
+const getObzArcStorageKey = (co) => `__obzArc_${toObzArcCompanyKey(co)}`;
+const toObzArcBool = (v) => {
+  const s = String(v || '').trim().toLowerCase();
+  return s === '1' || s === 'true' || s === 'yes' || s === 'ha' || s === 'ok' || s === '✅';
+};
+const sortObzArcItems = (items = []) => {
+  const toTs = (item) => {
+    const period = String(item?.period || '').trim();
+    const type = String(item?.type || '').trim();
+    if (type === 'daily' && /^\d{4}-\d{2}-\d{2}$/.test(period)) return (toDate(period)?.getTime() || 0);
+    if (type === 'monthly' && /^\d{4}-\d{2}$/.test(period)) return (toDate(`${period}-01`)?.getTime() || 0);
+    return toDate(item?.analyzedAt)?.getTime() || 0;
+  };
+  return [...(items || [])].sort((a, b) => {
+    const da = toTs(a);
+    const db = toTs(b);
+    if (db !== da) return db - da;
+    return (toDate(b?.analyzedAt)?.getTime() || 0) - (toDate(a?.analyzedAt)?.getTime() || 0);
+  });
+};
+const normalizeObzArcCategories = (src = {}) => (
+  Object.fromEntries(FIXED_CATS.map((c) => [c.key, Math.max(0, Number(src?.[c.key] || 0) || 0)]))
+);
+const normalizeObzArcRows = (rows = [], period = '') => (
+  (Array.isArray(rows) ? rows : []).map((r, idx) => {
+    const note = String(r?.note || '').trim().slice(0, 260);
+    const rid = String(r?.rid || '').trim() || makeObzvonRowKey(r) || `${period}_${idx + 1}`;
+    const catRaw = String(r?.cat || '').trim();
+    const cat = FIXED_CATS.some((c) => c.key === catRaw) ? catRaw : detectCat(note);
+    return {
+      id: String(r?.id || `${period}_${idx + 1}`),
+      rid,
+      customerId: String(r?.customerId || '').trim(),
+      customer: String(r?.customer || r?.customerName || '').trim(),
+      operator: String(r?.operator || '').trim(),
+      callDate: toIsoDate(r?.callDate || ''),
+      topic: String(r?.topic || '').trim(),
+      note,
+      cat,
+      followedUp: Boolean(r?.followedUp),
+      orderedAfter: Boolean(r?.orderedAfter),
+    };
+  })
+);
+const normalizeObzArcItems = (items = []) => {
+  const map = new Map();
+  (Array.isArray(items) ? items : []).forEach((item, idx) => {
+    const type = String(item?.type || '').trim() === 'daily' ? 'daily' : 'monthly';
+    const period = String(item?.period || '').trim();
+    if (!period) return;
+    const rows = normalizeObzArcRows(item?.rows, period);
+    const key = `${type}__${period}`;
+    const current = map.get(key);
+    const next = {
+      id: String(item?.id || `${type}_${period}_${idx + 1}`),
+      type,
+      period,
+      analyzedAt: String(item?.analyzedAt || new Date().toISOString()),
+      totalNotes: Math.max(0, Number(item?.totalNotes || rows.length || 0) || 0),
+      noteCount: Math.max(0, Number(item?.noteCount || rows.length || 0) || 0),
+      categories: normalizeObzArcCategories(item?.categories || {}),
+      rows,
+      xulosa: String(item?.xulosa || '').trim(),
+    };
+    if (!current) {
+      map.set(key, next);
+      return;
+    }
+    const curTs = toDate(current?.analyzedAt)?.getTime() || 0;
+    const nextTs = toDate(next?.analyzedAt)?.getTime() || 0;
+    map.set(key, nextTs >= curTs ? next : current);
+  });
+  return sortObzArcItems(Array.from(map.values())).slice(0, 365);
+};
+const readObzArc = (co) => {
+  try { return normalizeObzArcItems(JSON.parse(localStorage.getItem(getObzArcStorageKey(co)) || '[]')); }
+  catch { return []; }
+};
+const writeObzArc = (co, items = []) => {
+  localStorage.setItem(getObzArcStorageKey(co), JSON.stringify(normalizeObzArcItems(items)));
+};
 const saveObzArc = (co, item) => {
-  const arr = readObzArc(co).filter(a => !(a.period===item.period && a.type===item.type));
+  const arr = readObzArc(co).filter((a) => !(a?.period === item?.period && a?.type === item?.type));
   arr.unshift(item);
-  localStorage.setItem('__obzArc_'+co, JSON.stringify(arr.slice(0,365)));
+  writeObzArc(co, arr);
+};
+const normalizeObzArcHeader = (v) => String(v || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+const parseObzArcSheetRows = (rows = []) => {
+  if (!Array.isArray(rows) || rows.length === 0) return {};
+  const first = Array.isArray(rows[0]) ? rows[0] : [];
+  const firstNormalized = first.map(normalizeObzArcHeader);
+  const hasHeader = firstNormalized.includes('recordid') && firstNormalized.includes('company');
+  const header = hasHeader ? first : OBZVON_ARXIV_SHEET_HEADERS;
+  const hMap = {};
+  header.forEach((h, idx) => { hMap[normalizeObzArcHeader(h)] = idx; });
+  const pick = (row, headerKey, fallbackIdx) => {
+    const idx = Number.isFinite(hMap[headerKey]) ? hMap[headerKey] : fallbackIdx;
+    return String((Array.isArray(row) ? row[idx] : '') || '').trim();
+  };
+  const body = hasHeader ? rows.slice(1) : rows;
+  const byCompany = {};
+  body.forEach((row) => {
+    const company = toObzArcCompanyKey(pick(row, 'company', 2));
+    if (!company) return;
+    const type = pick(row, 'type', 3) === 'daily' ? 'daily' : 'monthly';
+    const period = pick(row, 'period', 4);
+    if (!period) return;
+    const recordId = pick(row, 'recordid', 1) || `${company}__${type}__${period}`;
+    if (!byCompany[company]) byCompany[company] = new Map();
+    if (!byCompany[company].has(recordId)) {
+      let cats = {};
+      const rawCats = pick(row, 'categoriesjson', 8);
+      if (rawCats) {
+        try { cats = JSON.parse(rawCats); } catch {}
+      }
+      byCompany[company].set(recordId, {
+        id: recordId,
+        type,
+        period,
+        analyzedAt: pick(row, 'analyzedat', 5) || new Date().toISOString(),
+        totalNotes: Math.max(0, Number(pick(row, 'totalnotes', 6)) || 0),
+        noteCount: Math.max(0, Number(pick(row, 'notecount', 7)) || 0),
+        categories: normalizeObzArcCategories(cats),
+        rows: [],
+        xulosa: pick(row, 'xulosa', 9),
+      });
+    }
+    const item = byCompany[company].get(recordId);
+    const rid = pick(row, 'rowrid', 10);
+    const note = pick(row, 'note', 17);
+    const customer = pick(row, 'customer', 12);
+    const customerId = pick(row, 'customerid', 11);
+    if (!rid && !note && !customer && !customerId) return;
+    const catRaw = pick(row, 'rowcategory', 16);
+    const cat = FIXED_CATS.some((c) => c.key === catRaw) ? catRaw : detectCat(note);
+    item.rows.push({
+      id: rid || `${recordId}_${item.rows.length + 1}`,
+      rid: rid || `${recordId}_${item.rows.length + 1}`,
+      customerId,
+      customer,
+      operator: pick(row, 'operator', 14),
+      callDate: toIsoDate(pick(row, 'calldate', 15)),
+      topic: pick(row, 'topic', 13),
+      note: note.slice(0, 260),
+      cat,
+      followedUp: toObzArcBool(pick(row, 'followedup', 18)),
+      orderedAfter: toObzArcBool(pick(row, 'orderedafter', 19)),
+    });
+  });
+  const out = {};
+  Object.keys(byCompany).forEach((company) => {
+    out[company] = normalizeObzArcItems(Array.from(byCompany[company].values()));
+  });
+  return out;
+};
+const serializeObzArcByCompanyToSheetRows = (byCompany = {}) => {
+  const out = [];
+  const companyKeys = Object.keys(byCompany || {}).sort();
+  let seq = 1;
+  companyKeys.forEach((company) => {
+    const items = normalizeObzArcItems(byCompany[company] || []);
+    items.forEach((item) => {
+      const categories = normalizeObzArcCategories(item?.categories || {});
+      const base = {
+        recordId: String(item?.id || `${company}__${item?.type || 'monthly'}__${item?.period || ''}`),
+        company,
+        type: String(item?.type || 'monthly'),
+        period: String(item?.period || ''),
+        analyzedAt: String(item?.analyzedAt || ''),
+        totalNotes: String(Math.max(0, Number(item?.totalNotes || 0) || 0)),
+        noteCount: String(Math.max(0, Number(item?.noteCount || 0) || 0)),
+        categoriesJson: JSON.stringify(categories),
+        xulosa: String(item?.xulosa || '').trim(),
+      };
+      const rows = Array.isArray(item?.rows) && item.rows.length ? item.rows : [null];
+      rows.forEach((r) => {
+        out.push({
+          no: String(seq++),
+          ...base,
+          rowRid: String(r?.rid || '').trim(),
+          customerId: String(r?.customerId || '').trim(),
+          customer: String(r?.customer || '').trim(),
+          topic: String(r?.topic || '').trim(),
+          operator: String(r?.operator || '').trim(),
+          callDate: String(toIsoDate(r?.callDate || '') || '').trim(),
+          rowCategory: String(r?.cat || '').trim(),
+          note: String(r?.note || '').trim().slice(0, 260),
+          followedUp: r?.followedUp ? '1' : '0',
+          orderedAfter: r?.orderedAfter ? '1' : '0',
+        });
+      });
+    });
+  });
+  return out;
+};
+const parseObzArcResponse = (text) => {
+  const raw = String(text || '').trim();
+  if (!raw) return {};
+  try { return JSON.parse(raw); } catch { return { raw }; }
+};
+const fetchSheetCsvAllowEmpty = async (sheetId, gid, label, timeoutMs = 12000) => {
+  const sources = [
+    buildGsUrl(sheetId, gid),
+    `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`,
+    `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=${gid}`,
+  ];
+  const urls = sources.flatMap((url) => [
+    url,
+    `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ]);
+  for (const u of urls) {
+    try {
+      const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
+      if (!r.ok) continue;
+      const text = await r.text();
+      if (text.trim().startsWith('<')) continue;
+      return parseGsCsv(text);
+    } catch { continue; }
+  }
+  throw new Error(`"${label}" varaqi yuklanmadi. GID: ${gid}`);
+};
+const loadObzArcAllFromGoogleSheet = async () => {
+  const rows = await fetchSheetCsvAllowEmpty(OBZVON_ARCHIVE_SHEET_ID, OBZVON_ARCHIVE_SHEET_GID, 'Tahlil arxivi', 16000);
+  return parseObzArcSheetRows(rows);
+};
+const loadObzArcFromGoogleSheet = async (company) => {
+  const all = await loadObzArcAllFromGoogleSheet();
+  return normalizeObzArcItems(all[toObzArcCompanyKey(company)] || []);
+};
+const pushObzArcRowsToGoogleSheet = async (rows = [], by = 'unknown') => {
+  const accessUrl = normalizeAccessApiUrl(localStorage.getItem(ACCESS_SYNC_URL_KEY) || '');
+  const urlsToTry = Array.from(new Set([OBZVON_EXPORT_APPS_SCRIPT_URL, accessUrl].filter(Boolean)));
+  if (!urlsToTry.length) return { ok: false, error: 'Google Sheet export URL topilmadi' };
+  const payload = {
+    sheetId: OBZVON_ARCHIVE_SHEET_ID,
+    sheetName: OBZVON_ARCHIVE_SHEET_NAME,
+    sheetGid: OBZVON_ARCHIVE_SHEET_GID,
+    gid: OBZVON_ARCHIVE_SHEET_GID,
+    sheetUrl: OBZVON_ARCHIVE_SHEET_URL,
+    withHeaders: true,
+    headers: OBZVON_ARXIV_SHEET_HEADERS,
+    rows,
+    by,
+  };
+  const actions = ['obzvon_new_sheet_replace', 'obzvon_new_export'];
+  let lastErr = '';
+  for (const url of urlsToTry) {
+    const isAppsScript = /script\.google\.com/i.test(String(url || ''));
+    for (const action of actions) {
+      try {
+        const reqInit = isAppsScript
+          ? {
+              method: 'POST',
+              mode: 'cors',
+              cache: 'no-store',
+              headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+              body: JSON.stringify({ ...payload, action }),
+            }
+          : {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...payload, action }),
+            };
+        const resp = await fetch(url, reqInit);
+        const text = await resp.text().catch(() => '');
+        const js = parseObzArcResponse(text);
+        if (resp.ok && (js?.ok || String(js?.status || '').toLowerCase() === 'ok')) {
+          return { ok: true };
+        }
+        lastErr = js?.error || js?.message || `HTTP ${resp.status} (${action})`;
+      } catch (e) {
+        lastErr = String(e?.message || e || 'unknown');
+      }
+    }
+  }
+  return { ok: false, error: lastErr || "Google Sheetga yozib bo'lmadi" };
+};
+const syncObzArcCompanyToGoogleSheet = async (company, items = [], by = 'unknown') => {
+  let allByCompany = {};
+  try {
+    allByCompany = await loadObzArcAllFromGoogleSheet();
+  } catch (e) {
+    return { ok: false, error: `Arxiv sheetni o'qib bo'lmadi: ${String(e?.message || e || '')}` };
+  }
+  allByCompany[toObzArcCompanyKey(company)] = normalizeObzArcItems(items || []);
+  const payloadRows = serializeObzArcByCompanyToSheetRows(allByCompany);
+  return pushObzArcRowsToGoogleSheet(payloadRows, by);
 };
 
 /* Izoh matnini avtomatik kategoriyaga ajratadi */
 const detectCat = (note) => {
   const n = normalizeMatchText(String(note || ''));
+  const tgMention = (
+    /\b(tg|tgdan|tgda|telegram|telegramdan|telegramda)\b/.test(n) ||
+    n.includes('telega')
+  );
+  const tgWrite = n.includes('yoz') || n.includes('napis') || n.includes('писал') || n.includes('qarzini sor');
+  if (tgMention && tgWrite) return 'telegram_yozildi';
+
   if (n.includes('kotarmadi') || n.includes('trubka') || n.includes('javob bermadi') ||
       n.includes('ne beret') || n.includes('nedostupno') || n.includes('qabul qilmadi'))
     return 'tel_kotarmadi';
-  if (n.includes('suvi bor') || n.includes('borekan') || n.includes('borakan') ||
-      n.includes('hali bor') || n.includes('suv bor'))
+  const hasOrderWord = n.includes('buyurtma') || n.includes('zakaz');
+  const hasFutureHint = (
+    n.includes('keyin') ||
+    n.includes('ertaga') ||
+    n.includes('indin') ||
+    n.includes('berarkan') ||
+    n.includes('beradi') ||
+    n.includes('oladi') ||
+    n.includes('olarkan') ||
+    /\b\d+\s*kun/.test(n)
+  );
+  const hasOrderDone = (
+    n.includes('buyurtma berdi') ||
+    n.includes('zakaz oldim') ||
+    n.includes('zakaz oldi') ||
+    n.includes('zakaz qildi') ||
+    n.includes('buyurtma qildi') ||
+    n.includes('tasdiq') ||
+    n.includes('podtverd')
+  );
+  if (
+    n.includes('suvi bor') ||
+    n.includes('borekan') ||
+    n.includes('borakan') ||
+    n.includes('hali bor') ||
+    n.includes('suv bor') ||
+    /\b\d+\s*ta\s*bor\b/.test(n) ||
+    (hasOrderWord && hasFutureHint && !hasOrderDone) ||
+    (hasOrderWord && !hasOrderDone)
+  )
     return 'suv_borekan';
   if (n.includes('boshqa joy') || n.includes('boshqa brand') || n.includes('kerak emas') ||
       n.includes('ne nado') || n.includes('bolmaydi') || n.includes('toxtatdi') ||
       n.includes('boshqa kompaniya') || n.includes('boshqa yerdan'))
     return 'kelishuv_tugatildi';
-  if (n.includes('buyurtma') || n.includes('zakaz') || n.includes('beradi') ||
-      n.includes('tasdiqladi') || n.includes('podtverdil'))
+  if (hasOrderDone || n.includes('tasdiqladi') || n.includes('podtverdil'))
     return 'buyurtma';
   return 'boshqa';
+};
+const buildObzvonAiCategoryPrompt = ({ companyKey = 'murodbaxsh', sample = [] } = {}) => {
+  const cKey = normalizeCompanyKey(companyKey);
+  const commonRules = [
+    'Vazifa: har bir izohni faqat bitta kategoriyaga ajrating.',
+    'Ruxsat etilgan kategoriya kalitlari: tel_kotarmadi, telegram_yozildi, buyurtma, suv_borekan, kelishuv_tugatildi, boshqa.',
+    'Agar izohda "telegram/tg dan yozdim" ma\'nosi bo\'lsa ustuvor kategoriya: telegram_yozildi.',
+    'Agar "keyin oladi", "2-3 kunda", "ertaga zakaz", "2 ta bor" bo\'lsa: suv_borekan.',
+    'Buyurtma faqat hozirgi qo\'ng\'iroqda tasdiqlangan bo\'lsa: buyurtma.',
+    'Hech qaysi kategoriya aniq tushmasa: boshqa.',
+    'Faqat JSON qaytaring. Qo\'shimcha matn yozmang.',
+  ];
+  const companyRules = cKey === 'murodbaxsh'
+    ? [
+        'Kompaniya konteksti: Murodbaxsh obzvonlarida "buyurtma olish" maqsadida suv nazarda tutiladi.',
+        'Murodbaxshda "zakaz keyin" mazmuni buyurtma emas, suv_borekan hisoblanadi.',
+        'Qarzdorlik maqsadida "tgdan yozdim qarzini so\'radim" bo\'lsa telegram_yozildi hisoblanadi.',
+      ]
+    : [
+        'Kompaniya konteksti: umumiy biznes obzvoni. Suvga xos qoidani faqat izoh ma\'nosi tasdiqlasa qo\'llang.',
+      ];
+  const examples = cKey === 'murodbaxsh'
+    ? [
+        '"2-3 kundan keyin zakaz berarkan" -> suv_borekan',
+        '"2 ta bor" -> suv_borekan',
+        '"tel kotarmadi tgdan yozdim" -> telegram_yozildi',
+        '"zakaz oldim" -> buyurtma',
+        '"boshqa firmadan olyapti" -> kelishuv_tugatildi',
+      ]
+    : [
+        '"tel kotarmadi" -> tel_kotarmadi',
+        '"telegramdan yozdim" -> telegram_yozildi',
+        '"hozir buyurtma berdi" -> buyurtma',
+      ];
+  return `Siz call-center izohlarini kategoriyalovchi modelsiz.
+
+QOIDALAR:
+${commonRules.map((x, i) => `${i + 1}. ${x}`).join('\n')}
+
+KOMPANIYA:
+${companyRules.map((x, i) => `${i + 1}. ${x}`).join('\n')}
+
+MISOLLAR:
+${examples.map((x, i) => `${i + 1}. ${x}`).join('\n')}
+
+FORMAT:
+- JSON massiv qaytaring.
+- Har element: {"idx": <number>, "cat": "<category_key>"}.
+- Faqat idx va cat maydonlari bo'lsin.
+
+IZOHLAR:
+${sample.map((x) => `${x.idx}. ${x.note}`).join('\n')}`;
+};
+const buildObzvonAiSummaryPrompt = ({ companyKey = 'murodbaxsh', period = '', total = 0, catTotals = {} } = {}) => {
+  const cKey = normalizeCompanyKey(companyKey);
+  const companyHint = cKey === 'murodbaxsh'
+    ? "Murodbaxsh konteksti: asosiy oqim suv buyurtmasi va suv bo'yicha qarzdorlik."
+    : "Umumiy kompaniya konteksti: izohlar ma'nosiga tayangan holda xulosa bering.";
+  return `Quyidagi kategoriya statistikasi bo'yicha 2-3 jumlalik boshqaruv xulosasi yozing (uzbek, lotin).
+
+${companyHint}
+Davr: ${period}
+Jami izoh: ${total}
+tel_kotarmadi: ${catTotals.tel_kotarmadi || 0}
+telegram_yozildi: ${catTotals.telegram_yozildi || 0}
+buyurtma: ${catTotals.buyurtma || 0}
+suv_borekan: ${catTotals.suv_borekan || 0}
+kelishuv_tugatildi: ${catTotals.kelishuv_tugatildi || 0}
+boshqa: ${catTotals.boshqa || 0}
+
+Natija aniq, amaliy va qisqa bo'lsin.`;
 };
 const normalizeTopicKey = (topic) => {
   const t = normalizeMatchText(String(topic || '')).replace(/\s+/g, ' ').trim();
@@ -13340,16 +13740,88 @@ function KorxonaHolati({ D, company, obzvonRows=[] }) {
 function TahlilArxivi({ company, obzvonRows=[] }) {
   const [arc,setArc]   = useState(()=>readObzArc(company));
   const [aiSt,setAiSt] = useState({loading:false,err:'',msg:''});
+  const [sheetSt,setSheetSt] = useState({ loading:false, saving:false, err:'', src:'cache' });
   const allRows        = useMemo(()=>Array.isArray(obzvonRows)?obzvonRows:[], [obzvonRows]);
-  useEffect(() => { setArc(readObzArc(company)); }, [company]);
-
-  const refresh  = ()=>setArc(readObzArc(company));
+  const archiveStorageKey = useMemo(() => getObzArcStorageKey(company), [company]);
   const getKey   = ()=>localStorage.getItem('__claude_api_key')||'';
+  const getActor = () => (
+    String(localStorage.getItem('aq-session-user') || '').trim() ||
+    String(localStorage.getItem('aq-current-user') || '').trim() ||
+    'unknown'
+  );
+  const pullFromSheet = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setSheetSt((prev) => ({ ...prev, loading:true, err:'' }));
+    try {
+      const remote = await loadObzArcFromGoogleSheet(company);
+      const cached = readObzArc(company);
+      if ((!remote || remote.length === 0) && cached.length > 0) {
+        setArc(cached);
+        setSheetSt((prev) => ({ ...prev, loading:false, saving:true, err:'', src:'cache' }));
+        const migrate = await syncObzArcCompanyToGoogleSheet(company, cached, getActor());
+        if (migrate?.ok) {
+          setSheetSt({ loading:false, saving:false, err:'', src:'google' });
+        } else {
+          setSheetSt((prev) => ({
+            ...prev,
+            loading:false,
+            saving:false,
+            src:'cache',
+            err:String(migrate?.error || "Google Sheetga migratsiyada xato"),
+          }));
+        }
+        return cached;
+      }
+      writeObzArc(company, remote);
+      setArc(remote);
+      setSheetSt({ loading:false, saving:false, err:'', src:'google' });
+      return remote;
+    } catch (e) {
+      const fallback = readObzArc(company);
+      setArc(fallback);
+      setSheetSt((prev) => ({
+        ...prev,
+        loading:false,
+        saving:false,
+        src:'cache',
+        err:String(e?.message || e || "Google Sheetdan o'qishda xato"),
+      }));
+      return fallback;
+    }
+  }, [company]);
+  const pushToSheet = useCallback(async (items = [], { updateLocal = true } = {}) => {
+    const normalized = normalizeObzArcItems(items);
+    if (updateLocal) {
+      writeObzArc(company, normalized);
+      setArc(normalized);
+    }
+    setSheetSt((prev) => ({ ...prev, saving:true, err:'' }));
+    const rs = await syncObzArcCompanyToGoogleSheet(company, normalized, getActor());
+    if (rs?.ok) {
+      setSheetSt((prev) => ({ ...prev, saving:false, err:'', src:'google' }));
+      return { ok:true, items: normalized };
+    }
+    setSheetSt((prev) => ({
+      ...prev,
+      saving:false,
+      src:'cache',
+      err: String(rs?.error || "Google Sheetga saqlashda xato"),
+    }));
+    return { ok:false, items: normalized, error: String(rs?.error || '') };
+  }, [company]);
+  useEffect(() => {
+    pullFromSheet({ silent:false });
+  }, [company, pullFromSheet]);
+  const refresh  = ()=>{ pullFromSheet({ silent:false }); };
 
-  const del = (id)=>{
-    const arr=arc.filter(a=>a.id!==id);
-    localStorage.setItem('__obzArc_'+company,JSON.stringify(arr));
-    setArc(arr);
+  const del = async (id)=>{
+    const arr = normalizeObzArcItems((arc || []).filter((a)=>a.id!==id));
+    const rs = await pushToSheet(arr);
+    if (!rs.ok) {
+      setAiSt((prev) => ({
+        ...prev,
+        err: `Google Sheetga saqlanmadi: ${rs.error || "noma'lum xato"}`,
+      }));
+    }
   };
 
   /* Arxiv tahlil (qattiq kategoriya + ixtiyoriy AI xulosa) */
@@ -13389,6 +13861,53 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
       return;
     }
     if (!pendingRows.length) {
+      if (existing && existingRows.length) {
+        const recatRows = existingRows.map((r) => {
+          const nextCat = detectCat(r?.note);
+          return {
+            ...(r || {}),
+            rid: String(r?.rid || '').trim() || makeObzvonRowKey(r),
+            cat: nextCat,
+          };
+        });
+        const recatTotals = Object.fromEntries(FIXED_CATS.map((c) => [c.key, 0]));
+        recatRows.forEach((r) => {
+          const cat = String(r?.cat || '').trim();
+          if (Object.prototype.hasOwnProperty.call(recatTotals, cat)) recatTotals[cat] += 1;
+        });
+        const changed = recatRows.reduce((acc, r, idx) => {
+          const oldCat = String(existingRows[idx]?.cat || '').trim();
+          return acc + (oldCat !== String(r?.cat || '').trim() ? 1 : 0);
+        }, 0);
+        if (changed > 0) {
+          const topCat = FIXED_CATS
+            .map((c) => ({ key: c.key, label: c.label, val: Number(recatTotals[c.key] || 0) }))
+            .sort((a, b) => b.val - a.val)[0];
+          const item = {
+            id: existing?.id || Date.now(),
+            type,
+            period,
+            totalNotes: rowsWithNote.length,
+            noteCount: recatRows.length,
+            categories: recatTotals,
+            rows: recatRows,
+            xulosa: `${period} qayta kategoriyalandi. Eng ko'p kategoriya: ${topCat?.label || '—'} (${topCat?.val || 0} ta).`,
+            analyzedAt: new Date().toISOString(),
+          };
+          saveObzArc(company, item);
+          const nextArc = readObzArc(company);
+          setArc(nextArc);
+          const syncRs = await pushToSheet(nextArc, { updateLocal:false });
+          setAiSt({
+            loading: false,
+            err: syncRs.ok ? '' : `Google Sheetga saqlanmadi: ${syncRs.error || 'xato'}`,
+            msg: syncRs.ok
+              ? `✅ ${period} qayta kategoriyalandi (${changed} ta qator o'zgardi)`
+              : `⚠️ ${period} qayta kategoriyalandi, lekin Google Sheetga yozilmadi`,
+          });
+          return;
+        }
+      }
       setAiSt({ loading: false, err: '', msg: `ℹ️ ${period} bo'yicha barcha qatorlar allaqachon tahlil qilingan` });
       return;
     }
@@ -13417,12 +13936,7 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
           note: String(r?.note || '').trim().slice(0, 240),
         }));
         if (sample.length) {
-          const classifyPrompt = `Quyidagi izohlarni faqat bitta qattiq kategoriyaga ajrating:
-Kategoriya kalitlari: tel_kotarmadi, buyurtma, suv_borekan, kelishuv_tugatildi, boshqa
-Faqat JSON qaytaring.
-Format: [{"idx":1,"cat":"boshqa"}]
-Izohlar:
-${sample.map((x) => `${x.idx}. ${x.note}`).join('\n')}`;
+          const classifyPrompt = buildObzvonAiCategoryPrompt({ companyKey: company, sample });
           const clsRes = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
@@ -13501,14 +14015,12 @@ ${sample.map((x) => `${x.idx}. ${x.note}`).join('\n')}`;
 
     try {
       if (aiKey.trim()) {
-        const prompt = `Quyidagi obzvon kategoriya statistikasi asosida 2-3 jumlalik qisqa boshqaruv xulosasi yozing (uzbek, latin, aniq va amaliy):
-Period: ${period}
-Total: ${mergedRows.length}
-tel_kotarmadi: ${catTotals.tel_kotarmadi || 0}
-buyurtma: ${catTotals.buyurtma || 0}
-suv_borekan: ${catTotals.suv_borekan || 0}
-kelishuv_tugatildi: ${catTotals.kelishuv_tugatildi || 0}
-boshqa: ${catTotals.boshqa || 0}`;
+        const prompt = buildObzvonAiSummaryPrompt({
+          companyKey: company,
+          period,
+          total: mergedRows.length,
+          catTotals,
+        });
         const res = await fetch('https://api.anthropic.com/v1/messages',{
           method:'POST',
           headers:{
@@ -13533,8 +14045,16 @@ boshqa: ${catTotals.boshqa || 0}`;
         analyzedAt:new Date().toISOString(),
       };
       saveObzArc(company, item);
-      setArc(readObzArc(company));
-      setAiSt({loading:false,err:'',msg:`✅ Saqlandi: ${period} (+${archivedRows.length} ta yangi, jami ${mergedRows.length} ta)`});
+      const nextArc = readObzArc(company);
+      setArc(nextArc);
+      const syncRs = await pushToSheet(nextArc, { updateLocal:false });
+      setAiSt({
+        loading:false,
+        err: syncRs.ok ? '' : `Google Sheetga saqlanmadi: ${syncRs.error || 'xato'}`,
+        msg: syncRs.ok
+          ? `✅ Saqlandi: ${period} (+${archivedRows.length} ta yangi, jami ${mergedRows.length} ta)`
+          : `⚠️ Mahalliy saqlandi: ${period}, lekin Google Sheetga yozilmadi`,
+      });
     } catch(e){
       const item = {
         id:existing?.id || Date.now(), type, period,
@@ -13545,32 +14065,21 @@ boshqa: ${catTotals.boshqa || 0}`;
         analyzedAt:new Date().toISOString(),
       };
       saveObzArc(company, item);
-      setArc(readObzArc(company));
-      setAiSt({loading:false,err:'AI xulosada xato bo‘ldi, lekin arxiv saqlandi: '+e.message,msg:''});
+      const nextArc = readObzArc(company);
+      setArc(nextArc);
+      const syncRs = await pushToSheet(nextArc, { updateLocal:false });
+      setAiSt({
+        loading:false,
+        err: syncRs.ok
+          ? `AI xulosada xato bo'ldi, lekin arxiv saqlandi: ${e.message}`
+          : `AI xulosada xato bo'ldi va Google Sheetga saqlanmadi: ${syncRs.error || e.message}`,
+        msg:'',
+      });
     }
   };
 
-  const visibleArc = useMemo(() => {
-    const monthlyByMonth = new Map();
-    (arc || [])
-      .filter((a) => a?.type === 'monthly')
-      .forEach((a) => {
-        const mk = String(a?.period || '').slice(0, 7);
-        if (mk) monthlyByMonth.set(mk, a);
-      });
-    return (arc || []).filter((item) => {
-      if (item?.type !== 'daily') return true;
-      const mk = String(item?.period || '').slice(0, 7);
-      const monthly = monthlyByMonth.get(mk);
-      if (!monthly) return true;
-      const monthlyKeys = new Set((Array.isArray(monthly?.rows) ? monthly.rows : []).map((r) => makeObzvonRowKey(r)));
-      const dailyRows = Array.isArray(item?.rows) ? item.rows : [];
-      if (!dailyRows.length) return false;
-      const covered = dailyRows.every((r) => monthlyKeys.has(makeObzvonRowKey(r)));
-      return !covered;
-    });
-  }, [arc]);
-  const dailyArc  = [...visibleArc].filter(a=>a.type==='daily').slice(0,30).reverse();
+  const sortedArc = useMemo(() => sortObzArcItems(arc || []), [arc]);
+  const dailyArc  = [...sortedArc].filter(a=>a.type==='daily').slice(0,30);
   const trendData = dailyArc.map(a=>({
     period:a.period.slice(5),
     ...Object.fromEntries(FIXED_CATS.map(c=>[c.label,a.categories?.[c.key]||0])),
@@ -13586,12 +14095,19 @@ boshqa: ${catTotals.boshqa || 0}`;
             {getKey()?'✓ AI kalit sozlangan (kategoriya + xulosa AI yordamida)':'Kalitsiz ham tahlil ishlaydi (qoidaviy kategoriya)'}
           </div>
         </div>
+        <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
+          Saqlash joyi: <a href={OBZVON_ARCHIVE_SHEET_URL} target="_blank" rel="noreferrer" style={{color:'var(--bl)'}}>Google Sheet (gid: {OBZVON_ARCHIVE_SHEET_GID})</a>.
+          {' '}Lokal cache kaliti: <code>{archiveStorageKey}</code>
+        </div>
+        {sheetSt.loading && <div style={{fontSize:11,color:'var(--bl)',marginBottom:6}}>Google Sheetdan arxiv yuklanmoqda...</div>}
+        {sheetSt.saving && <div style={{fontSize:11,color:'var(--or)',marginBottom:6}}>Google Sheetga saqlanmoqda...</div>}
+        {sheetSt.err && <div style={{fontSize:11,color:'var(--rd)',marginBottom:6}}>⚠️ {sheetSt.err}</div>}
         <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
           <button
             style={{background:aiSt.loading?'var(--s3)':'var(--bl)',color:'#fff',padding:'8px 16px',
               borderRadius:8,border:'none',cursor:aiSt.loading?'default':'pointer',fontWeight:700,fontSize:13}}
             onClick={()=>runArchiveAi('monthly')} disabled={aiSt.loading}
-          >Oylik tahlil (bu oy)</button>
+          >Oylik tahlil (kechagacha)</button>
           <button
             style={{background:aiSt.loading?'var(--s3)':'var(--gr)',color:'#fff',padding:'8px 16px',
               borderRadius:8,border:'none',cursor:aiSt.loading?'default':'pointer',fontWeight:700,fontSize:13}}
@@ -13604,7 +14120,7 @@ boshqa: ${catTotals.boshqa || 0}`;
       </div>
 
       {/* Arxiv bo'sh holati */}
-      {visibleArc.length===0&&(
+      {sortedArc.length===0&&(
         <div className="card" style={{padding:40,textAlign:'center',color:'var(--t3)'}}>
           <div style={{fontWeight:700,marginBottom:8}}>Arxiv bo'sh</div>
           <div style={{fontSize:13}}>"Oylik tahlil" yoki "Kunlik tahlil" tugmasini bosing</div>
@@ -13612,11 +14128,11 @@ boshqa: ${catTotals.boshqa || 0}`;
       )}
 
       {/* Arxiv mavjud */}
-      {visibleArc.length>0&&(
+      {sortedArc.length>0&&(
         <>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
             <div style={{fontWeight:700,fontSize:14}}>Tahlil arxivi
-              <span className="tag" style={{marginLeft:8,background:'var(--s3)',color:'var(--t2)'}}>{visibleArc.length} ta yozuv</span>
+              <span className="tag" style={{marginLeft:8,background:'var(--s3)',color:'var(--t2)'}}>{sortedArc.length} ta yozuv</span>
             </div>
             <button className="btn btn-gh btn-sm" onClick={refresh}>↻ Yangilash</button>
           </div>
@@ -13648,7 +14164,7 @@ boshqa: ${catTotals.boshqa || 0}`;
           )}
 
           {/* Arxiv ro'yxati */}
-          {visibleArc.map(item=>{
+          {sortedArc.map(item=>{
             const total=item.noteCount||1;
             return (
               <div key={item.id} className="card" style={{padding:'14px 16px'}}>
@@ -13701,7 +14217,7 @@ boshqa: ${catTotals.boshqa || 0}`;
                           <th>Sotib oldi?</th>
                         </tr></thead>
                         <tbody>
-                          {item.rows.slice(0, 120).map((r, idx) => {
+                          {item.rows.map((r, idx) => {
                             const cat = FIXED_CATS.find((c) => c.key === String(r?.cat || '')) || FIXED_CATS[FIXED_CATS.length - 1];
                             return (
                               <tr key={`${item.id}_${idx}`}>
