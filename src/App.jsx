@@ -148,7 +148,8 @@ const OBZVON_NEW_EXPORT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfj
 const OBZVON_ARCHIVE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8/edit';
 const OBZVON_ARCHIVE_SHEET_ID = '1lfjqNFaD2Gy-tyKrmWVX4ja2DvsyLcACaGlW2ZJrkf8';
 const OBZVON_ARCHIVE_SHEET_GID = '1496428845';
-const OBZVON_ARCHIVE_SHEET_NAME = 'Tahlil_arxivi';
+const OBZVON_ARCHIVE_SHEET_NAME = 'AI_tahlil';
+const OBZVON_ARCHIVE_SHEET_NAME_LEGACY = 'Tahlil_arxivi';
 const OBZVON_ARCHIVE_UPDATED_EVENT = 'aq-obz-archive-updated';
 const OBZVON_ARCHIVE_SYNC_ALERT_EVENT = 'aq-obz-archive-sync-alert';
 const OBZVON_ARCHIVE_AUTO_HOUR = 6;
@@ -12246,6 +12247,11 @@ const loadObzArcAllFromGoogleSheet = async (defaultCompany = '') => {
   try {
     rows = await fetchSheetCsvByNameAllowEmpty(OBZVON_ARCHIVE_SHEET_ID, OBZVON_ARCHIVE_SHEET_NAME, 'Tahlil arxivi', 16000);
   } catch {}
+  if ((!Array.isArray(rows) || rows.length === 0) && OBZVON_ARCHIVE_SHEET_NAME_LEGACY) {
+    try {
+      rows = await fetchSheetCsvByNameAllowEmpty(OBZVON_ARCHIVE_SHEET_ID, OBZVON_ARCHIVE_SHEET_NAME_LEGACY, 'Tahlil arxivi (legacy)', 16000);
+    } catch {}
+  }
   if (!Array.isArray(rows) || rows.length === 0) {
     rows = await fetchSheetCsvAllowEmpty(OBZVON_ARCHIVE_SHEET_ID, OBZVON_ARCHIVE_SHEET_GID, 'Tahlil arxivi', 16000);
   }
