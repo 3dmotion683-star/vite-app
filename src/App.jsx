@@ -14180,7 +14180,26 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
   useEffect(() => {
     pullFromSheet({ silent:false });
   }, [company, pullFromSheet]);
-  const refresh  = ()=>{ pullFromSheet({ silent:false }); };
+  const refresh = async () => {
+    const before = normalizeObzArcItems(arc || []);
+    const remote = normalizeObzArcItems(await pullFromSheet({ silent:false }));
+    if (remote.length === 0 && before.length > 0) {
+      const rs = await pushToSheet(before, { updateLocal: true });
+      if (!rs.ok) {
+        setAiSt((prev) => ({
+          ...prev,
+          err: `Google Sheetga tiklab yozilmadi: ${rs.error || "noma'lum xato"}`,
+        }));
+        return;
+      }
+      await pullFromSheet({ silent:false });
+      setAiSt((prev) => ({
+        ...prev,
+        err: '',
+        msg: `✅ Sheet bo'sh edi, ${before.length} ta arxiv yozuvi qayta tiklandi`,
+      }));
+    }
+  };
 
   const del = async (id)=>{
     const arr = normalizeObzArcItems((arc || []).filter((a)=>a.id!==id));
