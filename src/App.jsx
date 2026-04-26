@@ -152,6 +152,7 @@ const OBZVON_ARCHIVE_SHEET_NAME = 'AI_tahlil';
 const OBZVON_ARCHIVE_SHEET_NAME_LEGACY = 'Tahlil_arxivi';
 const OBZVON_ARCHIVE_UPDATED_EVENT = 'aq-obz-archive-updated';
 const OBZVON_ARCHIVE_SYNC_ALERT_EVENT = 'aq-obz-archive-sync-alert';
+const OBZVON_ARCHIVE_MANUAL_CHECK_EVENT = 'aq-obz-archive-manual-check';
 const OBZVON_ARCHIVE_AUTO_HOUR = 4;
 const OBZVON_ARCHIVE_AUTO_LAST_KEY = 'aq-obz-archive-auto-last-date';
 const OBZVON_NEW_EXPORT_HOUR = 3;
@@ -14230,6 +14231,18 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
   const refresh = async () => {
     await pullFromSheet({ silent:false });
   };
+  const runAutoCheckNow = () => {
+    try {
+      window.dispatchEvent(new CustomEvent(OBZVON_ARCHIVE_MANUAL_CHECK_EVENT, {
+        detail: { company: toObzArcCompanyKey(company) },
+      }));
+      setAiSt((prev) => ({
+        ...prev,
+        err: '',
+        msg: "⏳ Avto tekshiruv ishga tushdi",
+      }));
+    } catch {}
+  };
 
   /* Arxiv tahlil (qattiq kategoriya + ixtiyoriy AI xulosa) */
   const runArchiveAi = async (type) => {
@@ -14480,6 +14493,12 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
               borderRadius:8,border:'none',cursor:aiSt.loading?'default':'pointer',fontWeight:700,fontSize:13}}
             onClick={()=>runArchiveAi('daily')} disabled={aiSt.loading}
           >Kunlik tahlil (kecha)</button>
+          <button
+            style={{background:'var(--s3)',color:'var(--t2)',padding:'8px 16px',
+              borderRadius:8,border:'1px solid var(--b2)',cursor:'pointer',fontWeight:700,fontSize:13}}
+            onClick={runAutoCheckNow}
+            disabled={aiSt.loading}
+          >Auto tekshir (hozir)</button>
         </div>
         {aiSt.loading&&<div style={{marginTop:8,color:'var(--bl)',fontSize:12}}>⏳ {aiSt.msg}</div>}
         {aiSt.err   &&<div style={{marginTop:8,color:'var(--rd)',fontSize:12}}>⚠️ {aiSt.err}</div>}
@@ -17829,13 +17848,13 @@ export default function App() {
     if (!isLoggedIn) return;
     const companyKey = normalizeCompanyKey(activeCompany);
     if (!companyKey) return;
-    const runAutoArchiveDaily = async () => {
+    const runAutoArchiveDaily = async ({ force = false } = {}) => {
       if (archiveAutoBusyRef.current) return;
       const rowsSnapshot = Array.isArray(mergedCompanyObzvonRowsRef.current) ? mergedCompanyObzvonRowsRef.current : [];
       const now = new Date();
       const today = toIsoDate(now);
       const hh = now.getHours();
-      if (!today || hh < OBZVON_ARCHIVE_AUTO_HOUR) return;
+      if (!today || (!force && hh < OBZVON_ARCHIVE_AUTO_HOUR)) return;
       const targetDate = toIsoDate(new Date(now.getTime() - 86400000));
       if (!targetDate) return;
       const rowsWithNote = rowsSnapshot.filter((r) => {
@@ -17957,9 +17976,16 @@ export default function App() {
         archiveAutoBusyRef.current = false;
       }
     };
-    runAutoArchiveDaily();
-    const t = setInterval(runAutoArchiveDaily, 5 * 60 * 1000);
-    return () => clearInterval(t);
+    const onManualArchiveCheck = (ev) => {
+      const evCompany = normalizeCompanyKey(ev?.detail?.company || '');
+      if (evCompany && evCompany !== companyKey) return;
+      runAutoArchiveDaily({ force: true });
+    };
+    runAutoArchiveDaily({ force: false });
+    window.addEventListener(OBZVON_ARCHIVE_MANUAL_CHECK_EVENT, onManualArchiveCheck);
+    return () => {
+      window.removeEventListener(OBZVON_ARCHIVE_MANUAL_CHECK_EVENT, onManualArchiveCheck);
+    };
   }, [
     isLoggedIn,
     sessionUser,
