@@ -152,7 +152,7 @@ const OBZVON_ARCHIVE_SHEET_NAME = 'AI_tahlil';
 const OBZVON_ARCHIVE_SHEET_NAME_LEGACY = 'Tahlil_arxivi';
 const OBZVON_ARCHIVE_UPDATED_EVENT = 'aq-obz-archive-updated';
 const OBZVON_ARCHIVE_SYNC_ALERT_EVENT = 'aq-obz-archive-sync-alert';
-const OBZVON_ARCHIVE_AUTO_HOUR = 6;
+const OBZVON_ARCHIVE_AUTO_HOUR = 4;
 const OBZVON_ARCHIVE_AUTO_LAST_KEY = 'aq-obz-archive-auto-last-date';
 const OBZVON_NEW_EXPORT_HOUR = 3;
 const OBZVON_NEW_EXPORTED_MAP_KEY = 'aq-obzvon-new-exported-map';
@@ -14190,13 +14190,13 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
       return [];
     }
   }, [company]);
-  const pushToSheet = useCallback(async (items = [], { updateLocal = true } = {}) => {
+  const pushToSheet = useCallback(async (items = [], { updateLocal = false, mode = 'append' } = {}) => {
     const normalized = normalizeObzArcItems(items);
     if (updateLocal) {
       setArc(normalized);
     }
     setSheetSt((prev) => ({ ...prev, saving:true, err:'' }));
-    const rs = await syncObzArcCompanyToGoogleSheet(company, normalized, getActor());
+    const rs = await syncObzArcCompanyToGoogleSheet(company, normalized, getActor(), mode);
     if (rs?.ok) {
       clearObzArc(company);
       emitObzArcUpdated(company);
@@ -14228,35 +14228,7 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
     pullFromSheet({ silent:false });
   }, [company, pullFromSheet]);
   const refresh = async () => {
-    const before = normalizeObzArcItems(arc || []);
-    const remote = normalizeObzArcItems(await pullFromSheet({ silent:false }));
-    if (remote.length === 0 && before.length > 0) {
-      const rs = await pushToSheet(before, { updateLocal: true });
-      if (!rs.ok) {
-        setAiSt((prev) => ({
-          ...prev,
-          err: `Google Sheetga tiklab yozilmadi: ${rs.error || "noma'lum xato"}`,
-        }));
-        return;
-      }
-      await pullFromSheet({ silent:false });
-      setAiSt((prev) => ({
-        ...prev,
-        err: '',
-        msg: `✅ Sheet bo'sh edi, ${before.length} ta arxiv yozuvi qayta tiklandi`,
-      }));
-    }
-  };
-
-  const del = async (id)=>{
-    const arr = normalizeObzArcItems((arc || []).filter((a)=>a.id!==id));
-    const rs = await pushToSheet(arr);
-    if (!rs.ok) {
-      setAiSt((prev) => ({
-        ...prev,
-        err: `Google Sheetga saqlanmadi: ${rs.error || "noma'lum xato"}`,
-      }));
-    }
+    await pullFromSheet({ silent:false });
   };
 
   /* Arxiv tahlil (qattiq kategoriya + ixtiyoriy AI xulosa) */
@@ -14296,46 +14268,6 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
       return;
     }
     if (!pendingRows.length) {
-      if (existing && existingRows.length) {
-        const recatRows = existingRows.map((r) => {
-          const nextCat = detectCat(r?.note);
-          return {
-            ...(r || {}),
-            rid: String(r?.rid || '').trim() || makeObzArcMatchKey(r),
-            cat: nextCat,
-          };
-        });
-        const recatTotals = Object.fromEntries(FIXED_CATS.map((c) => [c.key, 0]));
-        recatRows.forEach((r) => {
-          const cat = String(r?.cat || '').trim();
-          if (Object.prototype.hasOwnProperty.call(recatTotals, cat)) recatTotals[cat] += 1;
-        });
-        const changed = recatRows.reduce((acc, r, idx) => {
-          const oldCat = String(existingRows[idx]?.cat || '').trim();
-          return acc + (oldCat !== String(r?.cat || '').trim() ? 1 : 0);
-        }, 0);
-        if (changed > 0) {
-          const topCat = FIXED_CATS
-            .map((c) => ({ key: c.key, label: c.label, val: Number(recatTotals[c.key] || 0) }))
-            .sort((a, b) => b.val - a.val)[0];
-          const item = {
-            id: existing?.id || Date.now(),
-            type, period,
-            totalNotes: rowsWithNote.length, noteCount: recatRows.length,
-            categories: recatTotals, rows: recatRows,
-            xulosa: `${period} qayta kategoriyalandi. Eng ko'p: ${topCat?.label || '—'} (${topCat?.val || 0} ta).`,
-            analyzedAt: new Date().toISOString(),
-          };
-          const nextArc = normalizeObzArcItems([item, ...(arc || []).filter(a => !(a.type===type && a.period===period))]);
-          const syncRs = await pushToSheet(nextArc, { updateLocal:true });
-          if (syncRs.ok) {
-            setAiSt({ loading:false, err:'', msg:`✅ Google Sheetga saqlandi: ${period} (${changed} ta o'zgardi)` });
-          } else {
-            setAiSt({ loading:false, err:`Google Sheetga saqlanmadi: ${syncRs.error || "xato"}`, msg:'' });
-          }
-          return;
-        }
-      }
       setAiSt({ loading: false, err: '', msg: `ℹ️ ${period} bo'yicha barcha qatorlar allaqachon tahlil qilingan` });
       return;
     }
@@ -14360,7 +14292,7 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
       try {
         const sample = pendingRows.slice(0, 180).map((r, i) => ({
           idx: i + 1,
-          key: makeObzvonRowKey(r),
+          key: makeObzArcMatchKey(r),
           note: String(r?.note || '').trim().slice(0, 240),
         }));
         if (sample.length) {
@@ -14407,7 +14339,7 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
       FIXED_CATS.map((c) => [c.key, Number(existing?.categories?.[c.key] || 0)])
     );
     pendingRows.forEach((r) => {
-      const key = makeObzvonRowKey(r);
+      const key = makeObzArcMatchKey(r);
       const cat = aiCatByKey.get(key) || detectCat(r?.note);
       if (Object.prototype.hasOwnProperty.call(catTotals, cat)) catTotals[cat] += 1;
     });
@@ -14464,16 +14396,21 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
         const text = String(data?.content?.[0]?.text || '').trim();
         if (text) xulosa = text;
       }
-      const item = {
-        id:existing?.id || Date.now(), type, period,
-        totalNotes:rowsWithNote.length, noteCount:mergedRows.length,
-        categories:catTotals,
-        rows: mergedRows,
+      const appendItem = {
+        id: Date.now(),
+        type,
+        period,
+        totalNotes: rowsWithNote.length,
+        noteCount: archivedRows.length,
+        categories: catTotals,
+        rows: archivedRows,
         xulosa,
-        analyzedAt:new Date().toISOString(),
+        analyzedAt: new Date().toISOString(),
       };
-      const nextArc = normalizeObzArcItems([item, ...(arc || []).filter((a) => !(a.type === type && a.period === period))]);
-      const syncRs = await pushToSheet(nextArc, { updateLocal:true });
+      const syncRs = await pushToSheet([appendItem], { updateLocal:false, mode:'append' });
+      if (syncRs.ok) {
+        await pullFromSheet({ silent:true });
+      }
       setAiSt({
         loading:false,
         err: syncRs.ok ? '' : `Google Sheetga saqlanmadi: ${syncRs.error || 'xato'}`,
@@ -14482,16 +14419,21 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
           : `⚠️ Google Sheetga yozilmadi: ${period}`,
       });
     } catch(e){
-      const item = {
-        id:existing?.id || Date.now(), type, period,
-        totalNotes:rowsWithNote.length, noteCount:mergedRows.length,
-        categories:catTotals,
-        rows: mergedRows,
+      const appendItem = {
+        id: Date.now(),
+        type,
+        period,
+        totalNotes: rowsWithNote.length,
+        noteCount: archivedRows.length,
+        categories: catTotals,
+        rows: archivedRows,
         xulosa,
-        analyzedAt:new Date().toISOString(),
+        analyzedAt: new Date().toISOString(),
       };
-      const nextArc = normalizeObzArcItems([item, ...(arc || []).filter((a) => !(a.type === type && a.period === period))]);
-      const syncRs = await pushToSheet(nextArc, { updateLocal:true });
+      const syncRs = await pushToSheet([appendItem], { updateLocal:false, mode:'append' });
+      if (syncRs.ok) {
+        await pullFromSheet({ silent:true });
+      }
       setAiSt({
         loading:false,
         err: syncRs.ok
@@ -14522,7 +14464,7 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
         <div style={{fontSize:11,color:'var(--t3)',marginBottom:10}}>
           Saqlash joyi: <a href={OBZVON_ARCHIVE_SHEET_URL} target="_blank" rel="noreferrer" style={{color:'var(--bl)'}}>Google Sheet</a>
           {' '}→ varaq nomi: <code>{OBZVON_ARCHIVE_SHEET_NAME}</code>.
-          {' '}Tahlil arxivi faqat Google Sheetdan o'qiladi.
+          {' '}Tahlil arxivi faqat Google Sheetdan o'qiladi. Ilovadan o'chirish o'chirilgan.
         </div>
         {sheetSt.loading && <div style={{fontSize:11,color:'var(--bl)',marginBottom:6}}>Google Sheetdan arxiv yuklanmoqda...</div>}
         {sheetSt.saving && <div style={{fontSize:11,color:'var(--or)',marginBottom:6}}>Google Sheetga saqlanmoqda...</div>}
@@ -14593,7 +14535,7 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
             const total=item.noteCount||1;
             return (
               <div key={item.id} className="card" style={{padding:'14px 16px'}}>
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
+                <div style={{display:'flex',alignItems:'flex-start',marginBottom:12}}>
                   <div>
                     <span style={{fontWeight:700,fontSize:14}}>{item.period}</span>
                     <span className="tag" style={{marginLeft:8,background:item.type==='monthly'?'var(--bl2,var(--bl))':'var(--gr2)',
@@ -14602,8 +14544,6 @@ function TahlilArxivi({ company, obzvonRows=[] }) {
                     </span>
                     <span className="tag" style={{marginLeft:4,background:'var(--s3)',color:'var(--t3)'}}>{item.noteCount} ta izoh</span>
                   </div>
-                  <button style={{background:'none',border:'none',cursor:'pointer',color:'var(--rd)',fontSize:16}}
-                    onClick={()=>del(item.id)}>✕</button>
                 </div>
                 {item.xulosa&&(
                   <div style={{background:'var(--s3)',borderRadius:8,padding:'8px 12px',fontSize:12,
@@ -17887,7 +17827,6 @@ export default function App() {
   }, [mergedCompanyObzvonRows]);
   useEffect(() => {
     if (!isLoggedIn) return;
-    if (sessionUser !== 'Admin') return;
     const companyKey = normalizeCompanyKey(activeCompany);
     if (!companyKey) return;
     const runAutoArchiveDaily = async () => {
