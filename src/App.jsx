@@ -6390,6 +6390,7 @@ function Obzvon({
   D,
   company='murodbaxsh',
   currentUser='Admin',
+  currentAccess=null,
   canEditAllNew=false,
   canDeleteAllNew=false,
   canPublishAllNew=false,
@@ -6406,6 +6407,7 @@ function Obzvon({
   setOpFilterState=null,
 }) {
   const { customers, rawOrders=[] } = D;
+  const canSeeAll = (currentAccess?.scope || 'all') === 'all';
   const [tab, setTab] = useState('main');
   const [searchAll, setSearchAll] = useState('');
   const [searchAllNew, setSearchAllNew] = useState('');
@@ -6862,7 +6864,7 @@ function Obzvon({
       const c = customers.find((x)=>x.id===mid);
       if (!c) return;
       if (!isActiveCustomerName(c.name)) return;
-      if (currentUser !== 'Admin') {
+      if (!canSeeAll) {
         const owner = assignment[mid] || '';
         if (owner && normalizeUserKey(owner) !== normalizeUserKey(currentUser)) return;
       }
@@ -6884,7 +6886,7 @@ function Obzvon({
       });
     });
     return out.sort((a,b)=>(b.passed-a.passed));
-  }, [rawOrders, customers, currentUser, D.assignmentById]);
+  }, [rawOrders, customers, canSeeAll, currentUser, D.assignmentById]);
   const dueCandidates = useMemo(
     () => callCandidates.filter((c) => c.passed < 60 && c.passed >= c.shouldIn),
     [callCandidates]
@@ -6990,11 +6992,11 @@ function Obzvon({
         operator: D.assignmentById?.[c.id] || '-',
       };
     });
-    if (normalizedCurrentOperator && normalizedCurrentOperator !== 'admin') {
+    if (!canSeeAll && normalizedCurrentOperator && normalizedCurrentOperator !== 'admin') {
       rows = rows.filter((r) => String(r.operator || '').trim().toLowerCase() === normalizedCurrentOperator);
     }
     return rows;
-  }, [D.customers, D.assignmentById, latestCallByCustomer, latestOrdersByCustomer, currentUser]);
+  }, [D.customers, D.assignmentById, latestCallByCustomer, latestOrdersByCustomer, canSeeAll, currentUser]);
   const operatorTableRows = useMemo(() => {
     let rows = [...operatorTableBaseRows];
     if (deferredOpSearch) {
@@ -17782,6 +17784,67 @@ export default function App() {
     }
   }, [canSwitchCompany, companyFilter, lockedCompany]);
   const D = useMemo(() => filterDataByCompany(scopedD, activeCompany), [scopedD, activeCompany]);
+  const operatorScopeDiagnostic = useMemo(() => {
+    if (!isLoggedIn) return null;
+    if (!scopeOwn) return null;
+    const userKey = normalizeUserKey(effectiveUser);
+    if (!userKey || userKey === 'admin') return null;
+
+    const assignmentEntries = Object.entries(rawD.assignmentById || {});
+    const assignedIdKeys = new Set(
+      Array.from(ownIds || [])
+        .map((id) => normalizeIdKey(id))
+        .filter(Boolean)
+    );
+    const allAssignedCustomers = (rawD.customers || []).filter((c) => assignedIdKeys.has(normalizeIdKey(c?.id)));
+    const visibleAssignedCustomers = (D.customers || []).filter((c) => assignedIdKeys.has(normalizeIdKey(c?.id)));
+
+    if (assignmentEntries.length === 0) {
+      return {
+        tone: 'warn',
+        title: "Operator biriktiruvi topilmadi",
+        details: [
+          "`mijozlar` varag'i yuklanmagan, nomi o'zgargan yoki bo'sh.",
+          "Admin barcha ma'lumotni ko'radi, operator esa bo'sh qoladi.",
+        ],
+      };
+    }
+
+    if (ownIds.size === 0) {
+      return {
+        tone: 'warn',
+        title: `${effectiveUser} loginiga mijoz biriktirilmagan`,
+        details: [
+          "Sheetdagi operator nomi login nomi bilan aynan bir xil bo'lishi kerak.",
+          `Masalan login "${effectiveUser}" bo'lsa, "mijozlar" varag'ida ham operator "${effectiveUser}" bo'lishi kerak.`,
+        ],
+      };
+    }
+
+    if (!allAssignedCustomers.length) {
+      return {
+        tone: 'warn',
+        title: "Biriktirilgan IDlar mijozlar bazasiga mos kelmadi",
+        details: [
+          "`mijozlar` varag'idagi IDlar asosiy mijozlar jadvalidagi IDlar bilan bir xil bo'lishi kerak.",
+          "ID ustuni yoki format o'zgargan bo'lsa, operatorda zakaz/kassa/doljniki bo'sh ko'rinadi.",
+        ],
+      };
+    }
+
+    if (!visibleAssignedCustomers.length) {
+      return {
+        tone: 'info',
+        title: `${effectiveUser} boshqa kompaniyaga biriktirilgan`,
+        details: [
+          `Bu login uchun ${allAssignedCustomers.length} ta mijoz topildi, lekin ${companyLabelByKey(activeCompany)} ichida yo'q.`,
+          "Admin -> Nastroyka -> Hodimlar ruhsatlari ichida biriktirilgan kompaniyani tekshiring.",
+        ],
+      };
+    }
+
+    return null;
+  }, [isLoggedIn, scopeOwn, effectiveUser, rawD.assignmentById, rawD.customers, ownIds, D.customers, activeCompany]);
   useEffect(() => {
     if (!TG_BOT_API_BASE) return;
     if (sessionUser !== 'Admin') return;
@@ -18823,6 +18886,26 @@ export default function App() {
           </div>
 
           <div data-filter-boundary="1" style={{flex:1,overflow:page==='nazorat'?'hidden':'auto',padding:page==='nazorat'?8:12,display:'flex',flexDirection:'column'}}>
+            {data && operatorScopeDiagnostic && (
+              <div
+                className="card"
+                style={{
+                  padding:'12px 14px',
+                  marginBottom:12,
+                  background: operatorScopeDiagnostic.tone === 'info' ? 'var(--s2)' : 'rgba(255, 214, 102, .12)',
+                  border: `1px solid ${operatorScopeDiagnostic.tone === 'info' ? 'var(--b2)' : 'var(--yl)'}`,
+                }}
+              >
+                <div style={{fontWeight:800,marginBottom:6,color:operatorScopeDiagnostic.tone === 'info' ? 'var(--bl)' : 'var(--yl)'}}>
+                  {operatorScopeDiagnostic.title}
+                </div>
+                {operatorScopeDiagnostic.details.map((line, idx) => (
+                  <div key={`${operatorScopeDiagnostic.title}_${idx}`} style={{fontSize:12.5,color:'var(--t2)',lineHeight:1.6}}>
+                    {line}
+                  </div>
+                ))}
+              </div>
+            )}
             {!data && page!=='doljniki' && page!=='tg_bot' ? (
               <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <div style={{textAlign:'center',maxWidth:440}}>
@@ -18883,6 +18966,7 @@ export default function App() {
                   D={D}
                   company={activeCompany}
                   currentUser={effectiveUser}
+                  currentAccess={currentAccess}
                   canEditAllNew={!!(currentAccess.visible?.obzvon_new_edit ?? (effectiveUser === 'Admin'))}
                   canDeleteAllNew={!!(currentAccess.visible?.obzvon_new_delete ?? (effectiveUser === 'Admin'))}
                   canPublishAllNew={!!(currentAccess.visible?.obzvon_new_publish ?? (effectiveUser === 'Admin'))}
